@@ -30,7 +30,7 @@ namespace Gym.Tests {
                     }
 
                     cp.Render();
-                    Thread.Sleep(30);
+                    Thread.Sleep(30); //this is to prevent it from finishing instantly !
                 }
 
             Console.ReadLine();

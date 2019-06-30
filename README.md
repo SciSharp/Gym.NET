@@ -1,6 +1,10 @@
 # Gym.NET
-A complete [openai/gym](https://github.com/openai/gym) port to C#.<br>
+A complete port of [openai/gym](https://github.com/openai/gym) to C#.<br>
 ** WORK IN PROGRESS ** 
+
+##### openai/gym
+OpenAI Gym is a toolkit for developing and comparing reinforcement learning algorithms. This is the gym open-source library, which gives you access to a standardized set of environments.
+
 
 ## TODO
 - Implement [Spaces](https://github.com/openai/gym/tree/master/gym/spaces)
@@ -13,7 +17,9 @@ A complete [openai/gym](https://github.com/openai/gym) port to C#.<br>
   - [X] Env(object)
   - [ ] GoalEnv(Env)
 
- - Implement environments
+ - Implement environments<br>
+    To run an environment, see [Gym.Tests](./tests/Gym.Tests/)
+   - [ ] Convert Gym.Environments to a net-standard project.
    - [ ] classics
      - [X] CartPole-v1 
        - [ ] Compare visually against python's version
