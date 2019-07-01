@@ -9,13 +9,6 @@ namespace Gym.Tests {
     public class CartpoleEnvironment {
         [TestMethod]
         public void Run() {
-            //Environment.SetEnvironmentVariable("PATH", Environment.GetEnvironmentVariable("PATH") + @";C:\Program Files\ArrayFire\v3\lib");
-            //Device.SetBackend(Backend.CPU);
-
-            //var v = Viewer.Run(600, 500, "heythere");
-            //v.TestRendering();
-            //Thread.Sleep(300);
-
             var cp = new CartPoleEnv();
             var rnd = new Random();
             var done = true;
@@ -32,8 +25,6 @@ namespace Gym.Tests {
                     cp.Render();
                     Thread.Sleep(30); //this is to prevent it from finishing instantly !
                 }
-
-            Console.ReadLine();
         }
     }
 }
