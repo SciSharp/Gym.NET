@@ -219,7 +219,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Gym.Environments\Gym.Environments.csproj">
-      <Project>{09278a80-ae19-40fa-a218-88d8669a8916}</Project>
+      <Project>{149f54f3-8396-443f-8dc6-672c7db9c4ac}</Project>
       <Name>Gym.Environments</Name>
     </ProjectReference>
     <ProjectReference Include="..\..\src\Gym\Gym.csproj">
