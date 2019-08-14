@@ -76,12 +76,12 @@ namespace Ebby.Gym.Envs.Classic {
             var cartwidth = 50.0f;
             var cartheight = 30.0f;
 
-            lock (this) {
-                //to prevent double initalization.
-                if (viewer == null) {
-                    viewer = Viewer.Run(screen_width, screen_height, "cartpole-v1");
+            if (viewer == null)
+                lock (this) {
+                    //to prevent double initalization.
+                    if (viewer == null)
+                        viewer = Viewer.Run(screen_width, screen_height, "cartpole-v1");
                 }
-            }
 
             //pole
             l = -polewidth / 2;
