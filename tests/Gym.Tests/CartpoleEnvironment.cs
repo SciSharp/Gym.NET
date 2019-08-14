@@ -12,7 +12,7 @@ namespace Gym.Tests {
             var cp = new CartPoleEnv();
             var rnd = new Random();
             var done = true;
-            using (var sw = new StopwatchMeasurer("time it took to run all steps in ms"))
+            using (new StopwatchMeasurer("time it took to run all steps in ms"))
                 for (int i = 0; i < 100_000; i++) {
                     if (done) {
                         cp.Reset();
