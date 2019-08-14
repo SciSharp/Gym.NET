@@ -79,7 +79,7 @@ namespace Ebby.Gym.Envs.Classic {
             lock (this) {
                 //to prevent double initalization.
                 if (viewer == null) {
-                    viewer = Viewer.Run(screen_width, screen_height);
+                    viewer = Viewer.Run(screen_width, screen_height, "cartpole-v1");
                 }
             }
 

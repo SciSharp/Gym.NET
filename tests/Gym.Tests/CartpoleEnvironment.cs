@@ -23,7 +23,7 @@ namespace Gym.Tests {
                     }
 
                     cp.Render();
-                    Thread.Sleep(30); //this is to prevent it from finishing instantly !
+                    Thread.Sleep(15); //this is to prevent it from finishing instantly !
                 }
         }
     }

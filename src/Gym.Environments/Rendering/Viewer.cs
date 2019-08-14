@@ -35,7 +35,7 @@ namespace Ebby.Gym.Rendering {
             Viewer v = null;
             using (var me = new ManualResetEventSlim()) {
                 var thread = new Thread(() => {
-                    v = new Viewer(width + 12, height + 12);
+                    v = new Viewer(width + 12, height + 12, title);
                     me.Set();
                     v.ShowDialog();
                 });
@@ -56,7 +56,7 @@ namespace Ebby.Gym.Rendering {
             Height = height;
             Width = width;
             if (title != null)
-                this.Name = title;
+                this.Text = title;
         }
 
         /// <summary>
