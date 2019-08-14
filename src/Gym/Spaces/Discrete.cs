@@ -14,7 +14,7 @@ namespace Gym.Spaces {
         }
 
         public override NDArray Sample() {
-            return RandomState.randint(0, N, 1);
+            return RandomState.randint(0, N, default);
         }
 
         public override bool Contains(object ndArray) {
