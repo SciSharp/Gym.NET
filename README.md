@@ -1,10 +1,21 @@
 # Gym.NET
+
+[![NuGet](https://img.shields.io/nuget/dt/Gym.NET)](https://www.nuget.org/packages/Gym.NET)
+
 A complete port of [openai/gym](https://github.com/openai/gym) to C#.<br>
 ** WORK IN PROGRESS ** 
 
 ##### openai/gym
 OpenAI Gym is a toolkit for developing and comparing reinforcement learning algorithms. This is the gym open-source library, which gives you access to a standardized set of environments.
 
+## Installation
+```sh
+### For gym's abstract classes for RL, install:
+PM> Install-Package Gym.NET
+
+### For implemented environments, install:
+PM> Install-Package Gym.NET.Environments
+```
 
 ## TODO
 - Implement [Spaces](https://github.com/openai/gym/tree/master/gym/spaces)
