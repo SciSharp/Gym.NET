@@ -1,6 +1,7 @@
 # Gym.NET
 
-[![NuGet](https://img.shields.io/nuget/dt/Gym.NET)](https://www.nuget.org/packages/Gym.NET)
+[![NuGet](https://img.shields.io/nuget/dt/Gym.NET)](https://www.nuget.org/packages/Gym.NET)<a href="http://scisharpstack.org"><img src="https://github.com/SciSharp/SciSharp/blob/master/art/scisharp_badge.png" width="200" height="200" align="right" /></a>
+
 
 A complete port of [openai/gym](https://github.com/openai/gym) to C#.<br>
 ** WORK IN PROGRESS ** 
