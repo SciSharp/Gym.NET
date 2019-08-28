@@ -23,7 +23,7 @@
 
   <ItemGroup>
     <PackageReference Include="NGraphics" Version="0.5.0" />
-    <PackageReference Include="NumSharp" Version="0.11.0-alpha3" />
+    <PackageReference Include="NumSharp" Version="0.20.0" />
     <PackageReference Include="SixLabors.ImageSharp" Version="1.0.0-beta0005" />
     <PackageReference Include="SixLabors.ImageSharp.Drawing" Version="1.0.0-beta0005" />
 	<PackageReference Include="JetBrains.Annotations" Version="2019.1.3" />
