@@ -1,6 +1,6 @@
-﻿namespace Ebby.Gym.Rendering
+﻿namespace Gym.Rendering.WinForm.Rendering
 {
-    partial class Viewer
+    partial class WinFormViewer
     {
         /// <summary>
         /// Required designer variable.

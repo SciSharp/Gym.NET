@@ -5,6 +5,8 @@ using Gym.Observations;
 using Gym.Spaces;
 using Gym.Threading;
 using NumSharp;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.PixelFormats;
 
 // ReSharper disable once CheckNamespace
 namespace Gym.Envs {
@@ -22,7 +24,7 @@ namespace Gym.Envs {
             return DistributedScheduler.Default.Run(() => Step(action));
         }
 
-        public abstract byte[] Render(string mode = "human");
+        public abstract Image<Rgba32> Render(string mode = "human");
         public abstract void Close();
         public abstract void Seed(int seed);
 

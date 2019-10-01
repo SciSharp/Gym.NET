@@ -1,29 +1,25 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Drawing;
-using System.Media;
 using System.Numerics;
-using Ebby.Gym.Rendering;
 using Gym.Collections;
 using Gym.Envs;
 using Gym.Observations;
 using Gym.Spaces;
-using NGraphics;
 using NumSharp;
-using NumSharp.Generic;
-using SixLabors.Shapes;
-using Color = NGraphics.Color;
-using Point = NGraphics.Point;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
-using SixLabors.ImageSharp.Processing.Processors;
-using SixLabors.Primitives;
+using SixLabors.Shapes;
 using PointF = SixLabors.Primitives.PointF;
 
-namespace Ebby.Gym.Envs.Classic {
-    public class CartPoleEnv : Env {
+namespace Gym.Environments.Envs.Classic
+{
+    public class CartPoleEnv : Env
+    {
+        private readonly Func<int, int, string, IEnvViewer> _viewerFunc;
+        private IEnvViewer _viewer;
+
         //constants
         private const float gravity = 9.8f;
         private const float masscart = 1.0f;
@@ -34,34 +30,35 @@ namespace Ebby.Gym.Envs.Classic {
         private const float force_mag = 10.0f;
         private const float tau = 0.02f;
         private const string kinematics_integrator = "euler";
-        private const float theta_threshold_radians = (float) (12 * 2 * Math.PI / 360); // Angle at which to fail the episode   
+        private const float theta_threshold_radians = (float)(12 * 2 * Math.PI / 360); // Angle at which to fail the episode   
         private const float x_threshold = 2.4f;
 
         //properties
         private NumPyRandom random;
-        private Viewer viewer;
         private NDArray state;
         private int steps_beyond_done = -1;
 
-        public CartPoleEnv() {
+        public CartPoleEnv(Func<int, int, string, IEnvViewer> viewerFunc)
+        {
+            _viewerFunc = viewerFunc;
             // Angle limit set to 2 * theta_threshold_radians so failing observation is still within bounds  
             var high = np.array(x_threshold * 2, float.MaxValue, theta_threshold_radians * 2, float.MaxValue);
             ActionSpace = new Discrete(2);
             ObservationSpace = new Box(-high, high, np.float32);
             random = np.random.RandomState();
 
-            Metadata = new Dict(
-                "render.modes", new[] {"human", "rgb_array"},
-                "video.frames_per_second", 50);
+            Metadata = new Dict("render.modes", new[] { "human", "rgb_array" }, "video.frames_per_second", 50);
         }
 
-        public override NDArray Reset() {
+        public override NDArray Reset()
+        {
             steps_beyond_done = -1;
             state = random.uniform(-0.05, 0.05, 4);
             return np.array(state);
         }
 
-        public override byte[] Render(string mode = "human") {
+        public override Image<Rgba32> Render(string mode = "human")
+        {
             float b;
             float t;
             float r;
@@ -76,11 +73,17 @@ namespace Ebby.Gym.Envs.Classic {
             var cartwidth = 50.0f;
             var cartheight = 30.0f;
 
-            if (viewer == null)
-                lock (this) {
+            if (_viewerFunc == null)
+            {
+                throw new ArgumentNullException(nameof(_viewerFunc), $"No {nameof(_viewerFunc)} have been set");
+            }
+
+            if (_viewer == null)
+                lock (this)
+                {
                     //to prevent double initalization.
-                    if (viewer == null)
-                        viewer = Viewer.Run(screen_width, screen_height, "cartpole-v1");
+                    if (_viewer == null)
+                        _viewer = _viewerFunc.Invoke(screen_width, screen_height, "cartpole-v1");
                 }
 
             //pole
@@ -100,16 +103,19 @@ namespace Ebby.Gym.Envs.Classic {
             var cart = new RectangularPolygon(-cartwidth / 2, carty - cartheight / 2, cartwidth, cartheight);
             var draw = new List<(IPath, Rgba32)>();
 
-            if (!Equals(state, null)) {
-                var center_x = (float) (state.GetDouble(0) * scale + screen_width / 2.0f);
+            if (!Equals(state, null))
+            {
+                var center_x = (float)(state.GetDouble(0) * scale + screen_width / 2.0f);
                 //no y cuz it doesnt change.
                 var cbounds = circle.Bounds;
                 var pivotPoint = new PointF(cbounds.X + cbounds.Width / 2f, cbounds.Y + cbounds.Height / 2f);
 
                 draw.Add((cart.Translate(center_x, 0), Rgba32.Black));
-                draw.Add((pole.Transform(Matrix3x2.CreateRotation((float) -state.GetDouble(2), pivotPoint)).Translate(center_x, 0), new Rgba32(204, 153, 102)));
+                draw.Add((pole.Transform(Matrix3x2.CreateRotation((float)-state.GetDouble(2), pivotPoint)).Translate(center_x, 0), new Rgba32(204, 153, 102)));
                 draw.Add((circle.Translate(center_x, 0), Rgba32.Teal));
-            } else {
+            }
+            else
+            {
                 draw.Add((pole, Rgba32.Orange));
                 draw.Add((cart, Rgba32.Black));
                 draw.Add((circle, Rgba32.Teal));
@@ -121,21 +127,17 @@ namespace Ebby.Gym.Envs.Classic {
             img.Mutate(i => i.BackgroundColor(Rgba32.White));
             img.Mutate(i => i.BackgroundColor(Rgba32.White));
             img.Mutate(i => i.Fill(Rgba32.Black, new RectangularPolygon(new PointF(0, carty), new PointF(screen_width, carty + 1))));
-            foreach (var (path, rgba32) in draw) {
+            foreach (var (path, rgba32) in draw)
+            {
                 img.Mutate(i => i.Fill(rgba32, path));
             }
 
-            viewer.Render(img);
-
-            //todo if (mode == "rgb_array") {
-            //todo     ImageConverter converter = new ImageConverter();
-            //todo     return (byte[]) converter.ConvertTo(((ImageImage) canvas.GetImage()).Image, typeof(byte[]));
-            //todo }
-
-            return null;
+            _viewer.Render(img);
+            return img;
         }
 
-        public override Step Step(int action) {
+        public override Step Step(int action)
+        {
             Debug.Assert(ActionSpace.Contains(action), $"{action} ({action.GetType().Name}) invalid action for {GetType().Name} environment");
             //get the last step data
             var x = state.GetDouble(0);
@@ -150,12 +152,15 @@ namespace Ebby.Gym.Envs.Classic {
             var thetaacc = (gravity * sintheta - costheta * temp) / (length * (4.0 / 3.0 - masspole * costheta * costheta / total_mass));
             var xacc = temp - polemass_length * thetaacc * costheta / total_mass;
             // ReSharper disable once ConditionIsAlwaysTrueOrFalse
-            if (kinematics_integrator == "euler") {
+            if (kinematics_integrator == "euler")
+            {
                 x = x + tau * x_dot;
                 x_dot = x_dot + tau * xacc;
                 theta = theta + tau * theta_dot;
                 theta_dot = theta_dot + tau * thetaacc;
-            } else {
+            }
+            else
+            {
                 // semi-implicit euler
                 x_dot = x_dot + tau * xacc;
                 x = x + tau * x_dot;
@@ -166,14 +171,20 @@ namespace Ebby.Gym.Envs.Classic {
             state = np.array(x, x_dot, theta, theta_dot);
             var done = x < -x_threshold || x > x_threshold || theta < -theta_threshold_radians || theta > theta_threshold_radians;
             float reward;
-            if (!done) {
+            if (!done)
+            {
                 reward = 1.0f;
-            } else if (steps_beyond_done == -1) {
+            }
+            else if (steps_beyond_done == -1)
+            {
                 // Pole just fell!
                 steps_beyond_done = 0;
                 reward = 1.0f;
-            } else {
-                if (steps_beyond_done == 0) {
+            }
+            else
+            {
+                if (steps_beyond_done == 0)
+                {
                     Console.WriteLine("You are calling 'step()' even though this environment has already returned done = True. You should always call 'reset()' once you receive 'done = True' -- any further steps are undefined behavior.");
                     //todo logging: logger.warn("You are calling 'step()' even though this environment has already returned done = True. You should always call 'reset()' once you receive 'done = True' -- any further steps are undefined behavior.");
                 }
@@ -185,15 +196,18 @@ namespace Ebby.Gym.Envs.Classic {
             return new Step(state, reward, done, null);
         }
 
-        public override void Close() {
-            if (viewer != null) {
-                viewer.Close();
-                viewer.Dispose();
-                viewer = null;
+        public override void Close()
+        {
+            if (_viewer != null)
+            {
+                _viewer.Close();
+                _viewer.Dispose();
+                _viewer = null;
             }
         }
 
-        public override void Seed(int seed) {
+        public override void Seed(int seed)
+        {
             random = np.random.RandomState(seed);
         }
     }

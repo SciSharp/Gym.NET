@@ -1,41 +1,37 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.ComponentModel;
-using System.Data;
 using System.Diagnostics;
 using System.Drawing;
 using System.IO;
-using System.Linq;
-using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
 using System.Windows.Forms;
+using Gym.Environments;
 using Gym.Threading;
 using NGraphics;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
-using Point = NGraphics.Point;
-using Size = System.Drawing.Size;
 
-namespace Ebby.Gym.Rendering {
+namespace Gym.Rendering.WinForm.Rendering
+{
     /// <summary>
     ///     A form with PictureBox that accepts <see cref="IImageCanvas"/> and renders it on it. Start <see cref="Viewer"/> by calling <see cref="Run"/>
     /// </summary>
-    public partial class Viewer : Form {
+    public partial class WinFormViewer : Form, IEnvViewer
+    {
         private int _lastSize = 0;
-        private ManualResetEventSlim _ready = new ManualResetEventSlim();
+        private readonly ManualResetEventSlim _ready = new ManualResetEventSlim();
 
         /// <summary>
-        ///     Starts a <see cref="Viewer"/> in seperate thread.
+        ///     Starts a <see cref="WinFormViewer"/> in seperate thread.
         /// </summary>
         /// <param name="height">The height of the form</param>
         /// <param name="width">The width of the form</param>
         /// <param name="title">The title of the form, also mentioned in the thread name.</param>
-        public static Viewer Run(int width, int height, string title = null) {
-            Viewer v = null;
+        public static IEnvViewer Run(int width, int height, string title = null) {
+            WinFormViewer v = null;
             using (var me = new ManualResetEventSlim()) {
                 var thread = new Thread(() => {
-                    v = new Viewer(width + 12, height + 12, title);
+                    v = new WinFormViewer(width + 12, height + 12, title);
                     me.Set();
                     v.ShowDialog();
                 });
@@ -51,12 +47,12 @@ namespace Ebby.Gym.Rendering {
             return v;
         }
 
-        public Viewer(int width, int height, string title = null) {
+        public WinFormViewer(int width, int height, string title = null) {
             InitializeComponent();
             Height = height;
             Width = width;
             if (title != null)
-                this.Text = title;
+                Text = title;
         }
 
         /// <summary>
@@ -129,8 +125,7 @@ namespace Ebby.Gym.Rendering {
             //
             //Render(canvas);
         }
-
-
+        
         protected override void OnClosing(CancelEventArgs e) {
             base.OnClosing(e);
             PictureFrame.Image.TryDispose();

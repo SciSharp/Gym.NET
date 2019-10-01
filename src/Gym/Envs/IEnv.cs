@@ -3,6 +3,8 @@ using Gym.Collections;
 using Gym.Observations;
 using Gym.Spaces;
 using NumSharp;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.PixelFormats;
 
 // ReSharper disable once CheckNamespace
 namespace Gym.Envs {
@@ -14,7 +16,7 @@ namespace Gym.Envs {
         NDArray Reset();
         Step Step(int action);
         Task<Step> StepAsync(int action);
-        byte[] Render(string mode = "human");
+        Image<Rgba32> Render(string mode = "human");
         void Close();
         void Seed(int seed);
     }
