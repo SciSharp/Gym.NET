@@ -7,7 +7,6 @@ using System.Threading;
 using System.Windows.Forms;
 using Gym.Environments;
 using Gym.Threading;
-using NGraphics;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 

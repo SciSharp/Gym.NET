@@ -2,6 +2,25 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>netcoreapp2.1</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
+    <PackageId>Gym.NET.Rendering.Avalonia</PackageId>
+    <Version>0.1.0-alpha2</Version>
+    <Authors>Eli Belash</Authors>
+    <Company>SciSharp STACK</Company>
+    <Product>Gym.NET.Rendering.Avalonia</Product>
+    <Description>openai/gym's popular toolkit for developing and comparing reinforcement learning algorithms port to C#.  This package contains ported gym's environments.</Description>
+    <Copyright>2019 © SciSharp STACK Team</Copyright>
+    <PackageLicenseUrl>https://github.com/SciSharp/Gym.NET/blob/master/README.md</PackageLicenseUrl>
+    <PackageProjectUrl>https://github.com/SciSharp/Gym.NET</PackageProjectUrl>
+    <PackageIconUrl>https://avatars3.githubusercontent.com/u/44989469?s=200&amp;v=4</PackageIconUrl>
+    <RepositoryUrl>https://github.com/SciSharp/Gym.NET</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageTags>gym, openai, reinforcement learning,learning,learning,NumPy, NumSharp, MachineLearning</PackageTags>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <AllowedOutputExtensionsInPackageBuildOutputFolder>$(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb</AllowedOutputExtensionsInPackageBuildOutputFolder>
+    <AssemblyVersion>0.1.0.2</AssemblyVersion>
+    <FileVersion>0.1.0.2</FileVersion>
   </PropertyGroup>
   <ItemGroup>
     <Compile Update="**\*.xaml.cs">
