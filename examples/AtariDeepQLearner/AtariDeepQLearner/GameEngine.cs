@@ -4,7 +4,6 @@ using System.IO;
 using System.Linq;
 using AtariDeepQLearner.GameConfigurations;
 using Gym.Envs;
-using NumSharp;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 
@@ -95,7 +94,7 @@ namespace AtariDeepQLearner
             trainer.Load(choosenFile.OpenRead());
         }
 
-        private NDArray ComposeAction(IGameConfiguration configuration, IEnv env, Trainer trainer, ReplayMemory memory, Imager imager, Image<Rgba32> oldImage, float epsilon)
+        private int ComposeAction(IGameConfiguration configuration, IEnv env, Trainer trainer, ReplayMemory memory, Imager imager, Image<Rgba32> oldImage, float epsilon)
         {
             if (oldImage == null)
             {
@@ -117,9 +116,10 @@ namespace AtariDeepQLearner
                 .InvertColors()
                 .Grayscale()
                 .Compile()
-                .Rectify();
+                .Rectify()
+                .ToArray();
 
-            return PredictionToPython(trainer.Predict(processedImage.ToArray(), epsilon));
+            return PredictionToPython(trainer.Predict(processedImage));
         }
 
         private static int PredictionToPython(float[] prediction) =>

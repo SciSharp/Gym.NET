@@ -11,10 +11,10 @@ namespace AtariDeepQLearner.Runner
         public int MemoryFrames => 1;
         public int FrameWidth => 600;
         public int FrameHeight => 400;
-        public int ScaledImageWidth => 28;
-        public int ScaledImageHeight => 28;
+        public int ScaledImageWidth => 50;
+        public int ScaledImageHeight => 50;
         public int Episodes => 200;
-        public int BatchSize => 200;
+        public int BatchSize => 100;
         public int Epochs => 1;
     }
 }

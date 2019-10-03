@@ -17,7 +17,7 @@ namespace AtariDeepQLearner
     public class ReplayMemory
     {
         public List<Episode> Episodes { get; } = new List<Episode>();
-        private List<Observation> Observations { get; } = new List<Observation>();
+        private List<Observation> _observations  = new List<Observation>();
         private Queue<Image<Rgba32>> _imagesQueue = new Queue<Image<Rgba32>>();
         private int _currentId;
         private readonly int _stageFrames;
@@ -45,7 +45,7 @@ namespace AtariDeepQLearner
             }
 
             _imagesQueue.Dequeue();
-            Observations.Add(new Observation(_stageFrames)
+            _observations.Add(new Observation(_stageFrames)
             {
                 Id = _currentId++,
                 ActionTaken = action,
@@ -55,12 +55,13 @@ namespace AtariDeepQLearner
         }
 
         public Image<Rgba32>[] GetCurrent() =>
-            Observations.Any() ? Observations.Last().Images.ToArray() : null;
+            _observations.Any() ? _observations.Last().Images.ToArray() : null;
 
         public void EndEpisode()
         {
             _imagesQueue = new Queue<Image<Rgba32>>();
-            Episodes.Add(new Episode { Observations = Observations.ToArray() });
+            Episodes.Add(new Episode { Observations = _observations.ToArray() });
+            _observations = new List<Observation>();
         }
 
         public void Save(string fileName, int? maxItems = null)

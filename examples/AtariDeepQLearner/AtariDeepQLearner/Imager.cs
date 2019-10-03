@@ -59,7 +59,8 @@ namespace AtariDeepQLearner
 
             for (var index = 0; index < rgbaArray.Length; index += 4)
             {
-                yield return (float)rgbaArray[index] / 255;
+                //yield return (float)rgbaArray[index] / 255;
+                yield return (float)rgbaArray[index] > 0 ? 1 : 0; // hardcore, fix this
             }
         }
 
@@ -85,16 +86,16 @@ namespace AtariDeepQLearner
 
             _outputImage.Mutate(compiledAction);
 
-            //var ffff = $"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee.bmp";
-            //if (File.Exists(ffff))
-            //{
-            //    File.Delete(ffff);
-            //}
+            var ffff = $"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee.bmp";
+            if (File.Exists(ffff))
+            {
+                File.Delete(ffff);
+            }
 
-            //using (var stream = File.Create(ffff))
-            //{
-            //    _outputImage.SaveAsBmp(stream);
-            //}
+            using (var stream = File.Create(ffff))
+            {
+                _outputImage.SaveAsBmp(stream);
+            }
             return this;
         }
 

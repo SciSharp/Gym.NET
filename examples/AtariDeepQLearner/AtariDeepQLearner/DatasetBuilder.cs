@@ -30,12 +30,12 @@ namespace AtariDeepQLearner
                 .OrderByDescending(x => x.TotalReward)
                 .Take(10)
                 .ToList();
-
-            Console.WriteLine($"Training on best {bestEpisodes.Count} episodes out of {memory.Episodes.Count}");
-
+            
             var observations = bestEpisodes
                 .SelectMany(x => x.Observations)
                 .ToList();
+
+            Console.WriteLine($"Training on best {bestEpisodes.Count} episodes out of {memory.Episodes.Count}. {observations.Count} observations");
 
             return DatasetLoader.Training(BuildRawData(observations), _batchSize);
         }
