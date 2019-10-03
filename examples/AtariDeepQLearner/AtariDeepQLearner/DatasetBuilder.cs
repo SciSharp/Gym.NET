@@ -28,7 +28,7 @@ namespace AtariDeepQLearner
             var bestEpisodes = memory
                 .Episodes
                 .OrderByDescending(x => x.TotalReward)
-                .Take((int)Math.Ceiling((double)memory.Episodes.Count / 3))
+                .Take(10)
                 .ToList();
 
             Console.WriteLine($"Training on best {bestEpisodes.Count} episodes out of {memory.Episodes.Count}");
@@ -47,9 +47,11 @@ namespace AtariDeepQLearner
                 if (_observationDictionary.ContainsKey(observation.Id))
                 {
                     yield return _observationDictionary[observation.Id];
+                    continue;
                 }
 
-                var x = _imager.Load(observation.Images)
+                var x = _imager
+                    .Load(observation.Images)
                     .ComposeFrames(_inputImgWidth, _inputImgHeight)
                     .InvertColors()
                     .Grayscale()

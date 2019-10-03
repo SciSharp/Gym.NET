@@ -24,11 +24,15 @@ namespace AtariDeepQLearner
             _datasetBuilder = new DatasetBuilder(inputImgWidth, inputImgHeight, outputs, batchSize);
 
             _network = NetworkManager.NewSequential(TensorInfo.Image<Alpha8>(inputImgHeight, inputImgWidth),
-                NetworkLayers.FullyConnected(24, ActivationType.ReLU),
-                NetworkLayers.FullyConnected(24, ActivationType.ReLU),
-                //NetworkLayers.Convolutional((5, 5), 50, ActivationType.Identity),
-                //NetworkLayers.Pooling(ActivationType.LeakyReLU), // used to reduce the spatial dimensions
+                NetworkLayers.Convolutional((5, 5), 20, ActivationType.Identity),
+                NetworkLayers.Pooling(ActivationType.LeakyReLU),
+                NetworkLayers.Convolutional((3, 3), 40, ActivationType.Identity),
+                NetworkLayers.Pooling(ActivationType.LeakyReLU),
+                NetworkLayers.FullyConnected(125, ActivationType.LeakyReLU),
+                NetworkLayers.FullyConnected(64, ActivationType.LeakyReLU),
                 NetworkLayers.Softmax(outputs));
+            //NetworkLayers.Convolutional((5, 5), 50, ActivationType.Identity),
+            //NetworkLayers.Pooling(ActivationType.LeakyReLU), // used to reduce the spatial dimensions);
         }
 
         public void Load(Stream modelStream)

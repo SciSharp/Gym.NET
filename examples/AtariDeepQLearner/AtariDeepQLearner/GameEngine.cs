@@ -31,7 +31,7 @@ namespace AtariDeepQLearner
 
             for (var i = 0; i < game.Episodes; i++)
             {
-                Console.WriteLine($"Stage [{++i}]/[{game.Episodes}]");
+                Console.WriteLine($"Stage [{i + 1}]/[{game.Episodes}]");
 
                 env.Reset();
                 env.Step(env.ActionSpace.Sample());
@@ -45,7 +45,7 @@ namespace AtariDeepQLearner
                     var currentState = env.Step(action);
                     if (oldImage != null)
                     {
-                        memory.Memorize(oldImage, int.Parse(action.ToString()), currentState.Reward);
+                        memory.Memorize(oldImage, action, currentState.Reward);
                     }
                     oldImage = env.Render();
                     episodeReward += currentState.Reward;
@@ -54,7 +54,10 @@ namespace AtariDeepQLearner
                         memory.EndEpisode();
                         Console.WriteLine("Reward: " + episodeReward);
                         rewards.Add(episodeReward);
-                        trainer.TrainOnMemory(memory);
+                        if (i % 10 == 0)
+                        {
+                            trainer.TrainOnMemory(memory);
+                        }
                         break;
                     }
                 }
@@ -119,7 +122,7 @@ namespace AtariDeepQLearner
             return PredictionToPython(trainer.Predict(processedImage.ToArray(), epsilon));
         }
 
-        private static NDArray PredictionToPython(float[] prediction) =>
+        private static int PredictionToPython(float[] prediction) =>
             prediction.ToList().IndexOf(prediction.Max());
     }
 }

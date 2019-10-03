@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using SixLabors.ImageSharp;
@@ -83,6 +84,17 @@ namespace AtariDeepQLearner
             }
 
             _outputImage.Mutate(compiledAction);
+
+            //var ffff = $"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee.bmp";
+            //if (File.Exists(ffff))
+            //{
+            //    File.Delete(ffff);
+            //}
+
+            //using (var stream = File.Create(ffff))
+            //{
+            //    _outputImage.SaveAsBmp(stream);
+            //}
             return this;
         }
 
