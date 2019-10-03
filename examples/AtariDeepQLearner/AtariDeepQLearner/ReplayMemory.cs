@@ -19,6 +19,7 @@ namespace AtariDeepQLearner
         public List<Episode> Episodes { get; } = new List<Episode>();
         private List<Observation> Observations { get; } = new List<Observation>();
         private Queue<Image<Rgba32>> _imagesQueue = new Queue<Image<Rgba32>>();
+        private int _currentId;
         private readonly int _stageFrames;
         private readonly int _imageWidth;
         private readonly int _imageHeight;
@@ -46,6 +47,7 @@ namespace AtariDeepQLearner
             _imagesQueue.Dequeue();
             Observations.Add(new Observation(_stageFrames)
             {
+                Id = _currentId++,
                 ActionTaken = action,
                 Reward = currentReward,
                 Images = _imagesQueue.ToArray()

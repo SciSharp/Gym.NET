@@ -11,6 +11,7 @@ namespace AtariDeepQLearner.GameConfigurations
         int ScaledImageWidth { get; }
         int ScaledImageHeight { get; }
         int Episodes { get; }
+        int BatchSize { get; }
         int Epochs { get; }
     }
 }

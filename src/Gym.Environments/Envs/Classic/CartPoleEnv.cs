@@ -111,7 +111,7 @@ namespace Gym.Environments.Envs.Classic
                 var pivotPoint = new PointF(cbounds.X + cbounds.Width / 2f, cbounds.Y + cbounds.Height / 2f);
 
                 draw.Add((cart.Translate(center_x, 0), Rgba32.Black));
-                draw.Add((pole.Transform(Matrix3x2.CreateRotation((float)-state.GetDouble(2), pivotPoint)).Translate(center_x, 0), new Rgba32(204, 153, 102)));
+                draw.Add((pole.Transform(Matrix3x2.CreateRotation((float)state.GetDouble(2), pivotPoint)).Translate(center_x, 0), new Rgba32(204, 153, 102)));
                 draw.Add((circle.Translate(center_x, 0), Rgba32.Teal));
             }
             else

@@ -1,11 +1,8 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using NeuralNetworkNET.APIs;
 using NeuralNetworkNET.APIs.Enums;
 using NeuralNetworkNET.APIs.Interfaces;
-using NeuralNetworkNET.APIs.Interfaces.Data;
 using NeuralNetworkNET.APIs.Structs;
 using NeuralNetworkNET.SupervisedLearning.Progress;
 using SixLabors.ImageSharp.PixelFormats;
@@ -14,68 +11,49 @@ namespace AtariDeepQLearner
 {
     public class Trainer
     {
-        private readonly INeuralNetwork _network;
+        private INeuralNetwork _network;
         private readonly Random _random = new Random();
-        private readonly Imager _imager = new Imager();
+        private readonly DatasetBuilder _datasetBuilder;
         private readonly int _outputs;
         private readonly int _epochs;
-        private readonly int _inputImgWidth;
-        private readonly int _inputImgHeight;
 
-        public Trainer(int inputImgWidth, int inputImgHeight, int outputs, int epochs)
+        public Trainer(int inputImgWidth, int inputImgHeight, int outputs, int batchSize, int epochs)
         {
-            _inputImgWidth = inputImgWidth;
-            _inputImgHeight = inputImgHeight;
             _outputs = outputs;
             _epochs = epochs;
-
-            if (CuDnnNetworkLayers.IsCudaSupportAvailable)
-            {
-                Console.ForegroundColor = ConsoleColor.DarkGreen;
-                Console.WriteLine("Cuda Gpu support available");
-                Console.ResetColor();
-
-                _network = NetworkManager.NewSequential(TensorInfo.Image<Alpha8>(inputImgHeight, inputImgWidth),
-                    CuDnnNetworkLayers.Convolutional((5, 5), 50, ActivationType.Identity),
-                    //NetworkLayers.Pooling(ActivationType.LeakyReLU), // used to reduce the spatial dimensions
-                    CuDnnNetworkLayers.FullyConnected(10, ActivationType.Sigmoid),
-                    CuDnnNetworkLayers.Softmax(outputs));
-                return;
-            }
+            _datasetBuilder = new DatasetBuilder(inputImgWidth, inputImgHeight, outputs, batchSize);
 
             _network = NetworkManager.NewSequential(TensorInfo.Image<Alpha8>(inputImgHeight, inputImgWidth),
-                NetworkLayers.Convolutional((5, 5), 50, ActivationType.Identity),
+                NetworkLayers.FullyConnected(24, ActivationType.ReLU),
+                NetworkLayers.FullyConnected(24, ActivationType.ReLU),
+                //NetworkLayers.Convolutional((5, 5), 50, ActivationType.Identity),
                 //NetworkLayers.Pooling(ActivationType.LeakyReLU), // used to reduce the spatial dimensions
-                NetworkLayers.FullyConnected(10, ActivationType.Sigmoid),
                 NetworkLayers.Softmax(outputs));
         }
 
-        public ITrainingDataset BuildStuff(ReplayMemory memory)
+        public void Load(Stream modelStream)
         {
-            var bestEpisodes = memory
-                .Episodes
-                .OrderByDescending(x => x.TotalReward)
-                .Take((int)Math.Ceiling((double)memory.Episodes.Count / 5))
-                .ToList();
-
-            Console.WriteLine($"Trainint on best {bestEpisodes.Count} {nameof(bestEpisodes)} out of {memory.Episodes.Count}");
-
-            var observations = bestEpisodes
-                .SelectMany(x => x.Observations)
-                .ToList();
-
-            //var bestObservations = observations
-            //    .OrderByDescending(x => x.Reward)
-            //    .Take((int)Math.Ceiling((double)observations.Count / 10))
-            //    .ToList();
-
-            //Console.WriteLine($"Trainint on best {bestObservations.Count} {nameof(bestObservations)} out of {observations.Count}");
-
-            return DatasetLoader.Training(BuildRawData(observations), 20);
+            using (var backupStream = new MemoryStream())
+            {
+                modelStream.CopyTo(backupStream);
+                modelStream.Seek(0, SeekOrigin.Begin);
+                _network = NetworkLoader.TryLoad(modelStream, ExecutionModePreference.Cuda);
+                if (_network == null)
+                {
+                    backupStream.Seek(0, SeekOrigin.Begin);
+                    _network = NetworkLoader.TryLoad(backupStream, ExecutionModePreference.Cpu);
+                }
+            }
+            if (_network == null)
+            {
+                throw new InvalidOperationException($"Cannot load model");
+            }
         }
 
-        public void TrainOnMemory(ITrainingDataset trainingData)
+        public void TrainOnMemory(ReplayMemory memory)
         {
+            var trainingData = _datasetBuilder.BuildDataset(memory);
+
             // Train the network
             var result = NetworkManager.TrainNetwork(_network,
                 trainingData,
@@ -85,7 +63,7 @@ namespace AtariDeepQLearner
                 TrainingProgress);
             Console.WriteLine("\nTraining session completed, moving to next one");
 
-            var backupName = $"backup-network-{DateTime.Now:yyyyMMdd-HH-mm-ss}";
+            var backupName = $"backup-network-{DateTime.Now:yyyyMMdd-HH-mm-ss}.modl";
             _network.Save(File.Create(backupName));
             Console.WriteLine($"Backup model {backupName} saved");
         }
@@ -108,24 +86,6 @@ namespace AtariDeepQLearner
 
         public float[] Predict(float[] input) =>
             _network.Forward(input);
-
-        private IEnumerable<(float[] x, float[] y)> BuildRawData(IEnumerable<Observation> bestObservations)
-        {
-            foreach (var observation in bestObservations)
-            {
-                var x = _imager.Load(observation.Images)
-                    .ComposeFrames(_inputImgWidth, _inputImgHeight)
-                    .InvertColors()
-                    .Grayscale()
-                    .Compile()
-                    .Rectify()
-                    .ToArray();
-
-                var y = new float[_outputs];
-                y[observation.ActionTaken] = 1;
-                yield return (x, y);
-            }
-        }
 
         // Training monitor
         private static void TrackBatchProgress(BatchProgress progress)
