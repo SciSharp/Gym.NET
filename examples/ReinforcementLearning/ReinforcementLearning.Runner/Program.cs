@@ -1,4 +1,4 @@
-﻿namespace AtariDeepQLearner.Runner
+﻿namespace ReinforcementLearning.Runner
 {
     class Program
     {

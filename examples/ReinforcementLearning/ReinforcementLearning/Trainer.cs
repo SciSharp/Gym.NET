@@ -7,7 +7,7 @@ using NeuralNetworkNET.APIs.Structs;
 using NeuralNetworkNET.SupervisedLearning.Progress;
 using SixLabors.ImageSharp.PixelFormats;
 
-namespace AtariDeepQLearner
+namespace ReinforcementLearning
 {
     public class Trainer
     {

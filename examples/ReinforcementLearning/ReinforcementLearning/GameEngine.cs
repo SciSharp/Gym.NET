@@ -2,13 +2,13 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using AtariDeepQLearner.GameConfigurations;
 using Gym.Envs;
 using Gym.Observations;
+using ReinforcementLearning.GameConfigurations;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 
-namespace AtariDeepQLearner
+namespace ReinforcementLearning
 {
     public class GameEngine
     {
@@ -22,6 +22,7 @@ namespace AtariDeepQLearner
             var env = game.EnvIstance;
             _trainer = new Trainer(game.ScaledImageWidth, game.ScaledImageHeight, env.ActionSpace.Shape.Size, game.BatchSize, game.Epochs);
             LoadModelToTrainer(_trainer);
+            PlayGame(game, env);
 
             var memory = new ReplayMemory(game.MemoryFrames, game.FrameWidth, game.FrameHeight);
 
@@ -84,6 +85,13 @@ namespace AtariDeepQLearner
 
         private void PlayGame<TGame>(TGame game, IEnv env) where TGame : IGameConfiguration
         {
+            Console.WriteLine("Press [p] play the game with the current trained model, any other key to skip");
+            var pressed = Console.ReadKey().KeyChar;
+            if (pressed != 'p')
+            {
+                return;
+            }
+
             var rewards = new List<float>();
             var episodesRewards = new List<float>();
             var imageQueue = new Queue<Image<Rgba32>>(game.MemoryFrames);
@@ -120,7 +128,7 @@ namespace AtariDeepQLearner
 
         private static void LoadModelToTrainer(Trainer trainer)
         {
-            Console.WriteLine("Press [L] to load last saved model");
+            Console.WriteLine("Press [L] to load last saved model, any other key to train new one");
             var pressed = Console.ReadKey().KeyChar;
             if (pressed != 'l')
             {

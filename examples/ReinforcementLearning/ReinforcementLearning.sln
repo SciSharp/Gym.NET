@@ -1,11 +1,11 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 15
-VisualStudioVersion = 15.0.28307.779
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.28803.352
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AtariDeepQLearner", "AtariDeepQLearner\AtariDeepQLearner.csproj", "{51DDA8DE-8577-4B1F-8372-150D78C8E755}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ReinforcementLearning", "ReinforcementLearning\ReinforcementLearning.csproj", "{51DDA8DE-8577-4B1F-8372-150D78C8E755}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AtariDeepQLearner.Runner", "AtariDeepQLearner.Runner\AtariDeepQLearner.Runner.csproj", "{002D19F8-75F7-428E-89BE-030EF1D3A013}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ReinforcementLearning.Runner", "ReinforcementLearning.Runner\ReinforcementLearning.Runner.csproj", "{002D19F8-75F7-428E-89BE-030EF1D3A013}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Gym", "..\..\src\Gym\Gym.csproj", "{E3CB139E-52DB-41B5-87A3-7626B1F9CD98}"
 EndProject

@@ -1,6 +1,6 @@
 ﻿using Gym.Envs;
 
-namespace AtariDeepQLearner.GameConfigurations
+namespace ReinforcementLearning.GameConfigurations
 {
     public interface IGameConfiguration
     {

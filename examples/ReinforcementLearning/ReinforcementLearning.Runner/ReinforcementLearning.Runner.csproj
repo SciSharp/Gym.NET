@@ -7,7 +7,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\src\Gym.Rendering.Avalonia\Gym.Rendering.Avalonia.csproj" />
-    <ProjectReference Include="..\AtariDeepQLearner\AtariDeepQLearner.csproj" />
+    <ProjectReference Include="..\ReinforcementLearning\ReinforcementLearning.csproj" />
   </ItemGroup>
 
 </Project>

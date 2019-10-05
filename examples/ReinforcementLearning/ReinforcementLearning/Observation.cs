@@ -1,7 +1,7 @@
 ﻿using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 
-namespace AtariDeepQLearner
+namespace ReinforcementLearning
 {
     public class Observation
     {

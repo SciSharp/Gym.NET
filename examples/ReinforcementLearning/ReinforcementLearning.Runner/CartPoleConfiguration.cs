@@ -1,9 +1,9 @@
-﻿using AtariDeepQLearner.GameConfigurations;
-using Gym.Environments.Envs.Classic;
+﻿using Gym.Environments.Envs.Classic;
 using Gym.Envs;
 using Gym.Rendering.Avalonia;
+using ReinforcementLearning.GameConfigurations;
 
-namespace AtariDeepQLearner.Runner
+namespace ReinforcementLearning.Runner
 {
     public sealed class CartPoleConfiguration : IGameConfiguration
     {

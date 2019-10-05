@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using SixLabors.ImageSharp;
@@ -10,7 +9,7 @@ using SixLabors.ImageSharp.Processing;
 using Point = SixLabors.Primitives.Point;
 using Size = SixLabors.Primitives.Size;
 
-namespace AtariDeepQLearner
+namespace ReinforcementLearning
 {
     public class Imager
     {
@@ -32,13 +31,12 @@ namespace AtariDeepQLearner
             _outputImage = new Image<Rgba32>(imageWidth, imageHeight);
             var singleImageWidth = imageWidth / stageFrames;
 
-            for (var index = 0; index < _images.Length; index++)
+            Parallel.For(0, _images.Length, index =>
             {
                 var image = _images[index];
-                image.Mutate(o => o.Resize(new Size(singleImageWidth, imageHeight)));
-                var index1 = index;
-                _outputImage.Mutate(o => o.DrawImage(image, new Point(singleImageWidth * index1, 0), 1f));
-            }
+                image.Mutate(o => o.Resize(new Size(singleImageWidth, imageHeight))); // sometimes throws InvalidOperationException: Collection was modified
+                _outputImage.Mutate(o => o.DrawImage(image, new Point(singleImageWidth * index, 0), 1f));
+            });
 
             return this;
         }

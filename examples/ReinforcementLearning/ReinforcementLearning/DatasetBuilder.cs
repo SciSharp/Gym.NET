@@ -4,7 +4,7 @@ using System.Linq;
 using NeuralNetworkNET.APIs;
 using NeuralNetworkNET.APIs.Interfaces.Data;
 
-namespace AtariDeepQLearner
+namespace ReinforcementLearning
 {
     internal class DatasetBuilder
     {
