@@ -65,8 +65,8 @@ namespace ReinforcementLearning
                     if (currentState.Done)
                     {
                         memory.EndEpisode();
-                        Console.WriteLine($"Reward: {episodeReward}, average is {rewards.Average()}");
                         rewards.Add(episodeReward);
+                        Console.WriteLine($"Reward: {episodeReward}, average is {rewards.Average()}");
                         if (i != 0 && i % 10 == 0)
                         {
                             _trainer.TrainOnMemory(memory);
