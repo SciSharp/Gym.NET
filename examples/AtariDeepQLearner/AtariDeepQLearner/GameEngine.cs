@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using AtariDeepQLearner.GameConfigurations;
 using Gym.Envs;
+using Gym.Observations;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 
@@ -12,40 +13,52 @@ namespace AtariDeepQLearner
     public class GameEngine
     {
         private readonly Random _random = new Random();
+        private Trainer _trainer;
+        private readonly Imager _imager = new Imager();
 
         public void Play<TGame>(TGame game)
             where TGame : IGameConfiguration
         {
             var env = game.EnvIstance;
-            var trainer = new Trainer(game.ScaledImageWidth, game.ScaledImageHeight, env.ActionSpace.Shape.Size, game.BatchSize, game.Epochs);
-            LoadModelToTrainer(trainer);
+            _trainer = new Trainer(game.ScaledImageWidth, game.ScaledImageHeight, env.ActionSpace.Shape.Size, game.BatchSize, game.Epochs);
+            LoadModelToTrainer(_trainer);
 
             var memory = new ReplayMemory(game.MemoryFrames, game.FrameWidth, game.FrameHeight);
-            var imager = new Imager();
 
             env.Seed(0);
 
             var rewards = new List<float>();
             Image<Rgba32> oldImage = null;
 
+            var skipFrameCount = 0;
             for (var i = 0; i < game.Episodes; i++)
             {
-                Console.WriteLine($"Stage [{i + 1}]/[{game.Episodes}]");
+                var epsilon = (float)(game.Episodes - i) / game.Episodes;
+                Console.WriteLine($"Stage [{i + 1}]/[{game.Episodes}], with exploration rate {epsilon}");
 
                 env.Reset();
                 env.Step(env.ActionSpace.Sample());
                 float episodeReward = 0;
+                var action = 0;
                 while (true)
                 {
-                    var epsilon = (float)(game.Episodes - i) / game.Episodes;
-
-                    var action = ComposeAction(game, env, trainer, memory, imager, oldImage, epsilon);
-
-                    var currentState = env.Step(action);
-                    if (oldImage != null)
+                    Step currentState;
+                    if (skipFrameCount >= game.SkippedFrames)
                     {
-                        memory.Memorize(oldImage, action, currentState.Reward);
+                        skipFrameCount = 0;
+                        currentState = env.Step(action);
                     }
+                    else
+                    {
+                        action = ComposeAction(game, env, memory, oldImage, epsilon);
+
+                        currentState = env.Step(action);
+                        if (oldImage != null)
+                        {
+                            memory.Memorize(oldImage, action, currentState.Reward, currentState.Done);
+                        }
+                    }
+
                     oldImage = env.Render();
                     episodeReward += currentState.Reward;
                     if (currentState.Done)
@@ -53,20 +66,55 @@ namespace AtariDeepQLearner
                         memory.EndEpisode();
                         Console.WriteLine("Reward: " + episodeReward);
                         rewards.Add(episodeReward);
-                        if (i % 10 == 0)
+                        if (i != 0 && i % 10 == 0)
                         {
-                            trainer.TrainOnMemory(memory);
+                            _trainer.TrainOnMemory(memory);
                         }
                         break;
                     }
                 }
-
-#pragma warning disable 4014
-                //Task.Run(() => memory.Save($"memory {DateTime.Now:yyyyMMdd-HH-mm-ss}.json", 10));
-#pragma warning restore 4014
             }
 
-            Console.WriteLine("Average Reward: " + rewards.Average());
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine("\n\nTraining completed\n\n");
+            Console.ResetColor();
+
+            PlayGame(game, env);
+        }
+
+        private void PlayGame<TGame>(TGame game, IEnv env) where TGame : IGameConfiguration
+        {
+            var rewards = new List<float>();
+            var episodesRewards = new List<float>();
+            var imageQueue = new Queue<Image<Rgba32>>(game.MemoryFrames);
+            env.Reset();
+
+            while (true)
+            {
+                var image = env.Render();
+                imageQueue.Enqueue(image);
+                Step currentState;
+                if (imageQueue.Count == game.MemoryFrames)
+                {
+                    var action = PredictAction(game, imageQueue.ToArray());
+                    currentState = env.Step(action);
+                }
+                else
+                {
+                    currentState = env.Step(env.ActionSpace.Sample());
+                }
+
+                rewards.Add(currentState.Reward);
+                if (currentState.Done)
+                {
+                    var espisodeReward = rewards.Sum();
+                    episodesRewards.Add(espisodeReward);
+                    Console.WriteLine($"Reward:  {espisodeReward}, average is {episodesRewards.Average()}");
+                    rewards = new List<float>();
+                    env.Reset();
+                    env.Step(env.ActionSpace.Sample());
+                }
+            }
         }
 
         private static void LoadModelToTrainer(Trainer trainer)
@@ -94,7 +142,7 @@ namespace AtariDeepQLearner
             trainer.Load(choosenFile.OpenRead());
         }
 
-        private int ComposeAction(IGameConfiguration configuration, IEnv env, Trainer trainer, ReplayMemory memory, Imager imager, Image<Rgba32> oldImage, float epsilon)
+        private int ComposeAction(IGameConfiguration configuration, IEnv env, ReplayMemory memory, Image<Rgba32> oldImage, float epsilon)
         {
             if (oldImage == null)
             {
@@ -111,7 +159,12 @@ namespace AtariDeepQLearner
                 return env.ActionSpace.Sample();
             }
 
-            var processedImage = imager.Load(current)
+            return PredictAction(configuration, current);
+        }
+
+        private int PredictAction(IGameConfiguration configuration, Image<Rgba32>[] current)
+        {
+            var processedImage = _imager.Load(current)
                 .ComposeFrames(configuration.ScaledImageWidth, configuration.ScaledImageHeight)
                 .InvertColors()
                 .Grayscale()
@@ -119,10 +172,8 @@ namespace AtariDeepQLearner
                 .Rectify()
                 .ToArray();
 
-            return PredictionToPython(trainer.Predict(processedImage));
+            var prediction = _trainer.Predict(processedImage);
+            return prediction.ToList().IndexOf(prediction.Max());
         }
-
-        private static int PredictionToPython(float[] prediction) =>
-            prediction.ToList().IndexOf(prediction.Max());
     }
 }

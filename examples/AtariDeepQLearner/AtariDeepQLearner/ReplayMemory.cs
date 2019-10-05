@@ -17,7 +17,7 @@ namespace AtariDeepQLearner
     public class ReplayMemory
     {
         public List<Episode> Episodes { get; } = new List<Episode>();
-        private List<Observation> _observations  = new List<Observation>();
+        private List<Observation> _observations = new List<Observation>();
         private Queue<Image<Rgba32>> _imagesQueue = new Queue<Image<Rgba32>>();
         private int _currentId;
         private readonly int _stageFrames;
@@ -31,7 +31,7 @@ namespace AtariDeepQLearner
             _imageHeight = imageHeight;
         }
 
-        public void Memorize(Image<Rgba32> prev, int action, float currentReward)
+        public void Memorize(Image<Rgba32> prev, int action, float currentReward, bool done)
         {
             if (prev.Width != _imageWidth || prev.Height != _imageHeight)
             {
@@ -49,7 +49,7 @@ namespace AtariDeepQLearner
             {
                 Id = _currentId++,
                 ActionTaken = action,
-                Reward = currentReward,
+                Reward = done ? -20 : currentReward,
                 Images = _imagesQueue.ToArray()
             });
         }

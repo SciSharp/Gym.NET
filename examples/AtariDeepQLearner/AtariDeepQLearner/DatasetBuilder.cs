@@ -28,9 +28,9 @@ namespace AtariDeepQLearner
             var bestEpisodes = memory
                 .Episodes
                 .OrderByDescending(x => x.TotalReward)
-                .Take(10)
+                .Take(memory.Episodes.Count / 10)
                 .ToList();
-            
+
             var observations = bestEpisodes
                 .SelectMany(x => x.Observations)
                 .ToList();

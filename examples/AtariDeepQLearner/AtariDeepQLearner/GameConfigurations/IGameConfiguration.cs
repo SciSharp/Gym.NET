@@ -6,6 +6,7 @@ namespace AtariDeepQLearner.GameConfigurations
     {
         IEnv EnvIstance { get; }
         int MemoryFrames { get; }
+        int SkippedFrames { get; }
         int FrameWidth { get; }
         int FrameHeight { get; }
         int ScaledImageWidth { get; }
