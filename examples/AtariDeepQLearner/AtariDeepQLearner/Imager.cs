@@ -32,12 +32,13 @@ namespace AtariDeepQLearner
             _outputImage = new Image<Rgba32>(imageWidth, imageHeight);
             var singleImageWidth = imageWidth / stageFrames;
 
-            Parallel.For(0, _images.Length, index =>
+            for (var index = 0; index < _images.Length; index++)
             {
                 var image = _images[index];
                 image.Mutate(o => o.Resize(new Size(singleImageWidth, imageHeight)));
-                _outputImage.Mutate(o => o.DrawImage(image, new Point(singleImageWidth * index, 0), 1f));
-            });
+                var index1 = index;
+                _outputImage.Mutate(o => o.DrawImage(image, new Point(singleImageWidth * index1, 0), 1f));
+            }
 
             return this;
         }
