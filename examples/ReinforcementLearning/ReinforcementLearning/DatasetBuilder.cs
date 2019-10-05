@@ -23,7 +23,7 @@ namespace ReinforcementLearning
             _batchSize = batchSize;
         }
 
-        public ITrainingDataset BuildDataset(ReplayMemory memory)
+        public ITrainingDataset BuildDataset(IConcurrentMemory memory)
         {
             var bestEpisodes = memory
                 .Episodes

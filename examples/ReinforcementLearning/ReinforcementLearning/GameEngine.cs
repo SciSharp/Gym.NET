@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using Gym.Envs;
 using Gym.Observations;
 using ReinforcementLearning.GameConfigurations;
@@ -25,6 +26,8 @@ namespace ReinforcementLearning
             PlayGame(game, env);
 
             var memory = new ReplayMemory(game.MemoryFrames, game.FrameWidth, game.FrameHeight);
+            var ct = new CancellationTokenSource();
+            _trainer.StartAsyncTraining(memory, ct.Token);
 
             env.Seed(0);
 
@@ -60,7 +63,7 @@ namespace ReinforcementLearning
                         }
                     }
 
-                    oldImage = env.Render();
+                    oldImage = env.Render().Clone();
                     episodeReward += currentState.Reward;
                     if (currentState.Done)
                     {
@@ -69,12 +72,13 @@ namespace ReinforcementLearning
                         Console.WriteLine($"Reward: {episodeReward}, average is {rewards.Average()}");
                         if (i != 0 && i % 10 == 0)
                         {
-                            _trainer.TrainOnMemory(memory);
+                            //_trainer.TrainOnMemory(memory);
                         }
                         break;
                     }
                 }
             }
+            ct.Cancel();
 
             Console.ForegroundColor = ConsoleColor.Yellow;
             Console.WriteLine("\n\nTraining completed\n\n");
@@ -99,7 +103,7 @@ namespace ReinforcementLearning
 
             while (true)
             {
-                var image = env.Render();
+                var image = env.Render().Clone();
                 imageQueue.Enqueue(image);
                 Step currentState;
                 if (imageQueue.Count == game.MemoryFrames)
