@@ -24,18 +24,6 @@ namespace ReinforcementLearning
             _epochs = epochs;
             _datasetBuilder = new DatasetBuilder(inputImgWidth, inputImgHeight, outputs, batchSize);
 
-            if (CuDnnNetworkLayers.IsCudaSupportAvailable)
-            {
-                Console.ForegroundColor = ConsoleColor.DarkGreen;
-                Console.WriteLine("Cuda Gpu support available");
-                Console.ResetColor();
-
-                _network = NetworkManager.NewSequential(TensorInfo.Image<Alpha8>(inputImgHeight, inputImgWidth),
-                    CuDnnNetworkLayers.Convolutional((3, 3), 40, ActivationType.Identity),
-                    CuDnnNetworkLayers.Softmax(outputs));
-                return;
-            }
-
             _network = NetworkManager.NewSequential(TensorInfo.Image<Alpha8>(inputImgHeight, inputImgWidth),
                 NetworkLayers.Convolutional((3, 3), 40, ActivationType.Identity),
                 NetworkLayers.Softmax(outputs));
