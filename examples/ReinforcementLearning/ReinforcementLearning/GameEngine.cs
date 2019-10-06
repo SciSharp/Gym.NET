@@ -37,13 +37,14 @@ namespace ReinforcementLearning
             var skipFrameCount = 0;
             for (var i = 0; i < game.Episodes; i++)
             {
-                var epsilon = (float)(game.Episodes - i) / game.Episodes;
+                var epsilon = game.StartingEpsilon * (game.Episodes - i) / game.Episodes;
                 Console.WriteLine($"Stage [{i + 1}]/[{game.Episodes}], with exploration rate {epsilon}");
 
                 env.Reset();
                 env.Step(env.ActionSpace.Sample());
                 float episodeReward = 0;
                 var action = 0;
+                var framescount = 0;
                 while (true)
                 {
                     Step currentState;
@@ -63,15 +64,17 @@ namespace ReinforcementLearning
                         }
                     }
 
-                    oldImage = env.Render().Clone();
+                    oldImage = env.Render();
                     episodeReward += currentState.Reward;
-                    if (currentState.Done)
+                    if (currentState.Done || framescount > 1000)
                     {
                         memory.EndEpisode();
                         rewards.Add(episodeReward);
                         Console.WriteLine($"Reward: {episodeReward}, average is {rewards.Average()}");
                         break;
                     }
+
+                    framescount++;
                 }
             }
             ct.Cancel();
@@ -99,7 +102,7 @@ namespace ReinforcementLearning
 
             while (true)
             {
-                var image = env.Render().Clone();
+                var image = env.Render();
                 imageQueue.Enqueue(image);
                 Step currentState;
                 if (imageQueue.Count == game.MemoryFrames)
