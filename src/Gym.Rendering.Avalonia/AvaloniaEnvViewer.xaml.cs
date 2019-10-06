@@ -21,6 +21,7 @@ namespace Gym.Rendering.Avalonia
         private static string _title;
         private static AvaloniaEnvViewer _viewer;
         private static readonly ManualResetEventSlim ReadyResetEvent = new ManualResetEventSlim();
+        private static readonly ManualResetEventSlim RenderResetEvent = new ManualResetEventSlim();
 
         public AvaloniaEnvViewer()
         {
@@ -65,7 +66,10 @@ namespace Gym.Rendering.Avalonia
         {
             if (!Dispatcher.UIThread.CheckAccess())
             {
+                RenderResetEvent.Reset();
                 Dispatcher.UIThread.InvokeAsync(() => Render(img), DispatcherPriority.Render);
+                if (!RenderResetEvent.Wait(2_000))
+                    throw new Exception("Rendering timed out.");
                 return;
             }
 
@@ -78,6 +82,7 @@ namespace Gym.Rendering.Avalonia
                     Source = new Bitmap(ms)
                 };
             }
+            RenderResetEvent.Set();
         }
 
         private static void BuildViewer(Application app, string[] args)

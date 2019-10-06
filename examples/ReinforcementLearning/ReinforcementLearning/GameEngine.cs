@@ -63,7 +63,7 @@ namespace ReinforcementLearning
                         }
                     }
 
-                    oldImage = env.Render().Clone();
+                    oldImage = env.Render();
                     episodeReward += currentState.Reward;
                     if (currentState.Done)
                     {
@@ -99,7 +99,7 @@ namespace ReinforcementLearning
 
             while (true)
             {
-                var image = env.Render().Clone();
+                var image = env.Render();
                 imageQueue.Enqueue(image);
                 Step currentState;
                 if (imageQueue.Count == game.MemoryFrames)
