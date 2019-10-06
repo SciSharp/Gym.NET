@@ -44,6 +44,7 @@ namespace ReinforcementLearning
                 env.Step(env.ActionSpace.Sample());
                 float episodeReward = 0;
                 var action = 0;
+                var framescount = 0;
                 while (true)
                 {
                     Step currentState;
@@ -65,13 +66,15 @@ namespace ReinforcementLearning
 
                     oldImage = env.Render();
                     episodeReward += currentState.Reward;
-                    if (currentState.Done)
+                    if (currentState.Done || framescount > 1000)
                     {
                         memory.EndEpisode();
                         rewards.Add(episodeReward);
                         Console.WriteLine($"Reward: {episodeReward}, average is {rewards.Average()}");
                         break;
                     }
+
+                    framescount++;
                 }
             }
             ct.Cancel();
