@@ -70,6 +70,7 @@ namespace ReinforcementLearning
                         if (i != 0 && i % 10 == 0)
                         {
                             _trainer.TrainOnMemory(memory);
+                            rewards = new List<float>();
                         }
                         break;
                     }
