@@ -37,7 +37,7 @@ namespace ReinforcementLearning
             var skipFrameCount = 0;
             for (var i = 0; i < game.Episodes; i++)
             {
-                var epsilon = (float)(game.Episodes - i) / game.Episodes;
+                var epsilon = game.StartingEpsilon * (game.Episodes - i) / game.Episodes;
                 Console.WriteLine($"Stage [{i + 1}]/[{game.Episodes}], with exploration rate {epsilon}");
 
                 env.Reset();

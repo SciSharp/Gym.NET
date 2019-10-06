@@ -14,7 +14,8 @@ namespace ReinforcementLearning.Runner
         public int FrameHeight => 400;
         public int ScaledImageWidth => 50;
         public int ScaledImageHeight => 50;
-        public int Episodes => 500;
+        public float StartingEpsilon => .2F;
+        public int Episodes => 5000;
         public int BatchSize => 100;
         public int Epochs => 10;
     }
