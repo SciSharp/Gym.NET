@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -8,15 +9,20 @@ using SixLabors.ImageSharp.PixelFormats;
 
 namespace ReinforcementLearning
 {
+    public interface IConcurrentMemory
+    {
+        ConcurrentBag<Episode> Episodes { get; }
+    }
+
     public class Episode
     {
         public Observation[] Observations { get; set; }
         public float TotalReward => Observations?.Sum(x => x.Reward) ?? throw new InvalidOperationException($"No {nameof(Observations)} set");
     }
 
-    public class ReplayMemory
+    public class ReplayMemory: IConcurrentMemory
     {
-        public List<Episode> Episodes { get; } = new List<Episode>();
+        public ConcurrentBag<Episode> Episodes { get; } = new ConcurrentBag<Episode>();
         private List<Observation> _observations = new List<Observation>();
         private Queue<Image<Rgba32>> _imagesQueue = new Queue<Image<Rgba32>>();
         private int _currentId;
