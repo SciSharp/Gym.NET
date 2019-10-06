@@ -24,14 +24,21 @@ namespace ReinforcementLearning
             _epochs = epochs;
             _datasetBuilder = new DatasetBuilder(inputImgWidth, inputImgHeight, outputs, batchSize);
 
+            if (CuDnnNetworkLayers.IsCudaSupportAvailable)
+            {
+                Console.ForegroundColor = ConsoleColor.DarkGreen;
+                Console.WriteLine("Cuda Gpu support available");
+                Console.ResetColor();
+
+                _network = NetworkManager.NewSequential(TensorInfo.Image<Alpha8>(inputImgHeight, inputImgWidth),
+                    CuDnnNetworkLayers.Convolutional((3, 3), 40, ActivationType.Identity),
+                    CuDnnNetworkLayers.Softmax(outputs));
+                return;
+            }
+
             _network = NetworkManager.NewSequential(TensorInfo.Image<Alpha8>(inputImgHeight, inputImgWidth),
                 NetworkLayers.Convolutional((3, 3), 40, ActivationType.Identity),
-                //NetworkLayers.Pooling(ActivationType.LeakyReLU),
-                //NetworkLayers.FullyConnected(100, ActivationType.LeakyReLU),
-                //NetworkLayers.FullyConnected(20, ActivationType.LeakyReLU),
                 NetworkLayers.Softmax(outputs));
-            //NetworkLayers.Convolutional((5, 5), 50, ActivationType.Identity),
-            //NetworkLayers.Pooling(ActivationType.LeakyReLU), // used to reduce the spatial dimensions);
         }
 
         public void StartAsyncTraining(IConcurrentMemory memory, CancellationToken ct = default)
