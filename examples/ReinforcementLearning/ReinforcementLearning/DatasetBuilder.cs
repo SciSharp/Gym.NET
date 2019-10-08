@@ -3,24 +3,21 @@ using System.Collections.Generic;
 using System.Linq;
 using NeuralNetworkNET.APIs;
 using NeuralNetworkNET.APIs.Interfaces.Data;
+using ReinforcementLearning.GameConfigurations;
 
 namespace ReinforcementLearning
 {
     internal class DatasetBuilder
     {
-        private readonly int _batchSize;
-        private readonly int _inputImgHeight;
-        private readonly int _inputImgWidth;
+        private readonly IGameConfiguration _configuration;
         private readonly int _outputs;
         private readonly Imager _imager = new Imager();
         private readonly Dictionary<int, (float[] x, float[] y)> _observationDictionary = new Dictionary<int, (float[] x, float[] y)>();
 
-        public DatasetBuilder(int inputImgWidth, int inputImgHeight, int outputs, int batchSize)
+        public DatasetBuilder(IGameConfiguration configuration, int outputs)
         {
-            _inputImgWidth = inputImgWidth;
-            _inputImgHeight = inputImgHeight;
+            _configuration = configuration;
             _outputs = outputs;
-            _batchSize = batchSize;
         }
 
         public ITrainingDataset BuildDataset(IConcurrentMemory memory)
@@ -37,7 +34,7 @@ namespace ReinforcementLearning
 
             Console.WriteLine($"Training on best {bestEpisodes.Count} episodes out of {memory.Episodes.Count}. {observations.Count} observations");
 
-            return DatasetLoader.Training(BuildRawData(observations), _batchSize);
+            return DatasetLoader.Training(BuildRawData(observations), _configuration.BatchSize);
         }
 
         private IEnumerable<(float[] x, float[] y)> BuildRawData(IEnumerable<Observation> bestObservations)
@@ -52,7 +49,7 @@ namespace ReinforcementLearning
 
                 var x = _imager
                     .Load(observation.Images)
-                    .ComposeFrames(_inputImgWidth, _inputImgHeight)
+                    .ComposeFrames(_configuration.ScaledImageWidth, _configuration.ScaledImageHeight, _configuration.ImageStackLayout)
                     .InvertColors()
                     .Grayscale()
                     .Compile()

@@ -17,11 +17,11 @@ namespace ReinforcementLearning
         private Trainer _trainer;
         private readonly Imager _imager = new Imager();
 
-        public void Play<TGame>(TGame game)
-            where TGame : IGameConfiguration
+        public void Play<TGameConfiguration>(TGameConfiguration game)
+            where TGameConfiguration : IGameConfiguration
         {
             var env = game.EnvIstance;
-            _trainer = new Trainer(game.ScaledImageWidth, game.ScaledImageHeight, env.ActionSpace.Shape.Size, game.BatchSize, game.Epochs);
+            _trainer = new Trainer(game, env.ActionSpace.Shape.Size);
             LoadModelToTrainer(_trainer);
             PlayGame(game, env);
 
@@ -48,7 +48,7 @@ namespace ReinforcementLearning
                 while (true)
                 {
                     Step currentState;
-                    if (skipFrameCount >= game.SkippedFrames)
+                    if (skipFrameCount >= game.SkippedFrames + 1)
                     {
                         skipFrameCount = 0;
                         currentState = env.Step(action);
@@ -177,7 +177,7 @@ namespace ReinforcementLearning
         private int PredictAction(IGameConfiguration configuration, Image<Rgba32>[] current)
         {
             var processedImage = _imager.Load(current)
-                .ComposeFrames(configuration.ScaledImageWidth, configuration.ScaledImageHeight)
+                .ComposeFrames(configuration.ScaledImageWidth, configuration.ScaledImageHeight, configuration.ImageStackLayout)
                 .InvertColors()
                 .Grayscale()
                 .Compile()

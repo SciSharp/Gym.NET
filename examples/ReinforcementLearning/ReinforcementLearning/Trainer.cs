@@ -6,6 +6,7 @@ using NeuralNetworkNET.APIs.Enums;
 using NeuralNetworkNET.APIs.Interfaces;
 using NeuralNetworkNET.APIs.Structs;
 using NeuralNetworkNET.SupervisedLearning.Progress;
+using ReinforcementLearning.GameConfigurations;
 using SixLabors.ImageSharp.PixelFormats;
 
 namespace ReinforcementLearning
@@ -15,17 +16,17 @@ namespace ReinforcementLearning
         private INeuralNetwork _network;
         private readonly Random _random = new Random();
         private readonly DatasetBuilder _datasetBuilder;
+        private readonly IGameConfiguration _configuration;
         private readonly int _outputs;
-        private readonly int _epochs;
 
-        public Trainer(int inputImgWidth, int inputImgHeight, int outputs, int batchSize, int epochs)
+        public Trainer(IGameConfiguration configuration, int outputs)
         {
+            _configuration = configuration;
             _outputs = outputs;
-            _epochs = epochs;
-            _datasetBuilder = new DatasetBuilder(inputImgWidth, inputImgHeight, outputs, batchSize);
+            _datasetBuilder = new DatasetBuilder(configuration, outputs);
 
-            _network = NetworkManager.NewSequential(TensorInfo.Image<Alpha8>(inputImgHeight, inputImgWidth),
-                NetworkLayers.Convolutional((3, 3), 40, ActivationType.Identity),
+            _network = NetworkManager.NewSequential(TensorInfo.Image<Alpha8>(configuration.ScaledImageHeight, configuration.ScaledImageWidth),
+                NetworkLayers.Convolutional((2, 2), 40, ActivationType.Identity),
                 NetworkLayers.Softmax(outputs));
         }
 
@@ -72,7 +73,7 @@ namespace ReinforcementLearning
             var result = NetworkManager.TrainNetwork(clonedInstance,
                 trainingData,
                 TrainingAlgorithms.AdaDelta(),
-                _epochs, 0.5f,
+                _configuration.Epochs, 0.5f,
                 TrackBatchProgress,
                 TrainingProgress);
 
