@@ -22,7 +22,7 @@ namespace ReinforcementLearning
 
     public class ReplayMemory : IConcurrentMemory
     {
-        public ConcurrentBag<Episode> Episodes { get; set; } = new ConcurrentBag<Episode>();
+        public ConcurrentBag<Episode> Episodes { get; private set; } = new ConcurrentBag<Episode>();
         private List<Observation> _observations = new List<Observation>();
         private Queue<Image<Rgba32>> _imagesQueue = new Queue<Image<Rgba32>>();
         private int _currentId;
