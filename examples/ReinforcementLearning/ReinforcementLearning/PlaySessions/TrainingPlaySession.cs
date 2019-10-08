@@ -1,18 +1,29 @@
 ﻿using System;
 using System.Threading;
+using ReinforcementLearning.GameConfigurations;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 
 namespace ReinforcementLearning.PlaySessions
 {
-    internal class TrainingPlaySession : BasePlaySession
+    internal class TrainingPlaySession<TGameConfiguration> : BasePlaySession<TGameConfiguration>
+        where TGameConfiguration : IGameConfiguration
     {
+        private float _epsilon;
         private readonly CancellationTokenSource _ct;
 
-        internal TrainingPlaySession()
+        internal TrainingPlaySession(TGameConfiguration game, Trainer trainer) : base(game, trainer)
         {
             _ct = new CancellationTokenSource();
             Trainer.StartAsyncTraining(Memory, _ct.Token);
+        }
+
+        protected override void OnEpisodeStart(int episodeIndex)
+        {
+            base.OnEpisodeStart(episodeIndex);
+
+            _epsilon = Game.StartingEpsilon * (Game.Episodes - episodeIndex) / Game.Episodes;
+            Console.WriteLine($"Stage [{episodeIndex + 1}]/[{Game.Episodes}], with exploration rate {_epsilon}");
         }
 
         protected override void OnEpisodeDone()
@@ -35,7 +46,7 @@ namespace ReinforcementLearning.PlaySessions
 
         protected override int ComposeAction(Image<Rgba32>[] current)
         {
-            if (Random.NextDouble() <= Epsilon)
+            if (Random.NextDouble() <= _epsilon)
             {
                 return Game.EnvIstance.ActionSpace.Sample();
             }

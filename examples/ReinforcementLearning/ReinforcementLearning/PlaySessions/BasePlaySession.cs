@@ -8,69 +8,66 @@ using SixLabors.ImageSharp.PixelFormats;
 
 namespace ReinforcementLearning.PlaySessions
 {
-    internal abstract class BasePlaySession
+    internal abstract class BasePlaySession<TGameConfiguration>
+        where TGameConfiguration : IGameConfiguration
     {
+        protected readonly Trainer Trainer;
         protected IGameConfiguration Game;
         protected Imager Imager;
-        protected Trainer Trainer;
         protected ReplayMemory Memory;
         protected int Framescount;
         protected int? Action;
         protected Step CurrentState;
-        protected List<float> EpisodeRewards;
+        protected float CurrentEpisodeReward;
+        protected List<float> EpisodeRewards = new List<float>();
         protected Random Random = new Random();
-        protected float Epsilon;
 
-        protected BasePlaySession()
-        {
-            EpisodeRewards = new List<float>();
-            Imager = new Imager();
-            CurrentState = new Step();
-            Action = null;
-            Framescount = 0;
-        }
-
-        public void Play<TGameConfiguration>(TGameConfiguration game, Trainer trainer)
-            where TGameConfiguration : IGameConfiguration
+        protected BasePlaySession(TGameConfiguration game, Trainer trainer)
         {
             Game = game;
+            Trainer = trainer;
+            Imager = new Imager();
+            CurrentState = new Step();
             Memory = new ReplayMemory(Game.MemoryFrames, Game.FrameWidth, Game.FrameHeight);
+        }
 
-            game.EnvIstance.Seed(0);
+        public void Play()
+        {
+            Game.EnvIstance.Seed(0);
 
-            for (var i = 0; i < game.Episodes; i++)
+            for (var i = 0; i < Game.Episodes; i++)
             {
-                Epsilon = game.StartingEpsilon * (game.Episodes - i) / game.Episodes;
-                Console.WriteLine($"Stage [{i + 1}]/[{game.Episodes}], with exploration rate {Epsilon}");
+                OnEpisodeStart(i);
 
-                game.EnvIstance.Reset();
+                Game.EnvIstance.Reset();
                 while (true)
                 {
-                    var image = game.EnvIstance.Render();
+                    var image = Game.EnvIstance.Render();
 
-                    if (Framescount < game.SkippedFrames + 1 && Action.HasValue)
+                    if (Framescount < Game.SkippedFrames + 1 && Action.HasValue)
                     {
-                        CurrentState = game.EnvIstance.Step(Action.Value);
+                        CurrentState = Game.EnvIstance.Step(Action.Value);
                     }
                     else
                     {
                         var currentFrame = Memory.Enqueue(image);
-                        if (currentFrame != null && currentFrame.Length == game.MemoryFrames)
+                        if (currentFrame != null && currentFrame.Length == Game.MemoryFrames)
                         {
                             Action = ComposeAction(currentFrame);
-                            CurrentState = game.EnvIstance.Step(Action.Value);
+                            CurrentState = Game.EnvIstance.Step(Action.Value);
                             Memory.Memorize(Action.Value, CurrentState.Reward, CurrentState.Done);
                         }
 
                         Framescount = 0;
                     }
 
-                    EpisodeRewards.Add(CurrentState.Reward);
+                    CurrentEpisodeReward += CurrentState.Reward;
                     if (CurrentState.Done || Framescount > 1000)
                     {
                         OnEpisodeDone();
-                        Console.WriteLine($"Reward: {EpisodeRewards.Sum()}, average is {EpisodeRewards.Average()}");
-                        EpisodeRewards = new List<float>();
+                        EpisodeRewards.Add(CurrentEpisodeReward);
+                        Console.WriteLine($"Reward: {CurrentEpisodeReward}, average is {EpisodeRewards.Average()}");
+                        CurrentEpisodeReward = 0;
                         break;
                     }
 
@@ -95,6 +92,9 @@ namespace ReinforcementLearning.PlaySessions
             var prediction = Trainer.Predict(processedImage);
             return prediction.ToList().IndexOf(prediction.Max());
         }
+
+        protected virtual void OnEpisodeStart(int episodeIndex)
+        { }
 
         protected virtual void OnEpisodeDone()
         { }

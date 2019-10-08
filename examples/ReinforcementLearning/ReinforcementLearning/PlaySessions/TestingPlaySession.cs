@@ -1,9 +1,21 @@
 ﻿using System;
+using ReinforcementLearning.GameConfigurations;
 
 namespace ReinforcementLearning.PlaySessions
 {
-    internal class TestingPlaySession : BasePlaySession
+    internal class TestingPlaySession<TGameConfiguration> : BasePlaySession<TGameConfiguration>
+        where TGameConfiguration : IGameConfiguration
     {
+        public TestingPlaySession(TGameConfiguration game, Trainer trainer) : base(game, trainer)
+        { }
+
+        protected override void OnEpisodeStart(int episodeIndex)
+        {
+            base.OnEpisodeStart(episodeIndex);
+
+            Console.WriteLine($"Stage [{episodeIndex + 1}]/[{Game.Episodes}]");
+        }
+
         protected override void OnEpisodeDone()
         {
             base.OnEpisodeDone();

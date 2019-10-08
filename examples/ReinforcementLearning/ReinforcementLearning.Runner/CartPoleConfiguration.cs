@@ -1,4 +1,5 @@
-﻿using Gym.Environments.Envs.Classic;
+﻿using System;
+using Gym.Environments.Envs.Classic;
 using Gym.Envs;
 using Gym.Rendering.Avalonia;
 using ReinforcementLearning.GameConfigurations;
@@ -7,7 +8,9 @@ namespace ReinforcementLearning.Runner
 {
     public sealed class CartPoleConfiguration : IGameConfiguration
     {
-        public IEnv EnvIstance => new CartPoleEnv(AvaloniaEnvViewer.Run);
+        private readonly Lazy<IEnv> _env = new Lazy<IEnv>(() => new CartPoleEnv(AvaloniaEnvViewer.Run));
+
+        public IEnv EnvIstance => _env.Value;
         public ImageStackLayout ImageStackLayout => ImageStackLayout.Vertical;
         public int MemoryFrames => 2;
         public int SkippedFrames => 3;

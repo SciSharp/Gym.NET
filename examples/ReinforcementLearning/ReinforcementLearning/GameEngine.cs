@@ -8,9 +8,7 @@ namespace ReinforcementLearning
 {
     public class GameEngine
     {
-        private readonly Random _random = new Random();
         private Trainer _trainer;
-        private readonly Imager _imager = new Imager();
 
         public void Play<TGameConfiguration>(TGameConfiguration game)
             where TGameConfiguration : IGameConfiguration
@@ -35,10 +33,10 @@ namespace ReinforcementLearning
                 switch (pressed)
                 {
                     case '1':
-                        new TestingPlaySession().Play(game, _trainer);
+                        new TestingPlaySession<TGameConfiguration>(game, _trainer).Play();
                         break;
                     case '2':
-                        new TrainingPlaySession().Play(game, _trainer);
+                        new TrainingPlaySession<TGameConfiguration>(game, _trainer).Play();
                         break;
                     default:
                         Console.WriteLine($"Invalid selection {pressed}");
