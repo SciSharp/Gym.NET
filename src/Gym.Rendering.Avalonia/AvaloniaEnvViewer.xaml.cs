@@ -67,8 +67,8 @@ namespace Gym.Rendering.Avalonia
             if (!Dispatcher.UIThread.CheckAccess())
             {
                 RenderResetEvent.Reset();
-                Dispatcher.UIThread.InvokeAsync(() => Render(img), DispatcherPriority.Render);
-                if (!RenderResetEvent.Wait(2_000))
+                Dispatcher.UIThread.InvokeAsync(() => Render(img), DispatcherPriority.MaxValue);
+                if (!RenderResetEvent.Wait(4_000))
                     throw new Exception("Rendering timed out.");
                 return;
             }

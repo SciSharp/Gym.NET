@@ -26,7 +26,7 @@ namespace ReinforcementLearning
             _datasetBuilder = new DatasetBuilder(configuration, outputs);
 
             _network = NetworkManager.NewSequential(TensorInfo.Image<Alpha8>(configuration.ScaledImageHeight, configuration.ScaledImageWidth),
-                NetworkLayers.Convolutional((2, 2), 40, ActivationType.Identity),
+                NetworkLayers.Convolutional((3, 3), 20, ActivationType.Identity),
                 NetworkLayers.Softmax(outputs));
         }
 

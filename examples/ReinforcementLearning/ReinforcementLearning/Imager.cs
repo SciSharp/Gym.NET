@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using ReinforcementLearning.GameConfigurations;
@@ -8,6 +9,7 @@ using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Advanced;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
+using SixLabors.Primitives;
 using Point = SixLabors.Primitives.Point;
 using Size = SixLabors.Primitives.Size;
 
@@ -21,7 +23,7 @@ namespace ReinforcementLearning
 
         public virtual Imager Load(Image<Rgba32>[] images)
         {
-            _images = images;
+            _images = images.Select(x => x.Clone()).ToArray();
             _outputImage = null;
             _actions = new List<Action<IImageProcessingContext>>();
             return this;
@@ -53,6 +55,19 @@ namespace ReinforcementLearning
                 var image = _images[index];
                 image.Mutate(o => o.Resize(new Size(singleImageWidth, singleImageHeight)));
                 _outputImage.Mutate(o => o.DrawImage(image, pointBuilder.Invoke(index), 1f));
+            });
+
+            return this;
+        }
+
+        public virtual Imager Crop(FramePadding framePadding)
+        {
+            Parallel.For(0, _images.Length, index =>
+            {
+                var image = _images[index];
+                var widthToCrop = image.Width - framePadding.Left - framePadding.Right;
+                var heightToCrop = image.Height - framePadding.Top - framePadding.Bottom;
+                image.Mutate(o => o.Crop(new Rectangle(framePadding.Left, framePadding.Top, widthToCrop, heightToCrop)));
             });
 
             return this;

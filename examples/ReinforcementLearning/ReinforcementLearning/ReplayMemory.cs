@@ -20,7 +20,7 @@ namespace ReinforcementLearning
         public float TotalReward => Observations?.Sum(x => x.Reward) ?? throw new InvalidOperationException($"No {nameof(Observations)} set");
     }
 
-    public class ReplayMemory: IConcurrentMemory
+    public class ReplayMemory : IConcurrentMemory
     {
         public ConcurrentBag<Episode> Episodes { get; } = new ConcurrentBag<Episode>();
         private List<Observation> _observations = new List<Observation>();
@@ -37,20 +37,13 @@ namespace ReinforcementLearning
             _imageHeight = imageHeight;
         }
 
-        public void Memorize(Image<Rgba32> prev, int action, float currentReward, bool done)
+        public void Memorize(int action, float currentReward, bool done)
         {
-            if (prev.Width != _imageWidth || prev.Height != _imageHeight)
-            {
-                throw new ArgumentException($"Frame size differs from expected size");
-            }
-
-            _imagesQueue.Enqueue(prev);
-            if (_imagesQueue.Count <= _stageFrames)
+            if (_imagesQueue.Count < _stageFrames)
             {
                 return;
             }
 
-            _imagesQueue.Dequeue();
             _observations.Add(new Observation(_stageFrames)
             {
                 Id = _currentId++,
@@ -60,8 +53,26 @@ namespace ReinforcementLearning
             });
         }
 
-        public Image<Rgba32>[] GetCurrent() =>
-            _observations.Any() ? _observations.Last().Images.ToArray() : null;
+        public Image<Rgba32>[] Enqueue(Image<Rgba32> currentFrame)
+        {
+            if (currentFrame.Width != _imageWidth || currentFrame.Height != _imageHeight)
+            {
+                throw new ArgumentException($"Frame size differs from expected size");
+            }
+
+            _imagesQueue.Enqueue(currentFrame);
+            if (_imagesQueue.Count < _stageFrames)
+            {
+                return null;
+            }
+
+            if (_imagesQueue.Count > _stageFrames)
+            {
+                _imagesQueue.Dequeue();
+            }
+
+            return _imagesQueue.ToArray();
+        }
 
         public void EndEpisode()
         {

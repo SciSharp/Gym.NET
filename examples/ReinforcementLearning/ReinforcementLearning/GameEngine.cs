@@ -30,41 +30,39 @@ namespace ReinforcementLearning
             _trainer.StartAsyncTraining(memory, ct.Token);
 
             env.Seed(0);
-
             var rewards = new List<float>();
-            Image<Rgba32> oldImage = null;
 
-            var skipFrameCount = 0;
             for (var i = 0; i < game.Episodes; i++)
             {
                 var epsilon = game.StartingEpsilon * (game.Episodes - i) / game.Episodes;
                 Console.WriteLine($"Stage [{i + 1}]/[{game.Episodes}], with exploration rate {epsilon}");
 
                 env.Reset();
-                env.Step(env.ActionSpace.Sample());
                 float episodeReward = 0;
-                var action = 0;
                 var framescount = 0;
+                int? action = null;
+                var currentState = new Step();
                 while (true)
                 {
-                    Step currentState;
-                    if (skipFrameCount >= game.SkippedFrames + 1)
+                    var image = env.Render();
+
+                    if (framescount < game.SkippedFrames + 1 && action.HasValue)
                     {
-                        skipFrameCount = 0;
-                        currentState = env.Step(action);
+                        currentState = env.Step(action.Value);
                     }
                     else
                     {
-                        action = ComposeAction(game, env, memory, oldImage, epsilon);
-
-                        currentState = env.Step(action);
-                        if (oldImage != null)
+                        var currentFrame = memory.Enqueue(image);
+                        if (currentFrame != null && currentFrame.Length == game.MemoryFrames)
                         {
-                            memory.Memorize(oldImage, action, currentState.Reward, currentState.Done);
+                            action = ComposeAction(game, env, currentFrame, epsilon);
+                            currentState = env.Step(action.Value);
+                            memory.Memorize(action.Value, currentState.Reward, currentState.Done);
                         }
+
+                        framescount = 0;
                     }
 
-                    oldImage = env.Render();
                     episodeReward += currentState.Reward;
                     if (currentState.Done || framescount > 1000)
                     {
@@ -104,16 +102,12 @@ namespace ReinforcementLearning
             {
                 var image = env.Render();
                 imageQueue.Enqueue(image);
-                Step currentState;
+                var currentState = new Step();
                 if (imageQueue.Count == game.MemoryFrames)
                 {
                     var action = PredictAction(game, imageQueue.ToArray());
                     currentState = env.Step(action);
                     imageQueue.Dequeue();
-                }
-                else
-                {
-                    currentState = env.Step(env.ActionSpace.Sample());
                 }
 
                 rewards.Add(currentState.Reward);
@@ -124,7 +118,6 @@ namespace ReinforcementLearning
                     Console.WriteLine($"Reward:  {espisodeReward}, average is {episodesRewards.Average()}");
                     rewards = new List<float>();
                     env.Reset();
-                    env.Step(env.ActionSpace.Sample());
                 }
             }
         }
@@ -154,29 +147,20 @@ namespace ReinforcementLearning
             trainer.Load(choosenFile.OpenRead());
         }
 
-        private int ComposeAction(IGameConfiguration configuration, IEnv env, ReplayMemory memory, Image<Rgba32> oldImage, float epsilon)
+        private int ComposeAction(IGameConfiguration configuration, IEnv env, Image<Rgba32>[] currentFrame, float epsilon)
         {
-            if (oldImage == null)
-            {
-                return env.ActionSpace.Sample();
-            }
-            var current = memory.GetCurrent();
-            if (current == null || current.Length < configuration.MemoryFrames)
-            {
-                return env.ActionSpace.Sample();
-            }
-
             if (_random.NextDouble() <= epsilon)
             {
                 return env.ActionSpace.Sample();
             }
 
-            return PredictAction(configuration, current);
+            return PredictAction(configuration, currentFrame);
         }
 
         private int PredictAction(IGameConfiguration configuration, Image<Rgba32>[] current)
         {
             var processedImage = _imager.Load(current)
+                .Crop(configuration.FramePadding)
                 .ComposeFrames(configuration.ScaledImageWidth, configuration.ScaledImageHeight, configuration.ImageStackLayout)
                 .InvertColors()
                 .Grayscale()

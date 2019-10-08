@@ -8,15 +8,16 @@ namespace ReinforcementLearning.Runner
     public sealed class CartPoleConfiguration : IGameConfiguration
     {
         public IEnv EnvIstance => new CartPoleEnv(AvaloniaEnvViewer.Run);
-        public ImageStackLayout ImageStackLayout => ImageStackLayout.Horizontal;
+        public ImageStackLayout ImageStackLayout => ImageStackLayout.Vertical;
         public int MemoryFrames => 2;
-        public int SkippedFrames => 1;
+        public int SkippedFrames => 3;
         public int FrameWidth => 600;
         public int FrameHeight => 400;
         public int ScaledImageWidth => 50;
         public int ScaledImageHeight => 50;
-        public float StartingEpsilon => 1;
-        public int Episodes => 500;
+        public FramePadding FramePadding => new FramePadding { Top = 150, Bottom = 100 };
+        public float StartingEpsilon => 1F;
+        public int Episodes => 1000;
         public int BatchSize => 100;
         public int Epochs => 10;
     }

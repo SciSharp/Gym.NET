@@ -29,7 +29,7 @@ namespace ReinforcementLearning
                 .ToList();
 
             var observations = bestEpisodes
-                .SelectMany(x => x.Observations)
+                .SelectMany(x => x.Observations.Take(x.Observations.Length * 2 / 3))
                 .ToList();
 
             Console.WriteLine($"Training on best {bestEpisodes.Count} episodes out of {memory.Episodes.Count}. {observations.Count} observations");
@@ -49,6 +49,7 @@ namespace ReinforcementLearning
 
                 var x = _imager
                     .Load(observation.Images)
+                    .Crop(_configuration.FramePadding)
                     .ComposeFrames(_configuration.ScaledImageWidth, _configuration.ScaledImageHeight, _configuration.ImageStackLayout)
                     .InvertColors()
                     .Grayscale()
