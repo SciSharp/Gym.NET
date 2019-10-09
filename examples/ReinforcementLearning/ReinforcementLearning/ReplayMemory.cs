@@ -29,12 +29,14 @@ namespace ReinforcementLearning
         private readonly int _stageFrames;
         private readonly int _imageWidth;
         private readonly int _imageHeight;
+        private readonly int _episodesCapacity;
 
-        public ReplayMemory(int stageFrames, int imageWidth, int imageHeight)
+        public ReplayMemory(int stageFrames, int imageWidth, int imageHeight, int episodesCapacity)
         {
             _stageFrames = stageFrames;
             _imageWidth = imageWidth;
             _imageHeight = imageHeight;
+            _episodesCapacity = episodesCapacity;
         }
 
         public void Memorize(int action, float currentReward, bool done)
@@ -77,7 +79,19 @@ namespace ReinforcementLearning
         public void EndEpisode()
         {
             _imagesQueue = new Queue<Image<Rgba32>>();
-            Episodes.Add(new Episode { Observations = _observations.ToArray() });
+
+            var totalReward = _observations.Select(x => x.Reward).Sum();
+            var lowestEpisode = _observations.OrderBy(x => x.Reward).FirstOrDefault();
+            if (lowestEpisode == null || totalReward >= lowestEpisode.Reward)
+            {
+                Episodes.Add(new Episode { Observations = _observations.ToArray() });
+            }
+
+            if (Episodes.Count > _episodesCapacity)
+            {
+                Episodes.TryTake(lowestEpisode);
+            }
+
             _observations = new List<Observation>();
         }
 
