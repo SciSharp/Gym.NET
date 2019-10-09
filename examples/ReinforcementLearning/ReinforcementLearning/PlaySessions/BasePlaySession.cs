@@ -16,7 +16,7 @@ namespace ReinforcementLearning.PlaySessions
         protected Imager Imager;
         protected ReplayMemory Memory;
         protected int Framescount;
-        protected int? Action;
+        protected int Action;
         protected Step CurrentState;
         protected float CurrentEpisodeReward;
         protected List<float> EpisodeRewards = new List<float>();
@@ -38,15 +38,17 @@ namespace ReinforcementLearning.PlaySessions
             for (var i = 0; i < Game.Episodes; i++)
             {
                 OnEpisodeStart(i);
+                Framescount = Game.SkippedFrames + 1;
 
                 Game.EnvIstance.Reset();
+                CurrentState = new Step();
                 while (true)
                 {
                     var image = Game.EnvIstance.Render();
 
-                    if (Framescount < Game.SkippedFrames + 1 && Action.HasValue)
+                    if (Framescount < Game.SkippedFrames + 1)
                     {
-                        CurrentState = Game.EnvIstance.Step(Action.Value);
+                        CurrentState = Game.EnvIstance.Step(Action);
                     }
                     else
                     {
@@ -54,8 +56,8 @@ namespace ReinforcementLearning.PlaySessions
                         if (currentFrame != null && currentFrame.Length == Game.MemoryFrames)
                         {
                             Action = ComposeAction(currentFrame);
-                            CurrentState = Game.EnvIstance.Step(Action.Value);
-                            Memory.Memorize(Action.Value, CurrentState.Reward, CurrentState.Done);
+                            CurrentState = Game.EnvIstance.Step(Action);
+                            Memory.Memorize(Action, CurrentState.Reward, CurrentState.Done);
                         }
 
                         Framescount = 0;
