@@ -63,7 +63,7 @@ namespace ReinforcementLearning
         public void TrainOnMemory(IConcurrentMemory memory)
         {
             var trainingData = _datasetBuilder.BuildDataset(memory);
-            if (trainingData.Count == 0)
+            if (trainingData == null || trainingData.Count == 0)
             {
                 return;
             }

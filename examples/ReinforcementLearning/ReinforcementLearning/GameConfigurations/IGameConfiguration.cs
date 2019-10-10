@@ -7,6 +7,7 @@ namespace ReinforcementLearning.GameConfigurations
         IEnv EnvIstance { get; }
         ImageStackLayout ImageStackLayout { get; }
         int MemoryFrames { get; }
+        int MemoryCapacity { get; }
         int SkippedFrames { get; }
         int FrameWidth { get; }
         int FrameHeight { get; }

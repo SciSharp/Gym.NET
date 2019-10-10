@@ -50,7 +50,7 @@ namespace ReinforcementLearning
             {
                 Id = _currentId++,
                 ActionTaken = action,
-                Reward = done ? -20 : currentReward,
+                Reward = currentReward,
                 Images = _imagesQueue.ToArray()
             });
         }
@@ -76,20 +76,19 @@ namespace ReinforcementLearning
             return _imagesQueue.ToArray();
         }
 
-        public void EndEpisode()
+        public void EndEpisode(float episodeReward)
         {
             _imagesQueue = new Queue<Image<Rgba32>>();
 
-            var totalReward = _observations.Select(x => x.Reward).Sum();
-            var lowestEpisode = _observations.OrderBy(x => x.Reward).FirstOrDefault();
-            if (lowestEpisode == null || totalReward >= lowestEpisode.Reward)
+            var lowestEpisode = Episodes.OrderBy(x => x.TotalReward).FirstOrDefault();
+            if (lowestEpisode == null || episodeReward >= lowestEpisode.TotalReward || Episodes.Count < _episodesCapacity)
             {
                 Episodes.Add(new Episode { Observations = _observations.ToArray() });
             }
 
             if (Episodes.Count > _episodesCapacity)
             {
-                Episodes.TryTake(lowestEpisode);
+                Episodes = new ConcurrentBag<Episode>(Episodes.Except(new[] { lowestEpisode }));
             }
 
             _observations = new List<Observation>();

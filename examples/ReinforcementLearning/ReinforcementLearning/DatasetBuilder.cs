@@ -22,17 +22,23 @@ namespace ReinforcementLearning
 
         public ITrainingDataset BuildDataset(IConcurrentMemory memory)
         {
-            var bestEpisodes = memory
-                .Episodes
-                .OrderByDescending(x => x.TotalReward)
-                .Take(memory.Episodes.Count / 10)
-                .ToList();
+            if (memory.Episodes.Count < _configuration.MemoryCapacity)
+            {
+                return default;
+            }
 
-            var observations = bestEpisodes
+            //var episodes = memory
+            //    .Episodes
+            //    .OrderByDescending(x => x.TotalReward)
+            //    .Take(memory.Episodes.Count / 10)
+            //    .ToList();
+            var episodes = memory.Episodes;
+
+            var observations = episodes
                 .SelectMany(x => x.Observations.Take(x.Observations.Length * 2 / 3))
                 .ToList();
 
-            Console.WriteLine($"Training on best {bestEpisodes.Count} episodes out of {memory.Episodes.Count}. {observations.Count} observations");
+            Console.WriteLine($"Training on best {episodes.Count} episodes out of {memory.Episodes.Count}. {observations.Count} observations");
 
             return DatasetLoader.Training(BuildRawData(observations), _configuration.BatchSize);
         }

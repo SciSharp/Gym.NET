@@ -26,11 +26,11 @@ namespace ReinforcementLearning.PlaySessions
             Console.WriteLine($"Stage [{episodeIndex + 1}]/[{Game.Episodes}], with exploration rate {_epsilon}");
         }
 
-        protected override void OnEpisodeDone()
+        protected override void OnEpisodeDone(float episodeReward)
         {
-            base.OnEpisodeDone();
+            base.OnEpisodeDone(episodeReward);
 
-            Memory.EndEpisode();
+            Memory.EndEpisode(episodeReward);
         }
 
         protected override void OnCompleted()

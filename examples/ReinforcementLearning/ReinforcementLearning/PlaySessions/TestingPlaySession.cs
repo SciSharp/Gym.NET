@@ -16,9 +16,9 @@ namespace ReinforcementLearning.PlaySessions
             Console.WriteLine($"Stage [{episodeIndex + 1}]/[{Game.Episodes}]");
         }
 
-        protected override void OnEpisodeDone()
+        protected override void OnEpisodeDone(float episodeReward)
         {
-            base.OnEpisodeDone();
+            base.OnEpisodeDone(episodeReward);
 
             Memory.Clear();
         }

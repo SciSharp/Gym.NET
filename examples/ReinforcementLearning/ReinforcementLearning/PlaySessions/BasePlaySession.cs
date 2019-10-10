@@ -19,7 +19,7 @@ namespace ReinforcementLearning.PlaySessions
         protected int Action;
         protected Step CurrentState;
         protected float CurrentEpisodeReward;
-        protected List<float> EpisodeRewards = new List<float>();
+        protected Queue<float> EpisodeRewards = new Queue<float>();
         protected Random Random = new Random();
 
         protected BasePlaySession(TGameConfiguration game, Trainer trainer)
@@ -28,7 +28,7 @@ namespace ReinforcementLearning.PlaySessions
             Trainer = trainer;
             Imager = new Imager();
             CurrentState = new Step();
-            Memory = new ReplayMemory(Game.MemoryFrames, Game.FrameWidth, Game.FrameHeight);
+            Memory = new ReplayMemory(Game.MemoryFrames, Game.FrameWidth, Game.FrameHeight, Game.MemoryCapacity);
         }
 
         public void Play()
@@ -66,9 +66,13 @@ namespace ReinforcementLearning.PlaySessions
                     CurrentEpisodeReward += CurrentState.Reward;
                     if (CurrentState.Done || Framescount > 1000)
                     {
-                        OnEpisodeDone();
-                        EpisodeRewards.Add(CurrentEpisodeReward);
-                        Console.WriteLine($"Reward: {CurrentEpisodeReward}, average is {EpisodeRewards.Average()}");
+                        OnEpisodeDone(CurrentEpisodeReward);
+                        EpisodeRewards.Enqueue(CurrentEpisodeReward);
+                        if (EpisodeRewards.Count > 100)
+                        {
+                            EpisodeRewards.Dequeue();
+                        }
+                        Console.WriteLine($"Reward: {CurrentEpisodeReward}, average on last 100 is {EpisodeRewards.Average()}");
                         CurrentEpisodeReward = 0;
                         break;
                     }
@@ -98,7 +102,7 @@ namespace ReinforcementLearning.PlaySessions
         protected virtual void OnEpisodeStart(int episodeIndex)
         { }
 
-        protected virtual void OnEpisodeDone()
+        protected virtual void OnEpisodeDone(float episodeReward)
         { }
 
         protected virtual void OnCompleted()
