@@ -12,15 +12,15 @@ namespace ReinforcementLearning.Runner
 
         public IEnv EnvIstance => _env.Value;
         public ImageStackLayout ImageStackLayout => ImageStackLayout.Vertical;
-        public int MemoryFrames => 2;
+        public int MemoryFrames => 4;
         public int MemoryCapacity => 100;
-        public int SkippedFrames => 1;
+        public int SkippedFrames => 0;
         public int FrameWidth => 600;
         public int FrameHeight => 400;
-        public int ScaledImageWidth => 40;
-        public int ScaledImageHeight => 40;
+        public int ScaledImageWidth => 60;
+        public int ScaledImageHeight => 60;
         public FramePadding FramePadding => new FramePadding { Top = 150, Bottom = 100, Left = 200, Right = 200};
-        public float StartingEpsilon => .6F;
+        public float StartingEpsilon => .7F;
         public int Episodes => 4000;
         public int BatchSize => 100;
         public int Epochs => 10;
