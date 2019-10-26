@@ -3,16 +3,28 @@ using SixLabors.ImageSharp.PixelFormats;
 
 namespace ReinforcementLearning
 {
-    public class Observation
+    public abstract class Observation<TData>
     {
         public int Id { get; set; }
-        public Image<Rgba32>[] Images { get; set; }
+        public TData[] Data { get; set; }
         public int ActionTaken { get; set; }
         public float Reward { get; set; }
 
-        public Observation(int images)
+        protected Observation(int dataCount)
         {
-            Images = new Image<Rgba32>[images];
+            Data = new TData[dataCount];
         }
+    }
+
+    public class ImageObservation : Observation<Image<Rgba32>>
+    {
+        public ImageObservation(int dataCount) : base(dataCount)
+        { }
+    }
+
+    public class ParamterObservation : Observation<float[]>
+    {
+        public ParamterObservation(int dataCount) : base(dataCount)
+        { }
     }
 }

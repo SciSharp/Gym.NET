@@ -54,7 +54,7 @@ namespace ReinforcementLearning
                 }
 
                 var x = _imager
-                    .Load(observation.Images)
+                    .Load(observation.Data)
                     .Crop(_configuration.FramePadding)
                     .ComposeFrames(_configuration.ScaledImageWidth, _configuration.ScaledImageHeight, _configuration.ImageStackLayout)
                     .InvertColors()
