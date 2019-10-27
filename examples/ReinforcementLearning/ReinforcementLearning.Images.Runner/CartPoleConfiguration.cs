@@ -19,13 +19,13 @@ namespace ReinforcementLearning.Images.Runner
         public int MemoryStates => 2;
         public ImageStackLayout ImageStackLayout => ImageStackLayout.Vertical;
         public int MemoryCapacity => 100;
-        public int SkippedFrames => 0;
+        public int SkippedFrames => 1;
         public int FrameWidth => 600;
         public int FrameHeight => 400;
-        public int ScaledImageWidth => 60;
-        public int ScaledImageHeight => 60;
+        public int ScaledImageWidth => 40;
+        public int ScaledImageHeight => 40;
         public FramePadding FramePadding => new FramePadding { Top = 150, Bottom = 100, Left = 200, Right = 200 };
-        public float StartingEpsilon => .7F;
+        public float StartingEpsilon => 1F;
         public int Episodes => 4000;
         public int BatchSize => 100;
         public int Epochs => 10;
