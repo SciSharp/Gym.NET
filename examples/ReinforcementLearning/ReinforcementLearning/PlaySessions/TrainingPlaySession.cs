@@ -12,7 +12,7 @@ namespace ReinforcementLearning.PlaySessions
         private float _epsilon;
         private readonly CancellationTokenSource _ct;
 
-        internal TrainingPlaySession(TGameConfiguration game, Trainer<TData> trainer, ReplayMemory<TData> memory, DataBuilder<TData> dataBuilder) : base(game, trainer, memory, dataBuilder)
+        internal TrainingPlaySession(TGameConfiguration game, Trainer<TData> trainer, ReplayMemory<TData> memory, DataBuilder<TGameConfiguration, TData> dataBuilder) : base(game, trainer, memory, dataBuilder)
 
         {
             _ct = new CancellationTokenSource();

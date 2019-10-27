@@ -3,9 +3,9 @@ using ReinforcementLearning.GameConfigurations;
 
 namespace ReinforcementLearning.DataBuilders
 {
-    public class ParameterDataBuilder : DataBuilder<float[]>
+    public class ParameterDataBuilder : DataBuilder<IParametersGameConfiguration, float[]>
     {
-        public ParameterDataBuilder(IGameConfiguration configuration, int outputs) : base(configuration, outputs)
+        public ParameterDataBuilder(IParametersGameConfiguration configuration, int outputs) : base(configuration, outputs)
         { }
 
         public override float[] BuildInput(float[][] dataGroup) =>dataGroup

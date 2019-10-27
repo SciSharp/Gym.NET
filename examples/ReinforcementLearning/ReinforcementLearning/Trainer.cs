@@ -4,12 +4,10 @@ using System.Threading;
 using NeuralNetworkNET.APIs;
 using NeuralNetworkNET.APIs.Enums;
 using NeuralNetworkNET.APIs.Interfaces;
-using NeuralNetworkNET.APIs.Structs;
 using NeuralNetworkNET.SupervisedLearning.Progress;
 using ReinforcementLearning.DataBuilders;
 using ReinforcementLearning.GameConfigurations;
 using ReinforcementLearning.MemoryTypes;
-using SixLabors.ImageSharp.PixelFormats;
 
 namespace ReinforcementLearning
 {
@@ -17,20 +15,17 @@ namespace ReinforcementLearning
     {
         private INeuralNetwork _network;
         private readonly Random _random = new Random();
-        private readonly DataBuilder<TData> _dataBuilder;
+        private readonly DataBuilder<IGameConfiguration, TData> _dataBuilder;
         private readonly IGameConfiguration _configuration;
         private readonly int _outputs;
 
-        public Trainer(IGameConfiguration configuration, DataBuilder<TData> dataBuilder,  int outputs)
+        public Trainer(IGameConfiguration configuration, DataBuilder<IGameConfiguration, TData> dataBuilder,  int outputs)
         {
             _configuration = configuration;
             _outputs = outputs;
             _dataBuilder = dataBuilder;
 
-            _network = NetworkManager.NewSequential(TensorInfo.Image<Alpha8>(configuration.ScaledImageHeight, configuration.ScaledImageWidth),
-                NetworkLayers.Convolutional((4, 4),40, ActivationType.ReLU),
-                NetworkLayers.FullyConnected(20, ActivationType.ReLU),
-                NetworkLayers.Softmax(outputs));
+            _network = configuration.BuildNeuralNetwork();
         }
 
         public void StartAsyncTraining(IConcurrentMemory<TData> memory, CancellationToken ct = default)

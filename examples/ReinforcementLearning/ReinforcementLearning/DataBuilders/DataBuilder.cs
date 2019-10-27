@@ -8,14 +8,15 @@ using ReinforcementLearning.MemoryTypes;
 
 namespace ReinforcementLearning.DataBuilders
 {
-    public abstract class DataBuilder<TData>
+    public abstract class DataBuilder<TConfiguration, TData>
+        where TConfiguration : IGameConfiguration
     {
-        protected readonly IGameConfiguration Configuration;
+        protected readonly TConfiguration Configuration;
         protected readonly int Outputs;
         protected readonly Imager Imager = new Imager();
         protected readonly Dictionary<int, (float[] x, float[] y)> ObservationDictionary = new Dictionary<int, (float[] x, float[] y)>();
 
-        protected DataBuilder(IGameConfiguration configuration, int outputs)
+        protected DataBuilder(TConfiguration configuration, int outputs)
         {
             Configuration = configuration;
             Outputs = outputs;

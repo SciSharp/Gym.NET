@@ -15,7 +15,7 @@ namespace ReinforcementLearning.PlaySessions
         protected IGameConfiguration Game;
         protected Imager Imager;
         protected ReplayMemory<TData> Memory;
-        protected readonly DataBuilder<TData> DataBuilder;
+        protected readonly DataBuilder<TGameConfiguration, TData> DataBuilder;
         protected int Framescount;
         protected int Action;
         protected Step CurrentState;
@@ -23,7 +23,7 @@ namespace ReinforcementLearning.PlaySessions
         protected Queue<float> EpisodeRewards = new Queue<float>();
         protected Random Random = new Random();
 
-        protected BasePlaySession(TGameConfiguration game, Trainer<TData> trainer, ReplayMemory<TData> memory, DataBuilder<TData> dataBuilder)
+        protected BasePlaySession(TGameConfiguration game, Trainer<TData> trainer, ReplayMemory<TData> memory, DataBuilder<TGameConfiguration, TData> dataBuilder)
         {
             Game = game;
             Trainer = trainer;
@@ -55,7 +55,7 @@ namespace ReinforcementLearning.PlaySessions
                     else
                     {
                         var currentFrame = Memory.Enqueue(image, CurrentState);
-                        if (currentFrame != null && currentFrame.Length == Game.MemoryFrames)
+                        if (currentFrame != null && currentFrame.Length == Game.MemoryStates)
                         {
                             Action = ComposeAction(currentFrame);
                             CurrentState = Game.EnvInstance.Step(Action);

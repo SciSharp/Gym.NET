@@ -10,14 +10,14 @@ using SixLabors.ImageSharp.PixelFormats;
 
 namespace ReinforcementLearning.GameEngines
 {
-    public abstract class GameEngine<TData>
+    public abstract class GameEngine<TGameConfiguration, TData>
+        where TGameConfiguration : IGameConfiguration
     {
         protected Trainer<TData> Trainer;
         protected ReplayMemory<TData> Memory;
-        protected DataBuilder<TData> DataBuilder;
+        protected DataBuilder<TGameConfiguration, TData> DataBuilder;
 
-        public void Play<TGameConfiguration>(TGameConfiguration game)
-            where TGameConfiguration : IGameConfiguration
+        public void Play(TGameConfiguration game)
         {
             Trainer = BuildTrainer(game);
             Memory = BuildMemory(game);
@@ -52,12 +52,8 @@ namespace ReinforcementLearning.GameEngines
             }
         }
 
-        protected abstract DataBuilder<TData> BuildDataBuilder<TGameConfiguration>(TGameConfiguration game)
-            where TGameConfiguration : IGameConfiguration;
-
-        internal abstract ReplayMemory<TData> BuildMemory<TGameConfiguration>(TGameConfiguration game)
-            where TGameConfiguration : IGameConfiguration;
-
+        protected abstract DataBuilder<TGameConfiguration, TData> BuildDataBuilder(TGameConfiguration game);
+        internal abstract ReplayMemory<TData> BuildMemory(TGameConfiguration game);
         internal abstract Trainer<TData> BuildTrainer(IGameConfiguration game);
 
         private static void LoadModelToTrainer(Trainer<TData> trainer)
@@ -77,29 +73,5 @@ namespace ReinforcementLearning.GameEngines
             Console.WriteLine($"Loading model {choosenFile.FullName}");
             trainer.Load(choosenFile.OpenRead());
         }
-    }
-
-    public class ImageGameEngine : GameEngine<Image<Rgba32>>
-    {
-        internal override ReplayMemory<Image<Rgba32>> BuildMemory<TGameConfiguration>(TGameConfiguration game) =>
-            new ImageReplayMemory(game.MemoryFrames, game.ScaledImageWidth, game.ScaledImageHeight, game.MemoryCapacity);
-
-        internal override Trainer<Image<Rgba32>> BuildTrainer(IGameConfiguration game) =>
-            new Trainer<Image<Rgba32>>(game, DataBuilder, game.EnvInstance.ActionSpace.Shape.Size);
-
-        protected override DataBuilder<Image<Rgba32>> BuildDataBuilder<TGameConfiguration>(TGameConfiguration game)=>
-            new ImageDataBuilder(game, game.EnvInstance.ActionSpace.Shape.Size);
-    }
-
-    public class ParameterGameEngine : GameEngine<float[]>
-    {
-        internal override ReplayMemory<float[]> BuildMemory<TGameConfiguration>(TGameConfiguration game) =>
-            new ParameterReplayMemory(game.MemoryFrames, game.ScaledImageWidth, game.ScaledImageHeight, game.MemoryCapacity);
-
-        internal override Trainer<float[]> BuildTrainer(IGameConfiguration game) =>
-            new Trainer<float[]>(game, DataBuilder, game.EnvInstance.ActionSpace.Shape.Size);
-
-        protected override DataBuilder<float[]> BuildDataBuilder<TGameConfiguration>(TGameConfiguration game) =>
-            new ParameterDataBuilder(game, game.EnvInstance.ActionSpace.Shape.Size);
     }
 }
