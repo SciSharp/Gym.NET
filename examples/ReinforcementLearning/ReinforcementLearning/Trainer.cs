@@ -11,15 +11,16 @@ using ReinforcementLearning.MemoryTypes;
 
 namespace ReinforcementLearning
 {
-    public class Trainer<TData>
+    public class Trainer<TGameConfiguration, TData> 
+        where TGameConfiguration : IGameConfiguration
     {
         private INeuralNetwork _network;
         private readonly Random _random = new Random();
-        private readonly DataBuilder<IGameConfiguration, TData> _dataBuilder;
-        private readonly IGameConfiguration _configuration;
+        private readonly DataBuilder<TGameConfiguration, TData> _dataBuilder;
+        private readonly TGameConfiguration _configuration;
         private readonly int _outputs;
 
-        public Trainer(IGameConfiguration configuration, DataBuilder<IGameConfiguration, TData> dataBuilder,  int outputs)
+        public Trainer(TGameConfiguration configuration, DataBuilder<TGameConfiguration, TData> dataBuilder,  int outputs)
         {
             _configuration = configuration;
             _outputs = outputs;

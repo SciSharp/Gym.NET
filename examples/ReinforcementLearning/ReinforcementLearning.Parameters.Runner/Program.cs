@@ -6,7 +6,7 @@ namespace ReinforcementLearning.Parameters.Runner
     {
         static void Main(string[] args)
         {
-            new ParameterGameEngine().Play(new CartPoleConfiguration());
+            new ParameterGameEngine(new CartPoleConfiguration()).Play();
         }
     }
 }

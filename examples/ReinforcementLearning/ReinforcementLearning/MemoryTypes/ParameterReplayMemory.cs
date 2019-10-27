@@ -17,10 +17,16 @@ namespace ReinforcementLearning.MemoryTypes
 
         protected override float[] GetDataInput(Image<Rgba32> currentFrame, Step currentStep)
         {
+            if (currentStep.Observation == null)
+            {
+                return Enumerable.Repeat(0F, _parameterLength).ToArray();
+            }
+
             var data = currentStep
                 .Observation
                 .GetData()
-                .Cast<float>()
+                .Cast<double>()
+                .Select(x => (float)x)
                 .ToArray();
 
             if (data.Length != _parameterLength)

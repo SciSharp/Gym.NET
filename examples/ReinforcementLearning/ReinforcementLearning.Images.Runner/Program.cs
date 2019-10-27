@@ -6,7 +6,7 @@ namespace ReinforcementLearning.Images.Runner
     {
         static void Main(string[] args)
         {
-            new ImageGameEngine().Play(new CartPoleConfiguration());
+            new ImageGameEngine(new CartPoleConfiguration()).Play();
         }
     }
 }

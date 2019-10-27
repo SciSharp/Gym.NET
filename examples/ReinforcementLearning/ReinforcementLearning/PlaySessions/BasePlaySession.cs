@@ -11,7 +11,7 @@ namespace ReinforcementLearning.PlaySessions
     internal abstract class BasePlaySession<TGameConfiguration, TData>
         where TGameConfiguration : IGameConfiguration
     {
-        protected readonly Trainer<TData> Trainer;
+        protected readonly Trainer<TGameConfiguration, TData> Trainer;
         protected IGameConfiguration Game;
         protected Imager Imager;
         protected ReplayMemory<TData> Memory;
@@ -23,7 +23,7 @@ namespace ReinforcementLearning.PlaySessions
         protected Queue<float> EpisodeRewards = new Queue<float>();
         protected Random Random = new Random();
 
-        protected BasePlaySession(TGameConfiguration game, Trainer<TData> trainer, ReplayMemory<TData> memory, DataBuilder<TGameConfiguration, TData> dataBuilder)
+        protected BasePlaySession(TGameConfiguration game, Trainer<TGameConfiguration, TData> trainer, ReplayMemory<TData> memory, DataBuilder<TGameConfiguration, TData> dataBuilder)
         {
             Game = game;
             Trainer = trainer;

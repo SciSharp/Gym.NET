@@ -5,23 +5,28 @@ using ReinforcementLearning.DataBuilders;
 using ReinforcementLearning.GameConfigurations;
 using ReinforcementLearning.MemoryTypes;
 using ReinforcementLearning.PlaySessions;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
 
 namespace ReinforcementLearning.GameEngines
 {
     public abstract class GameEngine<TGameConfiguration, TData>
         where TGameConfiguration : IGameConfiguration
     {
-        protected Trainer<TData> Trainer;
+        private readonly TGameConfiguration _game;
+
+        protected GameEngine(TGameConfiguration game)
+        {
+            _game = game;
+            Memory = BuildMemory(game);
+            DataBuilder = BuildDataBuilder(game);
+            Trainer = BuildTrainer(game);
+        }
+
+        protected Trainer<TGameConfiguration, TData> Trainer;
         protected ReplayMemory<TData> Memory;
         protected DataBuilder<TGameConfiguration, TData> DataBuilder;
 
-        public void Play(TGameConfiguration game)
+        public void Play()
         {
-            Trainer = BuildTrainer(game);
-            Memory = BuildMemory(game);
-            DataBuilder = BuildDataBuilder(game);
 
             Console.WriteLine("Press [L] to load last saved model, any other key to skip");
             var pressed = Console.ReadKey().KeyChar;
@@ -40,10 +45,10 @@ namespace ReinforcementLearning.GameEngines
                 switch (pressed)
                 {
                     case '1':
-                        new TestingPlaySession<TGameConfiguration, TData>(game, Trainer, Memory, DataBuilder).Play();
+                        new TestingPlaySession<TGameConfiguration, TData>(_game, Trainer, Memory, DataBuilder).Play();
                         break;
                     case '2':
-                        new TrainingPlaySession<TGameConfiguration, TData>(game, Trainer, Memory, DataBuilder).Play();
+                        new TrainingPlaySession<TGameConfiguration, TData>(_game, Trainer, Memory, DataBuilder).Play();
                         break;
                     default:
                         Console.WriteLine($"Invalid selection {pressed}");
@@ -54,9 +59,9 @@ namespace ReinforcementLearning.GameEngines
 
         protected abstract DataBuilder<TGameConfiguration, TData> BuildDataBuilder(TGameConfiguration game);
         internal abstract ReplayMemory<TData> BuildMemory(TGameConfiguration game);
-        internal abstract Trainer<TData> BuildTrainer(IGameConfiguration game);
+        internal abstract Trainer<TGameConfiguration, TData> BuildTrainer(TGameConfiguration game);
 
-        private static void LoadModelToTrainer(Trainer<TData> trainer)
+        private static void LoadModelToTrainer(Trainer<TGameConfiguration, TData> trainer)
         {
             var choosenFile = Directory.GetFiles("./")
                 .Select(x => new FileInfo(x))
