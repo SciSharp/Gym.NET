@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
@@ -95,7 +94,7 @@ namespace ReinforcementLearning
             }
         }
 
-        public virtual Imager Grayscale()
+        public virtual Imager Greyscale()
         {
             _actions.Add(x => x.Grayscale());
             return this;

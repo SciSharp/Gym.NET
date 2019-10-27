@@ -1,18 +1,19 @@
 ﻿using System;
 using System.Threading;
+using ReinforcementLearning.DataBuilders;
 using ReinforcementLearning.GameConfigurations;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
+using ReinforcementLearning.MemoryTypes;
 
 namespace ReinforcementLearning.PlaySessions
 {
-    internal class TrainingPlaySession<TGameConfiguration> : BasePlaySession<TGameConfiguration>
+    internal class TrainingPlaySession<TGameConfiguration, TData> : BasePlaySession<TGameConfiguration, TData>
         where TGameConfiguration : IGameConfiguration
     {
         private float _epsilon;
         private readonly CancellationTokenSource _ct;
 
-        internal TrainingPlaySession(TGameConfiguration game, Trainer trainer) : base(game, trainer)
+        internal TrainingPlaySession(TGameConfiguration game, Trainer<TData> trainer, ReplayMemory<TData> memory, DataBuilder<TData> dataBuilder) : base(game, trainer, memory, dataBuilder)
+
         {
             _ct = new CancellationTokenSource();
             Trainer.StartAsyncTraining(Memory, _ct.Token);
@@ -44,14 +45,14 @@ namespace ReinforcementLearning.PlaySessions
             Console.ResetColor();
         }
 
-        protected override int ComposeAction(Image<Rgba32>[] current)
+        protected override int ComposeAction(TData[] currentData)
         {
-            if (Random.NextDouble() <= _epsilon)
+            if(Random.NextDouble() <= _epsilon)
             {
-                return Game.EnvIstance.ActionSpace.Sample();
+                return Game.EnvInstance.ActionSpace.Sample();
             }
 
-            return base.ComposeAction(current);
+            return base.ComposeAction(currentData);
         }
     }
 }

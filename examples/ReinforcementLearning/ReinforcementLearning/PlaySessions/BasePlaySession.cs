@@ -2,19 +2,20 @@
 using System.Collections.Generic;
 using System.Linq;
 using Gym.Observations;
+using ReinforcementLearning.DataBuilders;
 using ReinforcementLearning.GameConfigurations;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
+using ReinforcementLearning.MemoryTypes;
 
 namespace ReinforcementLearning.PlaySessions
 {
-    internal abstract class BasePlaySession<TGameConfiguration>
+    internal abstract class BasePlaySession<TGameConfiguration, TData>
         where TGameConfiguration : IGameConfiguration
     {
-        protected readonly Trainer Trainer;
+        protected readonly Trainer<TData> Trainer;
         protected IGameConfiguration Game;
         protected Imager Imager;
-        protected ReplayMemory Memory;
+        protected ReplayMemory<TData> Memory;
+        protected readonly DataBuilder<TData> DataBuilder;
         protected int Framescount;
         protected int Action;
         protected Step CurrentState;
@@ -22,41 +23,42 @@ namespace ReinforcementLearning.PlaySessions
         protected Queue<float> EpisodeRewards = new Queue<float>();
         protected Random Random = new Random();
 
-        protected BasePlaySession(TGameConfiguration game, Trainer trainer)
+        protected BasePlaySession(TGameConfiguration game, Trainer<TData> trainer, ReplayMemory<TData> memory, DataBuilder<TData> dataBuilder)
         {
             Game = game;
             Trainer = trainer;
+            Memory = memory;
+            DataBuilder = dataBuilder;
             Imager = new Imager();
             CurrentState = new Step();
-            Memory = new ReplayMemory(Game.MemoryFrames, Game.FrameWidth, Game.FrameHeight, Game.MemoryCapacity);
         }
 
         public void Play()
         {
-            Game.EnvIstance.Seed(0);
+            Game.EnvInstance.Seed(0);
 
             for (var i = 0; i < Game.Episodes; i++)
             {
                 OnEpisodeStart(i);
                 Framescount = Game.SkippedFrames + 1;
 
-                Game.EnvIstance.Reset();
+                Game.EnvInstance.Reset();
                 CurrentState = new Step();
                 while (true)
                 {
-                    var image = Game.EnvIstance.Render();
+                    var image = Game.EnvInstance.Render();
 
                     if (Framescount < Game.SkippedFrames + 1)
                     {
-                        CurrentState = Game.EnvIstance.Step(Action);
+                        CurrentState = Game.EnvInstance.Step(Action);
                     }
                     else
                     {
-                        var currentFrame = Memory.Enqueue(image);
+                        var currentFrame = Memory.Enqueue(image, CurrentState);
                         if (currentFrame != null && currentFrame.Length == Game.MemoryFrames)
                         {
                             Action = ComposeAction(currentFrame);
-                            CurrentState = Game.EnvIstance.Step(Action);
+                            CurrentState = Game.EnvInstance.Step(Action);
                             Memory.Memorize(Action, CurrentState.Reward, CurrentState.Done);
                         }
 
@@ -84,17 +86,9 @@ namespace ReinforcementLearning.PlaySessions
             OnCompleted();
         }
 
-        protected virtual int ComposeAction(Image<Rgba32>[] current)
+        protected virtual int ComposeAction(TData[] currentData)
         {
-            var processedImage = Imager.Load(current)
-                .Crop(Game.FramePadding)
-                .ComposeFrames(Game.ScaledImageWidth, Game.ScaledImageHeight, Game.ImageStackLayout)
-                .InvertColors()
-                .Grayscale()
-                .Compile()
-                .Rectify()
-                .ToArray();
-
+            var processedImage = DataBuilder.BuildInput(currentData);
             var prediction = Trainer.Predict(processedImage);
             return prediction.ToList().IndexOf(prediction.Max());
         }

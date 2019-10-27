@@ -6,24 +6,26 @@ using NeuralNetworkNET.APIs.Enums;
 using NeuralNetworkNET.APIs.Interfaces;
 using NeuralNetworkNET.APIs.Structs;
 using NeuralNetworkNET.SupervisedLearning.Progress;
+using ReinforcementLearning.DataBuilders;
 using ReinforcementLearning.GameConfigurations;
+using ReinforcementLearning.MemoryTypes;
 using SixLabors.ImageSharp.PixelFormats;
 
 namespace ReinforcementLearning
 {
-    public class Trainer
+    public class Trainer<TData>
     {
         private INeuralNetwork _network;
         private readonly Random _random = new Random();
-        private readonly DatasetBuilder _datasetBuilder;
+        private readonly DataBuilder<TData> _dataBuilder;
         private readonly IGameConfiguration _configuration;
         private readonly int _outputs;
 
-        public Trainer(IGameConfiguration configuration, int outputs)
+        public Trainer(IGameConfiguration configuration, DataBuilder<TData> dataBuilder,  int outputs)
         {
             _configuration = configuration;
             _outputs = outputs;
-            _datasetBuilder = new DatasetBuilder(configuration, outputs);
+            _dataBuilder = dataBuilder;
 
             _network = NetworkManager.NewSequential(TensorInfo.Image<Alpha8>(configuration.ScaledImageHeight, configuration.ScaledImageWidth),
                 NetworkLayers.Convolutional((4, 4),40, ActivationType.ReLU),
@@ -31,7 +33,7 @@ namespace ReinforcementLearning
                 NetworkLayers.Softmax(outputs));
         }
 
-        public void StartAsyncTraining(IConcurrentMemory memory, CancellationToken ct = default)
+        public void StartAsyncTraining(IConcurrentMemory<TData> memory, CancellationToken ct = default)
         {
             new Thread(() =>
             {
@@ -61,9 +63,9 @@ namespace ReinforcementLearning
             }
         }
 
-        public void TrainOnMemory(IConcurrentMemory memory)
+        public void TrainOnMemory(IConcurrentMemory<TData> memory)
         {
-            var trainingData = _datasetBuilder.BuildDataset(memory);
+            var trainingData = _dataBuilder.BuildDataset(memory);
             if (trainingData == null || trainingData.Count == 0)
             {
                 return;

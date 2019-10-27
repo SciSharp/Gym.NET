@@ -1,6 +1,6 @@
 ﻿using System.Collections.Concurrent;
 
-namespace ReinforcementLearning
+namespace ReinforcementLearning.MemoryTypes
 {
     public interface IConcurrentMemory<TData>
     {

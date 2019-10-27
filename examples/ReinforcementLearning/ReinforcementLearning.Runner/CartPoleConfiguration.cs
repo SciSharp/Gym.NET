@@ -10,7 +10,7 @@ namespace ReinforcementLearning.Runner
     {
         private readonly Lazy<IEnv> _env = new Lazy<IEnv>(() => new CartPoleEnv(AvaloniaEnvViewer.Run));
 
-        public IEnv EnvIstance => _env.Value;
+        public IEnv EnvInstance => _env.Value;
         public ImageStackLayout ImageStackLayout => ImageStackLayout.Vertical;
         public int MemoryFrames => 4;
         public int MemoryCapacity => 100;

@@ -2,11 +2,14 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using Gym.Observations;
 using Newtonsoft.Json;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.PixelFormats;
 
 namespace ReinforcementLearning.MemoryTypes
 {
-    internal abstract class ReplayMemory<TData> : IConcurrentMemory<TData>
+    public abstract class ReplayMemory<TData> : IConcurrentMemory<TData>
     {
         public ConcurrentBag<Episode<TData>> Episodes { get; private set; } = new ConcurrentBag<Episode<TData>>();
         protected List<Observation<TData>> Observations = new List<Observation<TData>>();
@@ -21,7 +24,7 @@ namespace ReinforcementLearning.MemoryTypes
             EpisodesCapacity = episodesCapacity;
         }
 
-        protected abstract void ValidateInput(TData currentData);
+        protected abstract TData GetDataInput(Image<Rgba32> currentFrame, Step currentStep);
 
         public void Memorize(int action, float currentReward, bool done)
         {
@@ -39,9 +42,9 @@ namespace ReinforcementLearning.MemoryTypes
             });
         }
 
-        public TData[] Enqueue(TData currentData)
+        public TData[] Enqueue(Image<Rgba32> currentFrame, Step currentStep)
         {
-            ValidateInput(currentData);
+            var currentData = GetDataInput(currentFrame, currentStep);
 
             DataQueue.Enqueue(currentData);
             if (DataQueue.Count < StageFrames)

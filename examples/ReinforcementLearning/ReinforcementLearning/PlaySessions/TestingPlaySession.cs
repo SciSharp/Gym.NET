@@ -1,12 +1,14 @@
 ﻿using System;
+using ReinforcementLearning.DataBuilders;
 using ReinforcementLearning.GameConfigurations;
+using ReinforcementLearning.MemoryTypes;
 
 namespace ReinforcementLearning.PlaySessions
 {
-    internal class TestingPlaySession<TGameConfiguration> : BasePlaySession<TGameConfiguration>
+    internal class TestingPlaySession<TGameConfiguration, TData> : BasePlaySession<TGameConfiguration, TData>
         where TGameConfiguration : IGameConfiguration
     {
-        public TestingPlaySession(TGameConfiguration game, Trainer trainer) : base(game, trainer)
+        public TestingPlaySession(TGameConfiguration game, Trainer<TData> trainer, ReplayMemory<TData> memory, DataBuilder<TData> dataBuilder) : base(game, trainer, memory, dataBuilder)
         { }
 
         protected override void OnEpisodeStart(int episodeIndex)

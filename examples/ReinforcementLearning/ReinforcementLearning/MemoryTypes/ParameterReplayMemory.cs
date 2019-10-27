@@ -1,8 +1,12 @@
 ﻿using System;
+using System.Linq;
+using Gym.Observations;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.PixelFormats;
 
 namespace ReinforcementLearning.MemoryTypes
 {
-    internal class ParameterReplayMemory : ReplayMemory<float[]>
+    public class ParameterReplayMemory : ReplayMemory<float[]>
     {
         private readonly int _parameterLength;
 
@@ -11,12 +15,20 @@ namespace ReinforcementLearning.MemoryTypes
             _parameterLength = parameterLength;
         }
 
-        protected override void ValidateInput(float[] currentData)
+        protected override float[] GetDataInput(Image<Rgba32> currentFrame, Step currentStep)
         {
-            if (currentData.Length != _parameterLength)
+            var data = currentStep
+                .Observation
+                .GetData()
+                .Cast<float>()
+                .ToArray();
+
+            if (data.Length != _parameterLength)
             {
-                throw new ArgumentException($"Parameters size [{currentData.Length}] differs from expected size [{_parameterLength}]");
+                throw new ArgumentException($"Parameters size [{data.Length}] differs from expected size [{_parameterLength}]");
             }
+
+            return data;
         }
     }
 }
