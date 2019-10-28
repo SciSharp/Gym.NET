@@ -11,7 +11,6 @@ namespace ReinforcementLearning.DataBuilders {
         where TConfiguration : IGameConfiguration {
         protected readonly TConfiguration Configuration;
         protected readonly int Outputs;
-        protected readonly Imager Imager = new Imager();
 
         protected readonly Dictionary<int, (float[] x, float[] y)> ObservationDictionary =
             new Dictionary<int, (float[] x, float[] y)>();

@@ -11,7 +11,6 @@ namespace ReinforcementLearning.PlaySessions {
         where TGameConfiguration : IGameConfiguration {
         protected readonly Trainer<TGameConfiguration, TData> Trainer;
         protected IGameConfiguration Game;
-        protected Imager Imager;
         protected ReplayMemory<TData> Memory;
         protected readonly DataBuilder<TGameConfiguration, TData> DataBuilder;
         protected int Framescount;
@@ -27,7 +26,6 @@ namespace ReinforcementLearning.PlaySessions {
             Trainer = trainer;
             Memory = memory;
             DataBuilder = dataBuilder;
-            Imager = new Imager();
             CurrentState = new Step();
         }
 
