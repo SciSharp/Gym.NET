@@ -15,7 +15,7 @@ using PointF = SixLabors.Primitives.PointF;
 
 namespace Gym.Environments.Envs.Classic {
     public class CartPoleEnv : Env {
-        private readonly Func<int, int, string, IEnvViewer> _viewerFunc;
+        private readonly IEnvironmentViewerFactoryDelegate _viewerFactory;
         private IEnvViewer _viewer;
 
         //constants
@@ -38,8 +38,8 @@ namespace Gym.Environments.Envs.Classic {
         private NDArray state;
         private int steps_beyond_done = -1;
 
-        public CartPoleEnv(Func<int, int, string, IEnvViewer> viewerFunc) {
-            _viewerFunc = viewerFunc;
+        public CartPoleEnv(IEnvironmentViewerFactoryDelegate viewerFactory) {
+            _viewerFactory = viewerFactory;
             // Angle limit set to 2 * theta_threshold_radians so failing observation is still within bounds  
             var high = np.array(x_threshold * 2, float.MaxValue, theta_threshold_radians * 2, float.MaxValue);
             ActionSpace = new Discrete(2);
