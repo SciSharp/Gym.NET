@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Threading;
-using Ebby.Gym.Envs.Classic;
+using Gym.Environments.Envs.Classic;
+using Gym.Rendering.WinForm.Rendering;
 using Gym.Tests.Helpers;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
@@ -9,7 +10,7 @@ namespace Gym.Tests {
     public class CartpoleEnvironment {
         [TestMethod]
         public void Run() {
-            var cp = new CartPoleEnv();
+            var cp = new CartPoleEnv(WinFormViewer.Run);
             var rnd = new Random();
             var done = true;
             using (new StopwatchMeasurer("time it took to run all steps in ms"))

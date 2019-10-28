@@ -1,5 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="15.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="..\..\packages\Microsoft.Net.Compilers.Toolset.3.1.0\build\Microsoft.Net.Compilers.Toolset.props" Condition="Exists('..\..\packages\Microsoft.Net.Compilers.Toolset.3.1.0\build\Microsoft.Net.Compilers.Toolset.props')" />
   <Import Project="..\..\packages\MSTest.TestAdapter.2.0.0-beta4\build\net45\MSTest.TestAdapter.props" Condition="Exists('..\..\packages\MSTest.TestAdapter.2.0.0-beta4\build\net45\MSTest.TestAdapter.props')" />
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
@@ -60,23 +61,23 @@
     <Reference Include="NumSharp.Core, Version=0.20.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=AMD64">
       <HintPath>..\..\packages\NumSharp.0.20.0\lib\netstandard2.0\NumSharp.Core.dll</HintPath>
     </Reference>
-    <Reference Include="SixLabors.Core, Version=0.1.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\..\packages\SixLabors.Core.1.0.0-beta0006\lib\netstandard1.1\SixLabors.Core.dll</HintPath>
+    <Reference Include="SixLabors.Core, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\..\packages\SixLabors.Core.1.0.0-beta0008\lib\netstandard2.0\SixLabors.Core.dll</HintPath>
     </Reference>
     <Reference Include="SixLabors.Fonts, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\..\packages\SixLabors.Fonts.1.0.0-beta0007\lib\netstandard2.0\SixLabors.Fonts.dll</HintPath>
+      <HintPath>..\..\packages\SixLabors.Fonts.1.0.0-beta0009\lib\netstandard2.0\SixLabors.Fonts.dll</HintPath>
     </Reference>
     <Reference Include="SixLabors.ImageSharp, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\..\packages\SixLabors.ImageSharp.1.0.0-beta0005\lib\netstandard2.0\SixLabors.ImageSharp.dll</HintPath>
+      <HintPath>..\..\packages\SixLabors.ImageSharp.1.0.0-beta0007\lib\netstandard2.0\SixLabors.ImageSharp.dll</HintPath>
     </Reference>
     <Reference Include="SixLabors.ImageSharp.Drawing, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\..\packages\SixLabors.ImageSharp.Drawing.1.0.0-beta0005\lib\netstandard2.0\SixLabors.ImageSharp.Drawing.dll</HintPath>
+      <HintPath>..\..\packages\SixLabors.ImageSharp.Drawing.1.0.0-beta0007\lib\netstandard2.0\SixLabors.ImageSharp.Drawing.dll</HintPath>
     </Reference>
     <Reference Include="SixLabors.Shapes, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\..\packages\SixLabors.Shapes.1.0.0-beta0007\lib\netstandard2.0\SixLabors.Shapes.dll</HintPath>
+      <HintPath>..\..\packages\SixLabors.Shapes.1.0.0-beta0009\lib\netstandard2.0\SixLabors.Shapes.dll</HintPath>
     </Reference>
     <Reference Include="SixLabors.Shapes.Text, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\..\packages\SixLabors.Shapes.Text.1.0.0-beta0005\lib\netstandard2.0\SixLabors.Shapes.Text.dll</HintPath>
+      <HintPath>..\..\packages\SixLabors.Shapes.Text.1.0.0-beta0009\lib\netstandard2.0\SixLabors.Shapes.Text.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.AppContext, Version=4.1.1.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
@@ -204,6 +205,7 @@
       <Private>True</Private>
       <Private>True</Private>
     </Reference>
+    <Reference Include="System.Windows.Forms" />
     <Reference Include="System.Xml" />
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Xml.ReaderWriter, Version=4.1.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
@@ -221,6 +223,10 @@
     <ProjectReference Include="..\..\src\Gym.Environments\Gym.Environments.csproj">
       <Project>{149f54f3-8396-443f-8dc6-672c7db9c4ac}</Project>
       <Name>Gym.Environments</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\..\src\Gym.Rendering.WinForm\Gym.Rendering.WinForm.csproj">
+      <Project>{e35bc24b-0b25-4b28-b372-75bd67ecfc76}</Project>
+      <Name>Gym.Rendering.WinForm</Name>
     </ProjectReference>
     <ProjectReference Include="..\..\src\Gym\Gym.csproj">
       <Project>{c0b8b3ec-2e75-4a08-9220-1db9b8583cbe}</Project>
@@ -240,6 +246,7 @@
     <Error Condition="!Exists('..\..\packages\MSTest.TestAdapter.2.0.0-beta4\build\net45\MSTest.TestAdapter.props')" Text="$([System.String]::Format('$(ErrorText)', '..\..\packages\MSTest.TestAdapter.2.0.0-beta4\build\net45\MSTest.TestAdapter.props'))" />
     <Error Condition="!Exists('..\..\packages\MSTest.TestAdapter.2.0.0-beta4\build\net45\MSTest.TestAdapter.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\..\packages\MSTest.TestAdapter.2.0.0-beta4\build\net45\MSTest.TestAdapter.targets'))" />
     <Error Condition="!Exists('..\..\packages\NETStandard.Library.2.0.3\build\netstandard2.0\NETStandard.Library.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\..\packages\NETStandard.Library.2.0.3\build\netstandard2.0\NETStandard.Library.targets'))" />
+    <Error Condition="!Exists('..\..\packages\Microsoft.Net.Compilers.Toolset.3.1.0\build\Microsoft.Net.Compilers.Toolset.props')" Text="$([System.String]::Format('$(ErrorText)', '..\..\packages\Microsoft.Net.Compilers.Toolset.3.1.0\build\Microsoft.Net.Compilers.Toolset.props'))" />
   </Target>
   <Import Project="..\..\packages\MSTest.TestAdapter.2.0.0-beta4\build\net45\MSTest.TestAdapter.targets" Condition="Exists('..\..\packages\MSTest.TestAdapter.2.0.0-beta4\build\net45\MSTest.TestAdapter.targets')" />
   <Import Project="..\..\packages\NETStandard.Library.2.0.3\build\netstandard2.0\NETStandard.Library.targets" Condition="Exists('..\..\packages\NETStandard.Library.2.0.3\build\netstandard2.0\NETStandard.Library.targets')" />
