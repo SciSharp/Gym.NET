@@ -12,10 +12,8 @@ using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using Image = Avalonia.Controls.Image;
 
-namespace Gym.Rendering.Avalonia
-{
-    public class AvaloniaEnvViewer : Window, IEnvViewer
-    {
+namespace Gym.Rendering.Avalonia {
+    public class AvaloniaEnvViewer : Window, IEnvViewer {
         private static int _width;
         private static int _height;
         private static string _title;
@@ -23,34 +21,27 @@ namespace Gym.Rendering.Avalonia
         private static readonly ManualResetEventSlim ReadyResetEvent = new ManualResetEventSlim();
         private static readonly ManualResetEventSlim RenderResetEvent = new ManualResetEventSlim();
 
-        public AvaloniaEnvViewer()
-        {
+        public AvaloniaEnvViewer() {
             InitializeComponent();
 #if DEBUG
             this.AttachDevTools();
 #endif
         }
 
-        private void InitializeComponent()
-        {
+        private void InitializeComponent() {
             AvaloniaXamlLoader.Load(this);
         }
 
-        public void Dispose()
-        {
+        public void Dispose() {
             Close();
         }
 
-        public static IEnvViewer Run(int width, int height, string title = null)
-        {
+        public static IEnvViewer Run(int width, int height, string title = null) {
             _width = width;
             _height = height;
             _title = title;
 
-            var thread = new Thread(() =>
-            {
-                Program.BuildAvaloniaApp().Start(BuildViewer, new string[] { });
-            });
+            var thread = new Thread(() => { Program.BuildAvaloniaApp().Start(BuildViewer, new string[] { }); });
             thread.Start();
             thread.Name = $"{nameof(AvaloniaEnvViewer)} {(string.IsNullOrEmpty(title) ? "" : $"-{title}")}";
 
@@ -62,10 +53,8 @@ namespace Gym.Rendering.Avalonia
             return _viewer;
         }
 
-        public void Render(Image<Rgba32> img)
-        {
-            if (!Dispatcher.UIThread.CheckAccess())
-            {
+        public void Render(Image<Rgba32> img) {
+            if (!Dispatcher.UIThread.CheckAccess()) {
                 RenderResetEvent.Reset();
                 Dispatcher.UIThread.InvokeAsync(() => Render(img), DispatcherPriority.MaxValue);
                 if (!RenderResetEvent.Wait(4_000))
@@ -73,30 +62,26 @@ namespace Gym.Rendering.Avalonia
                 return;
             }
 
-            using (var ms = new MemoryStream())
-            {
+            using (var ms = new MemoryStream()) {
                 img.SaveAsBmp(ms);
                 ms.Seek(0, SeekOrigin.Begin);
-                Content = new Image
-                {
+                Content = new Image {
                     Source = new Bitmap(ms)
                 };
             }
+
             RenderResetEvent.Set();
         }
 
-        private static void BuildViewer(Application app, string[] args)
-        {
-            _viewer = new AvaloniaEnvViewer
-            {
+        private static void BuildViewer(Application app, string[] args) {
+            _viewer = new AvaloniaEnvViewer {
                 ClientSize = new Size(_width, _height),
                 Title = _title,
             };
             app.Run(_viewer);
         }
 
-        protected override void OnOpened(EventArgs e)
-        {
+        protected override void OnOpened(EventArgs e) {
             base.OnOpened(e);
             ReadyResetEvent.Set();
         }
