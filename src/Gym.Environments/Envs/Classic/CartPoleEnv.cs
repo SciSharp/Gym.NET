@@ -109,11 +109,9 @@ namespace Gym.Environments.Envs.Classic {
                 var pivotPoint = new PointF(cbounds.X + cbounds.Width / 2f, cbounds.Y + cbounds.Height / 2f);
 
                 draw.Add((cart.Translate(center_x, 0), Rgba32.Black));
-                draw.Add((pole.Transform(Matrix3x2.CreateRotation((float) state.GetDouble(2), pivotPoint))
-                    .Translate(center_x, 0), new Rgba32(204, 153, 102)));
+                draw.Add((pole.Transform(Matrix3x2.CreateRotation((float) state.GetDouble(2), pivotPoint)).Translate(center_x, 0), new Rgba32(204, 153, 102)));
                 draw.Add((circle.Translate(center_x, 0), Rgba32.Teal));
-            }
-            else {
+            } else {
                 draw.Add((pole, Rgba32.Orange));
                 draw.Add((cart, Rgba32.Black));
                 draw.Add((circle, Rgba32.Teal));
@@ -153,8 +151,7 @@ namespace Gym.Environments.Envs.Classic {
                 x_dot = x_dot + tau * xacc;
                 theta = theta + tau * theta_dot;
                 theta_dot = theta_dot + tau * thetaacc;
-            }
-            else {
+            } else {
                 // semi-implicit euler
                 x_dot = x_dot + tau * xacc;
                 x = x + tau * x_dot;
@@ -167,13 +164,11 @@ namespace Gym.Environments.Envs.Classic {
             float reward;
             if (!done) {
                 reward = 1.0f;
-            }
-            else if (steps_beyond_done == -1) {
+            } else if (steps_beyond_done == -1) {
                 // Pole just fell!
                 steps_beyond_done = 0;
                 reward = 1.0f;
-            }
-            else {
+            } else {
                 if (steps_beyond_done == 0) {
                     Console.WriteLine("You are calling 'step()' even though this environment has already returned done = True. You should always call 'reset()' once you receive 'done = True' -- any further steps are undefined behavior.");
                     //todo logging: logger.warn("You are calling 'step()' even though this environment has already returned done = True. You should always call 'reset()' once you receive 'done = True' -- any further steps are undefined behavior.");
