@@ -10,9 +10,12 @@ namespace ReinforcementLearning.PlaySessions {
         private float _epsilon;
         private readonly CancellationTokenSource _ct;
 
-        internal TrainingPlaySession(TGameConfiguration game, Trainer<TGameConfiguration, TData> trainer,
-            ReplayMemory<TData> memory, DataBuilder<TGameConfiguration, TData> dataBuilder) : base(game, trainer,
-            memory, dataBuilder) {
+        internal TrainingPlaySession(
+            TGameConfiguration game,
+            Trainer<TGameConfiguration, TData> trainer,
+            ReplayMemory<TData> memory,
+            DataBuilder<TGameConfiguration, TData> dataBuilder)
+            : base(game, trainer, memory, dataBuilder) {
             _ct = new CancellationTokenSource();
             Trainer.StartAsyncTraining(Memory, _ct.Token);
         }

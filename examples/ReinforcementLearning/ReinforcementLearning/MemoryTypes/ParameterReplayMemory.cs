@@ -26,8 +26,7 @@ namespace ReinforcementLearning.MemoryTypes {
                 .ToArray();
 
             if (data.Length != _parameterLength) {
-                throw new ArgumentException(
-                    $"Parameters size [{data.Length}] differs from expected size [{_parameterLength}]");
+                throw new ArgumentException($"Parameters size [{data.Length}] differs from expected size [{_parameterLength}]");
             }
 
             return data;

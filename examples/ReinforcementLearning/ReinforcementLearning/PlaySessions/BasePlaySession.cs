@@ -65,8 +65,7 @@ namespace ReinforcementLearning.PlaySessions {
                             EpisodeRewards.Dequeue();
                         }
 
-                        Console.WriteLine(
-                            $"Reward: {CurrentEpisodeReward}, average on last 100 is {EpisodeRewards.Average()}");
+                        Console.WriteLine($"Reward: {CurrentEpisodeReward}, average on last 100 is {EpisodeRewards.Average()}");
                         CurrentEpisodeReward = 0;
                         break;
                     }

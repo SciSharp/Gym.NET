@@ -13,11 +13,9 @@ namespace ReinforcementLearning.GameEngines {
             new ImageReplayMemory(game.MemoryStates, game.FrameWidth, game.FrameHeight, game.MemoryCapacity);
 
         internal override Trainer<IImageGameConfiguration, Image<Rgba32>> BuildTrainer(IImageGameConfiguration game) =>
-            new Trainer<IImageGameConfiguration, Image<Rgba32>>(game, DataBuilder,
-                game.EnvInstance.ActionSpace.Shape.Size);
+            new Trainer<IImageGameConfiguration, Image<Rgba32>>(game, DataBuilder, game.EnvInstance.ActionSpace.Shape.Size);
 
-        protected override DataBuilder<IImageGameConfiguration, Image<Rgba32>> BuildDataBuilder(
-            IImageGameConfiguration game) =>
+        protected override DataBuilder<IImageGameConfiguration, Image<Rgba32>> BuildDataBuilder(IImageGameConfiguration game) => 
             new ImageDataBuilder(game, game.EnvInstance.ActionSpace.Shape.Size);
     }
 }

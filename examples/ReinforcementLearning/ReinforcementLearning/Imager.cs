@@ -31,6 +31,7 @@ namespace ReinforcementLearning {
             var singleImageWidth = imageWidth;
             var singleImageHeight = imageHeight;
             Func<int, Point> pointBuilder;
+
             switch (imageStackLayout) {
                 case ImageStackLayout.Horizontal:
                     singleImageWidth = imageWidth / stageFrames;

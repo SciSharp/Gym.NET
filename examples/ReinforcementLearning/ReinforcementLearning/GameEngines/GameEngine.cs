@@ -55,19 +55,19 @@ namespace ReinforcementLearning.GameEngines {
         internal abstract Trainer<TGameConfiguration, TData> BuildTrainer(TGameConfiguration game);
 
         private static void LoadModelToTrainer(Trainer<TGameConfiguration, TData> trainer) {
-            var choosenFile = Directory.GetFiles("./")
+            var chosenFile = Directory.GetFiles("./")
                 .Select(x => new FileInfo(x))
                 .Where(x => x.Extension == ".modl")
                 .OrderByDescending(x => x.LastWriteTime)
                 .FirstOrDefault();
 
-            if (choosenFile == null) {
+            if (chosenFile == null) {
                 Console.WriteLine($"No model found in dir {Directory.GetCurrentDirectory()}");
                 return;
             }
 
-            Console.WriteLine($"Loading model {choosenFile.FullName}");
-            trainer.Load(choosenFile.OpenRead());
+            Console.WriteLine($"Loading model {chosenFile.FullName}");
+            trainer.Load(chosenFile.OpenRead());
         }
     }
 }

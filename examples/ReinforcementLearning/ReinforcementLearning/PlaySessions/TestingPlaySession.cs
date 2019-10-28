@@ -6,9 +6,8 @@ using ReinforcementLearning.MemoryTypes;
 namespace ReinforcementLearning.PlaySessions {
     internal class TestingPlaySession<TGameConfiguration, TData> : BasePlaySession<TGameConfiguration, TData>
         where TGameConfiguration : IGameConfiguration {
-        public TestingPlaySession(TGameConfiguration game, Trainer<TGameConfiguration, TData> trainer,
-            ReplayMemory<TData> memory, DataBuilder<TGameConfiguration, TData> dataBuilder) : base(game, trainer,
-            memory, dataBuilder) {
+        public TestingPlaySession(TGameConfiguration game, Trainer<TGameConfiguration, TData> trainer, ReplayMemory<TData> memory, DataBuilder<TGameConfiguration, TData> dataBuilder) 
+            : base(game, trainer, memory, dataBuilder) {
         }
 
         protected override void OnEpisodeStart(int episodeIndex) {

@@ -29,8 +29,7 @@ namespace Gym.Environments.Envs.Classic {
         private const float tau = 0.02f;
         private const string kinematics_integrator = "euler";
 
-        private const float
-            theta_threshold_radians = (float) (12 * 2 * Math.PI / 360); // Angle at which to fail the episode   
+        private const float theta_threshold_radians = (float) (12 * 2 * Math.PI / 360); // Angle at which to fail the episode   
 
         private const float x_threshold = 2.4f;
 
@@ -106,9 +105,8 @@ namespace Gym.Environments.Envs.Classic {
                 var pivotPoint = new PointF(cbounds.X + cbounds.Width / 2f, cbounds.Y + cbounds.Height / 2f);
 
                 draw.Add((cart.Translate(center_x, 0), Rgba32.Black));
-                draw.Add((
-                    pole.Transform(Matrix3x2.CreateRotation((float) state.GetDouble(2), pivotPoint))
-                        .Translate(center_x, 0), new Rgba32(204, 153, 102)));
+                draw.Add((pole.Transform(Matrix3x2.CreateRotation((float) state.GetDouble(2), pivotPoint))
+                    .Translate(center_x, 0), new Rgba32(204, 153, 102)));
                 draw.Add((circle.Translate(center_x, 0), Rgba32.Teal));
             }
             else {
@@ -122,8 +120,7 @@ namespace Gym.Environments.Envs.Classic {
             //line
             img.Mutate(i => i.BackgroundColor(Rgba32.White));
             img.Mutate(i => i.BackgroundColor(Rgba32.White));
-            img.Mutate(i => i.Fill(Rgba32.Black,
-                new RectangularPolygon(new PointF(0, carty), new PointF(screen_width, carty + 1))));
+            img.Mutate(i => i.Fill(Rgba32.Black, new RectangularPolygon(new PointF(0, carty), new PointF(screen_width, carty + 1))));
             foreach (var (path, rgba32) in draw) {
                 img.Mutate(i => i.Fill(rgba32, path));
             }
@@ -133,8 +130,7 @@ namespace Gym.Environments.Envs.Classic {
         }
 
         public override Step Step(int action) {
-            Debug.Assert(ActionSpace.Contains(action),
-                $"{action} ({action.GetType().Name}) invalid action for {GetType().Name} environment");
+            Debug.Assert(ActionSpace.Contains(action), $"{action} ({action.GetType().Name}) invalid action for {GetType().Name} environment");
             //get the last step data
             var x = state.GetDouble(0);
             var x_dot = state.GetDouble(1);
@@ -145,8 +141,7 @@ namespace Gym.Environments.Envs.Classic {
             var costheta = Math.Cos(theta);
             var sintheta = Math.Sin(theta);
             var temp = (force + polemass_length * theta_dot * theta_dot * sintheta) / total_mass;
-            var thetaacc = (gravity * sintheta - costheta * temp) /
-                           (length * (4.0 / 3.0 - masspole * costheta * costheta / total_mass));
+            var thetaacc = (gravity * sintheta - costheta * temp) / (length * (4.0 / 3.0 - masspole * costheta * costheta / total_mass));
             var xacc = temp - polemass_length * thetaacc * costheta / total_mass;
             // ReSharper disable once ConditionIsAlwaysTrueOrFalse
             if (kinematics_integrator == "euler") {
@@ -164,8 +159,7 @@ namespace Gym.Environments.Envs.Classic {
             }
 
             state = np.array(x, x_dot, theta, theta_dot);
-            var done = x < -x_threshold || x > x_threshold || theta < -theta_threshold_radians ||
-                       theta > theta_threshold_radians;
+            var done = x < -x_threshold || x > x_threshold || theta < -theta_threshold_radians || theta > theta_threshold_radians;
             float reward;
             if (!done) {
                 reward = 1.0f;
@@ -177,8 +171,7 @@ namespace Gym.Environments.Envs.Classic {
             }
             else {
                 if (steps_beyond_done == 0) {
-                    Console.WriteLine(
-                        "You are calling 'step()' even though this environment has already returned done = True. You should always call 'reset()' once you receive 'done = True' -- any further steps are undefined behavior.");
+                    Console.WriteLine("You are calling 'step()' even though this environment has already returned done = True. You should always call 'reset()' once you receive 'done = True' -- any further steps are undefined behavior.");
                     //todo logging: logger.warn("You are calling 'step()' even though this environment has already returned done = True. You should always call 'reset()' once you receive 'done = True' -- any further steps are undefined behavior.");
                 }
 
