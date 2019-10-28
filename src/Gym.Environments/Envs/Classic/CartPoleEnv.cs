@@ -6,6 +6,7 @@ using Gym.Collections;
 using Gym.Envs;
 using Gym.Observations;
 using Gym.Spaces;
+using JetBrains.Annotations;
 using NumSharp;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
@@ -49,6 +50,10 @@ namespace Gym.Environments.Envs.Classic {
             Metadata = new Dict("render.modes", new[] {"human", "rgb_array"}, "video.frames_per_second", 50);
         }
 
+        public CartPoleEnv([NotNull] IEnvViewer viewer) : this((IEnvironmentViewerFactoryDelegate)null) {
+            _viewer = viewer ?? throw new ArgumentNullException(nameof(viewer));
+        }
+
         public override NDArray Reset() {
             steps_beyond_done = -1;
             state = random.uniform(-0.05, 0.05, 4);
@@ -70,15 +75,14 @@ namespace Gym.Environments.Envs.Classic {
             var cartwidth = 50.0f;
             var cartheight = 30.0f;
 
-            if (_viewerFunc == null) {
-                throw new ArgumentNullException(nameof(_viewerFunc), $"No {nameof(_viewerFunc)} have been set");
-            }
-
             if (_viewer == null)
                 lock (this) {
                     //to prevent double initalization.
-                    if (_viewer == null)
-                        _viewer = _viewerFunc.Invoke(screen_width, screen_height, "cartpole-v1");
+                    if (_viewer == null) {
+                        if (_viewerFactory == null)
+                            throw new ArgumentNullException(nameof(_viewerFactory), $"No {nameof(_viewerFactory)} have been set");
+                        _viewer = _viewerFactory(screen_width, screen_height, "cartpole-v1");
+                    }
                 }
 
             //pole
@@ -182,6 +186,7 @@ namespace Gym.Environments.Envs.Classic {
             return new Step(state, reward, done, null);
         }
 
+        /// <remarks>Sets internally stored viewer to null. Might cause problems if factory was not passed.</remarks>
         public override void Close() {
             if (_viewer != null) {
                 _viewer.Close();
