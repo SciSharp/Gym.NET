@@ -6,15 +6,12 @@ using ReinforcementLearning.GameConfigurations;
 using ReinforcementLearning.MemoryTypes;
 using ReinforcementLearning.PlaySessions;
 
-namespace ReinforcementLearning.GameEngines
-{
+namespace ReinforcementLearning.GameEngines {
     public abstract class GameEngine<TGameConfiguration, TData>
-        where TGameConfiguration : IGameConfiguration
-    {
+        where TGameConfiguration : IGameConfiguration {
         private readonly TGameConfiguration _game;
 
-        protected GameEngine(TGameConfiguration game)
-        {
+        protected GameEngine(TGameConfiguration game) {
             _game = game;
             Memory = BuildMemory(game);
             DataBuilder = BuildDataBuilder(game);
@@ -25,25 +22,21 @@ namespace ReinforcementLearning.GameEngines
         protected ReplayMemory<TData> Memory;
         protected DataBuilder<TGameConfiguration, TData> DataBuilder;
 
-        public void Play()
-        {
-
+        public void Play() {
             Console.WriteLine("Press [L] to load last saved model, any other key to skip");
             var pressed = Console.ReadKey().KeyChar;
-            if (pressed == 'l')
-            {
+            if (pressed == 'l') {
                 LoadModelToTrainer(Trainer);
             }
+
             Console.Clear();
 
-            while (true)
-            {
+            while (true) {
                 Console.WriteLine("Press [1] to play the game with the current model");
                 Console.WriteLine("Press [2] to train");
                 pressed = Console.ReadKey().KeyChar;
 
-                switch (pressed)
-                {
+                switch (pressed) {
                     case '1':
                         new TestingPlaySession<TGameConfiguration, TData>(_game, Trainer, Memory, DataBuilder).Play();
                         break;
@@ -61,16 +54,14 @@ namespace ReinforcementLearning.GameEngines
         internal abstract ReplayMemory<TData> BuildMemory(TGameConfiguration game);
         internal abstract Trainer<TGameConfiguration, TData> BuildTrainer(TGameConfiguration game);
 
-        private static void LoadModelToTrainer(Trainer<TGameConfiguration, TData> trainer)
-        {
+        private static void LoadModelToTrainer(Trainer<TGameConfiguration, TData> trainer) {
             var choosenFile = Directory.GetFiles("./")
                 .Select(x => new FileInfo(x))
                 .Where(x => x.Extension == ".modl")
                 .OrderByDescending(x => x.LastWriteTime)
                 .FirstOrDefault();
 
-            if (choosenFile == null)
-            {
+            if (choosenFile == null) {
                 Console.WriteLine($"No model found in dir {Directory.GetCurrentDirectory()}");
                 return;
             }

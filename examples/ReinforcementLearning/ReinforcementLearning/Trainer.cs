@@ -9,19 +9,17 @@ using ReinforcementLearning.DataBuilders;
 using ReinforcementLearning.GameConfigurations;
 using ReinforcementLearning.MemoryTypes;
 
-namespace ReinforcementLearning
-{
-    public class Trainer<TGameConfiguration, TData> 
-        where TGameConfiguration : IGameConfiguration
-    {
+namespace ReinforcementLearning {
+    public class Trainer<TGameConfiguration, TData>
+        where TGameConfiguration : IGameConfiguration {
         private INeuralNetwork _network;
         private readonly Random _random = new Random();
         private readonly DataBuilder<TGameConfiguration, TData> _dataBuilder;
         private readonly TGameConfiguration _configuration;
         private readonly int _outputs;
 
-        public Trainer(TGameConfiguration configuration, DataBuilder<TGameConfiguration, TData> dataBuilder,  int outputs)
-        {
+        public Trainer(TGameConfiguration configuration, DataBuilder<TGameConfiguration, TData> dataBuilder,
+            int outputs) {
             _configuration = configuration;
             _outputs = outputs;
             _dataBuilder = dataBuilder;
@@ -29,41 +27,33 @@ namespace ReinforcementLearning
             _network = configuration.BuildNeuralNetwork();
         }
 
-        public void StartAsyncTraining(IConcurrentMemory<TData> memory, CancellationToken ct = default)
-        {
-            new Thread(() =>
-            {
-                while (!ct.IsCancellationRequested)
-                {
+        public void StartAsyncTraining(IConcurrentMemory<TData> memory, CancellationToken ct = default) {
+            new Thread(() => {
+                while (!ct.IsCancellationRequested) {
                     TrainOnMemory(memory);
                 }
             }).Start();
         }
 
-        public void Load(Stream modelStream)
-        {
-            using (var backupStream = new MemoryStream())
-            {
+        public void Load(Stream modelStream) {
+            using (var backupStream = new MemoryStream()) {
                 modelStream.CopyTo(backupStream);
                 modelStream.Seek(0, SeekOrigin.Begin);
                 _network = NetworkLoader.TryLoad(modelStream, ExecutionModePreference.Cuda);
-                if (_network == null)
-                {
+                if (_network == null) {
                     backupStream.Seek(0, SeekOrigin.Begin);
                     _network = NetworkLoader.TryLoad(backupStream, ExecutionModePreference.Cpu);
                 }
             }
-            if (_network == null)
-            {
+
+            if (_network == null) {
                 throw new InvalidOperationException($"Cannot load model");
             }
         }
 
-        public void TrainOnMemory(IConcurrentMemory<TData> memory)
-        {
+        public void TrainOnMemory(IConcurrentMemory<TData> memory) {
             var trainingData = _dataBuilder.BuildDataset(memory);
-            if (trainingData == null || trainingData.Count == 0)
-            {
+            if (trainingData == null || trainingData.Count == 0) {
                 return;
             }
 
@@ -86,15 +76,13 @@ namespace ReinforcementLearning
 
         public float[] Predict(float[] input, float epsilon) //epsilon = percentage of explorarion)
         {
-            if (_random.NextDouble() > epsilon)
-            {
+            if (_random.NextDouble() > epsilon) {
                 return _network.Forward(input);
             }
 
             var result = new float[_outputs];
-            for (var i = 0; i < _outputs; i++)
-            {
-                result[i] = (float)_random.NextDouble();
+            for (var i = 0; i < _outputs; i++) {
+                result[i] = (float) _random.NextDouble();
             }
 
             return result;
@@ -104,8 +92,7 @@ namespace ReinforcementLearning
             _network.Forward(input);
 
         // Training monitor
-        private static void TrackBatchProgress(BatchProgress progress)
-        {
+        private static void TrackBatchProgress(BatchProgress progress) {
             //Console.SetCursorPosition(0, Console.CursorTop);
             //var n = (int)(progress.Percentage * 32 / 100); // 32 is the number of progress '=' characters to display
             //var c = new char[32];
@@ -114,8 +101,7 @@ namespace ReinforcementLearning
         }
 
         // Training monitor 2
-        private void TrainingProgress(TrainingProgressEventArgs progress)
-        {
+        private void TrainingProgress(TrainingProgressEventArgs progress) {
             //Console.Write($"Epoch [{progress.Iteration}]/[{_epochs}]");
         }
     }

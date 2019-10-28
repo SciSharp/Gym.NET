@@ -6,28 +6,25 @@ using NeuralNetworkNET.APIs.Interfaces.Data;
 using ReinforcementLearning.GameConfigurations;
 using ReinforcementLearning.MemoryTypes;
 
-namespace ReinforcementLearning.DataBuilders
-{
+namespace ReinforcementLearning.DataBuilders {
     public abstract class DataBuilder<TConfiguration, TData>
-        where TConfiguration : IGameConfiguration
-    {
+        where TConfiguration : IGameConfiguration {
         protected readonly TConfiguration Configuration;
         protected readonly int Outputs;
         protected readonly Imager Imager = new Imager();
-        protected readonly Dictionary<int, (float[] x, float[] y)> ObservationDictionary = new Dictionary<int, (float[] x, float[] y)>();
 
-        protected DataBuilder(TConfiguration configuration, int outputs)
-        {
+        protected readonly Dictionary<int, (float[] x, float[] y)> ObservationDictionary =
+            new Dictionary<int, (float[] x, float[] y)>();
+
+        protected DataBuilder(TConfiguration configuration, int outputs) {
             Configuration = configuration;
             Outputs = outputs;
         }
 
         public abstract float[] BuildInput(TData[] dataGroup);
 
-        public ITrainingDataset BuildDataset(IConcurrentMemory<TData> memory)
-        {
-            if (memory.Episodes.Count < Configuration.MemoryCapacity)
-            {
+        public ITrainingDataset BuildDataset(IConcurrentMemory<TData> memory) {
+            if (memory.Episodes.Count < Configuration.MemoryCapacity) {
                 return default;
             }
 
@@ -42,12 +39,9 @@ namespace ReinforcementLearning.DataBuilders
             return DatasetLoader.Training(BuildRawData(observations), Configuration.BatchSize);
         }
 
-        private IEnumerable<(float[] x, float[] y)> BuildRawData(IEnumerable<Observation<TData>> bestObservations)
-        {
-            foreach (var observation in bestObservations)
-            {
-                if (ObservationDictionary.ContainsKey(observation.Id))
-                {
+        private IEnumerable<(float[] x, float[] y)> BuildRawData(IEnumerable<Observation<TData>> bestObservations) {
+            foreach (var observation in bestObservations) {
+                if (ObservationDictionary.ContainsKey(observation.Id)) {
                     yield return ObservationDictionary[observation.Id];
                     continue;
                 }

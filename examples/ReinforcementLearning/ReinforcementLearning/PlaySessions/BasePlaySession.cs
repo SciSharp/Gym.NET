@@ -6,11 +6,9 @@ using ReinforcementLearning.DataBuilders;
 using ReinforcementLearning.GameConfigurations;
 using ReinforcementLearning.MemoryTypes;
 
-namespace ReinforcementLearning.PlaySessions
-{
+namespace ReinforcementLearning.PlaySessions {
     internal abstract class BasePlaySession<TGameConfiguration, TData>
-        where TGameConfiguration : IGameConfiguration
-    {
+        where TGameConfiguration : IGameConfiguration {
         protected readonly Trainer<TGameConfiguration, TData> Trainer;
         protected IGameConfiguration Game;
         protected Imager Imager;
@@ -23,8 +21,8 @@ namespace ReinforcementLearning.PlaySessions
         protected Queue<float> EpisodeRewards = new Queue<float>();
         protected Random Random = new Random();
 
-        protected BasePlaySession(TGameConfiguration game, Trainer<TGameConfiguration, TData> trainer, ReplayMemory<TData> memory, DataBuilder<TGameConfiguration, TData> dataBuilder)
-        {
+        protected BasePlaySession(TGameConfiguration game, Trainer<TGameConfiguration, TData> trainer,
+            ReplayMemory<TData> memory, DataBuilder<TGameConfiguration, TData> dataBuilder) {
             Game = game;
             Trainer = trainer;
             Memory = memory;
@@ -33,30 +31,24 @@ namespace ReinforcementLearning.PlaySessions
             CurrentState = new Step();
         }
 
-        public void Play()
-        {
+        public void Play() {
             Game.EnvInstance.Seed(0);
 
-            for (var i = 0; i < Game.Episodes; i++)
-            {
+            for (var i = 0; i < Game.Episodes; i++) {
                 OnEpisodeStart(i);
                 Framescount = Game.SkippedFrames + 1;
 
                 Game.EnvInstance.Reset();
                 CurrentState = new Step();
-                while (true)
-                {
+                while (true) {
                     var image = Game.EnvInstance.Render();
 
-                    if (Framescount < Game.SkippedFrames + 1)
-                    {
+                    if (Framescount < Game.SkippedFrames + 1) {
                         CurrentState = Game.EnvInstance.Step(Action);
                     }
-                    else
-                    {
+                    else {
                         var currentFrame = Memory.Enqueue(image, CurrentState);
-                        if (currentFrame != null && currentFrame.Length == Game.MemoryStates)
-                        {
+                        if (currentFrame != null && currentFrame.Length == Game.MemoryStates) {
                             Action = ComposeAction(currentFrame);
                             CurrentState = Game.EnvInstance.Step(Action);
                             Memory.Memorize(Action, CurrentState.Reward, CurrentState.Done);
@@ -66,15 +58,15 @@ namespace ReinforcementLearning.PlaySessions
                     }
 
                     CurrentEpisodeReward += CurrentState.Reward;
-                    if (CurrentState.Done || Framescount > 1000)
-                    {
+                    if (CurrentState.Done || Framescount > 1000) {
                         OnEpisodeDone(CurrentEpisodeReward);
                         EpisodeRewards.Enqueue(CurrentEpisodeReward);
-                        if (EpisodeRewards.Count > 100)
-                        {
+                        if (EpisodeRewards.Count > 100) {
                             EpisodeRewards.Dequeue();
                         }
-                        Console.WriteLine($"Reward: {CurrentEpisodeReward}, average on last 100 is {EpisodeRewards.Average()}");
+
+                        Console.WriteLine(
+                            $"Reward: {CurrentEpisodeReward}, average on last 100 is {EpisodeRewards.Average()}");
                         CurrentEpisodeReward = 0;
                         break;
                     }
@@ -86,20 +78,19 @@ namespace ReinforcementLearning.PlaySessions
             OnCompleted();
         }
 
-        protected virtual int ComposeAction(TData[] currentData)
-        {
+        protected virtual int ComposeAction(TData[] currentData) {
             var processedImage = DataBuilder.BuildInput(currentData);
             var prediction = Trainer.Predict(processedImage);
             return prediction.ToList().IndexOf(prediction.Max());
         }
 
-        protected virtual void OnEpisodeStart(int episodeIndex)
-        { }
+        protected virtual void OnEpisodeStart(int episodeIndex) {
+        }
 
-        protected virtual void OnEpisodeDone(float episodeReward)
-        { }
+        protected virtual void OnEpisodeDone(float episodeReward) {
+        }
 
-        protected virtual void OnCompleted()
-        { }
+        protected virtual void OnCompleted() {
+        }
     }
 }

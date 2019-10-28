@@ -3,23 +3,19 @@ using Gym.Observations;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 
-namespace ReinforcementLearning.MemoryTypes
-{
-    public class ImageReplayMemory : ReplayMemory<Image<Rgba32>>
-    {
+namespace ReinforcementLearning.MemoryTypes {
+    public class ImageReplayMemory : ReplayMemory<Image<Rgba32>> {
         private readonly int _imageWidth;
         private readonly int _imageHeight;
 
-        public ImageReplayMemory(int stageFrames, int imageWidth, int imageHeight, int episodesCapacity) : base(stageFrames, episodesCapacity)
-        {
+        public ImageReplayMemory(int stageFrames, int imageWidth, int imageHeight, int episodesCapacity) : base(
+            stageFrames, episodesCapacity) {
             _imageWidth = imageWidth;
             _imageHeight = imageHeight;
         }
 
-        protected override Image<Rgba32> GetDataInput(Image<Rgba32> currentFrame, Step currentStep)
-        {
-            if (currentFrame.Width != _imageWidth || currentFrame.Height != _imageHeight)
-            {
+        protected override Image<Rgba32> GetDataInput(Image<Rgba32> currentFrame, Step currentStep) {
+            if (currentFrame.Width != _imageWidth || currentFrame.Height != _imageHeight) {
                 throw new ArgumentException($"Frame size differs from expected size");
             }
 

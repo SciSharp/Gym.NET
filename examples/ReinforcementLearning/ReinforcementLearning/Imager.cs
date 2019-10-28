@@ -12,31 +12,26 @@ using SixLabors.Primitives;
 using Point = SixLabors.Primitives.Point;
 using Size = SixLabors.Primitives.Size;
 
-namespace ReinforcementLearning
-{
-    public class Imager
-    {
+namespace ReinforcementLearning {
+    public class Imager {
         private Image<Rgba32>[] _images;
         private Image<Rgba32> _outputImage;
         private List<Action<IImageProcessingContext>> _actions;
 
-        public virtual Imager Load(Image<Rgba32>[] images)
-        {
+        public virtual Imager Load(Image<Rgba32>[] images) {
             _images = images.Select(x => x.Clone()).ToArray();
             _outputImage = null;
             _actions = new List<Action<IImageProcessingContext>>();
             return this;
         }
 
-        public virtual Imager ComposeFrames(int imageWidth, int imageHeight, ImageStackLayout imageStackLayout)
-        {
+        public virtual Imager ComposeFrames(int imageWidth, int imageHeight, ImageStackLayout imageStackLayout) {
             var stageFrames = _images.Length;
             _outputImage = new Image<Rgba32>(imageWidth, imageHeight);
             var singleImageWidth = imageWidth;
             var singleImageHeight = imageHeight;
             Func<int, Point> pointBuilder;
-            switch (imageStackLayout)
-            {
+            switch (imageStackLayout) {
                 case ImageStackLayout.Horizontal:
                     singleImageWidth = imageWidth / stageFrames;
                     pointBuilder = index => new Point(singleImageWidth * index, 0);
@@ -49,8 +44,7 @@ namespace ReinforcementLearning
                     throw new ArgumentOutOfRangeException(nameof(imageStackLayout), imageStackLayout, null);
             }
 
-            Parallel.For(0, _images.Length, index =>
-            {
+            Parallel.For(0, _images.Length, index => {
                 var image = _images[index];
                 image.Mutate(o => o.Resize(new Size(singleImageWidth, singleImageHeight)));
                 _outputImage.Mutate(o => o.DrawImage(image, pointBuilder.Invoke(index), 1f));
@@ -59,10 +53,8 @@ namespace ReinforcementLearning
             return this;
         }
 
-        public virtual Imager Crop(FramePadding framePadding)
-        {
-            Parallel.For(0, _images.Length, index =>
-            {
+        public virtual Imager Crop(FramePadding framePadding) {
+            Parallel.For(0, _images.Length, index => {
                 var image = _images[index];
                 var widthToCrop = image.Width - framePadding.Left - framePadding.Right;
                 var heightToCrop = image.Height - framePadding.Top - framePadding.Bottom;
@@ -72,60 +64,41 @@ namespace ReinforcementLearning
             return this;
         }
 
-        public virtual Imager Resize(int newWidth, int newHeight)
-        {
+        public virtual Imager Resize(int newWidth, int newHeight) {
             _actions.Add(x => x.Resize(newWidth, newHeight));
             return this;
         }
 
-        public virtual IEnumerable<float> Rectify()
-        {
+        public virtual IEnumerable<float> Rectify() {
             var rgbaArray = MemoryMarshal.AsBytes(_outputImage.GetPixelSpan()).ToArray();
 
-            if (rgbaArray.Length % 4 != 0)
-            {
+            if (rgbaArray.Length % 4 != 0) {
                 throw new Exception("Should never happen");
             }
 
-            for (var index = 0; index < rgbaArray.Length; index += 4)
-            {
+            for (var index = 0; index < rgbaArray.Length; index += 4) {
                 //yield return (float)rgbaArray[index] / 255;
-                yield return (float)rgbaArray[index] > 0 ? 1 : 0; // hardcore, fix this
+                yield return (float) rgbaArray[index] > 0 ? 1 : 0; // hardcore, fix this
             }
         }
 
-        public virtual Imager Greyscale()
-        {
+        public virtual Imager Greyscale() {
             _actions.Add(x => x.Grayscale());
             return this;
         }
 
-        public virtual Imager InvertColors()
-        {
+        public virtual Imager InvertColors() {
             _actions.Add(x => x.Invert());
             return this;
         }
 
-        public virtual Imager Compile()
-        {
+        public virtual Imager Compile() {
             var compiledAction = _actions[0];
-            for (var index = 1; index < _actions.Count; index++)
-            {
+            for (var index = 1; index < _actions.Count; index++) {
                 compiledAction += _actions[index];
             }
 
             _outputImage.Mutate(compiledAction);
-
-            //var ffff = $"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee.bmp";
-            //if (File.Exists(ffff))
-            //{
-            //    File.Delete(ffff);
-            //}
-
-            //using (var stream = File.Create(ffff))
-            //{
-            //    _outputImage.SaveAsBmp(stream);
-            //}
             return this;
         }
 

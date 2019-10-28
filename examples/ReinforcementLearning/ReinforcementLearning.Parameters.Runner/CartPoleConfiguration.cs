@@ -8,10 +8,8 @@ using NeuralNetworkNET.APIs.Interfaces;
 using NeuralNetworkNET.APIs.Structs;
 using ReinforcementLearning.GameConfigurations;
 
-namespace ReinforcementLearning.Parameters.Runner
-{
-    public sealed class CartPoleConfiguration : IParametersGameConfiguration
-    {
+namespace ReinforcementLearning.Parameters.Runner {
+    public sealed class CartPoleConfiguration : IParametersGameConfiguration {
         private readonly Lazy<IEnv> _env = new Lazy<IEnv>(() => new CartPoleEnv(AvaloniaEnvViewer.Run));
 
         public IEnv EnvInstance => _env.Value;

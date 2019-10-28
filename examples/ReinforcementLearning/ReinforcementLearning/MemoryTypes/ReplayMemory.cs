@@ -7,10 +7,8 @@ using Newtonsoft.Json;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 
-namespace ReinforcementLearning.MemoryTypes
-{
-    public abstract class ReplayMemory<TData> : IConcurrentMemory<TData>
-    {
+namespace ReinforcementLearning.MemoryTypes {
+    public abstract class ReplayMemory<TData> : IConcurrentMemory<TData> {
         public ConcurrentBag<Episode<TData>> Episodes { get; private set; } = new ConcurrentBag<Episode<TData>>();
         protected List<Observation<TData>> Observations = new List<Observation<TData>>();
         protected Queue<TData> DataQueue = new Queue<TData>();
@@ -18,23 +16,19 @@ namespace ReinforcementLearning.MemoryTypes
         protected readonly int StageFrames;
         protected readonly int EpisodesCapacity;
 
-        protected ReplayMemory(int stageFrames, int episodesCapacity)
-        {
+        protected ReplayMemory(int stageFrames, int episodesCapacity) {
             StageFrames = stageFrames;
             EpisodesCapacity = episodesCapacity;
         }
 
         protected abstract TData GetDataInput(Image<Rgba32> currentFrame, Step currentStep);
 
-        public void Memorize(int action, float currentReward, bool done)
-        {
-            if (DataQueue.Count < StageFrames)
-            {
+        public void Memorize(int action, float currentReward, bool done) {
+            if (DataQueue.Count < StageFrames) {
                 return;
             }
 
-            Observations.Add(new Observation<TData>(StageFrames)
-            {
+            Observations.Add(new Observation<TData>(StageFrames) {
                 Id = CurrentId++,
                 ActionTaken = action,
                 Reward = currentReward,
@@ -42,53 +36,45 @@ namespace ReinforcementLearning.MemoryTypes
             });
         }
 
-        public TData[] Enqueue(Image<Rgba32> currentFrame, Step currentStep)
-        {
+        public TData[] Enqueue(Image<Rgba32> currentFrame, Step currentStep) {
             var currentData = GetDataInput(currentFrame, currentStep);
 
             DataQueue.Enqueue(currentData);
-            if (DataQueue.Count < StageFrames)
-            {
+            if (DataQueue.Count < StageFrames) {
                 return null;
             }
 
-            if (DataQueue.Count > StageFrames)
-            {
+            if (DataQueue.Count > StageFrames) {
                 DataQueue.Dequeue();
             }
 
             return DataQueue.ToArray();
         }
 
-        public void EndEpisode(float episodeReward)
-        {
+        public void EndEpisode(float episodeReward) {
             DataQueue = new Queue<TData>();
 
             var lowestEpisode = Episodes.OrderBy(x => x.TotalReward).FirstOrDefault();
-            if (lowestEpisode == null || episodeReward >= lowestEpisode.TotalReward || Episodes.Count < EpisodesCapacity)
-            {
-                Episodes.Add(new Episode<TData> { Observations = Observations.ToArray() });
+            if (lowestEpisode == null || episodeReward >= lowestEpisode.TotalReward ||
+                Episodes.Count < EpisodesCapacity) {
+                Episodes.Add(new Episode<TData> {Observations = Observations.ToArray()});
             }
 
-            if (Episodes.Count > EpisodesCapacity)
-            {
-                Episodes = new ConcurrentBag<Episode<TData>>(Episodes.Except(new[] { lowestEpisode }));
+            if (Episodes.Count > EpisodesCapacity) {
+                Episodes = new ConcurrentBag<Episode<TData>>(Episodes.Except(new[] {lowestEpisode}));
             }
 
             Observations = new List<Observation<TData>>();
         }
 
-        public void Clear()
-        {
+        public void Clear() {
             DataQueue = new Queue<TData>();
             Episodes = new ConcurrentBag<Episode<TData>>();
             Observations = new List<Observation<TData>>();
         }
 
-        public void Save(string fileName, int? maxItems = null)
-        {
-            if (maxItems == null)
-            {
+        public void Save(string fileName, int? maxItems = null) {
+            if (maxItems == null) {
                 File.WriteAllText(fileName, JsonConvert.SerializeObject(Episodes, Formatting.None));
                 return;
             }

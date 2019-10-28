@@ -10,13 +10,11 @@ using Gym.Threading;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 
-namespace Gym.Rendering.WinForm.Rendering
-{
+namespace Gym.Rendering.WinForm.Rendering {
     /// <summary>
     ///     A form with PictureBox that accepts <see cref="IImageCanvas"/> and renders it on it. Start <see cref="Viewer"/> by calling <see cref="Run"/>
     /// </summary>
-    public partial class WinFormViewer : Form, IEnvViewer
-    {
+    public partial class WinFormViewer : Form, IEnvViewer {
         private int _lastSize = 0;
         private readonly ManualResetEventSlim _ready = new ManualResetEventSlim();
 
@@ -124,7 +122,7 @@ namespace Gym.Rendering.WinForm.Rendering
             //
             //Render(canvas);
         }
-        
+
         protected override void OnClosing(CancelEventArgs e) {
             base.OnClosing(e);
             PictureFrame.Image.TryDispose();

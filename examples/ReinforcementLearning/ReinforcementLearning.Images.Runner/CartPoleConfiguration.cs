@@ -9,10 +9,8 @@ using NeuralNetworkNET.APIs.Structs;
 using ReinforcementLearning.GameConfigurations;
 using SixLabors.ImageSharp.PixelFormats;
 
-namespace ReinforcementLearning.Images.Runner
-{
-    public sealed class CartPoleConfiguration : IImageGameConfiguration
-    {
+namespace ReinforcementLearning.Images.Runner {
+    public sealed class CartPoleConfiguration : IImageGameConfiguration {
         private readonly Lazy<IEnv> _env = new Lazy<IEnv>(() => new CartPoleEnv(AvaloniaEnvViewer.Run));
 
         public IEnv EnvInstance => _env.Value;
@@ -24,7 +22,7 @@ namespace ReinforcementLearning.Images.Runner
         public int FrameHeight => 400;
         public int ScaledImageWidth => 40;
         public int ScaledImageHeight => 40;
-        public FramePadding FramePadding => new FramePadding { Top = 150, Bottom = 100, Left = 200, Right = 200 };
+        public FramePadding FramePadding => new FramePadding {Top = 150, Bottom = 100, Left = 200, Right = 200};
         public float StartingEpsilon => 1F;
         public int Episodes => 4000;
         public int BatchSize => 100;
