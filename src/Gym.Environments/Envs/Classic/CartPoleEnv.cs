@@ -52,8 +52,11 @@ namespace Gym.Environments.Envs.Classic {
 
         public CartPoleEnv(IEnvironmentViewerFactoryDelegate viewerFactory) : this(viewerFactory, null) {}
 
-        public CartPoleEnv([NotNull] IEnvViewer viewer) : this((IEnvironmentViewerFactoryDelegate)null) {
+        public CartPoleEnv([NotNull] IEnvViewer viewer) : this((IEnvironmentViewerFactoryDelegate) null) {
             _viewer = viewer ?? throw new ArgumentNullException(nameof(viewer));
+        }
+
+        public CartPoleEnv() : this(NullEnvViewer.Factory) {
         }
 
         public override NDArray Reset() {
