@@ -108,26 +108,6 @@ namespace Gym.Rendering.WinForm {
             }
         }
 
-        /// <summary>
-        ///     Performs a rendering test.
-        /// </summary>
-        /// <param name="offset"></param>
-        public void TestRendering(int offset = 0) {
-            //IImageCanvas canvas = Platforms.Current.CreateImageCanvas(new NGraphics.Size(Height, Width), scale: 1);
-            //var skyBrush = new LinearGradientBrush(Point.Zero, Point.OneY, Colors.Blue, Colors.White);
-            //canvas.FillRectangle(new Rect(canvas.Size), skyBrush);
-            //canvas.FillEllipse(10, 10, 30 + offset, 30 + offset, Colors.Yellow);
-            //canvas.FillRectangle(50, 60, 60, 40, Colors.LightGray);
-            //canvas.FillPath(new PathOp[] {
-            //    new MoveTo(40, 60),
-            //    new LineTo(120, 60),
-            //    new LineTo(80, 30),
-            //    new ClosePath()
-            //}, Colors.Gray);
-            //
-            //Render(canvas);
-        }
-
         protected override void OnClosing(CancelEventArgs e) {
             base.OnClosing(e);
             PictureFrame.Image.TryDispose();
