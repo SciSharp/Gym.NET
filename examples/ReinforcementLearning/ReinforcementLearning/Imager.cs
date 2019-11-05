@@ -14,12 +14,12 @@ using Size = SixLabors.Primitives.Size;
 
 namespace ReinforcementLearning {
     public class Imager {
-        private Image<Rgba32>[] _images;
+        private Image[] _images;
         private Image<Rgba32> _outputImage;
         private List<Action<IImageProcessingContext>> _actions;
 
-        public virtual Imager Load(Image<Rgba32>[] images) {
-            _images = images.Select(x => x.Clone()).ToArray();
+        public virtual Imager Load(Image[] images) {
+            _images = images.Select(x => x.Clone(c => {})).ToArray();
             _outputImage = null;
             _actions = new List<Action<IImageProcessingContext>>();
             return this;
@@ -103,7 +103,7 @@ namespace ReinforcementLearning {
             return this;
         }
 
-        public virtual Image<Rgba32> Result() =>
+        public virtual Image Result() =>
             Compile()._outputImage;
     }
 }

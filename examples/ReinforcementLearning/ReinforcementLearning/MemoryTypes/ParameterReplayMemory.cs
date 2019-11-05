@@ -13,7 +13,7 @@ namespace ReinforcementLearning.MemoryTypes {
             _parameterLength = parameterLength;
         }
 
-        protected override float[] GetDataInput(Image<Rgba32> currentFrame, Step currentStep) {
+        protected override float[] GetDataInput(Image currentFrame, Step currentStep) {
             if (currentStep.Observation == null) {
                 return Enumerable.Repeat(0F, _parameterLength).ToArray();
             }

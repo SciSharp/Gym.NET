@@ -21,7 +21,7 @@ namespace ReinforcementLearning.MemoryTypes {
             EpisodesCapacity = episodesCapacity;
         }
 
-        protected abstract TData GetDataInput(Image<Rgba32> currentFrame, Step currentStep);
+        protected abstract TData GetDataInput(Image currentFrame, Step currentStep);
 
         public void Memorize(int action, float currentReward, bool done) {
             if (DataQueue.Count < StageFrames) {
@@ -36,7 +36,7 @@ namespace ReinforcementLearning.MemoryTypes {
             });
         }
 
-        public TData[] Enqueue(Image<Rgba32> currentFrame, Step currentStep) {
+        public TData[] Enqueue(Image currentFrame, Step currentStep) {
             var currentData = GetDataInput(currentFrame, currentStep);
 
             DataQueue.Enqueue(currentData);

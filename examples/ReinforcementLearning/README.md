@@ -4,8 +4,8 @@
 To run the sample:
 - build the solution 
 - copy the pre-trained file to the generated bin folder
-    - copy the file "Parameter pre-trained backup-network.modl" to ReinforcementLearning.Parameters.Runner\bin\Debug\netcoreapp2.2
-    - copy the file "Image pre-trained backup-network.modl" to ReinforcementLearning.Images.Runner\bin\Debug\netcoreapp2.2
+    - copy the file "Parameter pre-trained backup-network.modl" to ReinforcementLearning.Parameters.Runner\bin\Debug\netcoreapp3.0
+    - copy the file "Image pre-trained backup-network.modl" to ReinforcementLearning.Images.Runner\bin\Debug\netcoreapp3.0
 - set one of the two available project as startup project in VisualStudio solution explorer (ReinforcementLearning.Parameters.Runner or ReinforcementLearning.Images.Runner)
 - run
 - choose [L] to load the pre-trained NN.
@@ -20,7 +20,7 @@ To train a new agent:
 
 
 # Structure
-The example is splitted into two different .Net Core 2.2 projects both training the CartPole classic game using two different approaches.
+The example is splitted into two different .Net Core 3.0 projects both training the CartPole classic game using two different approaches.
 
 All the hyperparameters can be found and changed in the configuration file named CartPoleConfiguration.cs found in both projects.
 
