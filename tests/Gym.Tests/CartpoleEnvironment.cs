@@ -2,7 +2,7 @@
 using System.Threading;
 using Gym.Environments;
 using Gym.Environments.Envs.Classic;
-using Gym.Rendering.WinForm.Rendering;
+using Gym.Rendering.WinForm;
 using Gym.Tests.Helpers;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 

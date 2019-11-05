@@ -10,7 +10,7 @@ using Gym.Threading;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 
-namespace Gym.Rendering.WinForm.Rendering {
+namespace Gym.Rendering.WinForm {
     /// <summary>
     ///     A form with PictureBox that accepts <see cref="IImageCanvas"/> and renders it on it. Start <see cref="Viewer"/> by calling <see cref="Run"/>
     /// </summary>
