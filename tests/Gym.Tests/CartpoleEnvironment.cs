@@ -2,6 +2,7 @@
 using System.Threading;
 using Gym.Environments;
 using Gym.Environments.Envs.Classic;
+using Gym.Rendering.Avalonia;
 using Gym.Rendering.WinForm;
 using Gym.Tests.Helpers;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -11,7 +12,7 @@ namespace Gym.Tests {
     public class CartpoleEnvironment {
         [TestMethod]
         public void Run() {
-            var cp = new CartPoleEnv(WinFormViewer.Factory);
+            var cp = new CartPoleEnv(WinFormEnvViewer.Factory); //or AvaloniaEnvViewer.Factory
             var rnd = new Random(42);
             var done = true;
             using (new StopwatchMeasurer("time it took to run all steps in ms"))

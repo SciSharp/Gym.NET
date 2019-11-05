@@ -14,26 +14,26 @@ namespace Gym.Rendering.WinForm {
     /// <summary>
     ///     A form with PictureBox that accepts <see cref="IImageCanvas"/> and renders it on it. Start <see cref="Viewer"/> by calling <see cref="Run"/>
     /// </summary>
-    public partial class WinFormViewer : Form, IEnvViewer {
+    public partial class WinFormEnvViewer : Form, IEnvViewer {
         private int _lastSize = 0;
         private readonly ManualResetEventSlim _ready = new ManualResetEventSlim();
 
         /// <summary>
-        ///     A delegate that creates a <see cref="WinFormViewer"/> based on given parameters.
+        ///     A delegate that creates a <see cref="WinFormEnvViewer"/> based on given parameters.
         /// </summary>
         public static IEnvironmentViewerFactoryDelegate Factory => Run;
 
         /// <summary>
-        ///     Starts a <see cref="WinFormViewer"/> in seperate thread.
+        ///     Starts a <see cref="WinFormEnvViewer"/> in seperate thread.
         /// </summary>
         /// <param name="height">The height of the form</param>
         /// <param name="width">The width of the form</param>
         /// <param name="title">The title of the form, also mentioned in the thread name.</param>
         public static IEnvViewer Run(int width, int height, string title = null) {
-            WinFormViewer v = null;
+            WinFormEnvViewer v = null;
             using (var me = new ManualResetEventSlim()) {
                 var thread = new Thread(() => {
-                    v = new WinFormViewer(width + 12, height + 12, title);
+                    v = new WinFormEnvViewer(width + 12, height + 12, title);
                     me.Set();
                     v.ShowDialog();
                 });
@@ -49,7 +49,7 @@ namespace Gym.Rendering.WinForm {
             return v;
         }
 
-        public WinFormViewer(int width, int height, string title = null) {
+        public WinFormEnvViewer(int width, int height, string title = null) {
             InitializeComponent();
             Height = height;
             Width = width;

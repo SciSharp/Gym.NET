@@ -1,6 +1,6 @@
 ﻿namespace Gym.Rendering.WinForm
 {
-    partial class WinFormViewer
+    partial class WinFormEnvViewer
     {
         /// <summary>
         /// Required designer variable.
