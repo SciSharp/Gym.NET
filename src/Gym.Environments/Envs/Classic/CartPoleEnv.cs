@@ -39,16 +39,18 @@ namespace Gym.Environments.Envs.Classic {
         private NDArray state;
         private int steps_beyond_done = -1;
 
-        public CartPoleEnv(IEnvironmentViewerFactoryDelegate viewerFactory) {
+        public CartPoleEnv(IEnvironmentViewerFactoryDelegate viewerFactory, NumPyRandom randomState) {
             _viewerFactory = viewerFactory;
             // Angle limit set to 2 * theta_threshold_radians so failing observation is still within bounds  
             var high = np.array(x_threshold * 2, float.MaxValue, theta_threshold_radians * 2, float.MaxValue);
             ActionSpace = new Discrete(2);
             ObservationSpace = new Box(-high, high, np.float32);
-            random = np.random.RandomState();
+            random = randomState ?? np.random.RandomState();
 
             Metadata = new Dict("render.modes", new[] {"human", "rgb_array"}, "video.frames_per_second", 50);
         }
+
+        public CartPoleEnv(IEnvironmentViewerFactoryDelegate viewerFactory) : this(viewerFactory, null) {}
 
         public CartPoleEnv([NotNull] IEnvViewer viewer) : this((IEnvironmentViewerFactoryDelegate)null) {
             _viewer = viewer ?? throw new ArgumentNullException(nameof(viewer));
