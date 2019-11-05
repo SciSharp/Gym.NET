@@ -24,7 +24,7 @@ namespace Gym.Envs {
             return DistributedScheduler.Default.Run(() => Step(action));
         }
 
-        public abstract Image<Rgba32> Render(string mode = "human");
+        public abstract Image Render(string mode = "human");
         public abstract void Close();
         public abstract void Seed(int seed);
 

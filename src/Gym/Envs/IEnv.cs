@@ -16,7 +16,7 @@ namespace Gym.Envs {
         NDArray Reset();
         Step Step(int action);
         Task<Step> StepAsync(int action);
-        Image<Rgba32> Render(string mode = "human");
+        Image Render(string mode = "human");
         void Close();
         void Seed(int seed);
     }
