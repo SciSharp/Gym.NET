@@ -10,7 +10,8 @@ using Avalonia.Threading;
 using Gym.Environments;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
-using Image = Avalonia.Controls.Image;
+using Image = SixLabors.ImageSharp.Image;
+using AVImage = Avalonia.Controls.Image;
 
 namespace Gym.Rendering.Avalonia {
     public class AvaloniaEnvViewer : Window, IEnvViewer {
@@ -58,7 +59,7 @@ namespace Gym.Rendering.Avalonia {
             return _viewer;
         }
 
-        public void Render(Image<Rgba32> img) {
+        public void Render(Image img) {
             if (!Dispatcher.UIThread.CheckAccess()) {
                 RenderResetEvent.Reset();
                 Dispatcher.UIThread.InvokeAsync(() => Render(img), DispatcherPriority.MaxValue);
@@ -70,7 +71,7 @@ namespace Gym.Rendering.Avalonia {
             using (var ms = new MemoryStream()) {
                 img.SaveAsBmp(ms);
                 ms.Seek(0, SeekOrigin.Begin);
-                Content = new Image {
+                Content = new AVImage {
                     Source = new Bitmap(ms)
                 };
             }
