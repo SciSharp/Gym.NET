@@ -4,6 +4,7 @@ using System.IO;
 using System.Threading;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Logging.Serilog;
 using Avalonia.Markup.Xaml;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
@@ -47,7 +48,7 @@ namespace Gym.Rendering.Avalonia {
             _height = height;
             _title = title;
 
-            var thread = new Thread(() => { Program.BuildAvaloniaApp().Start(BuildViewer, Array.Empty<string>()); });
+            var thread = new Thread(() => { BuildAvaloniaApp().Start(BuildViewer, Array.Empty<string>()); });
             thread.Start();
             thread.Name = $"{nameof(AvaloniaEnvViewer)} {(string.IsNullOrEmpty(title) ? "" : $"-{title}")}";
 
@@ -91,5 +92,10 @@ namespace Gym.Rendering.Avalonia {
             base.OnOpened(e);
             ReadyResetEvent.Set();
         }
+
+        protected static AppBuilder BuildAvaloniaApp()
+            => AppBuilder.Configure<App>()
+                .UsePlatformDetect()
+                .LogToDebug();
     }
 }
