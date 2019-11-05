@@ -102,7 +102,7 @@ namespace Gym.Environments.Envs.Classic {
             var cart = new RectangularPolygon(-cartwidth / 2, carty - cartheight / 2, cartwidth, cartheight);
             var draw = new List<(IPath, Rgba32)>();
 
-            if (!Equals(state, null)) {
+            if (!(state is null)) {
                 var center_x = (float) (state.GetDouble(0) * scale + screen_width / 2.0f);
                 //no y cuz it doesnt change.
                 var cbounds = circle.Bounds;
