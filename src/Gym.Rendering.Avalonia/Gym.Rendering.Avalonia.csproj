@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <OutputType>Exe</OutputType>
-    <TargetFramework>netcoreapp2.1</TargetFramework>
+    <OutputType>Library</OutputType>
+    <TargetFramework>netcoreapp3.0</TargetFramework>
     <LangVersion>latest</LangVersion>
     <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
     <PackageId>Gym.NET.Rendering.Avalonia</PackageId>
@@ -21,6 +21,8 @@
     <AllowedOutputExtensionsInPackageBuildOutputFolder>$(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb</AllowedOutputExtensionsInPackageBuildOutputFolder>
     <AssemblyVersion>0.1.0.2</AssemblyVersion>
     <FileVersion>0.1.0.2</FileVersion>
+    <ApplicationIcon />
+    <StartupObject />
   </PropertyGroup>
   <ItemGroup>
     <Compile Update="**\*.xaml.cs">

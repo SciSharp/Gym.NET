@@ -4,7 +4,7 @@ using SixLabors.ImageSharp.PixelFormats;
 
 namespace Gym.Environments {
     /// <summary>
-    ///     A delegate that creates a <see cref="IEnvViewer"/> with given parameters.
+    ///     A delegate that creates a <see cref="IEnvViewer"/> from given parameters.
     /// </summary>
     /// <param name="width">The width of the rendering window.</param>
     /// <param name="height">The height of the rendering window.</param>
