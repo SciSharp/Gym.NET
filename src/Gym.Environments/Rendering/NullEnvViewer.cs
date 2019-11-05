@@ -14,7 +14,7 @@ namespace Gym.Environments {
         ///     Render the given <paramref name="img"/>.
         /// </summary>
         /// <param name="img">The image to render.</param>
-        public void Render(Image<Rgba32> img) {
+        public void Render(Image img) {
             //null
         }
 
