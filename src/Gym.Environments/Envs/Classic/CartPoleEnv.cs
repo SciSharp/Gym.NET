@@ -16,7 +16,7 @@ using PointF = SixLabors.Primitives.PointF;
 
 namespace Gym.Environments.Envs.Classic {
     public class CartPoleEnv : Env {
-        private readonly IEnvironmentViewerFactoryDelegate _viewerFactory;
+        private IEnvironmentViewerFactoryDelegate _viewerFactory;
         private IEnvViewer _viewer;
 
         //constants
@@ -65,7 +65,7 @@ namespace Gym.Environments.Envs.Classic {
             return np.array(state);
         }
 
-        public override Image<Rgba32> Render(string mode = "human") {
+        public override Image Render(string mode = "human") {
             float b;
             float t;
             float r;
@@ -85,7 +85,7 @@ namespace Gym.Environments.Envs.Classic {
                     //to prevent double initalization.
                     if (_viewer == null) {
                         if (_viewerFactory == null)
-                            throw new ArgumentNullException(nameof(_viewerFactory), $"No {nameof(_viewerFactory)} have been set");
+                            _viewerFactory = NullEnvViewer.Factory;
                         _viewer = _viewerFactory(screen_width, screen_height, "cartpole-v1");
                     }
                 }
