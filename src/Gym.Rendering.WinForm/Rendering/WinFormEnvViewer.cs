@@ -9,6 +9,7 @@ using Gym.Environments;
 using Gym.Threading;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
+using Image = SixLabors.ImageSharp.Image;
 
 namespace Gym.Rendering.WinForm {
     /// <summary>
@@ -61,7 +62,7 @@ namespace Gym.Rendering.WinForm {
         ///     Renders this canvas onto <see cref="PictureFrame"/>.
         /// </summary>
         /// <param name="canvas">Canvas painted from <see cref="NGraphics"/></param>
-        public void Render(Image<Rgba32> canvas) {
+        public void Render(Image canvas) {
             if (InvokeRequired) {
                 Invoke(new Action(() => Render(canvas)));
                 return;
@@ -79,7 +80,7 @@ namespace Gym.Rendering.WinForm {
         ///     Renders this canvas onto <see cref="PictureFrame"/>.
         /// </summary>
         /// <param name="canvas">Canvas painted from <see cref="NGraphics"/></param>
-        public void RenderAsync(Image<Rgba32> canvas) {
+        public void RenderAsync(Image canvas) {
             if (InvokeRequired) {
                 BeginInvoke(new Action(() => RenderAsync(canvas)));
                 return;
