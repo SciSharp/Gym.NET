@@ -36,12 +36,17 @@ namespace Gym.Rendering.Avalonia {
             Close();
         }
 
+        /// <summary>
+        ///     A delegate that creates a <see cref="AvaloniaEnvViewer"/> based on given parameters.
+        /// </summary>
+        public static IEnvironmentViewerFactoryDelegate Factory => Run;
+
         public static IEnvViewer Run(int width, int height, string title = null) {
             _width = width;
             _height = height;
             _title = title;
 
-            var thread = new Thread(() => { Program.BuildAvaloniaApp().Start(BuildViewer, new string[] { }); });
+            var thread = new Thread(() => { Program.BuildAvaloniaApp().Start(BuildViewer, Array.Empty<string>()); });
             thread.Start();
             thread.Name = $"{nameof(AvaloniaEnvViewer)} {(string.IsNullOrEmpty(title) ? "" : $"-{title}")}";
 

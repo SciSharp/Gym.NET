@@ -19,6 +19,11 @@ namespace Gym.Rendering.WinForm.Rendering {
         private readonly ManualResetEventSlim _ready = new ManualResetEventSlim();
 
         /// <summary>
+        ///     A delegate that creates a <see cref="WinFormViewer"/> based on given parameters.
+        /// </summary>
+        public static IEnvironmentViewerFactoryDelegate Factory => Run;
+
+        /// <summary>
         ///     Starts a <see cref="WinFormViewer"/> in seperate thread.
         /// </summary>
         /// <param name="height">The height of the form</param>

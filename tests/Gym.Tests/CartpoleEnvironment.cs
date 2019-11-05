@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Threading;
+using Gym.Environments;
 using Gym.Environments.Envs.Classic;
 using Gym.Rendering.WinForm.Rendering;
 using Gym.Tests.Helpers;
@@ -10,8 +11,8 @@ namespace Gym.Tests {
     public class CartpoleEnvironment {
         [TestMethod]
         public void Run() {
-            var cp = new CartPoleEnv(WinFormViewer.Run);
-            var rnd = new Random();
+            var cp = new CartPoleEnv(WinFormViewer.Factory);
+            var rnd = new Random(42);
             var done = true;
             using (new StopwatchMeasurer("time it took to run all steps in ms"))
                 for (int i = 0; i < 100_000; i++) {
