@@ -66,19 +66,17 @@ namespace Gym.Environments.Envs.Classic {
         }
 
         public override Image Render(string mode = "human") {
-            float b;
-            float t;
-            float r;
-            float l;
-            var screen_width = 600;
-            var screen_height = 400;
-            var world_width = x_threshold * 2;
-            var scale = screen_width / world_width;
-            var carty = 300;
-            var polewidth = 10.0f;
-            var poleheight = scale * (2 * length);
-            var cartwidth = 50.0f;
-            var cartheight = 30.0f;
+            float b, t, r, l;
+            const int screen_width = 600;
+            const int screen_height = 400;
+            const float world_width = x_threshold * 2;
+            const float scale = screen_width / world_width;
+            const int carty = 300;
+            const float polewidth = 10.0f;
+            const float poleheight = scale * (2 * length);
+            const float cartwidth = 50.0f;
+            const float cartheight = 30.0f;
+
 
             if (_viewer == null)
                 lock (this) {
