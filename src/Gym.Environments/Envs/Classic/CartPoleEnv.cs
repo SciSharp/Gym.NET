@@ -124,7 +124,6 @@ namespace Gym.Environments.Envs.Classic {
 
             //line
             img.Mutate(i => i.BackgroundColor(Rgba32.White));
-            img.Mutate(i => i.BackgroundColor(Rgba32.White));
             img.Mutate(i => i.Fill(Rgba32.Black, new RectangularPolygon(new PointF(0, carty), new PointF(screen_width, carty + 1))));
             foreach (var (path, rgba32) in draw) {
                 img.Mutate(i => i.Fill(rgba32, path));
