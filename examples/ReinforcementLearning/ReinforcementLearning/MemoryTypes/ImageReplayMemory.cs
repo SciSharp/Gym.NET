@@ -1,7 +1,6 @@
 ﻿using System;
 using Gym.Observations;
 using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
 
 namespace ReinforcementLearning.MemoryTypes {
     public class ImageReplayMemory : ReplayMemory<Image> {

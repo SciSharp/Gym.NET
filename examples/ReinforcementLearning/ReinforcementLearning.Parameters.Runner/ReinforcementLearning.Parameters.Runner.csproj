@@ -10,4 +10,10 @@
     <ProjectReference Include="..\ReinforcementLearning\ReinforcementLearning.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="Pre-trained backup-network.modl">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>

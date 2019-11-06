@@ -1,7 +1,6 @@
 ﻿using System.Linq;
 using ReinforcementLearning.GameConfigurations;
 using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
 
 namespace ReinforcementLearning.DataBuilders {
     public class ImageDataBuilder : DataBuilder<IImageGameConfiguration, Image> {

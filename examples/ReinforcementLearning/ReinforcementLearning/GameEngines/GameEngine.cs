@@ -23,10 +23,15 @@ namespace ReinforcementLearning.GameEngines {
         protected DataBuilder<TGameConfiguration, TData> DataBuilder;
 
         public void Play() {
-            Console.WriteLine("Press [L] to load last saved model, any other key to skip");
+            Console.WriteLine("Press [L] to load last saved model");
+            Console.WriteLine("Press [P] to load pre-trained model");
+            Console.WriteLine("Press any other key to skip");
             var pressed = Console.ReadKey().KeyChar;
             if (pressed == 'l') {
-                LoadModelToTrainer(Trainer);
+                LoadLatestModelToTrainer(Trainer);
+            }
+            if (pressed == 'p'){
+                LoadModelToTrainer(Trainer, new FileInfo("Pre-trained backup-network.modl"));
             }
 
             Console.Clear();
@@ -54,20 +59,30 @@ namespace ReinforcementLearning.GameEngines {
         internal abstract ReplayMemory<TData> BuildMemory(TGameConfiguration game);
         internal abstract Trainer<TGameConfiguration, TData> BuildTrainer(TGameConfiguration game);
 
-        private static void LoadModelToTrainer(Trainer<TGameConfiguration, TData> trainer) {
+        private static void LoadLatestModelToTrainer(Trainer<TGameConfiguration, TData> trainer) {
             var chosenFile = Directory.GetFiles("./")
                 .Select(x => new FileInfo(x))
                 .Where(x => x.Extension == ".modl")
                 .OrderByDescending(x => x.LastWriteTime)
                 .FirstOrDefault();
 
-            if (chosenFile == null) {
+            if (chosenFile == null)
+            {
                 Console.WriteLine($"No model found in dir {Directory.GetCurrentDirectory()}");
                 return;
             }
 
-            Console.WriteLine($"Loading model {chosenFile.FullName}");
-            trainer.Load(chosenFile.OpenRead());
+            LoadModelToTrainer(trainer, chosenFile);
+        }
+
+        private static void LoadModelToTrainer(Trainer<TGameConfiguration, TData> trainer, FileInfo file)
+        {
+            if (!file.Exists){
+                Console.WriteLine($"Cannot load model {file.FullName} from dir {Directory.GetCurrentDirectory()}");
+            }
+
+            Console.WriteLine($"Loading model {file.FullName}");
+            trainer.Load(file.OpenRead());
         }
     }
 }

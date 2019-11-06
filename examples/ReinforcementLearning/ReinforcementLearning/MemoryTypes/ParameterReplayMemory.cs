@@ -2,7 +2,6 @@
 using System.Linq;
 using Gym.Observations;
 using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
 
 namespace ReinforcementLearning.MemoryTypes {
     public class ParameterReplayMemory : ReplayMemory<float[]> {

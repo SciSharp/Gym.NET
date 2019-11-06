@@ -2,7 +2,6 @@
 using ReinforcementLearning.GameConfigurations;
 using ReinforcementLearning.MemoryTypes;
 using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
 
 namespace ReinforcementLearning.GameEngines {
     public class ImageGameEngine : GameEngine<IImageGameConfiguration, Image> {

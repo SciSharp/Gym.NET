@@ -2,13 +2,10 @@
 # How to run
 
 To run the sample:
-- build the solution 
-- copy the pre-trained file to the generated bin folder
-    - copy the file "Parameter pre-trained backup-network.modl" to ReinforcementLearning.Parameters.Runner\bin\Debug\netcoreapp3.0
-    - copy the file "Image pre-trained backup-network.modl" to ReinforcementLearning.Images.Runner\bin\Debug\netcoreapp3.0
+- build the solution
 - set one of the two available project as startup project in VisualStudio solution explorer (ReinforcementLearning.Parameters.Runner or ReinforcementLearning.Images.Runner)
 - run
-- choose [L] to load the pre-trained NN.
+- choose [L] to load the latest trained NN or [P] to load the pre-trained NN.
 - choose 1 to skip trainin and run the agent.
 
 To train a new agent:

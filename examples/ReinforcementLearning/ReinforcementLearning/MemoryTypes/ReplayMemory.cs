@@ -5,7 +5,6 @@ using System.Linq;
 using Gym.Observations;
 using Newtonsoft.Json;
 using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
 
 namespace ReinforcementLearning.MemoryTypes {
     public abstract class ReplayMemory<TData> : IConcurrentMemory<TData> {
