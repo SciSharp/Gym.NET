@@ -31,7 +31,7 @@ PM> Install-Package Gym.NET.Environments
 
  - Implement environments<br>
     To run an environment, see [Gym.Tests](./tests/Gym.Tests/)
-   - [ ] Convert Gym.Environments to a net-standard project.
+   - [X] Convert Gym.Environments to a net-standard project.
    - [ ] classics
      - [X] CartPole-v1 
        - [ ] Compare visually against python's version

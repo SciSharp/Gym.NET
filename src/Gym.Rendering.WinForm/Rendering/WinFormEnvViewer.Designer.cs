@@ -1,6 +1,6 @@
-﻿namespace Ebby.Gym.Rendering
+﻿namespace Gym.Rendering.WinForm
 {
-    partial class Viewer
+    partial class WinFormEnvViewer
     {
         /// <summary>
         /// Required designer variable.
@@ -17,7 +17,7 @@
             {
                 components.Dispose();
             }
-            base.Dispose(disposing);
+            base.Dispose(disposing); 
         }
 
         #region Windows Form Designer generated code

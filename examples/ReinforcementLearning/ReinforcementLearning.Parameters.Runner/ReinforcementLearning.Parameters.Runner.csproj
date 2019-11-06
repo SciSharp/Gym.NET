@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>netcoreapp3.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\Gym.Rendering.Avalonia\Gym.Rendering.Avalonia.csproj" />
+    <ProjectReference Include="..\ReinforcementLearning\ReinforcementLearning.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="Pre-trained backup-network.modl">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+</Project>

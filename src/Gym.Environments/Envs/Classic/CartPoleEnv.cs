@@ -1,29 +1,24 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Drawing;
-using System.Media;
 using System.Numerics;
-using Ebby.Gym.Rendering;
 using Gym.Collections;
 using Gym.Envs;
 using Gym.Observations;
 using Gym.Spaces;
-using NGraphics;
+using JetBrains.Annotations;
 using NumSharp;
-using NumSharp.Generic;
-using SixLabors.Shapes;
-using Color = NGraphics.Color;
-using Point = NGraphics.Point;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
-using SixLabors.ImageSharp.Processing.Processors;
-using SixLabors.Primitives;
+using SixLabors.Shapes;
 using PointF = SixLabors.Primitives.PointF;
 
-namespace Ebby.Gym.Envs.Classic {
+namespace Gym.Environments.Envs.Classic {
     public class CartPoleEnv : Env {
+        private IEnvironmentViewerFactoryDelegate _viewerFactory;
+        private IEnvViewer _viewer;
+
         //constants
         private const float gravity = 9.8f;
         private const float masscart = 1.0f;
@@ -34,25 +29,34 @@ namespace Ebby.Gym.Envs.Classic {
         private const float force_mag = 10.0f;
         private const float tau = 0.02f;
         private const string kinematics_integrator = "euler";
+
         private const float theta_threshold_radians = (float) (12 * 2 * Math.PI / 360); // Angle at which to fail the episode   
+
         private const float x_threshold = 2.4f;
 
         //properties
         private NumPyRandom random;
-        private Viewer viewer;
         private NDArray state;
         private int steps_beyond_done = -1;
 
-        public CartPoleEnv() {
+        public CartPoleEnv(IEnvironmentViewerFactoryDelegate viewerFactory, NumPyRandom randomState) {
+            _viewerFactory = viewerFactory;
             // Angle limit set to 2 * theta_threshold_radians so failing observation is still within bounds  
             var high = np.array(x_threshold * 2, float.MaxValue, theta_threshold_radians * 2, float.MaxValue);
             ActionSpace = new Discrete(2);
             ObservationSpace = new Box(-high, high, np.float32);
-            random = np.random.RandomState();
+            random = randomState ?? np.random.RandomState();
 
-            Metadata = new Dict(
-                "render.modes", new[] {"human", "rgb_array"},
-                "video.frames_per_second", 50);
+            Metadata = new Dict("render.modes", new[] {"human", "rgb_array"}, "video.frames_per_second", 50);
+        }
+
+        public CartPoleEnv(IEnvironmentViewerFactoryDelegate viewerFactory) : this(viewerFactory, null) {}
+
+        public CartPoleEnv([NotNull] IEnvViewer viewer) : this((IEnvironmentViewerFactoryDelegate) null) {
+            _viewer = viewer ?? throw new ArgumentNullException(nameof(viewer));
+        }
+
+        public CartPoleEnv() : this(NullEnvViewer.Factory) {
         }
 
         public override NDArray Reset() {
@@ -61,26 +65,27 @@ namespace Ebby.Gym.Envs.Classic {
             return np.array(state);
         }
 
-        public override byte[] Render(string mode = "human") {
-            float b;
-            float t;
-            float r;
-            float l;
-            var screen_width = 600;
-            var screen_height = 400;
-            var world_width = x_threshold * 2;
-            var scale = screen_width / world_width;
-            var carty = 300;
-            var polewidth = 10.0f;
-            var poleheight = scale * (2 * length);
-            var cartwidth = 50.0f;
-            var cartheight = 30.0f;
+        public override Image Render(string mode = "human") {
+            float b, t, r, l;
+            const int screen_width = 600;
+            const int screen_height = 400;
+            const float world_width = x_threshold * 2;
+            const float scale = screen_width / world_width;
+            const int carty = 300;
+            const float polewidth = 10.0f;
+            const float poleheight = scale * (2 * length);
+            const float cartwidth = 50.0f;
+            const float cartheight = 30.0f;
 
-            if (viewer == null)
+
+            if (_viewer == null)
                 lock (this) {
                     //to prevent double initalization.
-                    if (viewer == null)
-                        viewer = Viewer.Run(screen_width, screen_height, "cartpole-v1");
+                    if (_viewer == null) {
+                        if (_viewerFactory == null)
+                            _viewerFactory = NullEnvViewer.Factory;
+                        _viewer = _viewerFactory(screen_width, screen_height, "cartpole-v1");
+                    }
                 }
 
             //pole
@@ -100,14 +105,14 @@ namespace Ebby.Gym.Envs.Classic {
             var cart = new RectangularPolygon(-cartwidth / 2, carty - cartheight / 2, cartwidth, cartheight);
             var draw = new List<(IPath, Rgba32)>();
 
-            if (!Equals(state, null)) {
+            if (!(state is null)) {
                 var center_x = (float) (state.GetDouble(0) * scale + screen_width / 2.0f);
                 //no y cuz it doesnt change.
                 var cbounds = circle.Bounds;
                 var pivotPoint = new PointF(cbounds.X + cbounds.Width / 2f, cbounds.Y + cbounds.Height / 2f);
 
                 draw.Add((cart.Translate(center_x, 0), Rgba32.Black));
-                draw.Add((pole.Transform(Matrix3x2.CreateRotation((float) -state.GetDouble(2), pivotPoint)).Translate(center_x, 0), new Rgba32(204, 153, 102)));
+                draw.Add((pole.Transform(Matrix3x2.CreateRotation((float) state.GetDouble(2), pivotPoint)).Translate(center_x, 0), new Rgba32(204, 153, 102)));
                 draw.Add((circle.Translate(center_x, 0), Rgba32.Teal));
             } else {
                 draw.Add((pole, Rgba32.Orange));
@@ -119,20 +124,13 @@ namespace Ebby.Gym.Envs.Classic {
 
             //line
             img.Mutate(i => i.BackgroundColor(Rgba32.White));
-            img.Mutate(i => i.BackgroundColor(Rgba32.White));
             img.Mutate(i => i.Fill(Rgba32.Black, new RectangularPolygon(new PointF(0, carty), new PointF(screen_width, carty + 1))));
             foreach (var (path, rgba32) in draw) {
                 img.Mutate(i => i.Fill(rgba32, path));
             }
 
-            viewer.Render(img);
-
-            //todo if (mode == "rgb_array") {
-            //todo     ImageConverter converter = new ImageConverter();
-            //todo     return (byte[]) converter.ConvertTo(((ImageImage) canvas.GetImage()).Image, typeof(byte[]));
-            //todo }
-
-            return null;
+            _viewer.Render(img);
+            return img;
         }
 
         public override Step Step(int action) {
@@ -185,11 +183,12 @@ namespace Ebby.Gym.Envs.Classic {
             return new Step(state, reward, done, null);
         }
 
+        /// <remarks>Sets internally stored viewer to null. Might cause problems if factory was not passed.</remarks>
         public override void Close() {
-            if (viewer != null) {
-                viewer.Close();
-                viewer.Dispose();
-                viewer = null;
+            if (_viewer != null) {
+                _viewer.Close();
+                _viewer.Dispose();
+                _viewer = null;
             }
         }
 

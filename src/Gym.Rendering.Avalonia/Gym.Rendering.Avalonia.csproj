@@ -1,14 +1,14 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-
   <PropertyGroup>
-    <TargetFramework>netstandard2.0</TargetFramework>
+    <OutputType>Library</OutputType>
+    <TargetFramework>netcoreapp3.0</TargetFramework>
     <LangVersion>latest</LangVersion>
     <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
-    <PackageId>Gym.NET.Environments</PackageId>
+    <PackageId>Gym.NET.Rendering.Avalonia</PackageId>
     <Version>0.1.0-alpha2</Version>
     <Authors>Eli Belash</Authors>
     <Company>SciSharp STACK</Company>
-    <Product>Gym.NET.Environments</Product>
+    <Product>Gym.NET.Rendering.Avalonia</Product>
     <Description>openai/gym's popular toolkit for developing and comparing reinforcement learning algorithms port to C#.  This package contains ported gym's environments.</Description>
     <Copyright>2019 © SciSharp STACK Team</Copyright>
     <PackageLicenseUrl>https://github.com/SciSharp/Gym.NET/blob/master/README.md</PackageLicenseUrl>
@@ -21,23 +21,31 @@
     <AllowedOutputExtensionsInPackageBuildOutputFolder>$(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb</AllowedOutputExtensionsInPackageBuildOutputFolder>
     <AssemblyVersion>0.1.0.2</AssemblyVersion>
     <FileVersion>0.1.0.2</FileVersion>
+    <ApplicationIcon />
+    <StartupObject />
   </PropertyGroup>
-
   <ItemGroup>
-    <None Remove="Gym.csproj.DotSettings" />
-    <None Remove="Gym.Environments.csproj.DotSettings" />
-    <None Remove="Gymg.csproj.DotSettings" />
+    <Compile Update="**\*.xaml.cs">
+      <DependentUpon>%(Filename)</DependentUpon>
+    </Compile>
+    <AvaloniaResource Include="**\*.xaml">
+      <SubType>Designer</SubType>
+    </AvaloniaResource>
   </ItemGroup>
-
   <ItemGroup>
-    <PackageReference Include="NumSharp" Version="0.20.4" />
+    <PackageReference Include="Avalonia" Version="0.8.2" />
+    <PackageReference Include="Avalonia.Desktop" Version="0.8.2" />
     <PackageReference Include="SixLabors.ImageSharp" Version="1.0.0-beta0007" />
-    <PackageReference Include="SixLabors.ImageSharp.Drawing" Version="1.0.0-beta0007" />
-    <PackageReference Include="JetBrains.Annotations" Version="2019.1.3" />
   </ItemGroup>
-
   <ItemGroup>
-    <ProjectReference Include="..\Gym\Gym.csproj" />
+    <ProjectReference Include="..\Gym.Environments\Gym.Environments.csproj" />
   </ItemGroup>
-
+  <ItemGroup>
+    <None Update="App.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </None>
+    <None Update="AvaloniaEnvViewer.xaml">
+      <Generator>MSBuild:Compile</Generator>
+    </None>
+  </ItemGroup>
 </Project>
