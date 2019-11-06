@@ -66,8 +66,7 @@ namespace ReinforcementLearning.GameEngines {
                 .OrderByDescending(x => x.LastWriteTime)
                 .FirstOrDefault();
 
-            if (chosenFile == null)
-            {
+            if (chosenFile == null){
                 Console.WriteLine($"No model found in dir {Directory.GetCurrentDirectory()}");
                 return;
             }
