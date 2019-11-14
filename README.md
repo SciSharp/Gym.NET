@@ -18,7 +18,35 @@ PM> Install-Package Gym.NET
 PM> Install-Package Gym.NET.Environments
 ```
 
-## TODO
+## Example
+The following example runs and renders cartpole-v1 environment.
+```C#
+using Gym.Environments;
+using Gym.Environments.Envs.Classic;
+using Gym.Rendering.WinForm;
+
+var cp = new CartPoleEnv(WinFormEnvViewer.Factory); //or AvaloniaEnvViewer.Factory
+var done = true;
+for (int i = 0; i < 100_000; i++)
+{
+    if (done)
+    {
+        var observation = cp.Reset();
+        done = false;
+    }
+    else
+    {
+        var (observation, reward, _done, information) = cp.Step((i % 2)); //we switch between moving left and right
+        done = _done;
+        //do something with the reward and observation.
+    }
+
+    cp.Render();
+    Thread.Sleep(15); //this is to prevent it from finishing instantly !
+}
+```
+
+## Roadmap
 - Implement [Spaces](https://github.com/openai/gym/tree/master/gym/spaces)
   - [X] `Space` (base class)
   - [X] `Box`
