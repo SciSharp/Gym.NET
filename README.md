@@ -21,17 +21,19 @@ PM> Install-Package Gym.NET.Environments
 ## Example
 The following example runs and renders cartpole-v1 environment.
 ```C#
+using NumSharp;
+using SixLabors.ImageSharp;
 using Gym.Environments;
 using Gym.Environments.Envs.Classic;
 using Gym.Rendering.WinForm;
 
-var cp = new CartPoleEnv(WinFormEnvViewer.Factory); //or AvaloniaEnvViewer.Factory
-var done = true;
+CartPoleEnv cp = new CartPoleEnv(WinFormEnvViewer.Factory); //or AvaloniaEnvViewer.Factory
+bool done = true;
 for (int i = 0; i < 100_000; i++)
 {
     if (done)
     {
-        var observation = cp.Reset();
+        NDArray observation = cp.Reset();
         done = false;
     }
     else
@@ -41,7 +43,7 @@ for (int i = 0; i < 100_000; i++)
         //do something with the reward and observation.
     }
 
-    cp.Render();
+    SixLabors.ImageSharp.Image img = cp.Render(); //returns the image that was rendered.
     Thread.Sleep(15); //this is to prevent it from finishing instantly !
 }
 ```
