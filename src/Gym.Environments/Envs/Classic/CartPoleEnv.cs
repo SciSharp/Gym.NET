@@ -44,7 +44,7 @@ namespace Gym.Environments.Envs.Classic {
             // Angle limit set to 2 * theta_threshold_radians so failing observation is still within bounds  
             var high = np.array(x_threshold * 2, float.MaxValue, theta_threshold_radians * 2, float.MaxValue);
             ActionSpace = new Discrete(2);
-            ObservationSpace = new Box(-high, high, np.float32);
+            ObservationSpace = new Box((-1 * high), high, np.float32);
             random = randomState ?? np.random.RandomState();
 
             Metadata = new Dict("render.modes", new[] {"human", "rgb_array"}, "video.frames_per_second", 50);
