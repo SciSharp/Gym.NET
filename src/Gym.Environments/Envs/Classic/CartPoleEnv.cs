@@ -11,8 +11,9 @@ using NumSharp;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
-using SixLabors.Shapes;
-using PointF = SixLabors.Primitives.PointF;
+using SixLabors.ImageSharp.Drawing;
+using SixLabors.ImageSharp.Drawing.Processing;
+//using PointF = SixLabors.Primitives.PointF;
 
 namespace Gym.Environments.Envs.Classic {
     public class CartPoleEnv : Env {
@@ -111,20 +112,20 @@ namespace Gym.Environments.Envs.Classic {
                 var cbounds = circle.Bounds;
                 var pivotPoint = new PointF(cbounds.X + cbounds.Width / 2f, cbounds.Y + cbounds.Height / 2f);
 
-                draw.Add((cart.Translate(center_x, 0), Rgba32.Black));
+                draw.Add((cart.Translate(center_x, 0), new Rgba32(0,0,0)));
                 draw.Add((pole.Transform(Matrix3x2.CreateRotation((float) state.GetDouble(2), pivotPoint)).Translate(center_x, 0), new Rgba32(204, 153, 102)));
-                draw.Add((circle.Translate(center_x, 0), Rgba32.Teal));
+                draw.Add((circle.Translate(center_x, 0), new Rgba32(204, 153, 102)));
             } else {
-                draw.Add((pole, Rgba32.Orange));
-                draw.Add((cart, Rgba32.Black));
-                draw.Add((circle, Rgba32.Teal));
+                draw.Add((pole, new Rgba32(204, 153, 102)));
+                draw.Add((cart, new Rgba32(0, 0, 0)));
+                draw.Add((circle, new Rgba32(0, 0, 0)));
             }
 
             var img = new Image<Rgba32>(screen_width, screen_height);
 
             //line
-            img.Mutate(i => i.BackgroundColor(Rgba32.White));
-            img.Mutate(i => i.Fill(Rgba32.Black, new RectangularPolygon(new PointF(0, carty), new PointF(screen_width, carty + 1))));
+            img.Mutate(i => i.BackgroundColor(new Rgba32(255, 255, 255)));
+            img.Mutate(i => i.Fill(new Rgba32(0, 0, 0), new RectangleF(new PointF(0, carty), new SizeF(screen_width, 1))));
             foreach (var (path, rgba32) in draw) {
                 img.Mutate(i => i.Fill(rgba32, path));
             }

@@ -1,13 +1,13 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 16
-VisualStudioVersion = 16.0.29418.71
+# Visual Studio Version 17
+VisualStudioVersion = 17.4.33403.182
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Gym", "src\Gym\Gym.csproj", "{C0B8B3EC-2E75-4A08-9220-1DB9B8583CBE}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{7B98DBBA-4857-4C40-BF38-1307B799FC80}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Gym.Tests", "tests\Gym.Tests\Gym.Tests.csproj", "{03DC11D1-C5BF-4E1E-B96D-2B0EEFAE8F70}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Gym.Tests", "tests\Gym.Tests\Gym.Tests.csproj", "{03DC11D1-C5BF-4E1E-B96D-2B0EEFAE8F70}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Gym.Environments", "src\Gym.Environments\Gym.Environments.csproj", "{149F54F3-8396-443F-8DC6-672C7DB9C4AC}"
 EndProject
@@ -16,6 +16,8 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Renderers", "Renderers", "{E9BC95B2-B399-4116-8B76-68796391818E}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Gym.Rendering.Avalonia", "src\Gym.Rendering.Avalonia\Gym.Rendering.Avalonia.csproj", "{535B3610-F890-4C8D-A0FC-D4D1971E601D}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "ThirdParty", "ThirdParty", "{AB167D30-EF1E-4019-B070-03A7428FB79F}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -36,7 +38,6 @@ Global
 		{149F54F3-8396-443F-8DC6-672C7DB9C4AC}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{149F54F3-8396-443F-8DC6-672C7DB9C4AC}.Release|Any CPU.Build.0 = Release|Any CPU
 		{E35BC24B-0B25-4B28-B372-75BD67ECFC76}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{E35BC24B-0B25-4B28-B372-75BD67ECFC76}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{E35BC24B-0B25-4B28-B372-75BD67ECFC76}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{E35BC24B-0B25-4B28-B372-75BD67ECFC76}.Release|Any CPU.Build.0 = Release|Any CPU
 		{535B3610-F890-4C8D-A0FC-D4D1971E601D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU

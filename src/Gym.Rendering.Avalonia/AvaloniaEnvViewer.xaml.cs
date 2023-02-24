@@ -4,7 +4,6 @@ using System.IO;
 using System.Threading;
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Logging.Serilog;
 using Avalonia.Markup.Xaml;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
@@ -25,9 +24,6 @@ namespace Gym.Rendering.Avalonia {
 
         public AvaloniaEnvViewer() {
             InitializeComponent();
-#if DEBUG
-            this.AttachDevTools();
-#endif
         }
 
         private void InitializeComponent() {
@@ -82,8 +78,8 @@ namespace Gym.Rendering.Avalonia {
 
         private static void BuildViewer(Application app, string[] args) {
             _viewer = new AvaloniaEnvViewer {
-                ClientSize = new Size(_width, _height),
-                Title = _title,
+                Title = _title
+//                ClientSize = new Avalonia.Size(_width, _height),
             };
             app.Run(_viewer);
         }
@@ -93,6 +89,7 @@ namespace Gym.Rendering.Avalonia {
             ReadyResetEvent.Set();
         }
 
+        [Obsolete]
         protected static AppBuilder BuildAvaloniaApp()
             => AppBuilder.Configure<App>()
                 .UsePlatformDetect()
