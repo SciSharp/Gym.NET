@@ -34,11 +34,12 @@ namespace Gym.Tests.Envs.Aether
                 {
                     System.Diagnostics.Debug.WriteLine("{0}: a={1}, reward={2}, total={3}", steps, a, reward, total_reward);
                 }
-                if (done || steps > 20000)
+                if (done || steps > 200000)
                 {
                     break;
                 }
                 state = observation;
+                env.Render();
             }
             Assert.IsTrue(steps < 20000, "Too many steps.");
             System.Diagnostics.Debug.WriteLine("Total reward: {0} in {1} steps.", total_reward, steps);
