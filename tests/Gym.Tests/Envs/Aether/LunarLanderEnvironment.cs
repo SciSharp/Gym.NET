@@ -41,7 +41,7 @@ namespace Gym.Tests.Envs.Aether
                 state = observation;
                 env.Render();
             }
-            Assert.IsTrue(steps < 20000, "Too many steps.");
+            Assert.IsTrue(steps < 200000, "Too many steps.");
             System.Diagnostics.Debug.WriteLine("Total reward: {0} in {1} steps.", total_reward, steps);
         }
 

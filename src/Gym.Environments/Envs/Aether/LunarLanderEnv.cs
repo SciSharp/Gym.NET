@@ -54,6 +54,8 @@ namespace Gym.Environments.Envs.Aether
             }
         }
         internal class LunarLanderBody {
+            internal const int LEFT_LEG = 0;
+            internal const int RIGHT_LEG = 1;
             internal float LEG_W = 2f;
             internal float LEG_H = 8f;
             internal float LEG_AWAY = 20f;
@@ -62,14 +64,17 @@ namespace Gym.Environments.Envs.Aether
             private Vector2[] LANDER_POLY = { new Vector2(-14f / SCALE, 17f / SCALE), new Vector2(-17f / SCALE, 0f / SCALE), new Vector2(-17f / SCALE, -10f / SCALE), new Vector2(17f / SCALE, -10f / SCALE), new Vector2(17f / SCALE, 0f / SCALE), new Vector2(14f / SCALE, 17f / SCALE) };
             internal LunarLanderComponent Fuselage { get; set; } = null;
             internal LunarLanderComponent[] Legs { get; }
+            internal Rgba32 Color1 { get; set; }
+            internal Rgba32 Color2 { get; set; }
+
             internal LunarLanderBody(int nLegs, World world)
             {
                 Legs = new LunarLanderComponent[nLegs];
                 Fuselage = CreateFuselage(world);
-                // Original applied a random -x,y force to the lander
-                Legs[0] = CreateLeg(0, Fuselage, world);
-                Legs[1] = CreateLeg(1, Fuselage, world);
-                Fuselage.Unit.ApplyForce(new Vector2((float)np.random.uniform(-INITIAL_RANDOM, INITIAL_RANDOM), (float)np.random.uniform(-INITIAL_RANDOM, INITIAL_RANDOM)));
+                Legs[0] = CreateLeg(LEFT_LEG, Fuselage, world);
+                Legs[1] = CreateLeg(RIGHT_LEG, Fuselage, world);
+                Color1 = new Rgba32(128, 102, 230);
+                Color2 = new Rgba32(77, 77, 128);
             }
 
             internal Body[] Bodies
@@ -114,6 +119,14 @@ namespace Gym.Environments.Envs.Aether
                 c.Color2 = new Rgba32(77, 77, 128);
                 return (c);
             }
+            /// <summary>
+            /// Creates the body and fixture leg component of the lander. The iLeg parameter should be 0 or 1 for the left and right
+            /// legs.
+            /// </summary>
+            /// <param name="iLeg"></param>
+            /// <param name="fuselage"></param>
+            /// <param name="world"></param>
+            /// <returns></returns>
             private LunarLanderComponent CreateLeg(int iLeg, LunarLanderComponent fuselage, World world)
             {
                 LunarLanderComponent c = new LunarLanderComponent();
@@ -213,7 +226,11 @@ namespace Gym.Environments.Envs.Aether
         private float WindPower { get; set; } = 15f;
         private float TurbulencePower { get; set; } = 1.5f;
 
+        /// <summary>
+        /// True when the filled circles are drawn for the side and main thrusters
+        /// </summary>
         public bool RenderEngineParticles { get; set; } = true;
+        public bool Verbose { get; set; } = false;
 
         private int _wind_idx;
         private int _torque_idx;
@@ -221,7 +238,6 @@ namespace Gym.Environments.Envs.Aether
         private World _World;
         private Body _Moon;
         private List<LunarLanderParticle> _Particles = new List<LunarLanderParticle>();
-        private float _PrevReward = 0f;
         private float _Helipad_X1 = 0f;
         private float _Helipad_X2 = 0f;
         private float _Helipad_Y = 0f;
@@ -350,6 +366,7 @@ namespace Gym.Environments.Envs.Aether
             Destroy();
             _World = new World(new Vector2(0f, Gravity));
             _Lander = new LunarLanderBody(2,_World);
+            _Lander.Fuselage.Unit.ApplyForce(new Vector2(np.random.uniform(-INITIAL_RANDOM, INITIAL_RANDOM), np.random.uniform(-INITIAL_RANDOM, INITIAL_RANDOM)));
             GameOver = false;
             _PrevShaping = float.MinValue;
             float w = VIEWPORT_W / SCALE;
@@ -470,7 +487,10 @@ namespace Gym.Environments.Envs.Aether
                     p.Unit.ApplyLinearImpulse(new Vector2(ox * MAIN_ENGINE_POWER * m_power, oy * MAIN_ENGINE_POWER * m_power),impulse_pos);
                 }
                 Vector2 impulse = new Vector2(-ox * MAIN_ENGINE_POWER * m_power, -oy * MAIN_ENGINE_POWER * m_power);
-                System.Diagnostics.Debug.WriteLine("MAIN: @{2}: applying {0} to {1}", impulse, impulse_pos,_Lander.Fuselage.Unit.Position);
+                if (Verbose)
+                {
+                    System.Diagnostics.Debug.WriteLine("MAIN: @{2}: applying {0} to {1}", impulse, impulse_pos, _Lander.Fuselage.Unit.Position);
+                }
                 _Lander.Fuselage.Unit.ApplyLinearImpulse(impulse,impulse_pos);
             }
             #endregion
@@ -495,15 +515,18 @@ namespace Gym.Environments.Envs.Aether
                 }
                 float ox = tip.X * disp_x + side.X * (3f * disp_y + direction * SIDE_ENGINE_AWAY / SCALE);
                 float oy = -tip.Y * disp_x - side.Y * (3f * disp_y + direction * SIDE_ENGINE_AWAY / SCALE);
-                Vector2 impulse_pos = _Lander.Fuselage.Unit.Position + new Vector2(ox - tip.X * 17 / SCALE, oy + tip.Y * SIDE_ENGINE_AWAY / SCALE);
+                Vector2 impulse_pos = _Lander.Fuselage.Unit.Position + new Vector2(ox - tip.X * 17 / SCALE, oy + tip.Y * SIDE_ENGINE_HEIGHT / SCALE);
                 if (RenderEngineParticles)
                 {
                     LunarLanderParticle p = CreateParticle(.7f, impulse_pos.X, impulse_pos.Y, (int)(s_power * 100f));
                     p.RenderColor = new Rgba32(ThrusterRGB[0], ThrusterRGB[1], ThrusterRGB[2]);
-                    p.Unit.ApplyLinearImpulse(new Vector2(ox * MAIN_ENGINE_POWER * s_power, oy * MAIN_ENGINE_POWER * s_power), impulse_pos);
+                    p.Unit.ApplyLinearImpulse(new Vector2(ox * SIDE_ENGINE_POWER * s_power, oy * SIDE_ENGINE_POWER * s_power), impulse_pos);
                 }
                 Vector2 impulse = new Vector2(-ox * SIDE_ENGINE_POWER * s_power, -oy * SIDE_ENGINE_POWER * s_power);
-                System.Diagnostics.Debug.WriteLine("SIDE {2}: applying {0} to {1}", impulse, impulse_pos, direction);
+                if (Verbose)
+                {
+                    System.Diagnostics.Debug.WriteLine("SIDE {2}: applying {0} to {1}", impulse, impulse_pos, direction);
+                }
                 _Lander.Fuselage.Unit.ApplyLinearImpulse(impulse, impulse_pos);
             }
             #endregion
@@ -572,7 +595,7 @@ namespace Gym.Environments.Envs.Aether
                     {
                         if (_viewerFactory == null)
                             _viewerFactory = NullEnvViewer.Factory;
-                        _viewer = _viewerFactory(VIEWPORT_W, VIEWPORT_H, "lunarlander-v1");
+                        _viewer = _viewerFactory(VIEWPORT_W, VIEWPORT_H, "lunarlander-v2");
                     }
                 }
             // Define the buffer image for drawing
@@ -584,7 +607,6 @@ namespace Gym.Environments.Envs.Aether
                 foreach (LunarLanderParticle p in _Particles)
                 {
                     float ttl = (float)p.Decay() / 100f;
-                    System.Diagnostics.Debug.WriteLine("Particle TTL={0}", ttl);
                     if (ttl < 0f)
                     {
                         continue;
@@ -643,21 +665,20 @@ namespace Gym.Environments.Envs.Aether
                     img.Mutate(i => i.DrawPolygon(new Rgba32(255, 0, 0), 1f, sky_poly));
                 }
             }
-            /*
+            
             Transform moonT = _Moon.GetTransform();
             foreach (Fixture f in _Moon.FixtureList)
             {
                 EdgeShape poly = f.Shape as EdgeShape;
-                LinearLineSegment[] segments = new LinearLineSegment[3];
                 List<PointF> points = new List<PointF>();
-                foreach (Vector2 v in new Vector2[] { poly.Vertex0, poly.Vertex1, poly.Vertex2, poly.Vertex3 })
+                foreach (Vector2 v in new Vector2[] { poly.Vertex1, poly.Vertex2 })
                 {
                     Vector2 xv = Transform.Multiply(v, ref moonT) * SCALE;
                     PointF pv = new PointF(xv.X, VIEWPORT_H - xv.Y);
                     points.Add(pv);
                 }
                 img.Mutate(i => i.DrawPolygon(new Rgba32(255,0,0), 1f, points.ToArray()));
-            }*/
+            }
 
             // Draw the helipad
             foreach (float x in new float[] { _Helipad_X1, _Helipad_X2 }) {
