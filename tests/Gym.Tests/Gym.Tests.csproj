@@ -3,9 +3,11 @@
   <PropertyGroup>
     <TargetFrameworks>netcoreapp3.1;net6.0-windows</TargetFrameworks>
     <UseWindowsForms>true</UseWindowsForms>
+    <UseWpf>true</UseWpf>
     <IsPackable>false</IsPackable>
     <Company>SciSharp STACK</Company>
     <Authors>Eli Belash</Authors>
+    <OutputType>Exe</OutputType>
   </PropertyGroup>
 
   <ItemGroup>
@@ -21,6 +23,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Gym.Environments\Gym.Environments.csproj" />
     <ProjectReference Include="..\..\src\Gym.Rendering.Avalonia\Gym.Rendering.Avalonia.csproj" />
+    <ProjectReference Include="..\..\src\Gym.Rendering.WinForm\Gym.Rendering.WinForm.csproj" />
     <ProjectReference Include="..\..\src\Gym\Gym.csproj" />
   </ItemGroup>
 
