@@ -46,6 +46,8 @@ for (int i = 0; i < 100_000; i++)
     SixLabors.ImageSharp.Image img = cp.Render(); //returns the image that was rendered.
     Thread.Sleep(15); //this is to prevent it from finishing instantly !
 }
+
+cp.Close();
 ```
 
 ## Roadmap
@@ -89,5 +91,5 @@ for (int i = 0; i < 100_000; i++)
      - [ ] bipedal_walker
      - [ ] car_dynamics
      - [ ] car_racing
-     - [ ] lunar_lander
+     - [X] lunar_lander
    - [ ] atari
