@@ -12,6 +12,7 @@ using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using Image = SixLabors.ImageSharp.Image;
 using AVImage = Avalonia.Controls.Image;
+using Size = Avalonia.Size;
 
 namespace Gym.Rendering.Avalonia {
     public class AvaloniaEnvViewer : Window, IEnvViewer {
@@ -31,6 +32,12 @@ namespace Gym.Rendering.Avalonia {
         }
 
         public void Dispose() {
+            //invoke if required
+            if (!Dispatcher.UIThread.CheckAccess()) {
+                Dispatcher.UIThread.InvokeAsync(Dispose, DispatcherPriority.MaxValue);
+                return;
+            }
+
             Close();
         }
 
@@ -78,8 +85,8 @@ namespace Gym.Rendering.Avalonia {
 
         private static void BuildViewer(Application app, string[] args) {
             _viewer = new AvaloniaEnvViewer {
-                Title = _title
-//                ClientSize = new Avalonia.Size(_width, _height),
+                Title = _title,
+                ClientSize = new Size(_width, _height)
             };
             app.Run(_viewer);
         }
@@ -89,10 +96,20 @@ namespace Gym.Rendering.Avalonia {
             ReadyResetEvent.Set();
         }
 
+        public void Close() {
+            //invoke if required
+            if (!Dispatcher.UIThread.CheckAccess()) {
+                Dispatcher.UIThread.InvokeAsync(Close, DispatcherPriority.MaxValue);
+                return;
+            }
+
+            base.Close();
+        }
+
         [Obsolete]
-        protected static AppBuilder BuildAvaloniaApp()
-            => AppBuilder.Configure<App>()
-                .UsePlatformDetect()
-                .LogToDebug();
+        protected static AppBuilder BuildAvaloniaApp() =>
+            AppBuilder.Configure<App>()
+                      .UsePlatformDetect()
+                      .LogToDebug();
     }
 }
