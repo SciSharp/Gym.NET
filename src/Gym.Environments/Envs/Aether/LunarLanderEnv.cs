@@ -703,7 +703,11 @@ namespace Gym.Environments.Envs.Aether
 
         public override void Close()
         {
-            throw new NotImplementedException();
+            if (_viewer != null) {
+                _viewer.Close();
+                _viewer.Dispose();
+                _viewer = null;
+            }
         }
 
         public override void Seed(int seed)
