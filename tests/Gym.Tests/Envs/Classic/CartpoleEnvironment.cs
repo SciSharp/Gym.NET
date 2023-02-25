@@ -4,17 +4,15 @@ using System.Threading.Tasks;
 using Gym.Environments;
 using Gym.Environments.Envs.Classic;
 using Gym.Rendering.Avalonia;
+using Gym.Rendering.WinForm;
 using Gym.Tests.Helpers;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
-namespace Gym.Tests.Envs.Classic
-{
+namespace Gym.Tests.Envs.Classic {
     [TestClass]
-    public class CartpoleEnvironment
-    {
-        [TestMethod]
-        public void Run() {
-            var cp = new CartPoleEnv(WinFormEnvViewer.Factory); //or AvaloniaEnvViewer.Factory
+    public class CartpoleEnvironment {
+        public void Run(IEnvironmentViewerFactoryDelegate viewer) {
+            var cp = new CartPoleEnv(viewer); //or AvaloniaEnvViewer.Factory
             var done = true;
             try {
                 using (new StopwatchMeasurer("time it took to run all steps in ms")) {
@@ -34,6 +32,21 @@ namespace Gym.Tests.Envs.Classic
             } finally {
                 cp.Close();
             }
+        }
+
+        [TestMethod]
+        public void Run_WinFormEnv() {
+            Run(WinFormEnvViewer.Factory);
+        }
+
+        [TestMethod]
+        public void Run_AvaloniaEnv() {
+            Run(AvaloniaEnvViewer.Factory);
+        }
+
+        [TestMethod]
+        public void Run_NullEnv() {
+            Run(NullEnvViewer.Factory);
         }
     }
 }
