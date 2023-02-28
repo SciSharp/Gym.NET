@@ -721,8 +721,8 @@ namespace Gym.Environments.Envs.Aether
             //
             float dt = 1f / FPS;
             SolverIterations si = new SolverIterations();
-            si.PositionIterations = 6 * 30;
-            si.VelocityIterations = 2 * 30;
+            si.PositionIterations = 2 * 30;
+            si.VelocityIterations = 6 * 30;
             _World.Step(dt, ref si);
             //
             // Update our observation state

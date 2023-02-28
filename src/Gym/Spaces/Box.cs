@@ -67,7 +67,7 @@ namespace Gym.Spaces {
         }
 
         public override NDArray Sample(NDArray mask = null) {
-            if (mask != null)
+            if (!Equals(mask, null))
             {
                 throw new NotSupportedException("Box.sample cannot be provided a mask.");
             }
@@ -78,9 +78,9 @@ namespace Gym.Spaces {
 
             NDArray sample = np.empty(Shape);
 
-            sample[unbounded] = RandomState.normal(0.5, 1.0, unbounded[unbounded].shape);
-            sample[low_bounded] = RandomState.exponential(1.0, low_bounded[low_bounded].shape) + Low[low_bounded];
-            sample[upp_bounded] = RandomState.exponential(1.0, upp_bounded[upp_bounded].shape) + High[upp_bounded];
+            sample[unbounded] = RandomState.normal(0.5f, 1.0f, unbounded[unbounded].shape);
+            sample[low_bounded] = RandomState.exponential(1.0f, low_bounded[low_bounded].shape) + Low[low_bounded];
+            sample[upp_bounded] = RandomState.exponential(1.0f, upp_bounded[upp_bounded].shape) + High[upp_bounded];
             sample[bounded] = RandomState.uniform(Low[bounded], High[bounded], bounded[bounded].shape);
             if (DType == np.int32 || DType == np.uint32 || DType == np.@byte)
             {
