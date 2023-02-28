@@ -1,38 +1,92 @@
 ﻿using System;
 using System.Diagnostics;
 using System.Linq;
+using System.Reflection.Metadata;
+using System.Text.Json;
 using NumSharp;
 
 namespace Gym.Spaces {
+    public enum BoundedMannerEnum
+    {
+        Both,
+        Below,
+        Above
+    }
     public class Box : Space, IEquatable<Box> {
         protected NumPyRandom RandomState;
         public NDArray Low { get; }
         public NDArray High { get; }
-
+        public NDArray BoundedLow { get; private set;  }
+        public NDArray BoundedHigh { get; private set; }
         /// <summary>Initializes a new instance of the <see cref="T:System.Object" /> class.</summary>
-        public Box(int low, int high, Shape shape, Type dType = null, int seed = -1) : this((float) low, (float) high, shape, dType, seed) { }
+        public Box(int low, int high, Shape shape, Type dType = null, int seed = -1) : this((float) low, (float) high, shape, dType, seed, null) { }
+        public Box(int low, int high, Shape shape, Type dType = null, NumPyRandom random_state = null) : this((float)low, (float)high, shape, dType, -1, random_state) { }
 
-        public Box(float low, float high, Shape shape, Type dType = null, int seed = -1) : base(shape, (dType = dType ?? np.float32)) {
+        public Box(float low, float high, Shape shape, Type dType = null, int seed = -1, NumPyRandom random_state = null) : base(shape, (dType = dType ?? np.float32)) {
             if (Equals(shape, null)) throw new ArgumentNullException(nameof(shape));
 
             Low = (low + np.zeros(shape, dType)).astype(dType);
             High = (high + np.zeros(shape, dType)).astype(dType);
-            RandomState = seed != -1 ? np.random.RandomState(seed) : np.random;
+            RandomState = seed != -1 ? np.random.RandomState(seed) : random_state ?? np.random;
+            CheckBounded();
         }
 
         /// <summary>Initializes a new instance of the <see cref="T:System.Object" /> class.</summary>
-        public Box(NDArray low, NDArray high, Type dType = null, int seed = -1) : base(null, (dType = dType ?? np.float32)) {
+        public Box(NDArray low, NDArray high, Type dType = null, int seed = -1, NumPyRandom random_state = null) : base(null, (dType = dType ?? np.float32)) {
             if (Equals(low, null)) throw new ArgumentNullException(nameof(low));
             if (Equals(high, null)) throw new ArgumentNullException(nameof(high));
             Debug.Assert(low.shape.SequenceEqual(high.shape));
             Shape = low.shape;
             Low = low.astype(dType);
             High = high.astype(dType);
-            RandomState = seed != -1 ? np.random.RandomState(seed) : np.random;
+            RandomState = seed != -1 ? np.random.RandomState(seed) : random_state ?? np.random;
+            CheckBounded();
         }
 
-        public override NDArray Sample() {
-            return RandomState.uniform(Low, High, DType);
+        private void CheckBounded() {
+            NDArray neginf = np.full((float)-np.inf, Low.shape);
+            BoundedLow = (Low > neginf);
+            NDArray posinf = np.full((float)np.inf, Low.shape);
+            BoundedHigh = (High < posinf);
+        }
+
+        public bool IsBounded(BoundedMannerEnum manner)
+        {
+            bool below = np.all(BoundedLow);
+            bool above = np.all(BoundedHigh);
+            switch (manner)
+            {
+                case BoundedMannerEnum.Both:
+                    return below & above;
+                case BoundedMannerEnum.Above:
+                    return above;
+                case BoundedMannerEnum.Below:
+                    return below;
+            }
+            throw new ArgumentException("manner", "Unsupported BoundedMannerEnum value.");
+        }
+
+        public override NDArray Sample(NDArray mask = null) {
+            if (mask != null)
+            {
+                throw new NotSupportedException("Box.sample cannot be provided a mask.");
+            }
+            NDArray unbounded = ~BoundedLow & ~BoundedHigh;
+            NDArray upp_bounded = ~BoundedLow & BoundedHigh;
+            NDArray low_bounded = BoundedLow & ~BoundedHigh;
+            NDArray bounded = BoundedLow & BoundedHigh;
+
+            NDArray sample = np.empty(Shape);
+
+            sample[unbounded] = RandomState.normal(0.5, 1.0, unbounded[unbounded].shape);
+            sample[low_bounded] = RandomState.exponential(1.0, low_bounded[low_bounded].shape) + Low[low_bounded];
+            sample[upp_bounded] = RandomState.exponential(1.0, upp_bounded[upp_bounded].shape) + High[upp_bounded];
+            sample[bounded] = RandomState.uniform(Low[bounded], High[bounded], bounded[bounded].shape);
+            if (DType == np.int32 || DType == np.uint32 || DType == np.@byte)
+            {
+                sample = np.floor(sample);
+            }
+            return sample.astype(DType); // RandomState.uniform(Low, High, DType);
         }
 
         public override bool Contains(object ndArray) {

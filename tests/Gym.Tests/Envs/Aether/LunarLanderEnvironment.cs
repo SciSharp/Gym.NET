@@ -11,86 +11,188 @@ using System.Threading.Tasks;
 using Gym.Environments.Envs.Aether;
 using Gym.Rendering.WinForm;
 using NumSharp;
+using static System.Net.Mime.MediaTypeNames;
+using System.Security.Policy;
+using System.Windows.Documents;
+using System.Xml.Linq;
+using tainicom.Aether.Physics2D.Common;
 
 namespace Gym.Tests.Envs.Aether {
+
     [TestClass]
     public class LunarLanderEnvironment {
-        public void Run(IEnvironmentViewerFactoryDelegate factory) {
-            LunarLanderEnv env = new LunarLanderEnv(factory);
+        private Dictionary<int, float> _ExpectedScoreForRandomSeed = new Dictionary<int, float>();
+        private Dictionary<int, int> _ExpectedStepsForRandomSeed = new Dictionary<int, int>();
+        private const int MAX_STEPS = 5000;
+        private const bool VERBOSE = false;
+
+        public LunarLanderEnvironment()
+        {
+            // Total reward: 184.01764 in 1547 steps.
+            _ExpectedScoreForRandomSeed[1000] = 184.01764f;
+            _ExpectedStepsForRandomSeed[1000] = 1547;
+        }
+        public void Run(IEnvironmentViewerFactoryDelegate factory, NumPyRandom random_state, bool continuous = false) {
+            LunarLanderEnv env = new LunarLanderEnv(factory,random_state : random_state, continuous : continuous);
+            env.Verbose = VERBOSE;
             try {
                 // Run a PID test
                 float total_reward = 0f;
                 int steps = 0;
                 NDArray state = env.Reset();
                 while (true) {
-                    int a = PID(env, (float[]) state);
+                    object a = PID(env, (float[]) state);
                     var (observation, reward, done, information) = env.Step(a);
                     total_reward += reward;
                     steps++;
-                    if (steps % 1000 == 0) {
+                    if (VERBOSE && (steps % 1000 == 0)) {
                         System.Diagnostics.Debug.WriteLine("{0}: a={1}, reward={2}, total={3}", steps, a, reward, total_reward);
                     }
 
-                    if (done || steps > 200000) {
+                    if (done || steps > MAX_STEPS) {
                         break;
                     }
 
                     state = observation;
                     env.Render();
                 }
-
-                Assert.IsTrue(steps < 200000, "Too many steps.");
+                if (random_state != null)
+                {
+                    float escore = _ExpectedScoreForRandomSeed[random_state.Seed];
+                    int esteps = _ExpectedStepsForRandomSeed[random_state.Seed];
+                    Assert.AreEqual(esteps, steps, string.Format("Expected number of steps for seed {0} did not match.", random_state.Seed));
+                    Assert.AreEqual(escore, total_reward, 1e-5f, string.Format("Expected score for seed {0} did not match.", random_state.Seed));
+                }
+                Assert.IsTrue(steps < MAX_STEPS, "Too many steps.");
                 System.Diagnostics.Debug.WriteLine("Total reward: {0} in {1} steps.", total_reward, steps);
             } finally {
                 env.Close();
             }
         }
 
-        private int PID(LunarLanderEnv env, float[] s) {
+        /// <summary>
+        //    The heuristic for
+        //1. Testing
+        //2. Demonstration rollout.
+
+        //Args:
+        //    env: The environment
+        //    s (list): The state. Attributes:
+        //        s[0] is the horizontal coordinate
+        //        s[1] is the vertical coordinate
+        //        s[2] is the horizontal speed
+        //        s[3] is the vertical speed
+        //        s[4] is the angle
+        //        s[5] is the angular speed
+        //        s[6] 1 if first leg has contact, else 0
+        //        s[7] 1 if second leg has contact, else 0
+
+        //Returns:
+        //     a: The heuristic to be fed into the step function defined above to determine the next step and reward.
+        /// </summary>
+        /// <param name="env">The current lunar lander environment.</param>
+        /// <param name="s">The state</param>
+        /// <returns></returns>
+        private object PID(LunarLanderEnv env, float[] s) {
+            object action = null;
             float angle_targ = s[0] * 0.5f + s[2] * 1f; // Angle should point at target center
             if (angle_targ > 0.4f) {
-                angle_targ = 0.4f;
+                angle_targ = 0.4f; // more than 0.4 radians (22 degrees) is bad
             }
 
             if (angle_targ < -0.4) {
                 angle_targ = -0.4f;
             }
 
-            float hover_targ = 0.55f * np.abs(s[0]);
+            float hover_targ = 0.55f * Math.Abs(s[0]); // target y should be proportional to horizontal offset
             float angle_todo = (angle_targ - s[4]) * 0.5f - s[5] * 1f;
             float hover_todo = (hover_targ - s[1]) * 0.5f - s[3] * 0.5f;
 
+            // override to reduce fall speed, that's all we need after contact
             if (s[6] > 0f || s[7] > 0f) {
+                // legs have contact
                 angle_todo = 0f;
                 hover_todo = -s[3] * 0.5f;
             }
 
-            int a = 0;
-            if (hover_todo > Math.Abs(angle_todo) && hover_todo > 0.05f) {
-                a = 2;
-            } else if (angle_todo < -0.05f) {
-                a = 3;
-            } else if (angle_todo > 0.05f) {
-                a = 1;
+            if (env.ContinuousMode)
+            {
+                NDArray a = np.array(new float[] { hover_todo * 20f - 1f, -angle_todo * 20f });
+                action = np.clip(a, -1f, 1f);
             }
+            else
+            {
+                LunarLanderDiscreteActions a = LunarLanderDiscreteActions.Nothing;
+                if (hover_todo > Math.Abs(angle_todo) && hover_todo > 0.05f)
+                {
+                    a = LunarLanderDiscreteActions.FireMainEngine;
+                }
+                else if (angle_todo < -0.05f)
+                {
+                    a = LunarLanderDiscreteActions.FireRightThruster;
+                }
+                else if (angle_todo > 0.05f)
+                {
+                    a = LunarLanderDiscreteActions.FireLeftThruster;
+                }
+                action = (int)a;
+            }
+            if(VERBOSE) 
+                System.Diagnostics.Debug.WriteLine("PID: hover={0}, hover target={1}, approach angle={2}, action={3}.", hover_todo, hover_targ, angle_todo, action);
 
-            return a;
+            return action;
         }
 
 
         [TestMethod]
-        public void Run_WinFormEnv() {
-            Run(WinFormEnvViewer.Factory);
+        public void Run_Discrete_WinFormEnv() {
+            Run(WinFormEnvViewer.Factory,null);
         }
 
         [TestMethod]
-        public void Run_AvaloniaEnv() {
-            Run(AvaloniaEnvViewer.Factory);
+        public void Run_Discrete_AvaloniaEnv() {
+            Run(AvaloniaEnvViewer.Factory,null);
         }
 
         [TestMethod]
-        public void Run_NullEnv() {
-            Run(NullEnvViewer.Factory);
+        public void Run_Discrete_NullEnv() {
+            Run(NullEnvViewer.Factory,null);
+        }
+
+        [TestMethod]
+        public void Run_Continuous_WinFormEnv()
+        {
+            Run(WinFormEnvViewer.Factory, null, true);
+        }
+
+        [TestMethod]
+        public void Run_Continuous_AvaloniaEnv()
+        {
+            Run(AvaloniaEnvViewer.Factory, null,true);
+        }
+
+        [TestMethod]
+        public void Run_Continuous_NullEnv()
+        {
+            Run(NullEnvViewer.Factory, null,true);
+        }
+
+        [TestMethod]
+        public void Run_Discrete_WinFormEnv_ConsistencyCheck()
+        {
+            Run(WinFormEnvViewer.Factory, np.random.RandomState(1000));
+        }
+
+        [TestMethod]
+        public void Run_Discrete_AvaloniaEnv_ConsistencyCheck()
+        {
+            Run(AvaloniaEnvViewer.Factory, np.random.RandomState(1000));
+        }
+
+        [TestMethod]
+        public void Run_Discrete_NullEnv_ConsistencyCheck()
+        {
+            Run(NullEnvViewer.Factory, np.random.RandomState(1000));
         }
     }
 }

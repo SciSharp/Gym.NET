@@ -19,9 +19,133 @@ using SixLabors.ImageSharp.Drawing.Processing;
 using System.Linq;
 using Gym.Threading;
 using SixLabors.ImageSharp.ColorSpaces;
+using Gym.Exceptions;
 
 namespace Gym.Environments.Envs.Aether
 {
+    /// <summary>
+    /// Helpful enum for the discrete action space.
+    /// </summary>
+    public enum LunarLanderDiscreteActions : int
+    {
+        Nothing = 0,
+        FireLeftThruster = 1,
+        FireMainEngine = 2,
+        FireRightThruster = 3
+    }
+
+    /// <summary>
+    //    ## Description
+    //    This environment is a classic rocket trajectory optimization problem.
+    //    According to Pontryagin's maximum principle, it is optimal to fire the
+    //    engine at full throttle or turn it off. This is the reason why this
+    //    environment has discrete actions: engine on or off.
+
+    //    There are two environment versions: discrete or continuous.
+    //    The landing pad is always at coordinates (0,0). The coordinates are the
+    //    first two numbers in the state vector.
+    //    Landing outside of the landing pad is possible.Fuel is infinite, so an agent
+    //    can learn to fly and then land on its first attempt.
+
+    //    To see a heuristic landing, run:
+    //    ```
+    //    python gymnasium/envs/box2d/lunar_lander.py
+    //    ```
+    //    <!-- To play yourself, run: -->
+    //    <!-- python examples/agents/keyboard_agent.py LunarLander-v2 -->
+
+    //    ## Action Space
+    //    There are four discrete actions available:
+    //    - 0: do nothing
+    //    - 1: fire left orientation engine
+    //    - 2: fire main engine
+    //    - 3: fire right orientation engine
+
+    //    ## Observation Space
+    //    The state is an 8-dimensional vector: the coordinates of the lander in `x` & `y`, its linear
+    //    velocities in `x` & `y`, its angle, its angular velocity, and two booleans
+    //    that represent whether each leg is in contact with the ground or not.
+
+    //    ## Rewards
+    //    After every step a reward is granted.The total reward of an episode is the
+    //    sum of the rewards for all the steps within that episode.
+
+    //    For each step, the reward:
+    //    - is increased/decreased the closer/further the lander is to the landing pad.
+    //    - is increased/decreased the slower/faster the lander is moving.
+    //    - is decreased the more the lander is tilted (angle not horizontal).
+    //    - is increased by 10 points for each leg that is in contact with the ground.
+    //    - is decreased by 0.03 points each frame a side engine is firing.
+    //    - is decreased by 0.3 points each frame the main engine is firing.
+
+    //    The episode receive an additional reward of -100 or +100 points for crashing or landing safely respectively.
+
+    //    An episode is considered a solution if it scores at least 200 points.
+
+    //## Starting State
+    //    The lander starts at the top center of the viewport with a random initial
+    //    force applied to its center of mass.
+
+    //## Episode Termination
+    //    The episode finishes if:
+    //    1) the lander crashes(the lander body gets in contact with the moon);
+    //    2) the lander gets outside of the viewport(`x` coordinate is greater than 1);
+    //    3) the lander is not awake.From the[Box2D docs](https://box2d.org/documentation/md__d_1__git_hub_box2d_docs_dynamics.html#autotoc_md61),
+    //        a body which is not awake is a body which doesn't move and doesn't
+    //        collide with any other body:
+    //    > When Box2D determines that a body (or group of bodies) has come to rest,
+    //    > the body enters a sleep state which has very little CPU overhead.If a
+    //    > body is awake and collides with a sleeping body, then the sleeping body
+    //    > wakes up. Bodies will also wake up if a joint or contact attached to
+    //    > them is destroyed.
+
+    //## Arguments
+    //    To use to the _continuous_ environment, you need to specify the
+    //    `continuous= True` argument like below:
+    //    ```python
+    //    import gymnasium as gym
+    //    env = gym.make(
+    //        "LunarLander-v2",
+    //        continuous: bool = False,
+    //        gravity: float = -10.0,
+    //        enable_wind: bool = False,
+    //        wind_power: float = 15.0,
+    //        turbulence_power: float = 1.5,
+    //    )
+    //    ```
+    //    If `continuous= True` is passed, continuous actions (corresponding to the throttle of the engines) will be used and the
+    //    action space will be `Box(-1, +1, (2,), dtype=np.float32)`.
+    //    The first coordinate of an action determines the throttle of the main engine, while the second
+    //    coordinate specifies the throttle of the lateral boosters.
+    //    Given an action `np.array([main, lateral])`, the main engine will be turned off completely if
+    //    `main< 0` and the throttle scales affinely from 50% to 100% for `0 <= main <= 1` (in particular, the
+    //    main engine doesn't work  with less than 50% power).
+    //    Similarly, if `-0.5 < lateral< 0.5`, the lateral boosters will not fire at all.If `lateral< -0.5`, the left
+    //    booster will fire, and if `lateral> 0.5`, the right booster will fire.Again, the throttle scales affinely
+    //    from 50% to 100% between -1 and -0.5 (and 0.5 and 1, respectively).
+
+    //    `gravity` dictates the gravitational constant, this is bounded to be within 0 and -12.
+
+    //    If `enable_wind= True` is passed, there will be wind effects applied to the lander.
+    //    The wind is generated using the function `tanh(sin(2 k (t+C)) + sin(pi k (t+C)))`.
+    //    `k` is set to 0.01.
+    //    `C` is sampled randomly between -9999 and 9999.
+
+    //    `wind_power` dictates the maximum magnitude of linear wind applied to the craft.The recommended value for `wind_power` is between 0.0 and 20.0.
+    //    `turbulence_power` dictates the maximum magnitude of rotational wind applied to the craft.The recommended value for `turbulence_power` is between 0.0 and 2.0.
+
+    //    ## Version History
+    //    - v2: Count energy spent and in v0.24, added turbulence with wind power and turbulence_power parameters
+    //    - v1: Legs contact with ground added in state vector; contact with ground
+    //        give +10 reward points, and -10 if then lose contact; reward
+    //        renormalized to 200; harder initial random push.
+    //    - v0: Initial version
+
+    //    <!-- ## References -->
+
+    //    ## Credits
+    //    Created by Oleg Klimov
+    /// </summary>
     public class LunarLanderEnv : Env
     {
         private IEnvironmentViewerFactoryDelegate _viewerFactory;
@@ -220,11 +344,12 @@ namespace Gym.Environments.Envs.Aether
 
         public byte[] MainExhaustRGB { get; set; } = new byte[] { 255, 0, 0 };
         public byte[] ThrusterRGB { get; set; } = new byte[] { 255, 255, 0 };
-        private bool ContinuousMode { get; set; } = false;
-        private float Gravity { get; set; } = -10f;
-        private bool UseWind { get; set; } = false;
-        private float WindPower { get; set; } = 15f;
-        private float TurbulencePower { get; set; } = 1.5f;
+        public bool ContinuousMode { get; private set; } = false;
+        public float Gravity { get; private set; } = -10f;
+        public bool UseWind { get; private set; } = false;
+        public float WindPower { get; private set; } = 15f;
+        public float TurbulencePower { get; private set; } = 1.5f;
+        private NumPyRandom RandomState { get; set; }
 
         /// <summary>
         /// True when the filled circles are drawn for the side and main thrusters
@@ -250,8 +375,13 @@ namespace Gym.Environments.Envs.Aether
             _viewer = viewer ?? throw new ArgumentNullException(nameof(viewer));
         }
 
-        public LunarLanderEnv(IEnvironmentViewerFactoryDelegate viewerFactory, bool continuous = false, float gravity = -10f, bool enable_wind = false, float wind_power = 15f, float turbulence_power = 1.5f)
+        public LunarLanderEnv(IEnvironmentViewerFactoryDelegate viewerFactory, bool continuous = false, float gravity = -10f, bool enable_wind = false, float wind_power = 15f, float turbulence_power = 1.5f, NumPyRandom random_state=null)
         {
+            RandomState = random_state;
+            if (RandomState == null)
+            {
+                RandomState = np.random;
+            }
             _viewerFactory = viewerFactory;
             ContinuousMode = continuous;
             Gravity = gravity;
@@ -260,10 +390,6 @@ namespace Gym.Environments.Envs.Aether
             TurbulencePower = turbulence_power;
             _Contacts = new ContactDetector(this);
 
-            if (continuous)
-            {
-                throw new NotImplementedException("Continuous mode is not implemented/supported.");
-            }
             if (gravity < -12f || gravity > 0f)
             {
                 throw (new ArgumentException("Gravity must be between -12 and 0", "gravity"));
@@ -277,8 +403,8 @@ namespace Gym.Environments.Envs.Aether
                 throw (new WarningException("turbulence_power value is recommended to be between 0.0 and 2.0"));
             }
 
-            _wind_idx = np.random.randint(-9999, 9999);
-            _torque_idx = np.random.randint(-9999, 9999);
+            _wind_idx = RandomState.randint(-9999, 9999);
+            _torque_idx = RandomState.randint(-9999, 9999);
 
             _World = new World(new Vector2(0f,gravity));
             _Lander = new LunarLanderBody(2,_World);
@@ -289,11 +415,11 @@ namespace Gym.Environments.Envs.Aether
             ObservationSpace = new Box(low, high);
             if (ContinuousMode)
             {
-                ActionSpace = new Box(-1f, 1f);
+                ActionSpace = new Box(-1f, 1f, random_state : random_state);
             }
             else
             {
-                ActionSpace = new Discrete(4);
+                ActionSpace = new Discrete(4, random_state: random_state);
             }
 
         }
@@ -366,7 +492,7 @@ namespace Gym.Environments.Envs.Aether
             Destroy();
             _World = new World(new Vector2(0f, Gravity));
             _Lander = new LunarLanderBody(2,_World);
-            _Lander.Fuselage.Unit.ApplyForce(new Vector2(np.random.uniform(-INITIAL_RANDOM, INITIAL_RANDOM), np.random.uniform(-INITIAL_RANDOM, INITIAL_RANDOM)));
+            _Lander.Fuselage.Unit.ApplyForce(new Vector2(RandomState.uniform(-INITIAL_RANDOM, INITIAL_RANDOM), RandomState.uniform(-INITIAL_RANDOM, INITIAL_RANDOM)));
             GameOver = false;
             _PrevShaping = float.MinValue;
             float w = VIEWPORT_W / SCALE;
@@ -377,7 +503,7 @@ namespace Gym.Environments.Envs.Aether
             float[] height = new float[CHUNKS + 1];
             for (int i = 0; i < height.Length; i++)
             {
-                height[i] = np.random.uniform(0f, h / 2f);
+                height[i] = RandomState.uniform(0f, h / 2f);
             }
             float[] chunk_x = new float[CHUNKS];
             for (int i = 0; i < CHUNKS; i++)
@@ -437,11 +563,27 @@ namespace Gym.Environments.Envs.Aether
             _Lander.Legs[0].Unit.Position += dv;
             _Lander.Legs[1].Unit.Position += dv;
             // Do the zero step
+            if (ContinuousMode)
+            {
+                return Step(np.array(new float[] { 0f, 0f })).Observation;
+            }
             return Step(0).Observation;
         }
 
-        public override Step Step(int action)
+        public override Step Step(object action)
         {
+            int i_action = -1;
+            NDArray c_action = null;
+            LunarLanderDiscreteActions l_action = LunarLanderDiscreteActions.Nothing;
+            if (ContinuousMode)
+            {
+                c_action = (NDArray)action;
+            }
+            else
+            {
+                i_action = (int)action;
+                l_action = (LunarLanderDiscreteActions)i_action;
+            }
             if (UseWind && !_Lander.TouchedGround)
             {
                 float wind_mag = (float)(Math.Tanh(Math.Sin(0.02 * _wind_idx) + Math.Sin(Math.PI * 0.01 * _wind_idx)))*WindPower;
@@ -454,22 +596,56 @@ namespace Gym.Environments.Envs.Aether
             if (ContinuousMode)
             {
                 // Not implemented
+                c_action = np.clip(c_action, -1f, 1f).astype(NPTypeCode.Float);
+            }
+            else
+            {
+                if (!ActionSpace.Contains(i_action))
+                {
+                    throw(new InvalidActionError(string.Format("Action {0} is invalid.", i_action)));
+                }
             }
             Vector2 tip = new Vector2((float)Math.Sin(_Lander.Fuselage.Unit.Rotation), (float)Math.Cos(_Lander.Fuselage.Unit.Rotation));
             Vector2 side = new Vector2(-tip.Y, tip.X);
-            float disp_x = np.random.uniform(-1f, 1f) / SCALE;
-            float disp_y = np.random.uniform(-1f, 1f) / SCALE;
+            float disp_x = RandomState.uniform(-1f, 1f) / SCALE;
+            float disp_y = RandomState.uniform(-1f, 1f) / SCALE;
 
+            bool fire_main = false;
+            bool fire_thruster = false;
+            if (ContinuousMode)
+            {
+                if (c_action[0] > 0f)
+                    fire_main = true;
+                if (np.abs(c_action[1]) > 0.5f)
+                    fire_thruster = true;
+                if (Verbose)
+                {
+                    System.Diagnostics.Debug.WriteLine("CONTINUOUS: fire_main {0}, fire_thruster {1}", fire_main, fire_thruster);
+                }
+            }
+            else
+            {
+                fire_main = (l_action == LunarLanderDiscreteActions.FireMainEngine);
+                fire_thruster = (l_action == LunarLanderDiscreteActions.FireLeftThruster || l_action == LunarLanderDiscreteActions.FireRightThruster);
+            }
             #region Main Engine Physics
             float m_power = 0f;
-            if (!ContinuousMode && action == 2)
+            if (fire_main)
             {
                 // Main Engine
                 //
                 // ContinuousMode && action[0] > 0.0
                 if (ContinuousMode)
                 {
-                    // m_power = np.clip(action[0], 0f, 1f) + 1f) * 0.5f
+                    m_power = (np.clip(c_action[0], 0f, 1f) + 1f) *0.5f;
+                    if (Verbose)
+                    {
+                        System.Diagnostics.Debug.WriteLine("MAIN: m_power {0}", m_power);
+                    }
+                    if (m_power < 0.5f || m_power > 1f) {
+                        // TODO: Throw an exception or assert here.
+                        throw (new Exception("Main power is out of range"));
+                    }
                 }
                 else
                 {
@@ -497,7 +673,7 @@ namespace Gym.Environments.Envs.Aether
 
             #region Orientation Engine Physics
             float s_power = 0f;
-            if (action == 1 || action == 3)
+            if (fire_thruster)
             {
                 // Orientation Engines
                 //
@@ -505,12 +681,21 @@ namespace Gym.Environments.Envs.Aether
                 float direction = 0f;
                 if (ContinuousMode)
                 {
-                    direction = 1f; // sign(action[1])
-                    // s_power = np.clip(np.abs(action[1]), 0.5, 1.0);
+                    direction = c_action[1] < 0f ? -1f : 1f;
+                    s_power = np.clip(np.abs(c_action[1]), 0.5f, 1.0f);
+                    if (Verbose)
+                    {
+                        System.Diagnostics.Debug.WriteLine("SIDE {1}: s_power {0}", s_power, direction);
+                    }
+                    if (s_power < 0.5f || s_power > 1f)
+                    {
+                        // TODO: Assert power is out of bounds
+                        throw (new Exception("Thruster power is out of range"));
+                    }
                 }
                 else
                 {
-                    direction = action - 2f;
+                    direction = (float)i_action - 2f;
                     s_power = 1f;
                 }
                 float ox = tip.X * disp_x + side.X * (3f * disp_y + direction * SIDE_ENGINE_AWAY / SCALE);
@@ -607,7 +792,7 @@ namespace Gym.Environments.Envs.Aether
                 foreach (LunarLanderParticle p in _Particles)
                 {
                     float ttl = (float)p.Decay() / 100f;
-                    if (ttl < 0f)
+                    if (ttl <= 0f)
                     {
                         continue;
                     }
@@ -712,7 +897,7 @@ namespace Gym.Environments.Envs.Aether
 
         public override void Seed(int seed)
         {
-            throw new NotImplementedException();
+            RandomState.seed(seed);
         }
     }
 }

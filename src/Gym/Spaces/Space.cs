@@ -12,7 +12,7 @@ namespace Gym.Spaces {
             DType = dType;
         }
 
-        public abstract NDArray Sample();
+        public abstract NDArray Sample(NDArray mask = null);
         public abstract bool Contains(object ndArray);
         public abstract void Seed(int seed);
     }

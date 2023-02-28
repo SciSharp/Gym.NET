@@ -14,8 +14,8 @@ namespace Gym.Envs {
         Space ActionSpace { get; set; }
         Space ObservationSpace { get; set; }
         NDArray Reset();
-        Step Step(int action);
-        Task<Step> StepAsync(int action);
+        Step Step(object action);
+        Task<Step> StepAsync(object action);
         Image Render(string mode = "human");
         void Close();
         void Seed(int seed);

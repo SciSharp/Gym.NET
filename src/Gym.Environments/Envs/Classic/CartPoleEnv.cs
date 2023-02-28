@@ -134,15 +134,16 @@ namespace Gym.Environments.Envs.Classic {
             return img;
         }
 
-        public override Step Step(int action) {
-            Debug.Assert(ActionSpace.Contains(action), $"{action} ({action.GetType().Name}) invalid action for {GetType().Name} environment");
+        public override Step Step(object action) {
+            int iaction = (int)action;
+            Debug.Assert(ActionSpace.Contains(iaction), $"{action} ({action.GetType().Name}) invalid action for {GetType().Name} environment");
             //get the last step data
             var x = state.GetDouble(0);
             var x_dot = state.GetDouble(1);
             var theta = state.GetDouble(2);
             var theta_dot = state.GetDouble(3);
 
-            var force = action == 1 ? force_mag : -force_mag;
+            var force = iaction == 1 ? force_mag : -force_mag;
             var costheta = Math.Cos(theta);
             var sintheta = Math.Sin(theta);
             var temp = (force + polemass_length * theta_dot * theta_dot * sintheta) / total_mass;
