@@ -235,7 +235,7 @@ namespace Gym.Environments.Envs.Aether
                 {
                     v.Add(v2);
                 }
-                Fixture f = c.Unit.CreateFixture(new PolygonShape(v, 0.5f));
+                Fixture f = c.Unit.CreateFixture(new PolygonShape(v, 5f));
                 f.Friction = 0.1f;
                 f.CollisionCategories = Category.Cat16; // 0x0010
                 f.CollidesWith = Category.Cat1;
@@ -635,7 +635,6 @@ namespace Gym.Environments.Envs.Aether
             {
                 // Main Engine
                 //
-                // ContinuousMode && action[0] > 0.0
                 if (ContinuousMode)
                 {
                     m_power = (np.clip(c_action[0], 0f, 1f) + 1f) *0.5f;
@@ -678,7 +677,6 @@ namespace Gym.Environments.Envs.Aether
             {
                 // Orientation Engines
                 //
-                // ContinuousModel and abs(action[1]) > 0.5
                 float direction = 0f;
                 if (ContinuousMode)
                 {
