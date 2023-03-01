@@ -20,6 +20,7 @@ using System.Linq;
 using Gym.Threading;
 using SixLabors.ImageSharp.ColorSpaces;
 using Gym.Exceptions;
+using System.Diagnostics;
 
 namespace Gym.Environments.Envs.Aether
 {
@@ -152,10 +153,10 @@ namespace Gym.Environments.Envs.Aether
         private IEnvViewer _viewer;
         // static fields
         public int FPS = 50;
-        public const float SCALE = 30f;
+        public const float SCALE = 30f; //  affects how fast-paced the game is, forces should be adjusted as well
         public const float MAIN_ENGINE_POWER = 13f;
         public const float SIDE_ENGINE_POWER = 0.6f;
-        public const float INITIAL_RANDOM = 1000f;
+        public const float INITIAL_RANDOM = 1000f; // Set 1500 to make game harder
         public float SIDE_ENGINE_HEIGHT = 14f;
         public float SIDE_ENGINE_AWAY = 12f;
         // Screen
@@ -312,14 +313,15 @@ namespace Gym.Environments.Envs.Aether
 
             public bool BeginContact(Contact contact)
             {
+                _env._Lander.Fuselage.Contact = false;
                 if (_env._Lander.Fuselage.Is(contact.FixtureA.Body,contact.FixtureB.Body))
                 {
                     _env._Lander.Fuselage.Contact = true;
-                    _env.GameOver = true;
                 }
                 Body[] b = new Body[] { contact.FixtureA.Body, contact.FixtureB.Body };
                 for (int i = 0; i < _env._Lander.Legs.Length; i++)
                 {
+                    _env._Lander.Legs[i].Contact = false;
                     if (_env._Lander.Legs[i].Is(contact.FixtureA.Body, contact.FixtureB.Body))
                     {
                         _env._Lander.Legs[i].Contact = true;
@@ -330,6 +332,7 @@ namespace Gym.Environments.Envs.Aether
 
             public void EndContact(Contact contact)
             {
+                Debug.WriteLine("END CONTACT!");
                 Body[] b = new Body[] { contact.FixtureA.Body, contact.FixtureB.Body };
                 for (int i = 0; i < _env._Lander.Legs.Length; i++)
                 {
@@ -406,10 +409,6 @@ namespace Gym.Environments.Envs.Aether
             _wind_idx = RandomState.randint(-9999, 9999);
             _torque_idx = RandomState.randint(-9999, 9999);
 
-            _World = new World(new Vector2(0f,gravity));
-            _Lander = new LunarLanderBody(2,_World);
-            _World.ContactManager.BeginContact = new BeginContactDelegate(_Contacts.BeginContact);
-            _World.ContactManager.EndContact = new EndContactDelegate(_Contacts.EndContact);
             NDArray low = np.array(new float[] { -1.5f, -1.5f, -5f, -5f, (float)-Math.PI, -5f, 0f, 0f });
             NDArray high = np.array(new float[] { 1.5f, 1.5f, 5f, 5f, (float)Math.PI, 5f, 1f, 1f });
             ObservationSpace = new Box(low, high);
@@ -491,6 +490,8 @@ namespace Gym.Environments.Envs.Aether
         {
             Destroy();
             _World = new World(new Vector2(0f, Gravity));
+            _World.ContactManager.BeginContact = new BeginContactDelegate(_Contacts.BeginContact);
+            _World.ContactManager.EndContact = new EndContactDelegate(_Contacts.EndContact);
             _Lander = new LunarLanderBody(2,_World);
             _Lander.Fuselage.Unit.ApplyForce(new Vector2(RandomState.uniform(-INITIAL_RANDOM, INITIAL_RANDOM), RandomState.uniform(-INITIAL_RANDOM, INITIAL_RANDOM)));
             GameOver = false;
@@ -700,7 +701,7 @@ namespace Gym.Environments.Envs.Aether
                 }
                 float ox = tip.X * disp_x + side.X * (3f * disp_y + direction * SIDE_ENGINE_AWAY / SCALE);
                 float oy = -tip.Y * disp_x - side.Y * (3f * disp_y + direction * SIDE_ENGINE_AWAY / SCALE);
-                Vector2 impulse_pos = _Lander.Fuselage.Unit.Position + new Vector2(ox - tip.X * 17 / SCALE, oy + tip.Y * SIDE_ENGINE_HEIGHT / SCALE);
+                Vector2 impulse_pos = _Lander.Fuselage.Unit.Position + new Vector2(ox - tip.X * 17f / SCALE, oy + tip.Y * SIDE_ENGINE_HEIGHT / SCALE);
                 if (RenderEngineParticles)
                 {
                     LunarLanderParticle p = CreateParticle(.7f, impulse_pos.X, impulse_pos.Y, (int)(s_power * 100f));
@@ -724,6 +725,10 @@ namespace Gym.Environments.Envs.Aether
             si.PositionIterations = 2 * 30;
             si.VelocityIterations = 6 * 30;
             _World.Step(dt, ref si);
+            if (_Lander.Fuselage.Contact)
+            {
+                GameOver = true;
+            }
             //
             // Update our observation state
             //
@@ -847,7 +852,7 @@ namespace Gym.Environments.Envs.Aether
                 if ((i + 1) % 4 == 0)
                 {
                     // Draw it!
-                    img.Mutate(i => i.DrawPolygon(new Rgba32(255, 0, 0), 1f, sky_poly));
+                    img.Mutate(i => i.FillPolygon(new Rgba32(255, 255, 255), sky_poly));
                 }
             }
             
