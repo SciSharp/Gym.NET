@@ -146,6 +146,7 @@ namespace Gym.Environments.Envs.Aether
 
     //    ## Credits
     //    Created by Oleg Klimov
+    //    Converted to C# by Jacob Anderson
     /// </summary>
     public class LunarLanderEnv : Env
     {
