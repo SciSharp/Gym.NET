@@ -64,24 +64,26 @@ namespace Gym.Rendering.Avalonia {
         }
 
         public void Render(Image img) {
-            if (!Dispatcher.UIThread.CheckAccess()) {
-                RenderResetEvent.Reset();
-                Dispatcher.UIThread.InvokeAsync(() => Render(img), DispatcherPriority.MaxValue);
-                if (!RenderResetEvent.Wait(4_000))
-                    throw new Exception("Rendering timed out.");
-                return;
-            }
-
-            using (var ms = new MemoryStream()) {
+            using (var ms = new MemoryStream(img.Height * img.Width * img.PixelType.BitsPerPixel / 8)) {
                 img.SaveAsBmp(ms);
                 ms.Seek(0, SeekOrigin.Begin);
-                Content = new AVImage {
-                    Source = new Bitmap(ms)
-                };
+                var bitmap = new Bitmap(ms);
+                if (Dispatcher.UIThread.CheckAccess()) {
+                    Content = new AVImage {
+                        Source = bitmap
+                    };
+                } else {
+                    RenderResetEvent.Reset();
+                    Dispatcher.UIThread.InvokeAsync(() => {
+                        Content = new AVImage {
+                            Source = bitmap
+                        };
+                        RenderResetEvent.Set();
+                    }, DispatcherPriority.MaxValue);
+                    if (!RenderResetEvent.Wait(4_000))
+                        throw new Exception("Rendering timed out.");
+                }
             }
-
-            RenderResetEvent.Set();
-        }
 
         private static void BuildViewer(Application app, string[] args) {
             _viewer = new AvaloniaEnvViewer {
