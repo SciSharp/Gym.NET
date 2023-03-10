@@ -17,7 +17,7 @@ namespace Gym.Envs {
         Step Step(object action);
         Task<Step> StepAsync(object action);
         Image Render(string mode = "human");
-        void Close();
+        void CloseEnvironment();
         void Seed(int seed);
     }
 }

@@ -16,15 +16,18 @@ using Size = Avalonia.Size;
 
 namespace Gym.Rendering.Avalonia {
     public class AvaloniaEnvViewer : Window, IEnvViewer {
-        private static int _width;
-        private static int _height;
-        private static string _title;
-        private static AvaloniaEnvViewer _viewer;
-        private static readonly ManualResetEventSlim ReadyResetEvent = new ManualResetEventSlim();
-        private static readonly ManualResetEventSlim RenderResetEvent = new ManualResetEventSlim();
+  
+        private readonly ManualResetEventSlim ReadyResetEvent = new ManualResetEventSlim();
+        private readonly ManualResetEventSlim RenderResetEvent = new ManualResetEventSlim();
 
         public AvaloniaEnvViewer() {
             InitializeComponent();
+        }
+
+        public AvaloniaEnvViewer(int width, int height, string title) : this() {
+            Width = width;
+            Height = height;
+            Title = title;
         }
 
         private void InitializeComponent() {
@@ -38,30 +41,13 @@ namespace Gym.Rendering.Avalonia {
                 return;
             }
 
-            Close();
+            CloseEnvironment();
         }
 
         /// <summary>
         ///     A delegate that creates a <see cref="AvaloniaEnvViewer"/> based on given parameters.
         /// </summary>
-        public static IEnvironmentViewerFactoryDelegate Factory => Run;
-
-        public static IEnvViewer Run(int width, int height, string title = null) {
-            _width = width;
-            _height = height;
-            _title = title;
-
-            var thread = new Thread(() => { BuildAvaloniaApp().Start(BuildViewer, Array.Empty<string>()); });
-            thread.Start();
-            thread.Name = $"{nameof(AvaloniaEnvViewer)} {(string.IsNullOrEmpty(title) ? "" : $"-{title}")}";
-
-            if (!ReadyResetEvent.Wait(10_000))
-                throw new Exception("Starting viewer timed out.");
-
-            Debug.Assert(_viewer != null, "At this point viewer shouldn't be null.");
-
-            return _viewer;
-        }
+        public static IEnvironmentViewerFactoryDelegate Factory => StaticAvaloniaApp.Run;
 
         public void Render(Image img) {
             using (var ms = new MemoryStream(img.Height * img.Width * img.PixelType.BitsPerPixel / 8)) {
@@ -84,13 +70,6 @@ namespace Gym.Rendering.Avalonia {
                         throw new Exception("Rendering timed out.");
                 }
             }
-
-        private static void BuildViewer(Application app, string[] args) {
-            _viewer = new AvaloniaEnvViewer {
-                Title = _title,
-                ClientSize = new Size(_width, _height)
-            };
-            app.Run(_viewer);
         }
 
         protected override void OnOpened(EventArgs e) {
@@ -98,20 +77,15 @@ namespace Gym.Rendering.Avalonia {
             ReadyResetEvent.Set();
         }
 
-        public void Close() {
+        public void CloseEnvironment() {
             //invoke if required
             if (!Dispatcher.UIThread.CheckAccess()) {
-                Dispatcher.UIThread.InvokeAsync(Close, DispatcherPriority.MaxValue);
+                Dispatcher.UIThread.InvokeAsync(CloseEnvironment, DispatcherPriority.MaxValue);
                 return;
             }
 
-            base.Close();
+            Hide();
+            //Dispose();
         }
-
-        [Obsolete]
-        protected static AppBuilder BuildAvaloniaApp() =>
-            AppBuilder.Configure<App>()
-                      .UsePlatformDetect()
-                      .LogToDebug();
     }
 }

@@ -25,7 +25,7 @@ namespace Gym.Envs {
         }
 
         public abstract Image Render(string mode = "human");
-        public abstract void Close();
+        public abstract void CloseEnvironment();
         public abstract void Seed(int seed);
 
         /// <summary>
@@ -36,7 +36,7 @@ namespace Gym.Envs {
         }
 
         public void Dispose() {
-            Close();
+            CloseEnvironment();
         }
     }
 

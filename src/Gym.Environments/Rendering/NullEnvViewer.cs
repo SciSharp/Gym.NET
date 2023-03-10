@@ -1,4 +1,5 @@
-﻿using SixLabors.ImageSharp;
+﻿using System.Threading.Tasks;
+using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 
 namespace Gym.Environments {
@@ -6,8 +7,8 @@ namespace Gym.Environments {
         private static readonly NullEnvViewer _singleton = new NullEnvViewer();
 
         public static readonly IEnvironmentViewerFactoryDelegate Factory = Run;
-        public static IEnvViewer Run(int width, int height, string title = null) {
-            return _singleton;
+        public static Task<IEnvViewer> Run(int width, int height, string title = null) {
+            return Task.FromResult((IEnvViewer) _singleton);
         }
 
         /// <summary>
@@ -21,7 +22,7 @@ namespace Gym.Environments {
         /// <summary>
         ///     Close the rendering window.
         /// </summary>
-        public void Close() {
+        public void CloseEnvironment() {
             //null
         }
 

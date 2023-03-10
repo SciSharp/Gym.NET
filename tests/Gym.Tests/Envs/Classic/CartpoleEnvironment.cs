@@ -30,7 +30,7 @@ namespace Gym.Tests.Envs.Classic {
                     }
                 }
             } finally {
-                cp.Close();
+                cp.CloseEnvironment();
             }
         }
 

@@ -775,17 +775,17 @@ namespace Gym.Environments.Envs.Aether
 
         public override Image Render(string mode = "human")
         {
-            if (_viewer == null)
-                lock (this)
-                {
+            if (_viewer == null) {
+                lock (this) {
                     //to prevent double initalization.
-                    if (_viewer == null)
-                    {
+                    if (_viewer == null) {
                         if (_viewerFactory == null)
                             _viewerFactory = NullEnvViewer.Factory;
-                        _viewer = _viewerFactory(VIEWPORT_W, VIEWPORT_H, "lunarlander-v2");
+                        _viewer = _viewerFactory(VIEWPORT_W, VIEWPORT_H, "lunarlander-v2").GetAwaiter().GetResult();
                     }
                 }
+            }
+
             // Define the buffer image for drawing
             var img = new Image<Rgba32>(VIEWPORT_W, VIEWPORT_H);
             img.Mutate(i => i.BackgroundColor(new Rgba32(0, 0, 0))); // Space is black
@@ -889,11 +889,10 @@ namespace Gym.Environments.Envs.Aether
             return img;
         }
 
-        public override void Close()
+        public override void CloseEnvironment()
         {
             if (_viewer != null) {
-                _viewer.Close();
-                _viewer.Dispose();
+                _viewer.CloseEnvironment();
                 _viewer = null;
             }
         }
