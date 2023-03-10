@@ -3,8 +3,8 @@
 [![NuGet](https://img.shields.io/nuget/dt/Gym.NET)](https://www.nuget.org/packages/Gym.NET)<a href="http://scisharpstack.org"><img src="https://github.com/SciSharp/SciSharp/blob/master/art/scisharp_badge.png" width="200" height="200" align="right" /></a>
 
 
-A complete port of [openai/gym](https://github.com/openai/gym) to C#.<br>
-** WORK IN PROGRESS ** 
+A port of [openai/gym](https://github.com/openai/gym) to C#.<br>
+
 
 ##### openai/gym
 OpenAI Gym is a toolkit for developing and comparing reinforcement learning algorithms. This is the gym open-source library, which gives you access to a standardized set of environments.
@@ -16,6 +16,8 @@ PM> Install-Package Gym.NET
 
 ### For implemented environments, install:
 PM> Install-Package Gym.NET.Environments
+PM> Install-Package Gym.NET.Rendering.Avalonia
+PM> Install-Package Gym.NET.Rendering.WinForm
 ```
 
 ## Example
