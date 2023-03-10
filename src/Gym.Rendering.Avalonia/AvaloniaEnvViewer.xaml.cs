@@ -4,7 +4,6 @@ using System.IO;
 using System.Threading;
 using Avalonia;
 using Avalonia.Controls;
-using Avalonia.Logging.Serilog;
 using Avalonia.Markup.Xaml;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
@@ -13,6 +12,7 @@ using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using Image = SixLabors.ImageSharp.Image;
 using AVImage = Avalonia.Controls.Image;
+using Size = Avalonia.Size;
 
 namespace Gym.Rendering.Avalonia {
     public class AvaloniaEnvViewer : Window, IEnvViewer {
@@ -25,9 +25,6 @@ namespace Gym.Rendering.Avalonia {
 
         public AvaloniaEnvViewer() {
             InitializeComponent();
-#if DEBUG
-            this.AttachDevTools();
-#endif
         }
 
         private void InitializeComponent() {
@@ -35,6 +32,12 @@ namespace Gym.Rendering.Avalonia {
         }
 
         public void Dispose() {
+            //invoke if required
+            if (!Dispatcher.UIThread.CheckAccess()) {
+                Dispatcher.UIThread.InvokeAsync(Dispose, DispatcherPriority.MaxValue);
+                return;
+            }
+
             Close();
         }
 
@@ -61,29 +64,31 @@ namespace Gym.Rendering.Avalonia {
         }
 
         public void Render(Image img) {
-            if (!Dispatcher.UIThread.CheckAccess()) {
-                RenderResetEvent.Reset();
-                Dispatcher.UIThread.InvokeAsync(() => Render(img), DispatcherPriority.MaxValue);
-                if (!RenderResetEvent.Wait(4_000))
-                    throw new Exception("Rendering timed out.");
-                return;
-            }
-
-            using (var ms = new MemoryStream()) {
+            using (var ms = new MemoryStream(img.Height * img.Width * img.PixelType.BitsPerPixel / 8)) {
                 img.SaveAsBmp(ms);
                 ms.Seek(0, SeekOrigin.Begin);
-                Content = new AVImage {
-                    Source = new Bitmap(ms)
-                };
+                var bitmap = new Bitmap(ms);
+                if (Dispatcher.UIThread.CheckAccess()) {
+                    Content = new AVImage {
+                        Source = bitmap
+                    };
+                } else {
+                    RenderResetEvent.Reset();
+                    Dispatcher.UIThread.InvokeAsync(() => {
+                        Content = new AVImage {
+                            Source = bitmap
+                        };
+                        RenderResetEvent.Set();
+                    }, DispatcherPriority.MaxValue);
+                    if (!RenderResetEvent.Wait(4_000))
+                        throw new Exception("Rendering timed out.");
+                }
             }
-
-            RenderResetEvent.Set();
-        }
 
         private static void BuildViewer(Application app, string[] args) {
             _viewer = new AvaloniaEnvViewer {
-                ClientSize = new Size(_width, _height),
                 Title = _title,
+                ClientSize = new Size(_width, _height)
             };
             app.Run(_viewer);
         }
@@ -93,9 +98,20 @@ namespace Gym.Rendering.Avalonia {
             ReadyResetEvent.Set();
         }
 
-        protected static AppBuilder BuildAvaloniaApp()
-            => AppBuilder.Configure<App>()
-                .UsePlatformDetect()
-                .LogToDebug();
+        public void Close() {
+            //invoke if required
+            if (!Dispatcher.UIThread.CheckAccess()) {
+                Dispatcher.UIThread.InvokeAsync(Close, DispatcherPriority.MaxValue);
+                return;
+            }
+
+            base.Close();
+        }
+
+        [Obsolete]
+        protected static AppBuilder BuildAvaloniaApp() =>
+            AppBuilder.Configure<App>()
+                      .UsePlatformDetect()
+                      .LogToDebug();
     }
 }

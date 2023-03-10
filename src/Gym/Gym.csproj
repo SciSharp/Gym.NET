@@ -23,8 +23,9 @@
 	<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="JetBrains.Annotations" Version="2019.1.3" />
-    <PackageReference Include="NumSharp.Lite" Version="0.1.7" />
-    <PackageReference Include="SixLabors.ImageSharp" Version="1.0.0-beta0007" />
+	  <PackageReference Include="SixLabors.ImageSharp" Version="2.1.3" />
+	  <PackageReference Include="JetBrains.Annotations" Version="2022.3.1" />
+	  <PackageReference Include="SixLabors.ImageSharp.Drawing" Version="1.0.0-beta15" />
+	  <PackageReference Include="NumSharp.Lite" Version="0.1.12" />
   </ItemGroup>  
 </Project>

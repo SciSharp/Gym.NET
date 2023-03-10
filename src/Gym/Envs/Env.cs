@@ -18,9 +18,9 @@ namespace Gym.Envs {
         public Space ObservationSpace { get; set; }
 
         public abstract NDArray Reset();
-        public abstract Step Step(int action);
+        public abstract Step Step(object action);
 
-        public virtual Task<Step> StepAsync(int action) {
+        public virtual Task<Step> StepAsync(object action) {
             return DistributedScheduler.Default.Run(() => Step(action));
         }
 
@@ -41,11 +41,11 @@ namespace Gym.Envs {
     }
 
     public abstract class Env<TAction> : Env where TAction : Enum {
-        public override Step Step(int action) {
+        public override Step Step(object action) {
             return Step((TAction) (object) action);
         }
 
-        public override Task<Step> StepAsync(int action) {
+        public override Task<Step> StepAsync(object action) {
             return DistributedScheduler.Default.Run(() => Step((TAction) (object) action));
         }
 

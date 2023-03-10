@@ -1,8 +1,5 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk.WindowsDesktop">
   <PropertyGroup>
-    <ProjectSDKVersion>2.0.0</ProjectSDKVersion>
-  </PropertyGroup>
-  <PropertyGroup>
     <TargetFrameworks>netcoreapp3.1;net6.0-windows</TargetFrameworks>
     <LangVersion>latest</LangVersion>
     <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>

@@ -4,17 +4,27 @@ using NumSharp;
 namespace Gym.Spaces {
     public class Discrete : Space {
         public int N { get; }
+        public int Start { get; private set; }
         protected NumPyRandom RandomState;
 
         /// <summary>Initializes a new instance of the <see cref="T:System.Object" /> class.</summary>
-        public Discrete(int n, Type dType = null, int seed = -1) : base(new Shape(n), (dType = dType ?? np.float32)) {
+        public Discrete(int n, Type dType = null, int seed = -1, int start=0, NumPyRandom random_state = null) : base(new Shape(n), (dType = dType ?? np.float32)) {
             N = n;
-
-            RandomState = seed != -1 ? np.random.RandomState(seed) : np.random;
+            Start = start;
+            RandomState = seed != -1 ? np.random.RandomState(seed) : random_state ?? np.random;
         }
 
-        public override NDArray Sample() {
-            return RandomState.randint(0, N, default);
+        public override NDArray Sample(NDArray mask = null) {
+            if (mask != null)
+            {
+                NDArray bmask = (mask == 1); // Valid action mask with boolean selector
+                if (np.any(bmask))
+                {
+                    return Start + RandomState.choice((int)np.nonzero(bmask)[0]);
+                }
+                return Start;
+            }
+            return Start + RandomState.randint(0, N, default);
         }
 
         public override bool Contains(object ndArray) {
