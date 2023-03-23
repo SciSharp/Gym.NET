@@ -5,13 +5,6 @@ using Gym.Spaces;
 using NumSharp;
 using SixLabors.ImageSharp;
 using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using tainicom.Aether.Physics2D.Common;
-using tainicom.Aether.Physics2D.Collision.Shapes;
-using tainicom.Aether.Physics2D.Dynamics;
-using tainicom.Aether.Physics2D.Dynamics.Contacts;
-using tainicom.Aether.Physics2D.Dynamics.Joints;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
 using SixLabors.ImageSharp.Drawing;
@@ -21,6 +14,7 @@ using Gym.Threading;
 using SixLabors.ImageSharp.ColorSpaces;
 using Gym.Exceptions;
 using System.Diagnostics;
+using System.Collections.Generic;
 
 namespace Gym.Environments.Envs.Classic
 {
@@ -74,6 +68,7 @@ namespace Gym.Environments.Envs.Classic
             low = np.array(new float[] { 0f, 0f });
             high = np.array(new float[] { 200f, 10f });
             ActionSpace = new Box(low, high, random_state: random_state);
+            Metadata = new Dict("render.modes", new[] { "human", "rgb_array" }, "video.frames_per_second", 50);
         }
         public override NDArray Reset()
         {
@@ -109,14 +104,14 @@ namespace Gym.Environments.Envs.Classic
             float score = 0f;
             _ElapsedTime += _LEM.ApplyBurn(burn, time: time);
             if (Verbose)
-                Console.WriteLine("K=: {0:F2}", burn);
+                System.Diagnostics.Debug.WriteLine("K=: {0:F2}", burn);
             if (_LEM.OutOfFuel)
             {
                 _ElapsedTime += _LEM.Drift();
                 Status = LanderStatus.FreeFall;
                 if (Verbose)
                 {
-                    Console.WriteLine("FUEL OUT AT {0} SECONDS", _ElapsedTime);
+                    System.Diagnostics.Debug.WriteLine("FUEL OUT AT {0} SECONDS", _ElapsedTime);
                 }
             }
             if (_LEM.Altitude < 1e-5)
@@ -126,14 +121,14 @@ namespace Gym.Environments.Envs.Classic
                 if (U <= 1.2)
                 {
                     if (Verbose)
-                        Console.WriteLine("PERFECT LANDING!");
+                        System.Diagnostics.Debug.WriteLine("PERFECT LANDING!");
                     Status = LanderStatus.Landed;
                     score = 10.0f - U;
                 }
                 else if (U <= 10.0)
                 {
                     if (Verbose)
-                        Console.WriteLine("GOOD LANDING (COULD BE BETTER)");
+                        System.Diagnostics.Debug.WriteLine("GOOD LANDING (COULD BE BETTER)");
                     score = 2.0f;
                     Status = LanderStatus.Landed;
                 }
@@ -141,8 +136,8 @@ namespace Gym.Environments.Envs.Classic
                 {
                     if (Verbose)
                     {
-                        Console.WriteLine("SORRY THERE WERE NO SURVIVORS. YOU BLEW IT!");
-                        Console.WriteLine("IN FACT, YOU BLASTED A NEW LUNAR CRATER {0} FEET DEEP!", 0.277 * U);
+                        System.Diagnostics.Debug.WriteLine("SORRY THERE WERE NO SURVIVORS. YOU BLEW IT!");
+                        System.Diagnostics.Debug.WriteLine("IN FACT, YOU BLASTED A NEW LUNAR CRATER {0} FEET DEEP!", 0.277 * U);
                     }
                     Status = LanderStatus.Crashed;
                     score = -U;
@@ -151,8 +146,8 @@ namespace Gym.Environments.Envs.Classic
                 {
                     if (Verbose)
                     {
-                        Console.WriteLine("CRAFT DAMAGE ... YOU'RE STRANDED HERE UNTIL A RESCUE");
-                        Console.WriteLine("PARTY ARRIVES. HOPE YOU HAVE ENOUGH OXYGEN!");
+                        System.Diagnostics.Debug.WriteLine("CRAFT DAMAGE ... YOU'RE STRANDED HERE UNTIL A RESCUE");
+                        System.Diagnostics.Debug.WriteLine("PARTY ARRIVES. HOPE YOU HAVE ENOUGH OXYGEN!");
                     }
                     score = 0.5f;
                     Status = LanderStatus.Landed;
@@ -176,31 +171,27 @@ namespace Gym.Environments.Envs.Classic
 
         public override Image Render(string mode = "human")
         {
+            float ms = 1f / 50f * 1000f; // ms left for this frame
+            long lstart = DateTime.Now.Ticks;
             if (Verbose)
             {
                 if (_ElapsedTime < 1e-5)
                 {
-                    Console.WriteLine("CONTROL CALLING LUNAR MODULE. MANUAL CONTROL IS NECESSARY");
-                    Console.WriteLine("YOU MAY RESET FUEL RATE K EACH 10 SECS TO 0 OR ANY VALUE");
-                    Console.WriteLine("BETWEEN 8 & 200 LBS/SEC. YOU'VE 16000 LBS FUEL. ESTIMATED");
-                    Console.WriteLine("FREE FALL IMPACT TIME-120 SECS. CAPSULE WEIGHT-32500 LBS");
-                    Console.WriteLine("FIRST RADAR CHECK COMING UP");
-                    Console.WriteLine("COMMENCE LANDING PROCEDURE");
-                    Console.WriteLine("TIME,SECS   ALTITUDE,MILES+FEET   VELOCITY,MPH   FUEL,LBS   FUEL RATE");
+                    System.Diagnostics.Debug.WriteLine("CONTROL CALLING LUNAR MODULE. MANUAL CONTROL IS NECESSARY");
+                    System.Diagnostics.Debug.WriteLine("YOU MAY RESET FUEL RATE K EACH 10 SECS TO 0 OR ANY VALUE");
+                    System.Diagnostics.Debug.WriteLine("BETWEEN 8 & 200 LBS/SEC. YOU'VE 16000 LBS FUEL. ESTIMATED");
+                    System.Diagnostics.Debug.WriteLine("FREE FALL IMPACT TIME-120 SECS. CAPSULE WEIGHT-32500 LBS");
+                    System.Diagnostics.Debug.WriteLine("FIRST RADAR CHECK COMING UP");
+                    System.Diagnostics.Debug.WriteLine("COMMENCE LANDING PROCEDURE");
+                    System.Diagnostics.Debug.WriteLine("TIME,SECS   ALTITUDE,MILES+FEET   VELOCITY,MPH   FUEL,LBS   FUEL RATE");
                 }
                 else
                 {
-                    Console.Write("{0,8:F0}", _ElapsedTime);
-                    // Altitude
-                    Console.Write("{0,15}{1,7}", Math.Truncate(_LEM.Altitude), Math.Truncate(_LEM.AltitudeFeet));
-                    // VSI
-                    Console.Write("{0,15:F2}", _LEM.SpeedMPH);
-                    // Fuel
-                    Console.Write("{0,12:F1}", _LEM.NetFuel);
-                    Console.WriteLine();
+                    System.Diagnostics.Debug.WriteLine("{0,8:F0}{1,15}{2,7}{3,15:F2}{4,12:F1}", _ElapsedTime, Math.Truncate(_LEM.Altitude), Math.Truncate(_LEM.AltitudeFeet), _LEM.SpeedMPH, _LEM.NetFuel);
                 }
             }
-            if (_viewer == null)
+            if (_viewer == null && mode == "human")
+            {
                 lock (this)
                 {
                     //to prevent double initalization.
@@ -211,11 +202,73 @@ namespace Gym.Environments.Envs.Classic
                         _viewer = _viewerFactory(VIEWPORT_W, VIEWPORT_H, "lemlander-v1").GetAwaiter().GetResult();
                     }
                 }
-            // Define the buffer image for drawing
+            }            // Define the buffer image for drawing
             var img = new Image<Rgba32>(VIEWPORT_W, VIEWPORT_H);
+            var draw = new List<(IPath, Rgba32)>();
+            var fill = new List<(IPath, Rgba32)>();
+            // Setup the gauge for fuel and speed
+            int gauge_w = 100;
+            int gauge_h = VIEWPORT_H / 3;
+
+            var fuel_gauge = new RectangularPolygon(VIEWPORT_W/4 - gauge_w/2, VIEWPORT_H/2 - gauge_h, gauge_w, gauge_h);
+            draw.Add((fuel_gauge, new Rgba32(204, 153, 102)));
+            float net_fuel = _LEM.NetFuel / _LEM.FuelMass*(gauge_h-4); // [0,1]
+            fuel_gauge = new RectangularPolygon(fuel_gauge.Left+3, fuel_gauge.Bottom-net_fuel-2, gauge_w-4, net_fuel);
+            if (net_fuel < 0.1)
+            {
+                fill.Add((fuel_gauge, new Rgba32(255, 0, 0)));
+            }
+            else
+            {
+                fill.Add((fuel_gauge, new Rgba32(0, 255, 0)));
+            }
+
+            var speed_gauge = new RectangularPolygon(3*VIEWPORT_W / 4 - gauge_w / 2, VIEWPORT_H / 2 - gauge_h, gauge_w, gauge_h);
+            draw.Add((speed_gauge, new Rgba32(204, 153, 102)));
+            float speed = Math.Abs(_LEM.SpeedMPH / 3600 * (gauge_h - 4)); // [0,1]
+            speed_gauge = new RectangularPolygon(speed_gauge.Left + 3, speed_gauge.Bottom - speed - 2, gauge_w - 4, speed);
+            if (_LEM.Speed < 0f)
+            {
+                fill.Add((speed_gauge, new Rgba32(255, 0, 0)));
+            }
+            else
+            {
+                fill.Add((speed_gauge, new Rgba32(0, 255, 0)));
+            }
+
+            var alt_gauge = new RectangularPolygon(VIEWPORT_W / 2 - gauge_w / 2, VIEWPORT_H / 2 - gauge_h, gauge_w, gauge_h);
+            draw.Add((alt_gauge, new Rgba32(204, 153, 102)));
+            float alt = Math.Abs(_LEM.Altitude / 118 * (gauge_h - 4)); // [0,1]
+            alt_gauge = new RectangularPolygon(alt_gauge.Left + 3, alt_gauge.Bottom - alt - 2, gauge_w - 4, alt);
+            if (_LEM.Altitude < 15)
+            {
+                fill.Add((alt_gauge, new Rgba32(255, 0, 0)));
+            }
+            else
+            {
+                fill.Add((alt_gauge, new Rgba32(0, 255, 0)));
+            }
+
+            // Do the drawing
             img.Mutate(i => i.BackgroundColor(new Rgba32(0, 0, 0))); // Space is black
-            // Draw 
+            foreach (var (path, rgba32) in draw)
+            {
+                img.Mutate(i => i.Draw(rgba32,1f, path));
+            }
+            foreach (var (path, rgba32) in fill)
+            {
+                img.Mutate(i => i.Fill(rgba32, path));
+            }
+            //img.Mutate(x => x.DrawText("FUEL", ..., Color.Yellow, new PointF(100, 100)));
+            //img.Mutate(x => x.DrawText("ALTITUDE", ..., Color.Yellow, new PointF(100, 100)));
+            //img.Mutate(x => x.DrawText("SPEED", ..., Color.Yellow, new PointF(100, 100)));
+
             _viewer.Render(img);
+            ms -= (float)(new TimeSpan(DateTime.Now.Ticks - lstart).TotalMilliseconds);
+            if (ms > 0)
+            {
+                System.Threading.Thread.Sleep((int)ms);
+            }
             return (img);
         }
         public override void CloseEnvironment()

@@ -64,6 +64,7 @@ namespace Gym.Tests.Envs.Classic
                 env.CloseEnvironment();
             }
         }
+        #region Test 1 - A Known Series of Burns
         [TestMethod]
         public void Run_Test1_WinFormEnv()
         {
@@ -81,6 +82,29 @@ namespace Gym.Tests.Envs.Classic
         {
             Run(NullEnvViewer.Factory, null, _BurnsTest1, _TimeTest1);
         }
+        #endregion
+
+        #region Test 2 - Force The GUI Display
+        [TestMethod]
+        public void Run_Test2_WinFormEnv()
+        {
+            Run(WinFormEnvViewer.Factory, null, new float[] { 5f }, new float[] { 2f });
+        }
+        /// <summary>
+        /// Test the avalonia viewer with the slow run to force the display of the GUI
+        /// </summary>
+        [TestMethod]
+        public void Run_Test2_AvaloniaEnv()
+        {
+            Run(AvaloniaEnvViewer.Factory, null, new float[] { 5f }, new float[] { 2f });
+        }
+
+        [TestMethod]
+        public void Run_Test2_NullEnv()
+        {
+            Run(NullEnvViewer.Factory, null, new float[] { 5f }, new float[] { 2f });
+        }
+        #endregion
 
     }
 }
