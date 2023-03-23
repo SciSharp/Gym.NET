@@ -459,12 +459,11 @@ namespace Gym.Environments.Envs.Aether
             return (true);
         }
 
-        public override void Close()
+        public override void CloseEnvironment()
         {
             if (_viewer != null)
             {
-                _viewer.Close();
-                _viewer.Dispose();
+                _viewer.CloseEnvironment();
                 _viewer = null;
             }
         }

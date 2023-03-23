@@ -61,7 +61,7 @@ namespace Gym.Tests.Envs.Classic
             }
             finally
             {
-                env.Close();
+                env.CloseEnvironment();
             }
         }
         [TestMethod]

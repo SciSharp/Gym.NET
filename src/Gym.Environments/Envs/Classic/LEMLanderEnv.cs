@@ -208,7 +208,7 @@ namespace Gym.Environments.Envs.Classic
                     {
                         if (_viewerFactory == null)
                             _viewerFactory = NullEnvViewer.Factory;
-                        _viewer = _viewerFactory(VIEWPORT_W, VIEWPORT_H, "lemlander-v1");
+                        _viewer = _viewerFactory(VIEWPORT_W, VIEWPORT_H, "lemlander-v1").GetAwaiter().GetResult();
                     }
                 }
             // Define the buffer image for drawing
@@ -218,12 +218,11 @@ namespace Gym.Environments.Envs.Classic
             _viewer.Render(img);
             return (img);
         }
-        public override void Close()
+        public override void CloseEnvironment()
         {
             if (_viewer != null)
             {
-                _viewer.Close();
-                _viewer.Dispose();
+                _viewer.CloseEnvironment();
                 _viewer = null;
             }
         }

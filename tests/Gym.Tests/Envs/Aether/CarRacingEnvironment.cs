@@ -66,7 +66,7 @@ namespace Gym.Tests.Envs.Aether
             }
             finally
             {
-                env.Close();
+                env.CloseEnvironment();
             }
         }
         private object Driver(CarRacingEnv env, float[] s)
