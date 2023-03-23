@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Drawing;
 using System.IO;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 using Gym.Environments;
 using Gym.Threading;
@@ -30,24 +31,23 @@ namespace Gym.Rendering.WinForm {
         /// <param name="height">The height of the form</param>
         /// <param name="width">The width of the form</param>
         /// <param name="title">The title of the form, also mentioned in the thread name.</param>
-        public static IEnvViewer Run(int width, int height, string title = null) {
-            WinFormEnvViewer v = null;
-            using (var me = new ManualResetEventSlim()) {
-                var thread = new Thread(() => {
-                    v = new WinFormEnvViewer(width + 12, height + 12, title);
-                    me.Set();
-                    v.ShowDialog();
-                });
-                thread.Start();
-                thread.Name = $"Viewer{(string.IsNullOrEmpty(title) ? "" : $"-{title}")}";
+        public static async Task<IEnvViewer> Run(int width, int height, string title = null) {
+            var taskResult = new TaskCompletionSource<IEnvViewer>();
+            var thread = new Thread(() => {
+                var v = new WinFormEnvViewer(width + 12, height + 12, title);
+                taskResult.SetResult(v);
+                v.ShowDialog();
+            });
+            thread.Start();
+            thread.Name = $"Viewer{(string.IsNullOrEmpty(title) ? "" : $"-{title}")}";
 
-                if (!me.Wait(10_000))
-                    throw new Exception("Starting viewer timed out.");
-            }
+            var timeout = Task.Delay(10_000);
+            if (await Task.WhenAny(taskResult.Task, timeout) == timeout)
+                throw new Exception("Starting viewer timed out.");
 
-            Debug.Assert(v != null, "At this point viewer shouldn't be null.");
+            Debug.Assert(taskResult.Task.Result != null, "At this point viewer shouldn't be null.");
 
-            return v;
+            return taskResult.Task.Result;
         }
 
         public WinFormEnvViewer(int width, int height, string title = null) {
@@ -107,6 +107,16 @@ namespace Gym.Rendering.WinForm {
                 PictureFrame.Image = null;
                 img.Dispose();
             }
+        }
+
+        public void CloseEnvironment() {
+            if (InvokeRequired) {
+                Invoke(new Action(CloseEnvironment));
+                return;
+            }
+
+            Close();
+            Dispose();
         }
 
         protected override void OnClosing(CancelEventArgs e) {

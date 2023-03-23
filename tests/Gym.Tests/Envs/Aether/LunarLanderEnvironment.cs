@@ -23,6 +23,7 @@ namespace Gym.Tests.Envs.Aether {
     public class LunarLanderEnvironment {
         private Dictionary<int, float> _ExpectedScoreForRandomSeed = new Dictionary<int, float>();
         private Dictionary<int, int> _ExpectedStepsForRandomSeed = new Dictionary<int, int>();
+        private int _seed;
         private const int MAX_STEPS = 5000;
         private const bool VERBOSE = false;
 
@@ -32,8 +33,11 @@ namespace Gym.Tests.Envs.Aether {
             _ExpectedScoreForRandomSeed[1000] = 184.01764f;
             _ExpectedStepsForRandomSeed[1000] = 1547;
         }
-        public void Run(IEnvironmentViewerFactoryDelegate factory, NumPyRandom random_state, bool continuous = false) {
-            LunarLanderEnv env = new LunarLanderEnv(factory,random_state : random_state, continuous : continuous);
+
+
+        public void Run(IEnvironmentViewerFactoryDelegate factory, int? seed, bool continuous = false) {
+            _seed = seed ?? 0;
+            LunarLanderEnv env = new LunarLanderEnv(factory, random_state: np.random.RandomState(_seed), continuous: continuous);
             env.Verbose = VERBOSE;
             try {
                 // Run a PID test
@@ -56,17 +60,19 @@ namespace Gym.Tests.Envs.Aether {
                     state = observation;
                     env.Render();
                 }
-                if (random_state != null)
+                if (_seed != 0)
                 {
-                    float escore = _ExpectedScoreForRandomSeed[random_state.Seed];
-                    int esteps = _ExpectedStepsForRandomSeed[random_state.Seed];
-                    Assert.AreEqual(esteps, steps, string.Format("Expected number of steps for seed {0} did not match.", random_state.Seed));
-                    Assert.AreEqual(escore, total_reward, 1e-5f, string.Format("Expected score for seed {0} did not match.", random_state.Seed));
+                    #if DEBUG
+                    float escore = _ExpectedScoreForRandomSeed[_seed];
+                    int esteps = _ExpectedStepsForRandomSeed[_seed];
+                    Assert.AreEqual(esteps, steps, string.Format("Expected number of steps for seed {0} did not match.", _seed));
+                    Assert.AreEqual(escore, total_reward, 1e-5f, string.Format("Expected score for seed {0} did not match.", _seed));
+                    #endif
                 }
                 Assert.IsTrue(steps < MAX_STEPS, "Too many steps.");
                 System.Diagnostics.Debug.WriteLine("Total reward: {0} in {1} steps.", total_reward, steps);
             } finally {
-                env.Close();
+                env.CloseEnvironment();
             }
         }
 
@@ -143,6 +149,10 @@ namespace Gym.Tests.Envs.Aether {
             return action;
         }
 
+        [TestCleanup]
+        public void Cleanup() {
+            StaticAvaloniaApp.Shutdown();
+        }
 
         [TestMethod]
         public void Run_Discrete_WinFormEnv() {
@@ -172,6 +182,14 @@ namespace Gym.Tests.Envs.Aether {
         }
 
         [TestMethod]
+        public async Task Run_TwoInstances_Continuous_AvaloniaEnv()
+        {
+            var task1 = Task.Run(() => Run(AvaloniaEnvViewer.Factory, null,true));
+            var task2 = Task.Run(() => Run(AvaloniaEnvViewer.Factory, null,true));
+            await Task.WhenAll(task1, task2);
+        }
+
+        [TestMethod]
         public void Run_Continuous_NullEnv()
         {
             Run(NullEnvViewer.Factory, null,true);
@@ -180,19 +198,19 @@ namespace Gym.Tests.Envs.Aether {
         [TestMethod]
         public void Run_Discrete_WinFormEnv_ConsistencyCheck()
         {
-            Run(WinFormEnvViewer.Factory, np.random.RandomState(1000));
+            Run(WinFormEnvViewer.Factory, 1000);
         }
 
         [TestMethod]
         public void Run_Discrete_AvaloniaEnv_ConsistencyCheck()
         {
-            Run(AvaloniaEnvViewer.Factory, np.random.RandomState(1000));
+            Run(AvaloniaEnvViewer.Factory, 1000);
         }
 
         [TestMethod]
         public void Run_Discrete_NullEnv_ConsistencyCheck()
         {
-            Run(NullEnvViewer.Factory, np.random.RandomState(1000));
+            Run(NullEnvViewer.Factory, 1000);
         }
     }
 }

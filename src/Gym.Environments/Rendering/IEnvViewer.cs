@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading.Tasks;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 
@@ -11,7 +12,7 @@ namespace Gym.Environments {
     /// <param name="title">The title of the rendering window.</param>
     /// <returns>A new environment viewer created based on parameters passed.</returns>
     /// <remarks>Usually provided as a static method in the rendering class, e.g. <see cref="WinFormsViewer.Run"/><br></br>The method should run the environment in a separate background worker / thread.</remarks>
-    public delegate IEnvViewer IEnvironmentViewerFactoryDelegate(int width, int height, string title = null);
+    public delegate Task<IEnvViewer> IEnvironmentViewerFactoryDelegate(int width, int height, string title = null);
 
     /// <summary>
     ///     Represents a graphics engine that is able to <see cref="Render"/> images.
@@ -26,6 +27,6 @@ namespace Gym.Environments {
         /// <summary>
         ///     Close the rendering window.
         /// </summary>
-        void Close();
+        void CloseEnvironment();
     }
 }

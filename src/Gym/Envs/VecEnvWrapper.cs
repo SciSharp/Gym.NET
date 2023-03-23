@@ -25,7 +25,7 @@ namespace Gym.Envs {
 
         public override void Close() {
             foreach (var env in Environments) {
-                env.Close();
+                env.CloseEnvironment();
             }
         }
     }

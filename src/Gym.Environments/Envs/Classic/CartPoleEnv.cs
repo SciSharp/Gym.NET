@@ -85,7 +85,7 @@ namespace Gym.Environments.Envs.Classic {
                     if (_viewer == null) {
                         if (_viewerFactory == null)
                             _viewerFactory = NullEnvViewer.Factory;
-                        _viewer = _viewerFactory(screen_width, screen_height, "cartpole-v1");
+                        _viewer = _viewerFactory(screen_width, screen_height, "cartpole-v1").GetAwaiter().GetResult();
                     }
                 }
 
@@ -186,10 +186,9 @@ namespace Gym.Environments.Envs.Classic {
         }
 
         /// <remarks>Sets internally stored viewer to null. Might cause problems if factory was not passed.</remarks>
-        public override void Close() {
+        public override void CloseEnvironment() {
             if (_viewer != null) {
-                _viewer.Close();
-                _viewer.Dispose();
+                _viewer.CloseEnvironment();
                 _viewer = null;
             }
         }
