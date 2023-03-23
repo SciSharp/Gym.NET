@@ -5,12 +5,12 @@
     <LangVersion>latest</LangVersion>
     <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
     <PackageId>Gym.NET</PackageId>
-    <Version>0.1.0-alpha2</Version>
+    <Version>0.2.0</Version>
     <Authors>Eli Belash</Authors>
     <Company>SciSharp STACK</Company>
     <Product>Gym.NET</Product>
     <Description>openai/gym's popular toolkit for developing and comparing reinforcement learning algorithms port to C#. This package contains the base classes to mimic gym's OOP structure.</Description>
-    <Copyright>2019 © SciSharp STACK Team</Copyright>
+    <Copyright>2023 © SciSharp STACK Team</Copyright>
     <PackageLicenseUrl>https://github.com/SciSharp/Gym.NET/blob/master/README.md</PackageLicenseUrl>
     <PackageProjectUrl>https://github.com/SciSharp/Gym.NET</PackageProjectUrl>
     <PackageIconUrl>https://avatars3.githubusercontent.com/u/44989469?s=200&amp;v=4</PackageIconUrl>

@@ -4,7 +4,7 @@
     <LangVersion>latest</LangVersion>
     <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
     <PackageId>Gym.NET.Rendering.WinForm</PackageId>
-    <Version>0.1.0-alpha2</Version>
+    <Version>0.2.0</Version>
     <Authors>Eli Belash</Authors>
     <Company>SciSharp STACK</Company>
     <Product>Gym.NET.Rendering.WinForm</Product>
