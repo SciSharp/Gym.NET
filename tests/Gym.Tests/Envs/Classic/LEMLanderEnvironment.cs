@@ -29,6 +29,9 @@ namespace Gym.Tests.Envs.Classic
         // Test2 : Crash
         private float[] _BurnsTest2 = new float[] { 64f, 195.8f, 121.3f, 120.5f, 82.8f, 68.9f, 41.2f, 63.7f, 47.2f, 25.1f, 16.5f, 12.7f, 31.5f, 73f, 143.1f, 69.7f, 51.8f, 12.5f, 183.7f, 50f, 15f, 15f, 12f, 12.5f, 12.5f, 57.95f, 0.05f };
         private float[] _TimeTest2 = new float[] { 10f };
+        // Test3 : Landing
+        private float[] _BurnsTest3 = new float[] { 9.3f,116.4f,122.2f,25.8f,155.3f,53.8f,68.8f,31.2f,62.5f,82.9f,52.8f,13.10f,154.8f,76.8f,45.9f,62.1f,148.8f,177.7f,104.7f,13.3f,10.3f,5.3f,5f };
+        private float[] _TimeTest3 = new float[] { 10f };
         private int MAX_STEPS = 100;
         public LEMLanderEnv Run(IEnvironmentViewerFactoryDelegate factory, NumPyRandom random_state, float[] burns, float[] time)
         {
@@ -92,7 +95,7 @@ namespace Gym.Tests.Envs.Classic
         }
         #endregion
 
-        #region Test 2 - Solution
+        #region Test 2 - Crash
         [TestMethod]
         public void Run_Test2_WinFormEnv()
         {
@@ -136,6 +139,27 @@ namespace Gym.Tests.Envs.Classic
             Run(NullEnvViewer.Factory, null, new float[] { 5f }, new float[] { 2f });
         }
         #endregion
+        #region Test 4 - Landing Solution
+        [TestMethod]
+        public void Run_Test4_WinFormEnv()
+        {
+            LEMLanderEnv env = Run(WinFormEnvViewer.Factory, null, _BurnsTest3, _TimeTest3);
+            Assert.AreEqual(LanderStatus.Landed, env.Status);
+        }
 
+        [TestMethod]
+        public void Run_Test4_AvaloniaEnv()
+        {
+            LEMLanderEnv env = Run(AvaloniaEnvViewer.Factory, null, _BurnsTest3, _TimeTest3);
+            Assert.AreEqual(LanderStatus.Landed, env.Status);
+        }
+
+        [TestMethod]
+        public void Run_Test4_NullEnv()
+        {
+            LEMLanderEnv env = Run(NullEnvViewer.Factory, null, _BurnsTest3, _TimeTest3);
+            Assert.AreEqual(LanderStatus.Landed, env.Status);
+        }
+        #endregion
     }
 }
