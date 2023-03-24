@@ -155,7 +155,6 @@ namespace Gym.Environments.Envs.Classic
             }
             else if (_LEM.OutOfFuel)
             {
-                Status = LanderStatus.Crashed;
                 score = -_LEM.SpeedMPH;
             }
             Step step = new Step();

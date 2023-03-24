@@ -23,10 +23,14 @@ namespace Gym.Tests.Envs.Classic
     public class LEMLanderEnvironment
     {
         private const bool VERBOSE = true;
+        // Test1 : Fuel runs out
         private float[] _BurnsTest1 = new float[] { 35.6f, 177f, 180.2f, 8.2f, 13.3f, 121, 3f, 133.6f, 68.2f, 124.10f, 147.5f, 91f, 133.9f, 199.1f, 184.2f, 145.8f, 178.9f, 30.3f, 101.7f, 69.4f, 152.6f, 58.1f, 74.2f, 187.1f, 42.4f, 170.10f, 154.8f, 24.9f, 189.7f, 65.8f, 106.2f, 74.6f, 140.9f, 128f, 37f, 190.5f, 161f, 104.6f, 86f, 160.4f, 197.6f, 96.8f, 86f, 180.4f, 180.5f, 121, 8f, 178.2f };
         private float[] _TimeTest1 = new float[] { 3f };
+        // Test2 : Crash
+        private float[] _BurnsTest2 = new float[] { 64f, 195.8f, 121.3f, 120.5f, 82.8f, 68.9f, 41.2f, 63.7f, 47.2f, 25.1f, 16.5f, 12.7f, 31.5f, 73f, 143.1f, 69.7f, 51.8f, 12.5f, 183.7f, 50f, 15f, 15f, 12f, 12.5f, 12.5f, 57.95f, 0.05f };
+        private float[] _TimeTest2 = new float[] { 10f };
         private int MAX_STEPS = 100;
-        public void Run(IEnvironmentViewerFactoryDelegate factory, NumPyRandom random_state, float[] burns, float[] time)
+        public LEMLanderEnv Run(IEnvironmentViewerFactoryDelegate factory, NumPyRandom random_state, float[] burns, float[] time)
         {
             LEMLanderEnv env = new LEMLanderEnv(factory, random_state: random_state);
             env.Verbose = VERBOSE;
@@ -63,30 +67,57 @@ namespace Gym.Tests.Envs.Classic
             {
                 env.CloseEnvironment();
             }
+            return (env);
         }
         #region Test 1 - A Known Series of Burns
         [TestMethod]
         public void Run_Test1_WinFormEnv()
         {
-            Run(WinFormEnvViewer.Factory, null, _BurnsTest1, _TimeTest1);
+            LEMLanderEnv env = Run(WinFormEnvViewer.Factory, null, _BurnsTest1, _TimeTest1);
+            Assert.AreEqual(LanderStatus.FreeFall, env.Status);
         }
 
         [TestMethod]
         public void Run_Test1_AvaloniaEnv()
         {
-            Run(AvaloniaEnvViewer.Factory, null, _BurnsTest1, _TimeTest1);
+            LEMLanderEnv env = Run(AvaloniaEnvViewer.Factory, null, _BurnsTest1, _TimeTest1);
+            Assert.AreEqual(LanderStatus.FreeFall, env.Status);
         }
 
         [TestMethod]
         public void Run_Test1_NullEnv()
         {
-            Run(NullEnvViewer.Factory, null, _BurnsTest1, _TimeTest1);
+            LEMLanderEnv env = Run(NullEnvViewer.Factory, null, _BurnsTest1, _TimeTest1);
+            Assert.AreEqual(LanderStatus.FreeFall, env.Status);
         }
         #endregion
 
-        #region Test 2 - Force The GUI Display
+        #region Test 2 - Solution
         [TestMethod]
         public void Run_Test2_WinFormEnv()
+        {
+            LEMLanderEnv env = Run(WinFormEnvViewer.Factory, null, _BurnsTest2, _TimeTest2);
+            Assert.AreEqual(LanderStatus.Crashed, env.Status);
+        }
+
+        [TestMethod]
+        public void Run_Test2_AvaloniaEnv()
+        {
+            LEMLanderEnv env = Run(AvaloniaEnvViewer.Factory, null, _BurnsTest2, _TimeTest2);
+            Assert.AreEqual(LanderStatus.Crashed, env.Status);
+        }
+
+        [TestMethod]
+        public void Run_Test2_NullEnv()
+        {
+            LEMLanderEnv env = Run(NullEnvViewer.Factory, null, _BurnsTest2, _TimeTest2);
+            Assert.AreEqual(LanderStatus.Crashed, env.Status);
+        }
+        #endregion
+
+        #region Test 3 - Force The GUI Display
+        [TestMethod]
+        public void Run_Test3_WinFormEnv()
         {
             Run(WinFormEnvViewer.Factory, null, new float[] { 5f }, new float[] { 2f });
         }
@@ -94,13 +125,13 @@ namespace Gym.Tests.Envs.Classic
         /// Test the avalonia viewer with the slow run to force the display of the GUI
         /// </summary>
         [TestMethod]
-        public void Run_Test2_AvaloniaEnv()
+        public void Run_Test3_AvaloniaEnv()
         {
             Run(AvaloniaEnvViewer.Factory, null, new float[] { 5f }, new float[] { 2f });
         }
 
         [TestMethod]
-        public void Run_Test2_NullEnv()
+        public void Run_Test3_NullEnv()
         {
             Run(NullEnvViewer.Factory, null, new float[] { 5f }, new float[] { 2f });
         }
