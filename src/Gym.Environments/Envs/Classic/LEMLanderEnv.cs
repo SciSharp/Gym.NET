@@ -18,6 +18,10 @@ using System.Collections.Generic;
 
 namespace Gym.Environments.Envs.Classic
 {
+    /// <summary>
+    /// The status of the lander during the simulation. Starts in Landing status and 
+    /// is updated periodically during the simulation.
+    /// </summary>
     public enum LanderStatus
     {
         Landing, // In the process of landing
@@ -42,8 +46,14 @@ namespace Gym.Environments.Envs.Classic
         private float _StepTimeDuration = 10.0f;
 
         public LanderStatus Status { get; private set; }
+        /// <summary>
+        /// The LEM physics
+        /// </summary>
         private LEM _LEM = null;
         private NumPyRandom RandomState { get; set; }
+        /// <summary>
+        /// Set to true to get the original output transcript
+        /// </summary>
         public bool Verbose { get; set; } = false;
 
         public LEMLanderEnv(IEnvViewer viewer) : this((IEnvironmentViewerFactoryDelegate)null)
@@ -70,6 +80,10 @@ namespace Gym.Environments.Envs.Classic
             ActionSpace = new Box(low, high, random_state: random_state);
             Metadata = new Dict("render.modes", new[] { "human", "rgb_array" }, "video.frames_per_second", 50);
         }
+        /// <summary>
+        /// Resets the LEM to the original game parameters and runs a step with 0 burn and 0 time.
+        /// </summary>
+        /// <returns></returns>
         public override NDArray Reset()
         {
             _LEM = new LEM(a: START_ALTITUDE, m: START_MASS, v: START_VELOCITY, g: _LEM.Gravity, n: _LEM.FuelMass);
@@ -83,7 +97,8 @@ namespace Gym.Environments.Envs.Classic
         /// Original game was a 10 second fixed thrust period and variable burn amount. In this environment you will
         /// specify the burn rate and the amount of time for that burn.
         /// </summary>
-        /// <param name="action"></param>
+        /// <param name="action">The action as a 2 element array of float (burn,time)</param>
+        /// <returns>Step has (Altitude, Speed, Fuel) as the state. Information dictionary uses the same keys.</returns>
         public override Step Step(object action)
         {
             NDArray c_action = (NDArray)action;

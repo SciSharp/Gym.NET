@@ -3,6 +3,9 @@ using System.Collections.Generic;
 
 namespace Gym.Environments.Envs.Classic
 {
+    /// <summary>
+    /// LEM physics for a simple landing vehicle with a straight drop to the landing pad.
+    /// </summary>
     public class LEM
     {
         /// <summary>
@@ -89,6 +92,13 @@ namespace Gym.Environments.Envs.Classic
             return new Tuple<float, float>(J, I);
         }
 
+        /// <summary>
+        /// Updates the mass of the LEM for the given burn for the given step time. The altitude and
+        /// speed are updated from the result parameter.
+        /// </summary>
+        /// <param name="step">Time of the burn</param>
+        /// <param name="burn">Amount of fuel burn</param>
+        /// <param name="result">Output from a call to Update(step,burn)</param>
         private void Apply(float step, float burn, Tuple<float, float> result)
         {
             Mass -= step * burn;
@@ -96,6 +106,12 @@ namespace Gym.Environments.Envs.Classic
             Speed = result.Item1;
         }
 
+        /// <summary>
+        /// Main method to apply the descent burn to the LEM. Computes the new flight parameters.
+        /// </summary>
+        /// <param name="burn">The number of pounds of fuel to burn per second</param>
+        /// <param name="time">The number of seconds to perform the burn</param>
+        /// <returns>The elapsed time for the burn procedure</returns>
         public float ApplyBurn(float burn, float time =10.0f)
         {
             float elapsed = 0;
@@ -178,3 +194,56 @@ namespace Gym.Environments.Envs.Classic
         }
     }
 }
+/*
+ * ORIGINAL BASIC CODE TRANSCRIBED FROM COMPUTE MAGAZINE
+ * LUNAR LEM ROCKET
+ * 
+10 PRINT TAB(33);"LUNAR"
+20 PRINT TAB(15);"CREATIVE COMPUTING MORRISTOWN, NEW JERSEY"
+25 PRINT:PRINT:PRINT
+30 PRINT "THIS IS A COMPUTER SIMULATION OF AN APOLLO LUNAR"
+40 PRINT "LANDING CAPSULE.": PRINT: PRINT
+50 PRINT "THE ON-BOARD COMPUTER HAS FAILED (IT WAS MADE BY"
+60 PRINT "(XEROX) SO YOU HAVE TO LAND THE CASULE MANUALLY."
+70 PRINT: PRINT "SET BURN RATE OF RETRO ROCKETS TO ANY VALUE BETWEEN"
+80 PRINT "0 (FREE FALL) AND 200 (MAX BURN) POUNDS PER SECOND."
+90 PRINT "SET NEW BURN RATE EVERY 10 SECONDS." :PRINT
+100 PRINT "CAPSULE WEIGHT 32,500 LBS; FUEL WEIGHT 16,500 LBS."
+110 PRINT: PRINT: PRINT: PRINT "GOOD LUCK"
+120 L=0
+130 PRINT: PRINT "SEC","MI + FT","MPH","LB FUEL","BURN RATE" :PRINT
+140 A=120: V=1: M=33000: N=16500: G=1E-03: Z=1.8
+150 PRINT L, INT(A); INT(5280*(A-INT(A))),3600*V,M-N,:INPUT K:T=10
+160 IF M-N <1E-03 THEN 240
+170 IF T<1E-03 THEN 150
+180 S=T: IF M>= N+S*K THEN 200
+190 S=(M-N)/K
+200 GOSUB 420: IF I<= 0 THEN 340
+210 IF V<=0 THEN 230
+220 IF J<0 THEN 370
+230 GOSUB 330: GOTO 160
+240 PRINT "FUEL OUT AT";L;"SECONDS": S=(-V+SQR(V*V+2*A*G))/G
+250 V=V+G*S: L=L+S
+260 U=3600*V:PRINT "ON MOON AT";L;"SECONDS - IMPACT VELOCITY";U;"MPH"
+270 IF U <= 1.2 THEN PRINT "PERFECT LANDING!": GOTO 440
+280 IF U <= 10 THEN PRINT "GOOD LANDING (COULD BE BETTER)" : GOTO 440
+282 IF U > 60 THEN 300
+284 PRINT "CRAFT DAMAGE ... YOU'RE STRANDED HERE UNTIL A RESCUE"
+286 PRINT "PARTY ARRIVES. HOPE YOU HAVE ENOUGH OXYGEN!"
+288 GOTO 440
+300 PRINT "SORRY THERE WERE NO SURVIVORS. YOU BLEW IT!"
+310 PRINT "IN FACT, YOU BLASTED A NEW LUNAR CRATER";U*.277;"FEET DEEP!"
+320 GOTO 440
+330 L=L+S: T=T-S: M=M-S*K: A=I: V=J: RETURN
+340 IF S < 5E-03 THEN 260
+350 D=V+SQR(V*V+2*A*(G-Z*K/M)): S=2*A/D
+360 GOSUB 420: GOSUB 330: GOTO 340
+370 U=(1-M*G/(Z*K))/2: S=M*V/(Z*K*(U+SQR(U*U+V/Z)))+0.05: GOSUB 420
+380 IF I<=0 THEN 340
+390 GOSUB 330: IF J>0 THEN 160
+400 IF V>0 THEN 370
+410 GOTO 160
+420 Q=S*K/M: J=V+G*S+Z*(-Q-Q*Q/2-Q^3/3-Q^4/4-Q^5/5)
+430 I=A-G*S*S/2-V*S+Z*S*(Q/2+Q^2/6+Q^3/12+Q^4/20+Q^5/30):RETURN
+440 PRINT:PRINT:PRINT:PRINT "TRY AGAIN??": GOTO 70
+*/
