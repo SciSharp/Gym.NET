@@ -143,7 +143,7 @@ namespace Gym.Environments.Envs.Classic
                 else if (U <= 10.0)
                 {
                     if (Verbose)
-                        System.Diagnostics.Debug.WriteLine("GOOD LANDING (COULD BE BETTER)");
+                        System.Diagnostics.Debug.WriteLine("GOOD LANDING (COULD BE BETTER) AT {0:F2} MPH",U);
                     score = 2.0f;
                     Status = LanderStatus.Landed;
                 }
@@ -161,6 +161,7 @@ namespace Gym.Environments.Envs.Classic
                 {
                     if (Verbose)
                     {
+                        System.Diagnostics.Debug.WriteLine("LANDED AT {0:F2} MPH",U);
                         System.Diagnostics.Debug.WriteLine("CRAFT DAMAGE ... YOU'RE STRANDED HERE UNTIL A RESCUE");
                         System.Diagnostics.Debug.WriteLine("PARTY ARRIVES. HOPE YOU HAVE ENOUGH OXYGEN!");
                     }
