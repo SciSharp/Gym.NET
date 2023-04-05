@@ -32,6 +32,9 @@ namespace Gym.Environments.Envs.Aether
     {
         public float Friction { get; set; } = 0f;
         public bool RoadVisited { get; set; } = false;
+        public Rgba32 Color { get; set; } = new Rgba32(102,102,102); // 0.4,0.4,0.4
+        public int Index { get; set; } = 0;
+        public Fixture PhysicsFixture { get; set; }
     }
     #endregion
     /// <summary>
@@ -86,11 +89,15 @@ namespace Gym.Environments.Envs.Aether
         #endregion
 
         private World World { get; set; }
-        private Body Hull { get; set; }
+        public Body Hull { get; private set; }
         public Rgba32 BodyColor { get; set; } = new Rgba32(204, 0, 0);
         private List<Wheel> Wheels { get; set; }
         public float FuelSpent { get; set; } = 0f;
-        public List<RoadTile> Tiles { get; set; }
+
+        #region Telemetry
+        public float SteerAngle { get; private set; }
+        public float Speed { get; private set; }
+        #endregion
 
         #region Particles
         internal class CarParticle
@@ -111,7 +118,7 @@ namespace Gym.Environments.Envs.Aether
         #endregion
 
         #region Wheels
-        internal class Wheel
+        public class Wheel
         {
             internal Body Unit { get; set; }
             internal float WheelRad { get; set; }
@@ -130,6 +137,7 @@ namespace Gym.Environments.Envs.Aether
             internal Vector2? SkidStart { get; set; }
             internal CarParticle SkidParticle { get; set; }
             internal RevoluteJoint Joint { get; set; }
+            public List<RoadTile> Tiles { get; set; }
 
             internal Wheel()
             {
@@ -145,10 +153,12 @@ namespace Gym.Environments.Envs.Aether
                 });
                 Vector2 p = car.Position + pos * SIZE;
                 Unit = car.World.CreateBody(position: p, rotation: car.Rotation, bodyType: BodyType.Dynamic);
-                Fixture f = new Fixture(new PolygonShape(new Vertices(wheel_poly), 0.1f));
+                Unit.Tag = this;
+                Fixture f = Unit.CreateFixture(new PolygonShape(new Vertices(wheel_poly), 0.1f));
                 f.CollisionCategories = Category.All;
                 f.CollidesWith = Category.Cat1;
                 f.Restitution = 0f;
+                f.Tag = this;
                 WheelRad = front_k * WHEEL_R * SIZE;
                 Gas = 0f;
                 Brake = 0f;
@@ -167,6 +177,7 @@ namespace Gym.Environments.Envs.Aether
                 rjd.UpperLimit = 0.4f;
                 Joint = rjd;
                 car.World.Add(rjd);
+                Tiles = new List<RoadTile>();
                 return (this);
             }
         }
@@ -178,14 +189,10 @@ namespace Gym.Environments.Envs.Aether
             World = world;
             Wheels = new List<Wheel>();
             Hull = world.CreateBody(position: new Vector2(init_x, init_y), rotation: init_angle, bodyType: BodyType.Dynamic);
-            Fixture f = Hull.CreateFixture(new PolygonShape(HULL_POLY1, 1f));
-            Hull.Add(f);
-            f = Hull.CreateFixture(new PolygonShape(HULL_POLY2, 1f));
-            Hull.Add(f);
-            f = Hull.CreateFixture(new PolygonShape(HULL_POLY3, 1f));
-            Hull.Add(f);
-            f = Hull.CreateFixture(new PolygonShape(HULL_POLY4, 1f));
-            Hull.Add(f);
+            Fixture f = Hull.CreateFixture(new PolygonShape(ScaleIt(HULL_POLY1), 1f));
+            f = Hull.CreateFixture(new PolygonShape(ScaleIt(HULL_POLY2), 1f));
+            f = Hull.CreateFixture(new PolygonShape(ScaleIt(HULL_POLY3), 1f));
+            f = Hull.CreateFixture(new PolygonShape(ScaleIt(HULL_POLY4), 1f));
             foreach (Vector2 v in WHEELPOS)
             {
                 Wheel w = new Wheel();
@@ -193,7 +200,16 @@ namespace Gym.Environments.Envs.Aether
                 Wheels.Add(w);
                 w.Color = WheelColor;
             }
-            Tiles = new List<RoadTile>();
+        }
+
+        private Vertices ScaleIt(Vertices vx, float scale = SIZE)
+        {
+            Vertices n = new Vertices();
+            foreach (Vector2 v in vx)
+            {
+                n.Add(new Vector2(v.X * scale, v.Y * scale));
+            }
+            return (n);
         }
 
         #region Car Interface
@@ -242,7 +258,7 @@ namespace Gym.Environments.Envs.Aether
         /// </summary>
         /// <param name="dt">The time step</param>
         /// <param name="w">The wheel being simulated</param>
-        /// <returns></returns>
+        /// <returns>The amount of fuel spent in the step</returns>
         private float Step(float dt, Wheel w)
         {
             float steer_angle = w.Steer - w.Joint.JointAngle;
@@ -253,7 +269,7 @@ namespace Gym.Environments.Envs.Aether
             // Position -> friction_limit
             bool grass = true;
             float friction_limit = FRICTION_LIMIT * 0.6f; // Grass friction if no tile
-            foreach (RoadTile tile in Tiles)
+            foreach (RoadTile tile in w.Tiles)
             {
                 friction_limit = Math.Max(friction_limit, FRICTION_LIMIT * tile.Friction);
                 grass = false;
@@ -352,10 +368,12 @@ namespace Gym.Environments.Envs.Aether
             {
                 FuelSpent += Step(dt, w);
             }
+            SteerAngle = Hull.Rotation;
+            Speed = Hull.LinearVelocity.Length();
             return (this);
         }
 
-        private Vector2 RotateVec(Vector2 v, float angle) {
+        public static Vector2 RotateVec(Vector2 v, float angle) {
             float cos = (float)Math.Cos(angle);
             float sin = (float)Math.Sin(angle);
             return new Vector2(v.X * cos - v.Y * sin, v.X * sin + v.Y * cos); 

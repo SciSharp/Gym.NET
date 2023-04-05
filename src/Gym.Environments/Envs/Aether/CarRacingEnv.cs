@@ -22,6 +22,7 @@ using SixLabors.ImageSharp.ColorSpaces;
 using Gym.Exceptions;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.IO;
 
 namespace Gym.Environments.Envs.Aether
 {
@@ -113,6 +114,17 @@ namespace Gym.Environments.Envs.Aether
     /// </summary>
     public class CarRacingEnv : Env
     {
+        public enum StateFormat {
+            /// <summary>
+            /// State data is pixel data from rendered images in [w,h,3] format
+            /// </summary>
+            Pixels,
+            /// <summary>
+            /// State data is the telemetry of the car
+            /// </summary>
+            Telemetry
+        };
+
         #region Constants
         public const int STATE_W = 96; // Atari was 160 x 192
         public const int STATE_H = 96;
@@ -145,6 +157,10 @@ namespace Gym.Environments.Envs.Aether
         public Rgba32 GrassColor { get; set; } = new Rgba32(102, 230, 102);
         #endregion
 
+        /// <summary>
+        /// How the state data is output from the step. 
+        /// </summary>
+        public StateFormat StateOutputFormat { get; set; } = StateFormat.Pixels;
         private bool ContinuousMode { get; set; } = true;
         private bool DomainRandomize { get; set; } = false;
         private float LapCompletePercent { get; set; } = 0.95f;
@@ -158,6 +174,11 @@ namespace Gym.Environments.Envs.Aether
         private float T { get; set; } = 0f;
         private bool NewLap { get; set; } = false;
         private float StartAlpha { get; set; } = 0f;
+        private int TileVisitedCount { get; set; } = 0;
+
+        private Image<Rgba32> _LastRender = null;
+        private NDArray _LastImageArray = null;
+        private World _World;
 
         internal struct RoadPolygon
         {
@@ -173,6 +194,7 @@ namespace Gym.Environments.Envs.Aether
         {
             private CarRacingEnv _env { get; set; }
             private float LapCompletePercent { get; set; }
+            private bool EnvNewLap { get; set; } = false;
 
             public FrictionDetector(CarRacingEnv env, float lap_complete_percent)
             {
@@ -180,33 +202,50 @@ namespace Gym.Environments.Envs.Aether
                 LapCompletePercent = lap_complete_percent;
             }
 
-            private void DoContact(Contact contact)
+            private void DoContact(Contact contact,bool begin)
             {
                 RoadTile tile = contact.FixtureA.Body.Tag as RoadTile;
-                CarDynamics car = contact.FixtureB.Body.Tag as CarDynamics;
+                CarDynamics.Wheel car = contact.FixtureB.Body.Tag as CarDynamics.Wheel;
                 if (tile == null)
                 {
                     tile = contact.FixtureB.Body.Tag as RoadTile;
-                    car = contact.FixtureA.Body.Tag as CarDynamics;
+                    car = contact.FixtureA.Body.Tag as CarDynamics.Wheel;
                 }
                 if (tile == null || car == null)
                 {
                     // Contacts are only with Car and Tile instances
                     return;
                 }
-                if (car.Tiles.Count > 0)
+                if (begin)
                 {
+                    tile.Color = _env.RoadColor;
+                    car.Tiles.Add(tile);
+                    if (!tile.RoadVisited)
+                    {
+                        tile.RoadVisited = true;
+                        _env.Reward += 1000f / (float)_env.Track.Length;
+                        _env.TileVisitedCount++;
+                        float visitpct = (float)_env.TileVisitedCount / (float)_env.Track.Length;
+                        if (tile.Index == 0 && visitpct > LapCompletePercent)
+                        {
+                            EnvNewLap = true;
+                        }
+                    }
+                }
+                else
+                {
+                    car.Tiles.Remove(tile);
                 }
             }
             public bool BeginContact(Contact contact)
             {
-                DoContact(contact);
+                DoContact(contact,true);
                 return (false);
             }
 
             public void EndContact(Contact contact)
             {
-                DoContact(contact);
+                DoContact(contact,false);
             }
 
         }
@@ -429,13 +468,13 @@ namespace Gym.Environments.Envs.Aether
                 int oneside = 0;
                 for (int neg = 0; neg < BORDER_MIN_COUNT; neg++) {
                     int idx = i - neg * 4;
-                    if (idx < 0)
+                    while (idx < 0)
                     {
                         idx += track.Length;
                     }
                     float beta1 = track[idx  + 1];
-                    idx = i - (neg - 1) * 4;
-                    if (idx < 0)
+                    idx = i - neg*4 - 4;
+                    while (idx < 0)
                     {
                         idx += track.Length;
                     }
@@ -447,15 +486,82 @@ namespace Gym.Environments.Envs.Aether
                 good = good && (Math.Abs(oneside) == BORDER_MIN_COUNT);
                 border[i >> 2] = good;
             }
-            for (i = 0; i < track.Length; i += 4)
+            for (i = 0; i < border.Length; i++)
             {
-                int j = i >> 2;
                 for (int neg = 0; neg < BORDER_MIN_COUNT; neg++)
                 {
-                    border[j - neg] |= border[j];
+                    int j = i - neg;
+                    if (j < 0)
+                    {
+                        j += border.Length;
+                    }
+                    
+                    border[j] |= border[i];
                 }
             }
             // Create tiles
+            int prev_track_index = track.Length - 4;
+            for (i = 0; i < track.Length; i += 4, prev_track_index = (prev_track_index+4)%track.Length) // (alpha, beta, x, y)
+            {
+                // position 1
+                float alpha1 = track[i];
+                float beta1 = track[i + 1];
+                float x1 = track[i + 2];
+                float y1 = track[i + 3];
+                // previous position
+                float alpha2 = track[prev_track_index];
+                float beta2 = track[prev_track_index + 1];
+                float x2 = track[prev_track_index + 2];
+                float y2 = track[prev_track_index + 3];
+                float cos_beta1 = (float)Math.Cos(beta1);
+                float sin_beta1 = (float)Math.Sin(beta1);
+                float cos_beta2 = (float)Math.Cos(beta2);
+                float sin_beta2 = (float)Math.Sin(beta2);
+                Vector2 road1_l = new Vector2(x1 - TRACK_WIDTH * cos_beta1, y1 - TRACK_WIDTH * sin_beta1);
+                Vector2 road1_r = new Vector2(x1 + TRACK_WIDTH * cos_beta1, y1 + TRACK_WIDTH * sin_beta1);
+                Vector2 road2_l = new Vector2(x2 - TRACK_WIDTH * cos_beta2, y2 - TRACK_WIDTH * sin_beta2);
+                Vector2 road2_r = new Vector2(x2 + TRACK_WIDTH * cos_beta2, y2 + TRACK_WIDTH * sin_beta2);
+                Vertices vx = new Vertices();
+                vx.Add(road1_l);
+                vx.Add(road1_r);
+                vx.Add(road2_r);
+                vx.Add(road2_l);
+                // fixtureDef(shape = polygonShape(vertices =[(0, 0), (1, 0), (1, -1), (0, -1)]))
+                Body bx = _World.CreateBody(bodyType:BodyType.Static);
+                Fixture t = bx.CreateFixture(new PolygonShape(vx,1f));
+                RoadTile tile = new RoadTile();
+                bx.Tag = tile;
+                tile.Index = i / 4;
+                int c = 25 * (tile.Index % 3);
+                tile.Color = new Rgba32(RoadColor.R + c, RoadColor.G + c, RoadColor.B + c);
+                tile.RoadVisited = false;
+                tile.Friction = 1f;
+                t.IsSensor = true;
+                tile.PhysicsFixture = t;
+                RoadPolygon poly = new RoadPolygon();
+                poly.Verts = vx;
+                poly.Color = tile.Color;
+                RoadPoly.Add(poly);
+                Road.Add(bx);
+                if (border[tile.Index])
+                {
+                    int side = ((beta2-beta1) < 0) ? -1 : 1;
+                    Vector2 b1_l = new Vector2(x1 + side * TRACK_WIDTH * cos_beta1, y1 + side * TRACK_WIDTH * sin_beta1);
+                    Vector2 b1_r = new Vector2(x1 + side * (TRACK_WIDTH+BORDER) * cos_beta1, y1 + side * (TRACK_WIDTH+BORDER) * sin_beta1);
+                    Vector2 b2_l = new Vector2(x2 + side * TRACK_WIDTH * cos_beta2, y2 + side * TRACK_WIDTH * sin_beta2);
+                    Vector2 b2_r = new Vector2(x2 + side * (TRACK_WIDTH + BORDER) * cos_beta2, y2 + side * (TRACK_WIDTH + BORDER) * sin_beta2);
+                    vx = new Vertices();
+                    vx.Add(road1_l);
+                    vx.Add(road1_r);
+                    vx.Add(road2_r);
+                    vx.Add(road2_l);
+                    poly = new RoadPolygon();
+                    poly.Verts = vx;
+                    poly.Color = (tile.Index % 2 == 0) ? new Rgba32(255,255,255) : new Rgba32(255, 0, 0);
+                    RoadPoly.Add(poly);
+                }
+            }
+            Track = track;
             return (true);
         }
 
@@ -473,16 +579,120 @@ namespace Gym.Environments.Envs.Aether
             RandomState.seed(seed);
         }
 
+        private void FillPoly(Image<Rgba32> img, Vector2[] poly, Color c, float zoom, Vector2 trans, float angle)
+        {
+            PointF[] path = new PointF[poly.Length];
+            for (int i = 0; i < poly.Length; i++)
+            {
+                Vector2 v = CarDynamics.RotateVec(poly[i], angle) * zoom + trans;
+                path[i] = new PointF(v.X, v.Y);
+            }
+            img.Mutate(i => i.FillPolygon(c, path));
+        }
+        private void RenderIndicators(Image<Rgba32> img, int view_w, int view_h)
+        {
+        }
+        private void RenderRoad(Image<Rgba32> img, float zoom, Vector2 trans, float angle)
+        {
+            float bounds = PLAYFIELD;
+            Vector2[] field = new Vector2[] {
+                new Vector2(2f*bounds,2f*bounds),
+                new Vector2(2f*bounds,0f),
+                new Vector2(0f,0f),
+                new Vector2(0f, 2f*bounds)
+            };
+            FillPoly(img, field, new Rgba32(102, 204, 102), zoom, trans, angle);
+            float k = bounds / 20f;
+            for (int x = 0; x < 40; x += 2)
+            {
+                for (int y = 0; y < 40; y += 2)
+                {
+                    Vector2[] poly = new Vector2[] {
+                        new Vector2(k*x+k, k*y),
+                        new Vector2(k*x  , k*y),
+                        new Vector2(k*x  , k*y+k),
+                        new Vector2(k*x+k, k*y+k)
+                    };
+                    FillPoly(img, poly, new Rgba32(102, 230, 102), zoom, trans, angle);
+                }
+            }
+            Vector2 add = new Vector2(PLAYFIELD, PLAYFIELD);
+            for (int i = 0; i < RoadPoly.Count; i++)
+            {
+                Vector2[] road = new Vector2[RoadPoly[i].Verts.Count];
+                for (int j = 0; j < road.Length; j++)
+                {
+                    road[j] = RoadPoly[i].Verts[j] + add;
+                }
+                FillPoly(img, road, RoadPoly[i].Color, zoom, trans, angle);
+            }
+        }
+
         public override Image Render(string mode = "human")
         {
-            throw new NotImplementedException();
+            if (_viewer == null && mode == "human")
+            {
+                lock (this)
+                {
+                    //to prevent double initalization.
+                    if (_viewer == null)
+                    {
+                        if (_viewerFactory == null)
+                            _viewerFactory = NullEnvViewer.Factory;
+                        _viewer = _viewerFactory(WINDOW_W, WINDOW_H, "carracing").GetAwaiter().GetResult();
+                    }
+                }
+            }
+            Image<Rgba32> img = null;
+            if (_LastRender == null)
+            {
+                // Define the buffer image for drawing
+                img = new Image<Rgba32>(WINDOW_W, WINDOW_H);
+                img.Mutate(i => i.BackgroundColor(new Rgba32(0, 0, 0))); // Space is black
+                // Computing transforms
+                float angle = -Car.Hull.Rotation;
+                // Animating first second zoom.
+                float zoom = 0.1f * SCALE * (float)Math.Max(1f - T, 0f) + ZOOM * SCALE * (float)Math.Min(T, 1f);
+                float scroll_x = -(Car.Hull.Position.X + PLAYFIELD) * zoom;
+                float scroll_y = -(Car.Hull.Position.Y + PLAYFIELD) * zoom;
+                Vector2 trans = CarDynamics.RotateVec(new Vector2(scroll_x, scroll_y), angle) + new Vector2(WINDOW_W/2,WINDOW_H/4);
+                RenderRoad(img, zoom, trans, angle);
+                Car.Draw(img, zoom, trans, angle, mode != "state");
+                // flip the surface?
+                // Show stats
+                RenderIndicators(img, WINDOW_W, WINDOW_H);
+                // TODO: Display the reward as 42 pt text at (60, WINDOW_H - WINDOW_H * 2.5 / 40.0)
+
+                _LastRender = img;
+            }
+            if (mode == "state" && img != null)
+            {
+                // Convert the image to an NDArray
+                _LastImageArray = new float[WINDOW_W, WINDOW_H, 3];
+                for (int j = 0; j < WINDOW_H; j++)
+                {
+                    for (int i = 0; i < WINDOW_W; i++)
+                    {
+                        _LastImageArray[i, j, 0] = (float)img[i, j].R / 255f;
+                        _LastImageArray[i, j, 1] = (float)img[i, j].G / 255f;
+                        _LastImageArray[i, j, 2] = (float)img[i, j].B / 255f;
+                    }
+                }
+            }
+            // Clear out the last render so a new one is created
+            if (mode == "human")
+            {
+                _viewer.Render(_LastRender);
+                _LastRender = null;
+            }
+            return (img);
         }
 
         public override NDArray Reset()
         {
-            World world = new World(new Vector2(0f, 0f));
-            world.ContactManager.BeginContact = new BeginContactDelegate(ContactListener.BeginContact);
-            world.ContactManager.EndContact = new EndContactDelegate(ContactListener.EndContact);
+            _World = new World(new Vector2(0f, 0f));
+            _World.ContactManager.BeginContact = new BeginContactDelegate(ContactListener.BeginContact);
+            _World.ContactManager.EndContact = new EndContactDelegate(ContactListener.EndContact);
             Reward = 0f;
             PreviousReward = 0f;
             T = 0f;
@@ -500,13 +710,64 @@ namespace Gym.Environments.Envs.Aether
                     Debug.WriteLine("Retry to generate track (normal if there are not many instances of this message).");
                 }
             }
-            Car = new CarDynamics(world, Track[1], Track[2], Track[3]);
+            Car = new CarDynamics(_World, Track[1], Track[2], Track[3]);
             return (Step(null).Observation);
         }
 
         public override Step Step(object action)
         {
-            throw new NotImplementedException();
+            bool null_action = true;
+            NDArray a = null;
+            if (action != null)
+            {
+                null_action = false;
+                a = (NDArray)action;
+                Car.Steer(-1f * a[0]);
+                Car.Gas(a[1]);
+                Car.Brake(a[2]);
+            }
+            Car.Step(1f / FPS);
+            SolverIterations si = new SolverIterations();
+            si.PositionIterations = 2 * 30;
+            si.VelocityIterations = 6 * 30;
+            _World.Step(1f / FPS, ref si);
+            T += 1f / FPS;
+
+            // TODO: gather the 'state' pixels 
+
+            float step_reward = 0f;
+            bool done = false;
+
+            if (!null_action) // First step without action, called from reset()
+            {
+                Reward -= 0.1f;
+                //# We actually don't want to count fuel spent, we want car to be faster.
+                //# self.reward -=  10 * self.car.fuel_spent / ENGINE_POWER
+                Car.FuelSpent = 0f;
+                step_reward -= PreviousReward;
+                PreviousReward = Reward;
+                if (TileVisitedCount == Track.Length || NewLap)
+                {
+                    done = true;
+                }
+                Vector2 pos = Car.Hull.Position;
+                if (Math.Abs(pos.X) > PLAYFIELD || Math.Abs(pos.Y) > PLAYFIELD)
+                {
+                    done = true;
+                    step_reward = -100f;
+                }
+            }
+            Step step = new Step();
+            step.Done = done;
+            step.Reward = step_reward;
+            if (StateOutputFormat == StateFormat.Pixels) {
+                Image img = Render("state");
+                step.Observation = _LastImageArray;
+            }
+            else {
+                step.Observation = new float[] { Car.Hull.Position.X, Car.Hull.Position.Y, Car.Speed, Car.SteerAngle };
+            }
+            return step; 
         }
     }
 }
