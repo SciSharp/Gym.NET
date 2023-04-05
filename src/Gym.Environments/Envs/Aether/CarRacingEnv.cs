@@ -579,6 +579,15 @@ namespace Gym.Environments.Envs.Aether
             RandomState.seed(seed);
         }
 
+        /// <summary>
+        /// Useful method to draw a filled polygon that is zoomed, translated, and rotated.
+        /// </summary>
+        /// <param name="img">Target drawing surface</param>
+        /// <param name="poly">The path to fill</param>
+        /// <param name="c">The color to fill it with</param>
+        /// <param name="zoom">Zoom factor</param>
+        /// <param name="trans">Translation factor</param>
+        /// <param name="angle">Rotation factor</param>
         private void FillPoly(Image<Rgba32> img, Vector2[] poly, Color c, float zoom, Vector2 trans, float angle)
         {
             PointF[] path = new PointF[poly.Length];
@@ -589,9 +598,65 @@ namespace Gym.Environments.Envs.Aether
             }
             img.Mutate(i => i.FillPolygon(c, path));
         }
-        private void RenderIndicators(Image<Rgba32> img, int view_w, int view_h)
+
+        #region Indicator Rendering
+        private void RenderIndicatorIfMin(Image<Rgba32> img, float v, PointF[] path, Color c)
         {
+            if (Math.Abs(v) < 1e-4)
+            {
+                return;
+            }
+            img.Mutate(i => i.DrawPolygon(c, 1f, path));
+
         }
+        private PointF[] _indicator(float place, float s, float h, float W, float H, float v, bool vertical=true)
+        {
+            PointF[] path = null;
+            if (vertical)
+            {
+                path = new PointF[] {
+                    new PointF(place*s     ,H-(h+h*v)),
+                    new PointF((place+1f)*s,H-(h+h*v)),
+                    new PointF((place+1f)*s,H-h),
+                    new PointF(place*s     ,H-h),
+                };
+            }
+            else
+            {
+                path = new PointF[] {
+                    new PointF(place*s    ,H-4*h),
+                    new PointF((place+v)*s,H-4*h),
+                    new PointF((place+v)*s,H-2*h),
+                    new PointF(place*s    ,H-2*h),
+                };
+            }
+            return (path);
+        }
+        private void RenderIndicators(Image<Rgba32> img, int W, int H)
+        {
+            float s = W / 40f;
+            float h = H / 40f;
+            Rgba32 color = new Rgba32(0, 0, 0);
+            PointF[] poly = new PointF[] {
+                new PointF(W,H),
+                new PointF(W,H-5f*h),
+                new PointF(0f,H-5f*h),
+                new PointF(0f,H)
+            };
+            float v = np.sqrt(np.square(Car.Hull.LinearVelocity.X) + np.square(Car.Hull.LinearVelocity.Y));
+            RenderIndicatorIfMin(img, v, _indicator(5f, s, h, W, H, 0.02f * v), new Rgba32(255, 255, 255));
+            // ABS indicators
+            for (int i = 0; i < 4; i++)
+            {
+                v = Car.Wheels[i].Omega;
+                RenderIndicatorIfMin(img, v, _indicator(7f+i, s, h, W, H, 0.01f * v), i < 2 ? new Rgba32(0, 0, 255) : new Rgba32(51, 0, 255));
+            }
+            v = Car.Wheels[0].Joint.JointAngle;
+            RenderIndicatorIfMin(img, v, _indicator(20f, s, h, W, H, -10f * v, false), new Rgba32(0, 255, 0));
+            v = Car.Hull.AngularVelocity;
+            RenderIndicatorIfMin(img, v, _indicator(30f, s, h, W, H, -0.8f * v, false), new Rgba32(255, 0, 0));
+        }
+        #endregion
         private void RenderRoad(Image<Rgba32> img, float zoom, Vector2 trans, float angle)
         {
             float bounds = PLAYFIELD;
@@ -628,6 +693,11 @@ namespace Gym.Environments.Envs.Aether
             }
         }
 
+        /// <summary>
+        /// Renders the current state of the race
+        /// </summary>
+        /// <param name="mode">Rendering mode, either "human" or "state". State rendering will return the RGB array as the state in the observation.</param>
+        /// <returns></returns>
         public override Image Render(string mode = "human")
         {
             if (_viewer == null && mode == "human")

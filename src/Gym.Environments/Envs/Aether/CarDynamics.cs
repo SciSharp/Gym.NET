@@ -91,7 +91,7 @@ namespace Gym.Environments.Envs.Aether
         private World World { get; set; }
         public Body Hull { get; private set; }
         public Rgba32 BodyColor { get; set; } = new Rgba32(204, 0, 0);
-        private List<Wheel> Wheels { get; set; }
+        public List<Wheel> Wheels { get; private set; }
         public float FuelSpent { get; set; } = 0f;
 
         #region Telemetry
