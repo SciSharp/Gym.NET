@@ -146,6 +146,7 @@ namespace Gym.Environments.Envs.Aether
 
     //    ## Credits
     //    Created by Oleg Klimov
+    //    Converted to C# by Jacob Anderson
     /// </summary>
     public class LunarLanderEnv : Env
     {
@@ -421,6 +422,7 @@ namespace Gym.Environments.Envs.Aether
                 ActionSpace = new Discrete(4, random_state: random_state);
             }
 
+            Metadata = new Dict("render.modes", new[] { "human", "rgb_array" }, "video.frames_per_second", 50);
         }
 
         #region Particles
@@ -775,7 +777,7 @@ namespace Gym.Environments.Envs.Aether
 
         public override Image Render(string mode = "human")
         {
-            if (_viewer == null) {
+            if (_viewer == null && mode == "human") {
                 lock (this) {
                     //to prevent double initalization.
                     if (_viewer == null) {
