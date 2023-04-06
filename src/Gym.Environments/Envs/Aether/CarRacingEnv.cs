@@ -172,7 +172,7 @@ namespace Gym.Environments.Envs.Aether
         private float Reward { get; set; } = 0f;
         private float PreviousReward { get; set; } = 0f;
         private float T { get; set; } = 0f;
-        private bool NewLap { get; set; } = false;
+        internal bool NewLap { get; set; } = false;
         private float StartAlpha { get; set; } = 0f;
         private int TileVisitedCount { get; set; } = 0;
 
@@ -194,7 +194,6 @@ namespace Gym.Environments.Envs.Aether
         {
             private CarRacingEnv _env { get; set; }
             private float LapCompletePercent { get; set; }
-            private bool EnvNewLap { get; set; } = false;
 
             public FrictionDetector(CarRacingEnv env, float lap_complete_percent)
             {
@@ -228,7 +227,7 @@ namespace Gym.Environments.Envs.Aether
                         float visitpct = (float)_env.TileVisitedCount / (float)_env.Track.Length;
                         if (tile.Index == 0 && visitpct > LapCompletePercent)
                         {
-                            EnvNewLap = true;
+                            _env.NewLap = true;
                         }
                     }
                 }
@@ -478,7 +477,7 @@ namespace Gym.Environments.Envs.Aether
                     float beta2 = track[idx+1]; // index out of bounds TODO!
                     float dbeta = beta1 - beta2;
                     good &= (Math.Abs(dbeta) > TRACK_TURN_RATE * 0.2f);
-                    oneside += (dbeta < 0f ? -1 : 1);
+                    oneside += (dbeta < 0f ? -1 : (dbeta > 0f ? 1 : 0));
                 }
                 good = good && (Math.Abs(oneside) == BORDER_MIN_COUNT);
                 border[i >> 2] = good;
@@ -501,19 +500,18 @@ namespace Gym.Environments.Envs.Aether
             for (i = 0; i < track.Length; i += 4, prev_track_index = (prev_track_index+4)%track.Length) // (alpha, beta, x, y)
             {
                 // position 1
-                float alpha1 = track[i];
                 float beta1 = track[i + 1];
                 float x1 = track[i + 2];
                 float y1 = track[i + 3];
+                float cos_beta1 = (float)Math.Cos(beta1);
+                float sin_beta1 = (float)Math.Sin(beta1);
                 // previous position
-                float alpha2 = track[prev_track_index];
                 float beta2 = track[prev_track_index + 1];
                 float x2 = track[prev_track_index + 2];
                 float y2 = track[prev_track_index + 3];
-                float cos_beta1 = (float)Math.Cos(beta1);
-                float sin_beta1 = (float)Math.Sin(beta1);
                 float cos_beta2 = (float)Math.Cos(beta2);
                 float sin_beta2 = (float)Math.Sin(beta2);
+                // Polygon
                 Vector2 road1_l = new Vector2(x1 - TRACK_WIDTH * cos_beta1, y1 - TRACK_WIDTH * sin_beta1);
                 Vector2 road1_r = new Vector2(x1 + TRACK_WIDTH * cos_beta1, y1 + TRACK_WIDTH * sin_beta1);
                 Vector2 road2_l = new Vector2(x2 - TRACK_WIDTH * cos_beta2, y2 - TRACK_WIDTH * sin_beta2);
@@ -661,16 +659,16 @@ namespace Gym.Environments.Envs.Aether
         {
             float bounds = PLAYFIELD;
             Vector2[] field = new Vector2[] {
-                new Vector2(2f*bounds,2f*bounds),
-                new Vector2(2f*bounds,0f),
-                new Vector2(0f,0f),
-                new Vector2(0f, 2f*bounds)
+                new Vector2(bounds,bounds),
+                new Vector2(bounds,-bounds),
+                new Vector2(-bounds,-bounds),
+                new Vector2(-bounds, bounds)
             };
             FillPoly(img, field, new Rgba32(102, 204, 102), zoom, trans, angle);
             float k = GRASS_DIM;
-            for (int x = 0; x < 40; x += 2)
+            for (int x = -20; x < 20; x += 2)
             {
-                for (int y = 0; y < 40; y += 2)
+                for (int y = -20; y < 20; y += 2)
                 {
                     Vector2[] poly = new Vector2[] {
                         new Vector2(k*x+k, k*y),
@@ -684,12 +682,7 @@ namespace Gym.Environments.Envs.Aether
             Vector2 add = new Vector2(PLAYFIELD, PLAYFIELD);
             for (int i = 0; i < RoadPoly.Count; i++)
             {
-                Vector2[] road = new Vector2[RoadPoly[i].Verts.Count];
-                for (int j = 0; j < road.Length; j++)
-                {
-                    road[j] = RoadPoly[i].Verts[j] + add;
-                }
-                FillPoly(img, road, RoadPoly[i].Color, zoom, trans, angle);
+                FillPoly(img, RoadPoly[i].Verts.ToArray(), RoadPoly[i].Color, zoom, trans, angle);
             }
         }
 
@@ -765,6 +758,7 @@ namespace Gym.Environments.Envs.Aether
             _World.ContactManager.EndContact = new EndContactDelegate(ContactListener.EndContact);
             Reward = 0f;
             PreviousReward = 0f;
+            TileVisitedCount = 0;
             T = 0f;
             NewLap = false;
             RoadPoly.Clear();
@@ -792,9 +786,23 @@ namespace Gym.Environments.Envs.Aether
             {
                 null_action = false;
                 a = (NDArray)action;
-                Car.Steer(-1f * a[0]);
-                Car.Gas(a[1]);
-                Car.Brake(a[2]);
+                if (ContinuousMode)
+                {
+                    Car.Steer(-1f * a[0]);
+                    Car.Gas(a[1]);
+                    Car.Brake(a[2]);
+                }
+                else
+                {
+                    int i_action = (int)action;
+                    if (!ActionSpace.Contains(i_action))
+                    {
+                        throw (new InvalidActionError(string.Format("Action is invalid.")));
+                    }
+                    Car.Steer(-0.6f * (i_action == 1 ? 1f : 0f) + 0.6f * (i_action == 2 ? 1f : 0f));
+                    Car.Gas(0.2f * (i_action == 3 ? 1f : 0f));
+                    Car.Brake(0.8f * (i_action == 4 ? 1f : 0f));
+                }
             }
             Car.Step(1f / FPS);
             SolverIterations si = new SolverIterations();

@@ -298,7 +298,7 @@ namespace Gym.Environments.Envs.Aether
             else if(w.Brake > 0f)
             {
                 float brake_force = 15f; // Radians per second
-                dir = (w.Omega < 0f ? 1f : -1f); // Oppposite sign
+                dir = (w.Omega < 0f ? 1f : (w.Omega > 0f ? -1f : 0f)); // Oppposite sign
                 val = brake_force * w.Brake;
                 if (Math.Abs(val) > Math.Abs(w.Omega))
                 {
