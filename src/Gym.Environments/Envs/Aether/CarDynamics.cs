@@ -86,11 +86,11 @@ namespace Gym.Environments.Envs.Aether
         public Rgba32 WheelColor { get; set; } = new Rgba32(0, 0, 0);
         public Rgba32 WheelWhite { get; set; } = new Rgba32(77, 77, 77);
         public Rgba32 MudColor { get; set; } = new Rgba32(102, 102, 0);
+        public Rgba32 BodyColor { get; set; } = new Rgba32(204, 0, 0);
         #endregion
 
         private World World { get; set; }
         public Body Hull { get; private set; }
-        public Rgba32 BodyColor { get; set; } = new Rgba32(204, 0, 0);
         public List<Wheel> Wheels { get; private set; }
         public float FuelSpent { get; set; } = 0f;
 
@@ -214,15 +214,17 @@ namespace Gym.Environments.Envs.Aether
 
         #region Car Interface
         /// <summary>
-        /// Apply gas
+        /// Apply gas to rear 2 wheels
         /// </summary>
         /// <param name="gas">How much gas gets applied. Gets clipped between 0 and 1</param>
         /// <returns></returns>
         public float Gas(float gas)
         {
             gas = np.clip(gas, 0f, 1f);
-            foreach (Wheel w in Wheels)
+            for(int i=2; i < Wheels.Count; i++) 
             {
+                // Rear-wheel drive, positive traction
+                Wheel w = Wheels[i];
                 float diff = gas - w.Gas;
                 if (diff > 0.1f)
                 {
@@ -233,7 +235,7 @@ namespace Gym.Environments.Envs.Aether
             return (gas);
         }
         /// <summary>
-        /// Apply braking
+        /// Apply braking across all 4 wheels
         /// </summary>
         /// <param name="b">Degree to which the brakes are applied. More than 0.9 blocks the wheels to zero rotation, between 0 and 1.0</param>
         public void Brake(float b)
@@ -262,7 +264,7 @@ namespace Gym.Environments.Envs.Aether
         private float Step(float dt, Wheel w)
         {
             float steer_angle = w.Steer - w.Joint.JointAngle;
-            float dir = (steer_angle < 0f ? -1f : 1f);
+            float dir = (steer_angle < 0f ? -1f : (steer_angle > 0f ? 1f : 0f));
             float val = Math.Abs(steer_angle);
             w.Joint.MotorSpeed = dir * Math.Min(50f * val, 3f);
 
@@ -293,7 +295,7 @@ namespace Gym.Environments.Envs.Aether
             {
                 w.Omega = 0f;
             }
-            else
+            else if(w.Brake > 0f)
             {
                 float brake_force = 15f; // Radians per second
                 dir = (w.Omega < 0f ? 1f : -1f); // Oppposite sign
@@ -405,7 +407,7 @@ namespace Gym.Environments.Envs.Aether
                     Vector2 px = RotateVec(Transform.Multiply(polyVerts[i], ref trans), angle) * zoom + translation;
                     path[i] = new PointF(px.X, px.Y);
                 }
-                img.Mutate(i => i.DrawPolygon(BodyColor, 1f, path));
+                img.Mutate(i => i.FillPolygon(BodyColor, path));
             }
 
             foreach (Wheel w in Wheels)
@@ -421,7 +423,7 @@ namespace Gym.Environments.Envs.Aether
                         Vector2 px = RotateVec(Transform.Multiply(polyVerts[i], ref trans), angle) * zoom + translation;
                         path[i] = new PointF(px.X, px.Y);
                     }
-                    img.Mutate(i => i.DrawPolygon(w.Color, 1f, path));
+                    img.Mutate(i => i.FillPolygon(w.Color, path));
                 }
                 float a1 = w.Phase;
                 float a2 = a1 + 1.2f; // radians
@@ -435,25 +437,25 @@ namespace Gym.Environments.Envs.Aether
                 }
                 if (s1 > 0f)
                 {
-                    c1 = (c1 < 0f ? -1f : 1f);
+                    c1 = (c1 < 0f ? -1f : (c1 > 0f ? 1f : 0f));
                 }
                 if (s2 > 0f)
                 {
-                    c2 = (c2 < 0f ? -1f : 1f);
+                    c2 = (c2 < 0f ? -1f : (c2 > 0f ? 1f : 0f));
                 }
                 Vector2[] wp = new Vector2[4] {
                     new Vector2(-WHEEL_W*SIZE,WHEEL_R*c1*SIZE),
-                    new Vector2(WHEEL_W*SIZE,WHEEL_R*c1*SIZE),
-                    new Vector2(WHEEL_W*SIZE,WHEEL_R*c2*SIZE),
+                    new Vector2( WHEEL_W*SIZE,WHEEL_R*c1*SIZE),
+                    new Vector2( WHEEL_W*SIZE,WHEEL_R*c2*SIZE),
                     new Vector2(-WHEEL_W*SIZE,WHEEL_R*c2*SIZE)
                 };
                 path = new PointF[wp.Length];
                 for (int i = 0; i < wp.Length; i++)
                 {
-                    wp[i] = RotateVec(Transform.Multiply(wp[i], ref trans), angle) * zoom + translation;
-                    path[i] = new PointF(wp[i].X, wp[i].Y);
+                    Vector2 vec = RotateVec(Transform.Multiply(wp[i], ref trans), angle) * zoom + translation;
+                    path[i] = new PointF(vec.X, vec.Y);
                 }
-                img.Mutate(i => i.DrawPolygon(WheelWhite, 1f, path));
+                img.Mutate(i => i.FillPolygon(WheelWhite, path));
             }
         }
 

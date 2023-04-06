@@ -329,9 +329,7 @@ namespace Gym.Environments.Envs.Aether
                 checkpoints[j++] = alpha;
                 checkpoints[j++] = rad * (float)Math.Cos(alpha);
                 checkpoints[j++] = rad * (float)Math.Sin(alpha);
-                Debug.WriteLine("Checkpoint {0}: {1}", i, alpha);
             }
-            Debug.WriteLine("Start Alpha={0}", StartAlpha);
             Road.Clear();
             // Go from one checkpoint to another to create the xtrack.
             float x = 1.5f * TRACK_RAD;
@@ -381,7 +379,6 @@ namespace Gym.Environments.Envs.Aether
                     }
                     alpha -= 2f * (float)Math.PI;
                 }
-                Debug.WriteLine("Freeze {0} {3}: dest_i={2}, alpha={1}", no_freeze, alpha, dest_i/3,failed);
 
                 float r1x = (float)Math.Cos(beta);
                 float r1y = (float)Math.Sin(beta);
@@ -606,7 +603,7 @@ namespace Gym.Environments.Envs.Aether
             {
                 return;
             }
-            img.Mutate(i => i.DrawPolygon(c, 1f, path));
+            img.Mutate(i => i.FillPolygon(c, path));
 
         }
         private PointF[] _indicator(float place, float s, float h, float W, float H, float v, bool vertical=true)
@@ -643,7 +640,10 @@ namespace Gym.Environments.Envs.Aether
                 new PointF(0f,H-5f*h),
                 new PointF(0f,H)
             };
-            float v = np.sqrt(np.square(Car.Hull.LinearVelocity.X) + np.square(Car.Hull.LinearVelocity.Y));
+            // Blank out the indicator area
+            img.Mutate(i => i.FillPolygon(color, poly));
+            // Draw the telemetry indicators
+            float v = Car.Hull.LinearVelocity.Length();
             RenderIndicatorIfMin(img, v, _indicator(5f, s, h, W, H, 0.02f * v), new Rgba32(255, 255, 255));
             // ABS indicators
             for (int i = 0; i < 4; i++)
@@ -667,7 +667,7 @@ namespace Gym.Environments.Envs.Aether
                 new Vector2(0f, 2f*bounds)
             };
             FillPoly(img, field, new Rgba32(102, 204, 102), zoom, trans, angle);
-            float k = bounds / 20f;
+            float k = GRASS_DIM;
             for (int x = 0; x < 40; x += 2)
             {
                 for (int y = 0; y < 40; y += 2)
