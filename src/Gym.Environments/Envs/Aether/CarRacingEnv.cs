@@ -480,7 +480,7 @@ namespace Gym.Environments.Envs.Aether
                     }
                     float beta2 = track[idx+1]; // index out of bounds TODO!
                     float dbeta = beta1 - beta2;
-                    good = good && (Math.Abs(dbeta) > TRACK_TURN_RATE * 0.2f);
+                    good &= (Math.Abs(dbeta) > TRACK_TURN_RATE * 0.2f);
                     oneside += (dbeta < 0f ? -1 : 1);
                 }
                 good = good && (Math.Abs(oneside) == BORDER_MIN_COUNT);
@@ -551,10 +551,10 @@ namespace Gym.Environments.Envs.Aether
                     Vector2 b2_l = new Vector2(x2 + side * TRACK_WIDTH * cos_beta2, y2 + side * TRACK_WIDTH * sin_beta2);
                     Vector2 b2_r = new Vector2(x2 + side * (TRACK_WIDTH + BORDER) * cos_beta2, y2 + side * (TRACK_WIDTH + BORDER) * sin_beta2);
                     vx = new Vertices();
-                    vx.Add(road1_l);
-                    vx.Add(road1_r);
-                    vx.Add(road2_r);
-                    vx.Add(road2_l);
+                    vx.Add(b1_l);
+                    vx.Add(b1_r);
+                    vx.Add(b2_r);
+                    vx.Add(b2_l);
                     poly = new RoadPolygon();
                     poly.Verts = vx;
                     poly.Color = (tile.Index % 2 == 0) ? new Rgba32(255,255,255) : new Rgba32(255, 0, 0);
