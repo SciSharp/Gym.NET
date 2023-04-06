@@ -723,8 +723,8 @@ namespace Gym.Environments.Envs.Aether
                 float angle = -Car.Hull.Rotation;
                 // Animating first second zoom.
                 float zoom = 0.1f * SCALE * (float)Math.Max(1f - T, 0f) + ZOOM * SCALE * (float)Math.Min(T, 1f);
-                float scroll_x = -(Car.Hull.Position.X + PLAYFIELD) * zoom;
-                float scroll_y = -(Car.Hull.Position.Y + PLAYFIELD) * zoom;
+                float scroll_x = -(Car.Hull.Position.X) * zoom;
+                float scroll_y = -(Car.Hull.Position.Y) * zoom;
                 Vector2 trans = CarDynamics.RotateVec(new Vector2(scroll_x, scroll_y), angle) + new Vector2(WINDOW_W/2,WINDOW_H/4);
                 RenderRoad(img, zoom, trans, angle);
                 Car.Draw(img, zoom, trans, angle, mode != "state");
