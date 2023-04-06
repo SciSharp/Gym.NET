@@ -278,8 +278,8 @@ namespace Gym.Environments.Envs.Aether
             }
 
             // Force
-            Vector2 forw = w.Unit.GetWorldPoint(new Vector2(0f, 1f));
-            Vector2 side = w.Unit.GetWorldPoint(new Vector2(1f, 0f));
+            Vector2 forw = w.Unit.GetWorldVector(new Vector2(0f, 1f));
+            Vector2 side = w.Unit.GetWorldVector(new Vector2(1f, 0f));
             Vector2 v = w.Unit.LinearVelocity;
             float vf = forw.X * v.X + forw.Y * v.Y;
             float vs = side.X * v.X + side.Y * v.Y;
