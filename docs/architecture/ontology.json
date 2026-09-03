@@ -1,0 +1,175 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "name": "Gym.NET-Gymnasium-Ontology",
+  "version": "1.0.0-gymnasium",
+  "description": "Machine-readable component ontology and dependency graph for Gym.NET guide agents and autonomous tools.",
+  "sot": {
+    "repository": "refs/Gymnasium",
+    "upstream": "https://github.com/Farama-Foundation/Gymnasium",
+    "version": "1.0.0",
+    "standards": [
+      "FARAMA_GYMNASIUM_API_SPEC",
+      "TDD",
+      "SOLID",
+      "OBJECT_CALISTHENICS"
+    ]
+  },
+  "tensor_engine": {
+    "name": "NumSharp",
+    "repository": "refs/numsharp-sot",
+    "upstream": "https://github.com/SciSharp/NumSharp"
+  },
+  "modules": [
+    {
+      "name": "Gym.Core",
+      "path": "src/Gym",
+      "description": "Core environment interfaces, lifecycle models, step results, and spaces.",
+      "contracts": [
+        {
+          "name": "IEnv",
+          "type": "interface",
+          "methods": ["Reset", "Step", "Render", "Close", "Seed"]
+        },
+        {
+          "name": "StepResult",
+          "type": "record struct",
+          "properties": [
+            "Observation",
+            "Reward",
+            "Terminated",
+            "Truncated",
+            "Information"
+          ]
+        },
+        {
+          "name": "ResetResult",
+          "type": "record struct",
+          "properties": [
+            "Observation",
+            "Information"
+          ]
+        }
+      ],
+      "spaces": [
+        "Box",
+        "Discrete",
+        "MultiDiscrete",
+        "MultiBinary",
+        "TupleSpace",
+        "DictSpace",
+        "TextSpace",
+        "SequenceSpace",
+        "GraphSpace",
+        "OneOfSpace"
+      ]
+    },
+    {
+      "name": "Gym.Wrappers",
+      "path": "src/Gym/Wrappers",
+      "description": "Functional transformation and monitoring decorator pipeline.",
+      "base_classes": [
+        "Wrapper",
+        "ObservationWrapper",
+        "ActionWrapper",
+        "RewardWrapper"
+      ],
+      "standard_wrappers": [
+        "TimeLimit",
+        "TransformObservation",
+        "TransformReward",
+        "ClipAction",
+        "RescaleAction",
+        "RecordEpisodeStatistics",
+        "Autoreset",
+        "OrderEnforcing"
+      ]
+    },
+    {
+      "name": "Gym.Vector",
+      "path": "src/Gym/Vector",
+      "description": "Synchronous and asynchronous batch execution across parallel environments.",
+      "classes": [
+        "VectorEnv",
+        "SyncVectorEnv",
+        "AsyncVectorEnv"
+      ]
+    },
+    {
+      "name": "Gym.Environments",
+      "path": "src/Gym.Environments",
+      "description": "Concrete environment implementations for classical control and physics simulations.",
+      "environments": [
+        {
+          "id": "CartPole-v1",
+          "category": "classic_control",
+          "obs_dim": 4,
+          "action_type": "Discrete(2)",
+          "reward_range": "[-inf, inf]"
+        },
+        {
+          "id": "Pendulum-v1",
+          "category": "classic_control",
+          "obs_dim": 3,
+          "action_type": "Box(-2.0, 2.0, (1,))",
+          "reward_range": "[-inf, 0.0]"
+        },
+        {
+          "id": "MountainCar-v0",
+          "category": "classic_control",
+          "obs_dim": 2,
+          "action_type": "Discrete(3)",
+          "reward_range": "[-inf, inf]"
+        },
+        {
+          "id": "MountainCarContinuous-v0",
+          "category": "classic_control",
+          "obs_dim": 2,
+          "action_type": "Box(-1.0, 1.0, (1,))",
+          "reward_range": "[-inf, inf]"
+        },
+        {
+          "id": "Acrobot-v1",
+          "category": "classic_control",
+          "obs_dim": 6,
+          "action_type": "Discrete(3)",
+          "reward_range": "[-inf, inf]"
+        },
+        {
+          "id": "LunarLander-v3",
+          "category": "box2d",
+          "obs_dim": 8,
+          "action_type": "Discrete(4) | Box(-1.0, 1.0, (2,))",
+          "reward_range": "[-inf, inf]"
+        },
+        {
+          "id": "BipedalWalker-v3",
+          "category": "box2d",
+          "obs_dim": 24,
+          "action_type": "Box(-1.0, 1.0, (4,))",
+          "reward_range": "[-inf, inf]"
+        }
+      ]
+    },
+    {
+      "name": "Gym.Rendering",
+      "description": "Decoupled rendering abstractions and UI visualizer backends.",
+      "viewers": [
+        {
+          "name": "NullEnvViewer",
+          "type": "headless",
+          "target": "all"
+        },
+        {
+          "name": "AvaloniaEnvViewer",
+          "type": "gui_cross_platform",
+          "target": "desktop"
+        },
+        {
+          "name": "WinFormEnvViewer",
+          "type": "gui_windows",
+          "target": "windows_desktop"
+        }
+      ]
+    }
+  ]
+}
