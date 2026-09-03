@@ -52,8 +52,8 @@ namespace Gym.Spaces {
 
         public bool IsBounded(BoundedMannerEnum manner)
         {
-            bool below = np.all(BoundedLow);
-            bool above = np.all(BoundedHigh);
+            bool below = All(BoundedLow);
+            bool above = All(BoundedHigh);
             switch (manner)
             {
                 case BoundedMannerEnum.Both:
@@ -66,11 +66,33 @@ namespace Gym.Spaces {
             throw new ArgumentException("manner", "Unsupported BoundedMannerEnum value.");
         }
 
+        private static bool Any(NDArray a) => a.ndim == 0 ? a.GetBoolean(0) : np.any(a);
+        private static bool All(NDArray a) => a.ndim == 0 ? a.GetBoolean(0) : np.all(a);
+
         public override NDArray Sample(NDArray mask = null) {
             if (!Equals(mask, null))
             {
                 throw new NotSupportedException("Box.sample cannot be provided a mask.");
             }
+            if (Low.ndim == 0) {
+                bool isLowBounded = All(BoundedLow);
+                bool isHighBounded = All(BoundedHigh);
+                NDArray scalarSample;
+                if (isLowBounded && isHighBounded) {
+                    scalarSample = RandomState.uniform(Low.GetSingle(0), High.GetSingle(0));
+                } else if (isLowBounded) {
+                    scalarSample = RandomState.exponential(1.0f) + Low.GetSingle(0);
+                } else if (isHighBounded) {
+                    scalarSample = -RandomState.exponential(1.0f) + High.GetSingle(0);
+                } else {
+                    scalarSample = RandomState.normal(0.5f, 1.0f);
+                }
+                if (DType == np.int32 || DType == np.uint32 || DType == np.@byte) {
+                    scalarSample = np.floor(scalarSample);
+                }
+                return scalarSample.astype(DType);
+            }
+
             NDArray unbounded = ~BoundedLow & ~BoundedHigh;
             NDArray upp_bounded = ~BoundedLow & BoundedHigh;
             NDArray low_bounded = BoundedLow & ~BoundedHigh;
@@ -78,10 +100,22 @@ namespace Gym.Spaces {
 
             NDArray sample = np.empty(Shape);
 
-            sample[unbounded] = RandomState.normal(0.5f, 1.0f, unbounded[unbounded].shape);
-            sample[low_bounded] = RandomState.exponential(1.0f, low_bounded[low_bounded].shape) + Low[low_bounded];
-            sample[upp_bounded] = RandomState.exponential(1.0f, upp_bounded[upp_bounded].shape) + High[upp_bounded];
-            sample[bounded] = RandomState.uniform(Low[bounded], High[bounded], bounded[bounded].shape);
+            if (Any(unbounded))
+            {
+                sample[unbounded] = RandomState.normal(0.5f, 1.0f, unbounded[unbounded].shape);
+            }
+            if (Any(low_bounded))
+            {
+                sample[low_bounded] = RandomState.exponential(1.0f, low_bounded[low_bounded].shape) + Low[low_bounded];
+            }
+            if (Any(upp_bounded))
+            {
+                sample[upp_bounded] = -RandomState.exponential(1.0f, upp_bounded[upp_bounded].shape) + High[upp_bounded];
+            }
+            if (Any(bounded))
+            {
+                sample[bounded] = RandomState.uniform(Low[bounded], High[bounded], bounded[bounded].shape);
+            }
             if (DType == np.int32 || DType == np.uint32 || DType == np.@byte)
             {
                 sample = np.floor(sample);
