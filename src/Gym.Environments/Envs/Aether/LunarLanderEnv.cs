@@ -378,6 +378,33 @@ namespace Gym.Environments.Envs.Aether
             _viewer = viewer ?? throw new ArgumentNullException(nameof(viewer));
         }
 
+        /// <summary>
+        ///     Creates a lander on the Aether.Physics2D engine (not Box2D), with a discrete or continuous action space and
+        ///     optional wind and turbulence.
+        /// </summary>
+        /// <param name="viewerFactory">Creates the viewer on the first <see cref="Render"/>; <see langword="null"/> falls back to <see cref="NullEnvViewer.Factory"/>.</param>
+        /// <param name="continuous">
+        ///     <see langword="true"/> for throttle control: <see cref="Step(object)"/> expects a two-element main/side throttle array,
+        ///     but the declared <see cref="Box"/> action space is 0-d, so its samples can't be stepped (plan defect B-20).
+        ///     <see langword="false"/> for the four <see cref="LunarLanderDiscreteActions"/>.
+        /// </param>
+        /// <param name="gravity">Vertical gravity in m/s²; must be within [-12, 0].</param>
+        /// <param name="enable_wind">Applies wind force and turbulence torque on every step until the lander first touches the ground.</param>
+        /// <param name="wind_power">Maximum wind force; must be within [0, 20].</param>
+        /// <param name="turbulence_power">Maximum turbulence torque; must be within [0, 2].</param>
+        /// <param name="random_state">
+        ///     Generator for terrain, the initial push, engine dispersion and the action space. <see langword="null"/>
+        ///     falls back to the process-wide <c>np.random</c>, so a second env then perturbs this one's trajectory (plan defect B-29).
+        /// </param>
+        /// <exception cref="ArgumentException">Thrown when <paramref name="gravity"/> is outside [-12, 0].</exception>
+        /// <exception cref="WarningException">
+        ///     Thrown when <paramref name="wind_power"/> is outside [0, 20] or <paramref name="turbulence_power"/> is outside
+        ///     [0, 2]; Gymnasium only warns in these cases (plan defect B-27).
+        /// </exception>
+        /// <remarks>
+        ///     The wind and torque indices are drawn from the generator here even when <paramref name="enable_wind"/> is
+        ///     <see langword="false"/> (plan defect B-18), so they shift every later draw of a seeded generator.
+        /// </remarks>
         public LunarLanderEnv(IEnvironmentViewerFactoryDelegate viewerFactory, bool continuous = false, float gravity = -10f, bool enable_wind = false, float wind_power = 15f, float turbulence_power = 1.5f, NumPyRandom random_state=null)
         {
             RandomState = random_state;
@@ -406,8 +433,10 @@ namespace Gym.Environments.Envs.Aether
                 throw (new WarningException("turbulence_power value is recommended to be between 0.0 and 2.0"));
             }
 
-            _wind_idx = RandomState.randint(-9999, 9999);
-            _torque_idx = RandomState.randint(-9999, 9999);
+            // NumSharp 0.70 removed the implicit NDArray -> scalar conversions. randint(low, high) returns a 0-d array,
+            // the only shape the explicit cast accepts, so the draw and its value are unchanged.
+            _wind_idx = (int)RandomState.randint(-9999, 9999);
+            _torque_idx = (int)RandomState.randint(-9999, 9999);
 
             NDArray low = np.array(new float[] { -1.5f, -1.5f, -5f, -5f, (float)-Math.PI, -5f, 0f, 0f });
             NDArray high = np.array(new float[] { 1.5f, 1.5f, 5f, 5f, (float)Math.PI, 5f, 1f, 1f });
@@ -486,6 +515,19 @@ namespace Gym.Environments.Envs.Aether
             _Lander = null;
         }
 
+        /// <summary>
+        ///     Starts a new episode: rebuilds the world, generates new terrain around a flat helipad, pushes the lander with
+        ///     a random initial force, and returns the observation of one zero-action step.
+        /// </summary>
+        /// <returns>
+        ///     The 8-value observation (position, velocity, angle, angular velocity, two leg-contact flags) after the zero
+        ///     step. The physics has therefore already advanced one step when this returns.
+        /// </returns>
+        /// <remarks>
+        ///     Draws two force components, then twelve terrain heights, then the zero step's two dispersion values from the
+        ///     generator, in that order. Gymnasium draws the terrain first (plan defect B-17), so seeded episodes don't
+        ///     match Gymnasium's.
+        /// </remarks>
         public override NDArray Reset()
         {
             Destroy();
@@ -493,7 +535,9 @@ namespace Gym.Environments.Envs.Aether
             _World.ContactManager.BeginContact = new BeginContactDelegate(_Contacts.BeginContact);
             _World.ContactManager.EndContact = new EndContactDelegate(_Contacts.EndContact);
             _Lander = new LunarLanderBody(2,_World);
-            _Lander.Fuselage.Unit.ApplyForce(new Vector2(RandomState.uniform(-INITIAL_RANDOM, INITIAL_RANDOM), RandomState.uniform(-INITIAL_RANDOM, INITIAL_RANDOM)));
+            // NumSharp 0.70 removed the implicit NDArray -> float conversion. The scalar uniform() overload returns a
+            // 0-d float64 array, so each explicit cast narrows the same draw that was narrowed implicitly before.
+            _Lander.Fuselage.Unit.ApplyForce(new Vector2((float)RandomState.uniform(-INITIAL_RANDOM, INITIAL_RANDOM), (float)RandomState.uniform(-INITIAL_RANDOM, INITIAL_RANDOM)));
             GameOver = false;
             _PrevShaping = float.MinValue;
             float w = VIEWPORT_W / SCALE;
@@ -504,7 +548,7 @@ namespace Gym.Environments.Envs.Aether
             float[] height = new float[CHUNKS + 1];
             for (int i = 0; i < height.Length; i++)
             {
-                height[i] = RandomState.uniform(0f, h / 2f);
+                height[i] = (float)RandomState.uniform(0f, h / 2f);
             }
             float[] chunk_x = new float[CHUNKS];
             for (int i = 0; i < CHUNKS; i++)
@@ -571,6 +615,31 @@ namespace Gym.Environments.Envs.Aether
             return Step(0).Observation;
         }
 
+        /// <summary>
+        ///     Advances the simulation by one 1/FPS tick: applies wind and turbulence (when enabled), fires the engines the
+        ///     action selects with random dispersion, steps the Aether world, and scores the new state.
+        /// </summary>
+        /// <param name="action">
+        ///     In discrete mode, a boxed <see cref="int"/> in [0, 4) (a <see cref="LunarLanderDiscreteActions"/> value). In
+        ///     continuous mode, an <see cref="NDArray"/> of at least two elements (main throttle, lateral throttle), clipped to [-1, 1].
+        /// </param>
+        /// <returns>
+        ///     The transition: the 8-value observation; the shaping-based reward, overridden to -100 on a crash or on leaving
+        ///     past the right edge and to +100 once the lander comes to rest; the done flag; and diagnostics in
+        ///     <see cref="Gym.Observations.Step.Information"/> ("pos", "velocity", "angle", "omega", "LeftContact", "RightContact").
+        /// </returns>
+        /// <exception cref="InvalidCastException">Thrown when <paramref name="action"/> isn't a boxed <see cref="int"/> in discrete mode or an <see cref="NDArray"/> in continuous mode.</exception>
+        /// <exception cref="InvalidActionError">Thrown in discrete mode when <paramref name="action"/> is outside the action space.</exception>
+        /// <exception cref="IndexError">
+        ///     Thrown by NumSharp in continuous mode when <paramref name="action"/> has fewer than two elements, including a
+        ///     sample of this env's own 0-d continuous action space (plan defect B-20).
+        /// </exception>
+        /// <exception cref="NullReferenceException">Thrown when called before the first <see cref="Reset"/>, because the lander doesn't exist yet.</exception>
+        /// <remarks>
+        ///     Every call draws two dispersion values from the generator, even when no engine fires. Only the right edge ends
+        ///     the episode (plan defect B-24). <c>Done</c> merges termination and truncation (the pre-0.26 API). The two
+        ///     "power is out of range" guards can't fire, because both engine powers are clipped into [0.5, 1] first.
+        /// </remarks>
         public override Step Step(object action)
         {
             int i_action = -1;
@@ -608,16 +677,20 @@ namespace Gym.Environments.Envs.Aether
             }
             Vector2 tip = new Vector2((float)Math.Sin(_Lander.Fuselage.Unit.Rotation), (float)Math.Cos(_Lander.Fuselage.Unit.Rotation));
             Vector2 side = new Vector2(-tip.Y, tip.X);
-            float disp_x = RandomState.uniform(-1f, 1f) / SCALE;
-            float disp_y = RandomState.uniform(-1f, 1f) / SCALE;
+            // NumSharp 0.70 removed the implicit NDArray -> scalar conversions. Each explicit cast below wraps the whole
+            // expression the implicit conversion used to apply to, so the arithmetic stays in NDArray math exactly as
+            // before and only the final narrowing becomes visible. Every operand is 0-d (scalar draws or single elements
+            // of c_action), the only shape the explicit casts accept.
+            float disp_x = (float)(RandomState.uniform(-1f, 1f) / SCALE);
+            float disp_y = (float)(RandomState.uniform(-1f, 1f) / SCALE);
 
             bool fire_main = false;
             bool fire_thruster = false;
             if (ContinuousMode)
             {
-                if (c_action[0] > 0f)
+                if ((bool)(c_action[0] > 0f))
                     fire_main = true;
-                if (np.abs(c_action[1]) > 0.5f)
+                if ((bool)(np.abs(c_action[1]) > 0.5f))
                     fire_thruster = true;
                 if (Verbose)
                 {
@@ -637,7 +710,7 @@ namespace Gym.Environments.Envs.Aether
                 //
                 if (ContinuousMode)
                 {
-                    m_power = (np.clip(c_action[0], 0f, 1f) + 1f) *0.5f;
+                    m_power = (float)((np.clip(c_action[0], 0f, 1f) + 1f) *0.5f);
                     if (Verbose)
                     {
                         System.Diagnostics.Debug.WriteLine("MAIN: m_power {0}", m_power);
@@ -680,8 +753,8 @@ namespace Gym.Environments.Envs.Aether
                 float direction = 0f;
                 if (ContinuousMode)
                 {
-                    direction = c_action[1] < 0f ? -1f : 1f;
-                    s_power = np.clip(np.abs(c_action[1]), 0.5f, 1.0f);
+                    direction = (bool)(c_action[1] < 0f) ? -1f : 1f;
+                    s_power = (float)np.clip(np.abs(c_action[1]), 0.5f, 1.0f);
                     if (Verbose)
                     {
                         System.Diagnostics.Debug.WriteLine("SIDE {1}: s_power {0}", s_power, direction);
@@ -746,8 +819,11 @@ namespace Gym.Environments.Envs.Aether
             step.Information["RightContact"] = _Lander.Legs[1].Contact;
             step.Observation = new float[] { pos.X, pos.Y, vel.X, vel.Y, _Lander.Fuselage.Unit.Rotation, (float)step.Information["omega"], _Lander.Legs[0].Contact ? 1f : 0f, _Lander.Legs[1].Contact ? 1f : 0f };
             float reward = 0f;
-            float shaping = -100f * np.sqrt(pos.X * pos.X + pos.Y * pos.Y);
-            shaping += -100f * np.sqrt(vel.X * vel.X + vel.Y * vel.Y);
+            // Explicit casts replace the removed implicit NDArray -> float conversion. The second line keeps the old
+            // `shaping += NDArray` semantics (the sum is computed as an NDArray, then narrowed), rather than
+            // `+= (float)...`, which would add in float32 and could shift the reward by an ulp.
+            float shaping = (float)(-100f * np.sqrt(pos.X * pos.X + pos.Y * pos.Y));
+            shaping = (float)(shaping + -100f * np.sqrt(vel.X * vel.X + vel.Y * vel.Y));
             shaping += -100f * Math.Abs((float)step.Information["angle"]);
             shaping += 10f * (_Lander.Legs[0].Contact ? 1f : 0f);
             shaping += 10f * (_Lander.Legs[1].Contact ? 1f : 0f);

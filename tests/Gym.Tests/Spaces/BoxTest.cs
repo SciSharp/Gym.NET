@@ -33,11 +33,17 @@ namespace Gym.Tests.Spaces
             Assert.IsFalse(box.IsBounded(Gym.Spaces.BoundedMannerEnum.Both), "Box should not be bounded.");
         }
 
+        /// <summary>
+        ///     Guards the scalar (0-d) sampling path: a box bounded on both sides must sample inside its bounds. This
+        ///     is the only Box.Sample path the suite covers, so a regression in bounded uniform sampling surfaces here.
+        /// </summary>
         [TestMethod]
         public void TestBoxBoundedSampling()
         {
             Box box = new Box(-5.0, 5.0);
-            float sample = box.Sample(null);
+            // NumSharp 0.70 made NDArray -> scalar conversions explicit and accepts them only for 0-d arrays; a scalar
+            // box samples a 0-d array, so the cast reads the one value exactly.
+            float sample = (float)box.Sample(null);
             Assert.IsTrue(sample >= -5.0 && sample <= 5.0, "Box sampling should be on the range [-5.0,5.0]");
         }
     }

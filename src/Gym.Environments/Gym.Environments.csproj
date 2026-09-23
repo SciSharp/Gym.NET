@@ -31,11 +31,13 @@
 
   <ItemGroup>
     <PackageReference Include="Aether.Physics2D" Version="1.6.1" />
-    <PackageReference Include="NumSharp.Lite" Version="0.1.12" />
+    <PackageReference Include="NumSharp" Version="0.70.0" />
+    <!-- SixLabors stays on its last Apache-2.0 releases (ImageSharp 2.1.x, Drawing 1.0.x, Fonts 1.0.x). Newer majors ship
+         under the Six Labors Split License and fail Release builds without a Six Labors license key. -->
     <PackageReference Include="SixLabors.ImageSharp" Version="2.1.13" />
     <PackageReference Include="SixLabors.ImageSharp.Drawing" Version="1.0.0" />
     <PackageReference Include="SixLabors.Fonts" Version="1.0.1" />
-    <PackageReference Include="JetBrains.Annotations" Version="2024.3.0" />
+    <PackageReference Include="JetBrains.Annotations" Version="2026.2.0" />
   </ItemGroup>
 
   <ItemGroup>

@@ -49,11 +49,22 @@ namespace Gym.Observations {
             return Equals((Step) obj);
         }
 
-        /// <summary>Serves as the default hash function. </summary>
-        /// <returns>A hash code for the current object.</returns>
+        /// <summary>
+        ///     Combines the observation, reward, done flag and information into one hash. Since NumSharp 0.70 this
+        ///     throws whenever <see cref="Observation"/> is set, because <see cref="NDArray"/> is unhashable, so in
+        ///     practice only an empty step (<see cref="Step()"/>) can be hashed.
+        /// </summary>
+        /// <returns>A hash of the four members; a missing observation or information contributes 0.</returns>
+        /// <exception cref="NotSupportedException">
+        ///     Thrown by <see cref="NDArray.GetHashCode"/> when <see cref="Observation"/> isn't <see langword="null"/>:
+        ///     arrays are mutable and therefore unhashable, the same as NumPy's <c>ndarray</c>, and a Gymnasium step tuple
+        ///     that holds one.
+        /// </exception>
         public override int GetHashCode() {
             unchecked {
-                var hashCode = (Observation != null ? Observation.GetHashCode() : 0);
+                // `is not null` rather than `!= null`: since NumSharp 0.70, NDArray overloads != element-wise and
+                // returns an NDArray<bool>, so a null comparison through the operator no longer yields a bool.
+                var hashCode = (Observation is not null ? Observation.GetHashCode() : 0);
                 hashCode = (hashCode * 397) ^ Reward.GetHashCode();
                 hashCode = (hashCode * 397) ^ Done.GetHashCode();
                 hashCode = (hashCode * 397) ^ (Information != null ? Information.GetHashCode() : 0);
