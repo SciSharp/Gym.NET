@@ -1,3 +1,7 @@
 [submodule "refs/Gymnasium"]
 	path = refs/Gymnasium
 	url = https://github.com/Farama-Foundation/Gymnasium.git
+[submodule "refs/NumSharp"]
+	path = refs/NumSharp
+	url = https://github.com/SciSharp/NumSharp.git
+	branch = master
