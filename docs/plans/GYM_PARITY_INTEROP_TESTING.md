@@ -112,7 +112,7 @@ The core runner creates the same environment on both sides and drives them in lo
 public sealed class GymPair : IDisposable
 {
     /// <summary>Creates both environments.</summary>
-    /// <param name="id">A registered id, e.g. <c>"CartPole-v1"</c>; used for <c>gymnasium.make</c> and <c>Env.Make</c>.</param>
+    /// <param name="id">A registered id, e.g. <c>"CartPole-v1"</c>; used for <c>gymnasium.make</c> and <c>Gymnasium.Make</c>.</param>
     /// <param name="kwargs">Constructor kwargs with Python spelling; passed verbatim to both registries.</param>
     /// <param name="viaMake">True to include the make() wrapper stack on both sides; false to construct the bare env class.</param>
     /// <exception cref="ParityException">Thrown when either side fails to construct, or when they fail differently.</exception>

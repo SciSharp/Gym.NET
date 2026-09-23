@@ -52,7 +52,7 @@ Every number in this document was measured on 2026-09-23 against the revisions a
 
 Gym.NET is a byte-perfect .NET clone of Farama Gymnasium, as pinned in `refs/Gymnasium`, with additions that Gymnasium doesn't have (typed .NET APIs, desktop viewers, async stepping). Where Gym.NET and Gymnasium disagree, Gymnasium is right, unless this plan records a deliberate, documented deviation.
 
-It stays Gym.NET. The product name, the NuGet ids (`Gym.NET.*`) and the root namespace (`Gym`) don't change, and today's namespaces keep every type that survives the port (decision D1, §3.8). Parity covers what the code does and how its API is shaped, not package or namespace names.
+It stays Gym.NET. The product name, the NuGet ids (`Gym.NET.*`), the project names and the root namespace (`Gym`) don't change, and today's namespaces keep every type that survives the port (decision D1, §3.8). Class names are Gymnasium's, including the entry point: `Gymnasium.Make("CartPole-v1")` mirrors `gymnasium.make("CartPole-v1")` (D16). Parity covers what the code does and how its API is shaped, not package or namespace names.
 
 ### 1.2 Parity levels
 
@@ -239,16 +239,17 @@ Module constants become `const double`/`const int`, never public mutable fields 
 
 ### 3.8 Naming
 
-Gym.NET keeps its own names (decision D1). The product, the repository and the NuGet ids stay `Gym.NET` / `Gym.NET.*`, and the root namespace stays `Gym`. Every namespace that exists today keeps the types that survive the port, so existing `using Gym.Envs;` and `using Gym.Spaces;` directives still compile. Gymnasium modules without a home yet get namespaces in the same layout:
+Packages, projects and namespaces keep Gym.NET's names; classes take Gymnasium's (decisions D1 and D16). The product, the repository and the NuGet ids stay `Gym.NET` / `Gym.NET.*`, the projects keep their `Gym.*` names (§4.1), and the root namespace stays `Gym`. Every namespace that exists today keeps the types that survive the port, so existing `using Gym.Envs;` and `using Gym.Spaces;` directives still compile. Gymnasium modules without a home yet get namespaces in the same layout:
 
 | Gymnasium module | Gym.NET namespace | Today |
 |---|---|---|
+| `gymnasium` itself: the top-level `make`, `make_vec`, `spec`, `register`, `registry`, `pprint_registry`, `register_envs` | `Gym`, as the static class `Gymnasium` (D16) | new |
 | `gymnasium.core`: `Env`, `Wrapper`, `ObservationWrapper`, `ActionWrapper`, `RewardWrapper`; plus `IEnv`, `Info`, `Metadata`, `RenderResult` | `Gym.Envs` | exists: `Env`, `IEnv` |
 | the `reset`/`step` return tuples: `ResetResult`, `StepResult` | `Gym.Observations` | exists: `Step` |
 | `gymnasium.spaces` | `Gym.Spaces` | exists: `Space`, `Box`, `Discrete` |
 | `gymnasium.error` | `Gym.Exceptions`; Python's built-in exceptions come from `NumSharp` (§3.4) | exists: 3 exception types |
 | `gymnasium.logger` | `Gym`, as the static class `Logger` | new |
-| `gymnasium.envs.registration` | `Gym.Envs.Registration`; the top-level registration API sits on the static class `Env` (see below) | new |
+| `gymnasium.envs.registration` | `Gym.Envs.Registration`; its top-level names are re-exported by `Gymnasium` (first row) | new |
 | `gymnasium.envs.classic_control` | `Gym.Environments.Envs.Classic` | exists: `CartPoleEnv` |
 | `gymnasium.envs.toy_text` | `Gym.Environments.Envs.ToyText` | new |
 | `gymnasium.envs.box2d` | `Gym.Environments.Envs.Box2D` | new; replaces `Gym.Environments.Envs.Aether` |
@@ -268,8 +269,8 @@ The env families keep today's `Gym.Environments.Envs.<Family>` pattern, and `Gym
   - in caller code the name `Gym` binds to the namespace, so `Gym.Make` fails with CS0234;
   - inside any `Gym.*` namespace the type hides the namespace, so a `using Gym.Envs;` there fails with CS0426.
 
-  Both were checked with .NET SDK 10.0.101. Gymnasium's top-level registration API (`make`, `make_vec`, `spec`, `register`, `registry`, `pprint_registry`, `register_envs`) therefore sits on a non-generic static class `Env` next to `Env<TObs, TAct>`: `Env.Make("CartPole-v1")`. That is the BCL's `Tuple`/`Tuple<T1>` pattern, and it compiles from caller code and from inside an env subclass (decision D16).
-- Class names are kept **exactly** when they're valid C#, including `Continuous_MountainCarEnv`, so users can find them from Gymnasium docs.
+  Both were checked with .NET SDK 10.0.101. The Python package's top-level names (`make`, `make_vec`, `spec`, `register`, `registry`, `pprint_registry`, `register_envs`) therefore sit on a static class named after the package itself, `Gymnasium`, in namespace `Gym`: `Gymnasium.Make("CartPole-v1")` reads like `gymnasium.make("CartPole-v1")` (decision D16). It compiles from caller code and from inside `Gym.*` namespaces, and `Env` stays Gymnasium's base class.
+- Class names are kept **exactly** when they're valid C#, including `Continuous_MountainCarEnv`, so users can find them from Gymnasium docs. That holds even where the BCL uses the same name. `spaces.Tuple` stays `Gym.Spaces.Tuple`, although it is ambiguous with `System.Tuple` wherever `using System;` is in scope, ImplicitUsings included (CS0104, checked with .NET SDK 10.0.101). Gym.NET's own files and its docs use the alias `using Tuple = Gym.Spaces.Tuple;`.
 - Methods and properties use PascalCase with a 1:1 table: `step` → `Step`, `reset` → `Reset`, `np_random` → `NpRandom`, `np_random_seed` → `NpRandomSeed`, `render_mode` → `RenderMode`, `action_space` → `ActionSpace`, `unwrapped` → `Unwrapped`, `get_wrapper_attr` → `GetWrapperAttr`.
 - **Data keeps Python spelling byte-for-byte**: env ids, `info` keys (`"episode"`, `"final_obs"`), metadata keys (`"render_modes"`, `"render_fps"`, `"autoreset_mode"`), kwargs names in `EnvSpec`, error messages.
 
@@ -321,7 +322,7 @@ Gym.NET is Apache-2.0; ported code keeps Gymnasium's MIT notice. Add `THIRD-PART
 
 | Existing | Action |
 |---|---|
-| `Gym/Envs/IEnv.cs`, `Env.cs` | Replace with §6, still in `Gym.Envs`. The non-generic `Env` base class goes away; its name becomes the static registration class (D16), and subclasses move to `Env<TObs, TAct>` |
+| `Gym/Envs/IEnv.cs`, `Env.cs` | Replace with §6, still in `Gym.Envs`. The non-generic `Env` base class goes away and subclasses move to `Env<TObs, TAct>` |
 | `GoalEnv` | Delete; it now lives in Gymnasium-Robotics, and Gym.NET's version is a stub whose `Reset()` returns `null` |
 | `IVecEnv`, `VecEnv`, `VecEnvWrapper`, `DummyVecEnv` | Delete; replaced by `gymnasium.vector` (§10) |
 | `Observations/Step.cs` | Replace with `StepResult`/`ResetResult`, still in `Gym.Observations`; the legacy 4-tuple moves to `Gym.Legacy` |
@@ -509,7 +510,7 @@ public abstract class Env<TObs, TAct> : IEnv, IDisposable
     /// <summary>The render mode fixed at construction, or <c>null</c> when the env doesn't render; changing modes means building a new env.</summary>
     public string? RenderMode { get; protected init; }
 
-    /// <summary>The spec attached by <c>Env.Make</c>, or <c>null</c> for an env built with its constructor.</summary>
+    /// <summary>The spec attached by <c>Gymnasium.Make</c>, or <c>null</c> for an env built with its constructor.</summary>
     public EnvSpec? Spec { get; set; }
 
     /// <summary>The space every action passed to <see cref="Step"/> must belong to.</summary>
@@ -575,7 +576,7 @@ public abstract class Env<TObs, TAct> : IEnv, IDisposable
 }
 ```
 
-`IEnv` exposes the same members over `object` (`StepResult<object> Step(object action)`) so the registry, wrappers and vector envs can hold any env. `Env.Make<TObs, TAct>(id)` returns the typed view (§3.8, D16).
+`IEnv` exposes the same members over `object` (`StepResult<object> Step(object action)`) so the registry, wrappers and vector envs can hold any env. `Gymnasium.Make<TObs, TAct>(id)` returns the typed view (§3.8, D16).
 
 ### 6.4 `Info`, `Metadata`, `RenderResult`
 
@@ -615,7 +616,7 @@ Port `gymnasium/spaces/*` (3,752 lines). Rules specific to spaces:
 
 Port `gymnasium/envs/registration.py`:
 
-- **Where it lives.** `EnvSpec`, `WrapperSpec`, `VectorizeMode` and the registry go in `Gym.Envs.Registration`. The top-level names (`make`, `make_vec`, `spec`, `register`, `registry`, `pprint_registry`, `register_envs`) become members of the static class `Env` in `Gym.Envs`: `Env.Make`, `Env.MakeVec`, `Env.Spec`, `Env.Register`, `Env.Registry`, `Env.PprintRegistry`, `Env.RegisterEnvs` (§3.8, D16).
+- **Where it lives.** `EnvSpec`, `WrapperSpec`, `VectorizeMode` and the registry go in `Gym.Envs.Registration`. The top-level names (`make`, `make_vec`, `spec`, `register`, `registry`, `pprint_registry`, `register_envs`) become members of the static class `Gymnasium` in `Gym`: `Gymnasium.Make`, `Gymnasium.MakeVec`, `Gymnasium.Spec`, `Gymnasium.Register`, `Gymnasium.Registry`, `Gymnasium.PprintRegistry`, `Gymnasium.RegisterEnvs` (§3.8, D16).
 - **Registry.** A process-wide ordered registry of `EnvSpec` keyed by id. The id grammar is the source's regex: `^(?:(?P<namespace>[\w:-]+)\/)?(?:(?P<name>[\w:.-]+?))(?:-v(?P<version>\d+))?$`. .NET uses named groups the same way.
 - **Version resolution and errors:** `find_highest_version`, plus the exact messages of `NamespaceNotFound`, `NameNotFound`, `VersionNotFound` and `DeprecatedEnv`, which tests assert on.
 - **Entry points.** Gymnasium uses `"module:Class"` strings. .NET accepts a `Type`, a factory delegate, or an assembly-qualified type name string. `EnvSpec.EntryPoint` stores the .NET form; `to_json` output differs only in that field (documented deviation).
@@ -861,7 +862,7 @@ Bump the submodule, then:
 
 - Release the port as **2.0.0**, a breaking change. Package ids and namespaces don't change (D1), so package references and `using` directives keep working; the API inside them changes.
 - `Gym.Legacy` provides a `LegacyEnvAdapter` that exposes a new env through the old 4-tuple API, built on the ported `step_api_compatibility`. Everything in it is marked `[Obsolete]` with the replacement named.
-- A migration guide maps old calls to new ones: `Reset()` → `Reset(seed)`, `Step(a).Done` → `terminated || truncated`, `Seed(s)` → `Reset(seed: s)`, `Render("rgb_array")` → `render_mode` at construction, `new CartPoleEnv()` → `Env.Make("CartPole-v1")`, `class MyEnv : Env` → `class MyEnv : Env<TObs, TAct>`.
+- A migration guide maps old calls to new ones: `Reset()` → `Reset(seed)`, `Step(a).Done` → `terminated || truncated`, `Seed(s)` → `Reset(seed: s)`, `Render("rgb_array")` → `render_mode` at construction, `new CartPoleEnv()` → `Gymnasium.Make("CartPole-v1")`, `class MyEnv : Env` → `class MyEnv : Env<TObs, TAct>`.
 - Remove `Gym.Legacy` in 3.0.
 
 ---
@@ -930,7 +931,7 @@ A reasonable first release (2.0) is P0–P7: core, spaces, registry, wrappers, v
 
 | # | Decision | Options | Recommendation |
 |---|---|---|---|
-| D1 | Root namespace and package ids | `Gym` (current) or `Gymnasium` | **Decided 2026-09-23: it stays Gym.NET.** Root namespace `Gym` with today's namespaces kept (§3.8), NuGet ids `Gym.NET.*`, and project names in the existing `Gym.*` families (§4.1). No type can be named `Gym` (§3.8), so the `make` entry point is D16 |
+| D1 | Root namespace and package ids | `Gym` (current) or `Gymnasium` | **Decided 2026-09-23: it stays Gym.NET.** Root namespace `Gym` with today's namespaces kept (§3.8), NuGet ids `Gym.NET.*`, and project names in the existing `Gym.*` families (§4.1). Class names are Gymnasium's; no type can be named `Gym` (§3.8), so the entry point is the static class `Gymnasium` (D16) |
 | D2 | Reference platform and Gymnasium pin | Windows x64 or Linux x64; current SHA or next release tag | Windows x64 (§1.3); move to the next Gymnasium release tag once it exists |
 | D3 | NumSharp consumption | Project reference to `refs/NumSharp`, or NuGet ≥ 0.70 | NuGet pinned for releases; submodule for development |
 | D4 | Rasterizer licensing | LGPL sub-package; clean-room port verified by pixel tests; native SDL + pygame interop | Port `gfxdraw` (zlib) freely; clean-room `draw` verified by golden frames; LGPL sub-package only if clean-room parity fails |
@@ -945,7 +946,7 @@ A reasonable first release (2.0) is P0–P7: core, spaces, registry, wrappers, v
 | D13 | `examples/` | Update or remove | Rewrite one CartPole example on the new API; remove the rest |
 | D14 | toy_text assets | Ship in packages, or load from a Gymnasium checkout | Seek permission; until then load from `refs/Gymnasium` |
 | D15 | Golden storage | In repo, Git LFS, or CI artifacts | In repo, gzip-compressed JSONL (small for classic and toy_text); LFS for MuJoCo |
-| D16 | Home of the top-level registration API (`make`, `make_vec`, `spec`, `register`, `registry`, `pprint_registry`, `register_envs`); follows from D1 | A static class `Env` next to `Env<TObs, TAct>` (`Env.Make(…)`); a static class `Gymnasium` in `Gym` (`Gymnasium.Make(…)`, spelled like the Python module). A static class `Gym` is ruled out: CS0234 and CS0426 (§3.8) | Static `Env` in `Gym.Envs`. It follows the BCL's `Tuple`/`Tuple<T1>` and `ImmutableArray`/`ImmutableArray<T>` pattern, sits in the namespace users already import, and adds no second brand to the API. The current non-generic `Env` base class goes away under either option (§4.4) |
+| D16 | Home of the top-level registration API (`make`, `make_vec`, `spec`, `register`, `registry`, `pprint_registry`, `register_envs`); follows from D1 | A static class `Gymnasium` in `Gym` (`Gymnasium.Make(…)`, named after the Python package); a static class `Env` next to `Env<TObs, TAct>` (`Env.Make(…)`). A static class `Gym` is ruled out: CS0234 and CS0426 (§3.8) | **Decided 2026-09-23: the static class `Gymnasium` in namespace `Gym`.** Class names follow Gymnasium, so `gymnasium.make(…)` becomes `Gymnasium.Make(…)`, and `Env` stays Gymnasium's base class rather than doubling as a factory. Projects, folders and namespaces keep their `Gym.*` names |
 | D17 | Python built-in exceptions (`ValueError`, `TypeError`, `KeyError`, …) | Throw NumSharp's ports (namespace `NumSharp`), or define Gym.NET's own in `Gym.Exceptions` | **Decided 2026-09-23: reuse NumSharp's** (§3.4). Python has one `ValueError` for NumPy and Gymnasium alike, and a second definition is ambiguous (CS0104) wherever both namespaces are imported. `Gym.Exceptions` holds `gymnasium.error`'s types plus the built-ins NumSharp lacks (`AssertionError`, `NotImplementedError`, …). Recommendation: add those to NumSharp as well (§5.2 item 4). A later NumSharp copy, for example for `np.testing` (whose asserts raise `AssertionError`), would otherwise bring the collision back |
 
 ---
