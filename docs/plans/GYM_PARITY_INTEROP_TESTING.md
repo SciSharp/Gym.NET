@@ -64,7 +64,7 @@ Verified on 2026-09-23: this venv installs cleanly on Windows 11 x64 from Python
 ## 4. Project layout
 
 ```
-tests/Gymnasium.Tests.Parity/           live-interop test project (net8.0;net10.0)
+tests/Gym.Tests.Parity/                 live-interop test project (net8.0;net10.0)
   AssemblyInfo.cs                       [assembly: DoNotParallelize]
   Session/GymPythonSession.cs           engine start, venv + refs/Gymnasium on sys.path, manifest check
   Session/ParityTestBase.cs             InteropTestBase port: Scope, Gil(), leak gate, SkipUnless
@@ -112,7 +112,7 @@ The core runner creates the same environment on both sides and drives them in lo
 public sealed class GymPair : IDisposable
 {
     /// <summary>Creates both environments.</summary>
-    /// <param name="id">A registered id, e.g. <c>"CartPole-v1"</c>; used for <c>gymnasium.make</c> and <c>Gym.Make</c>.</param>
+    /// <param name="id">A registered id, e.g. <c>"CartPole-v1"</c>; used for <c>gymnasium.make</c> and <c>Env.Make</c>.</param>
     /// <param name="kwargs">Constructor kwargs with Python spelling; passed verbatim to both registries.</param>
     /// <param name="viaMake">True to include the make() wrapper stack on both sides; false to construct the bare env class.</param>
     /// <exception cref="ParityException">Thrown when either side fails to construct, or when they fail differently.</exception>
@@ -275,7 +275,7 @@ Following NumSharp's `HarnessSelfTests`, a parity harness that can't fail is wor
 - The state-injection technique detects the CartPole float32-constant divergence at step 1, and a float64 transcription is bit-identical for 4 × 500 steps. These were run offline, through JSON, not yet through pythonnet.
 
 **Not yet done:** booting pythonnet inside a Gym.NET test project. First steps for the next session:
-1. Create `tests/Gymnasium.Tests.Parity` with `pythonnet` `[3.0.5, 4.0.0)` and `NumSharp.Interop.pythonnet` (use a ProjectReference to `refs/NumSharp/src/NumSharp.Interop.pythonnet` until the Gym.NET NumSharp migration lands, port plan F1).
+1. Create `tests/Gym.Tests.Parity` with `pythonnet` `[3.0.5, 4.0.0)` and `NumSharp.Interop.pythonnet` (use a ProjectReference to `refs/NumSharp/src/NumSharp.Interop.pythonnet` until the Gym.NET NumSharp migration lands, port plan F1).
 2. Port `PythonSession` + `InteropTestBase`. Point `PYTHONNET_PYDLL` at the base `python312.dll`, then prepend the venv's `site-packages` and `refs/Gymnasium` to `sys.path`. Confirm `import gymnasium` and the manifest check.
 3. Implement `ByteContract` + `GymPair` for CartPole and reproduce, **live**, the offline result: the current `CartPoleEnv` diverges at step 1, and a float64 port matches for 500 steps.
 4. Add the §11 self-tests before any further coverage.
