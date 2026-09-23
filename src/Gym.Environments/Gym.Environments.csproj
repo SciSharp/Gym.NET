@@ -31,7 +31,7 @@
 
   <ItemGroup>
     <PackageReference Include="Aether.Physics2D" Version="1.6.1" />
-    <PackageReference Include="NumSharp" Version="0.70.0" />
+    <PackageReference Include="NumSharp.Lite" Version="0.1.12" />
     <!-- SixLabors stays on its last Apache-2.0 releases (ImageSharp 2.1.x, Drawing 1.0.x, Fonts 1.0.x). Newer majors ship
          under the Six Labors Split License and fail Release builds without a Six Labors license key. -->
     <PackageReference Include="SixLabors.ImageSharp" Version="2.1.13" />

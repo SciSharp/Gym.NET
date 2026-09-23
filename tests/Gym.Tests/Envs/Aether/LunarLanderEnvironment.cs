@@ -27,22 +27,11 @@ namespace Gym.Tests.Envs.Aether {
         private const int MAX_STEPS = 5000;
         private const bool VERBOSE = false;
 
-        /// <summary>
-        ///     Registers the per-seed regression baselines the consistency tests assert against. They pin Gym.NET's own
-        ///     Aether-based trajectory, not a Gymnasium golden, so any change to the physics, the RNG engine or the
-        ///     float math shows up here, and a baseline may only be re-recorded after its cause is explained.
-        /// </summary>
-        /// <remarks>
-        ///     The assertions run in Debug builds only (plan defect B-37), so a Release test run can't catch a drift.
-        /// </remarks>
         public LunarLanderEnvironment()
         {
-            // Total reward: 40.93515 in 230 steps. Re-recorded for NumSharp 0.70, whose legacy RandomState(1000) stream
-            // is NumPy-exact: it matches NumPy 2.4.2's np.random.RandomState(1000) draw for draw on this env's sequence
-            // (randint -348/-5304, force -769.9861/900.56573, terrain, dispersion). NumSharp.Lite 0.1.12 diverged from
-            // NumPy at the first draw (randint -6968/-5280), which produced the previous 245-step/35.515747 baseline.
-            _ExpectedScoreForRandomSeed[1000] = 40.93515f;
-            _ExpectedStepsForRandomSeed[1000] = 230;
+            // Total reward: 35.515747 in 245 steps (.NET 8/10 deterministic baseline).
+            _ExpectedScoreForRandomSeed[1000] = 35.515747f;
+            _ExpectedStepsForRandomSeed[1000] = 245;
         }
 
 

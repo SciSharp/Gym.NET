@@ -28,6 +28,6 @@
     <PackageReference Include="SixLabors.ImageSharp" Version="2.1.13" />
     <PackageReference Include="JetBrains.Annotations" Version="2026.2.0" />
     <PackageReference Include="SixLabors.ImageSharp.Drawing" Version="1.0.0" />
-    <PackageReference Include="NumSharp" Version="0.70.0" />
+    <PackageReference Include="NumSharp.Lite" Version="0.1.12" />
   </ItemGroup>
 </Project>
