@@ -269,6 +269,8 @@ Registration of the bundled envs happens in each env assembly (a module initiali
 
 Consume NumSharp from NuGet at a pinned version ≥ 0.70.0 for releases, and keep `refs/NumSharp` as a git submodule for development and agent reference (decision D3). 0.60.0 is not enough: `PCG64`, `SeedSequence` and `default_rng` first ship in 0.70.0 (commit `e868d8ae`).
 
+NuGet 0.70.0 is not enough either. The `DType` API that F1 adopts ("Stage B", commits `c916c579` and `68a02258`) landed on NumSharp master after 0.70.0 was released, so Gym.NET builds `refs/NumSharp` from source until the next NumSharp release. [`NUMSHARP_MIGRATION_PLAN.md`](NUMSHARP_MIGRATION_PLAN.md) §3.2 and §4 give the measurements and the source/package switch.
+
 ### 4.3 Licensing
 
 Gym.NET is Apache-2.0; ported code keeps Gymnasium's MIT notice. Add `THIRD-PARTY-NOTICES.md` listing:
@@ -313,7 +315,9 @@ Everything above depends on these. Each item lists scope, verification and exit 
 - Replace `NumSharp.Lite 0.1.12` with NumSharp ≥ 0.70.0 in every project.
 - Delete Lite workarounds: the `Any(...)` guards in `Box.Sample`, `!Equals(mask, null)`, the 0-d scalar path. They exist only because Lite's boolean masks crash (`AccessViolationException` on an all-false mask) and its operators convert arrays to scalars.
 - Adopt NumSharp 0.70 semantics: `dtype` is `DType`; `np.float32` etc. are `DType` statics.
-- **Exit:** `src/` builds against NumSharp ≥ 0.70 and no Lite-specific code remains.
+- Adopt NumSharp's `long` (int64) indexing wherever a value crosses into or out of NumSharp: Discrete elements, actions and seeds become `long`.
+- **Detailed plan:** [`NUMSHARP_MIGRATION_PLAN.md`](NUMSHARP_MIGRATION_PLAN.md), measured by a trial migration of the whole repository. It covers every compile site, 11 runtime traps the compiler does not catch, the ownership analyzer's findings, the new RNG baselines and the commit order.
+- **Exit:** `src/` builds against NumSharp master (`refs/NumSharp`, §4.2) and no Lite-specific code remains.
 
 ### 5.2 F2: Seeding and RNG
 
