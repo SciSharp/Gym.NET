@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 using NumSharp;
+using Python.Runtime;
 
 namespace Gym.Tests.Parity.Oracle {
     /// <summary>
@@ -35,6 +36,33 @@ namespace Gym.Tests.Parity.Oracle {
                 // NumPy stores the flag as a C int, which the property returns as a Python int, not a bool.
                 Entry("has_uint32", PythonInt(state.has_uint32 ? 1 : 0)),
                 Entry("uinteger", PythonInt(state.uinteger)),
+            });
+        }
+
+        /// <summary>
+        ///     The Python half of <see cref="Of"/>: a NumPy generator's <c>generator.bit_generator.state</c>, described. Takes
+        ///     the GIL itself.
+        /// </summary>
+        /// <param name="generator">The <c>numpy.random.Generator</c>; borrowed, never disposed here.</param>
+        /// <returns>The described state dictionary, or what reading it raised.</returns>
+        internal static Outcome OfPython(PyObject generator) {
+            return Outcome.CapturePython(() => {
+                using PyObject bitGenerator = Python.numpy.random.Generator.bit_generator(generator);
+                return Python.numpy.random.BitGenerator.state(bitGenerator);
+            });
+        }
+
+        /// <summary>
+        ///     A Gymnasium space's generator state, <c>space.np_random.bit_generator.state</c>, described. Reading
+        ///     <c>np_random</c> creates an entropy-seeded generator on a space that has none, so call it on seeded spaces.
+        /// </summary>
+        /// <param name="space">The space; borrowed.</param>
+        /// <returns>The described state dictionary, or what reading it raised.</returns>
+        internal static Outcome OfPythonSpace(PyObject space) {
+            return Outcome.CapturePython(() => {
+                using PyObject generator = Python.gymnasium.spaces.space.Space.np_random(space);
+                using PyObject bitGenerator = Python.numpy.random.Generator.bit_generator(generator);
+                return Python.numpy.random.BitGenerator.state(bitGenerator);
             });
         }
 

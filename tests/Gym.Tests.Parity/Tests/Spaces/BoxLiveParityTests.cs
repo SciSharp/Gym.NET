@@ -1,11 +1,15 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using Gym.Spaces;
+using Gym.Tests.Parity.Interop;
 using Gym.Tests.Parity.Oracle;
 using Gym.Tests.Parity.Session;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using NumSharp;
+using NumSharp.Interop.PythonNet;
+using Python.Runtime;
 
 namespace Gym.Tests.Parity.Tests.Spaces {
     /// <summary>
@@ -16,23 +20,48 @@ namespace Gym.Tests.Parity.Tests.Spaces {
     [TestClass]
     public sealed class BoxLiveParityTests : ParityTestBase {
         /// <summary>
-        ///     The boxes compared: Gymnasium's constructor (with <c>{seed}</c> to fill in) and the Gym.NET construction of the
-        ///     same box. They cover every bound category of <c>Box.sample</c> (bounded, unbounded, low-bounded, upper-bounded,
-        ///     all four at once) and the float, signed and unsigned integer dtype families.
+        ///     The boxes compared: Gymnasium's constructor in Python spelling (with <c>{seed}</c> to fill in, for reports), the
+        ///     same call through the <see cref="Python"/> tree, and the Gym.NET construction of the same box. They cover every
+        ///     bound category of <c>Box.sample</c> (bounded, unbounded, low-bounded, upper-bounded, all four at once) and the
+        ///     float, signed and unsigned integer dtype families. Integer boxes receive Python ints and float boxes Python
+        ///     floats, as a Gymnasium user writes them.
         /// </summary>
-        private static readonly (string Python, Func<long, Box> DotNet)[] Boxes = {
-            ("spaces.Box(-1.0, 1.0, (3,), np.float32, seed={seed})", seed => new Box(-1f, 1f, new Shape(3), np.float32, seed: seed)),
-            ("spaces.Box(-np.inf, np.inf, (3,), np.float64, seed={seed})", seed => new Box(float.NegativeInfinity, float.PositiveInfinity, new Shape(3), np.float64, seed: seed)),
-            ("spaces.Box(0.0, np.inf, (3,), np.float64, seed={seed})", seed => new Box(0f, float.PositiveInfinity, new Shape(3), np.float64, seed: seed)),
-            ("spaces.Box(-np.inf, 0.0, (3,), np.float64, seed={seed})", seed => new Box(float.NegativeInfinity, 0f, new Shape(3), np.float64, seed: seed)),
-            ("spaces.Box(np.array([-1.0, 0.0, -np.inf, -np.inf]), np.array([1.0, np.inf, 0.0, np.inf]), dtype=np.float64, seed={seed})", seed => {
-                using NDArray low = np.array(new[] { -1.0, 0.0, double.NegativeInfinity, double.NegativeInfinity });
-                using NDArray high = np.array(new[] { 1.0, double.PositiveInfinity, 0.0, double.PositiveInfinity });
-                return new Box(low, high, np.float64, seed: seed);
-            }),
-            ("spaces.Box(0, 5, (8,), np.int32, seed={seed})", seed => new Box(0, 5, new Shape(8), np.int32, seed: seed)),
-            ("spaces.Box(-5, 5, (4,), np.int8, seed={seed})", seed => new Box(-5, 5, new Shape(4), np.int8, seed: seed)),
-            ("spaces.Box(0, 255, (2, 3), np.uint8, seed={seed})", seed => new Box(0, 255, new Shape(2, 3), np.uint8, seed: seed)),
+        private static readonly (string Python, Func<long, PyObject> Gymnasium, Func<long, Box> DotNet)[] Boxes = {
+            ("spaces.Box(-1.0, 1.0, (3,), np.float32, seed={seed})",
+                seed => ScalarBox(-1.0, 1.0, new long[] { 3 }, "float32", seed),
+                seed => new Box(-1f, 1f, new Shape(3), np.float32, seed: seed)),
+            ("spaces.Box(-np.inf, np.inf, (3,), np.float64, seed={seed})",
+                seed => ScalarBox(double.NegativeInfinity, double.PositiveInfinity, new long[] { 3 }, "float64", seed),
+                seed => new Box(float.NegativeInfinity, float.PositiveInfinity, new Shape(3), np.float64, seed: seed)),
+            ("spaces.Box(0.0, np.inf, (3,), np.float64, seed={seed})",
+                seed => ScalarBox(0.0, double.PositiveInfinity, new long[] { 3 }, "float64", seed),
+                seed => new Box(0f, float.PositiveInfinity, new Shape(3), np.float64, seed: seed)),
+            ("spaces.Box(-np.inf, 0.0, (3,), np.float64, seed={seed})",
+                seed => ScalarBox(double.NegativeInfinity, 0.0, new long[] { 3 }, "float64", seed),
+                seed => new Box(float.NegativeInfinity, 0f, new Shape(3), np.float64, seed: seed)),
+            ("spaces.Box(np.array([-1.0, 0.0, -np.inf, -np.inf]), np.array([1.0, np.inf, 0.0, np.inf]), dtype=np.float64, seed={seed})",
+                seed => {
+                    using NDArray low = MixedLow();
+                    using NDArray high = MixedHigh();
+                    using PyObject pythonLow = low.ToNumpyCopy();
+                    using PyObject pythonHigh = high.ToNumpyCopy();
+                    using PyObject float64 = Python.numpy.dtype("float64");
+                    return Python.gymnasium.spaces.Box(pythonLow, pythonHigh, float64, seed);
+                },
+                seed => {
+                    using NDArray low = MixedLow();
+                    using NDArray high = MixedHigh();
+                    return new Box(low, high, np.float64, seed: seed);
+                }),
+            ("spaces.Box(0, 5, (8,), np.int32, seed={seed})",
+                seed => ScalarBox(0L, 5L, new long[] { 8 }, "int32", seed),
+                seed => new Box(0, 5, new Shape(8), np.int32, seed: seed)),
+            ("spaces.Box(-5, 5, (4,), np.int8, seed={seed})",
+                seed => ScalarBox(-5L, 5L, new long[] { 4 }, "int8", seed),
+                seed => new Box(-5, 5, new Shape(4), np.int8, seed: seed)),
+            ("spaces.Box(0, 255, (2, 3), np.uint8, seed={seed})",
+                seed => ScalarBox(0L, 255L, new long[] { 2, 3 }, "uint8", seed),
+                seed => new Box(0, 255, new Shape(2, 3), np.uint8, seed: seed)),
         };
 
         /// <summary>Every box of <see cref="Boxes"/> under the seeds of A.6.</summary>
@@ -56,18 +85,18 @@ namespace Gym.Tests.Parity.Tests.Spaces {
         [DataRow(6)]
         [DataRow(7)]
         public void Bounds_MatchGymnasium(int box) {
-            (string constructor, Func<long, Box> create) = Boxes[box];
+            (string constructor, Func<long, PyObject> gymnasium, Func<long, Box> create) = Boxes[box];
             string code = constructor.Replace("{seed}", "0");
-            using PyHandle python = PyGym.Evaluate(code);
+            using PyRef python = PyRef.Of(() => gymnasium(0));
             Box dotnet = create(0);
-            ByteContract.AssertSame($"{code}.low", python.Get("low"), Outcome.Returned(ValueFacts.Of(dotnet.Low)));
-            ByteContract.AssertSame($"{code}.high", python.Get("high"), Outcome.Returned(ValueFacts.Of(dotnet.High)));
-            ByteContract.AssertSame($"{code}.bounded_below", python.Get("bounded_below"), Outcome.Returned(ValueFacts.Of(dotnet.BoundedLow)));
-            ByteContract.AssertSame($"{code}.bounded_above", python.Get("bounded_above"), Outcome.Returned(ValueFacts.Of(dotnet.BoundedHigh)));
-            ByteContract.AssertSame($"{code}.dtype.str", python.Evaluate("x.dtype.str"), Outcome.Returned(ValueFacts.FromText(dotnet.DType.str)));
-            ByteContract.AssertSame($"{code}.shape", python.Get("shape"), Outcome.Returned(DiscreteLiveParityTests.ShapeFacts(dotnet.Shape)));
+            ByteContract.AssertSame($"{code}.low", Outcome.CapturePython(() => Python.gymnasium.spaces.box.Box.low(python.Object)), Outcome.Returned(ValueFacts.Of(dotnet.Low)));
+            ByteContract.AssertSame($"{code}.high", Outcome.CapturePython(() => Python.gymnasium.spaces.box.Box.high(python.Object)), Outcome.Returned(ValueFacts.Of(dotnet.High)));
+            ByteContract.AssertSame($"{code}.bounded_below", Outcome.CapturePython(() => Python.gymnasium.spaces.box.Box.bounded_below(python.Object)), Outcome.Returned(ValueFacts.Of(dotnet.BoundedLow)));
+            ByteContract.AssertSame($"{code}.bounded_above", Outcome.CapturePython(() => Python.gymnasium.spaces.box.Box.bounded_above(python.Object)), Outcome.Returned(ValueFacts.Of(dotnet.BoundedHigh)));
+            ByteContract.AssertSame($"{code}.dtype", Outcome.CapturePython(() => Python.gymnasium.spaces.space.Space.dtype(python.Object)), Outcome.Returned(ValueFacts.Of(dotnet.DType)));
+            ByteContract.AssertSame($"{code}.shape", Outcome.CapturePython(() => Python.gymnasium.spaces.space.Space.shape(python.Object)), Outcome.Returned(DiscreteLiveParityTests.ShapeFacts(dotnet.Shape)));
             foreach ((string manner, BoundedMannerEnum value) in new[] { ("both", BoundedMannerEnum.Both), ("below", BoundedMannerEnum.Below), ("above", BoundedMannerEnum.Above) })
-                ByteContract.AssertSame($"{code}.is_bounded('{manner}')", python.Invoke("is_bounded", manner), Outcome.Capture(() => dotnet.IsBounded(value)));
+                ByteContract.AssertSame($"{code}.is_bounded('{manner}')", Outcome.CapturePython(() => Python.gymnasium.spaces.box.Box.is_bounded(python.Object, manner)), Outcome.Capture(() => dotnet.IsBounded(value)));
         }
 
         /// <summary>
@@ -79,22 +108,23 @@ namespace Gym.Tests.Parity.Tests.Spaces {
         [TestMethod]
         [DynamicData(nameof(Cases))]
         public void Sample_MatchesGymnasium(int box, long seed) {
-            (string constructor, Func<long, Box> create) = Boxes[box];
-            string code = constructor.Replace("{seed}", seed.ToString(System.Globalization.CultureInfo.InvariantCulture));
-            using PyHandle python = PyGym.Evaluate(code);
+            (string constructor, Func<long, PyObject> gymnasium, Func<long, Box> create) = Boxes[box];
+            string code = constructor.Replace("{seed}", seed.ToString(CultureInfo.InvariantCulture));
+            using PyRef python = PyRef.Of(() => gymnasium(seed));
             Box dotnet = create(seed);
             for (int i = 1; i <= 5; i++)
-                ByteContract.AssertSame($"{code}.sample() #{i}", python.Invoke("sample"), Outcome.Capture(() => dotnet.Sample()));
-            ByteContract.AssertSame($"{code} generator state after 5 samples", python.Evaluate("x.np_random.bit_generator.state"), Outcome.Returned(GeneratorProbe.StateOf(dotnet)));
+                ByteContract.AssertSame($"{code}.sample() #{i}", Outcome.CapturePython(() => Python.gymnasium.spaces.space.Space.sample(python.Object)), Outcome.Capture(() => dotnet.Sample()));
+            ByteContract.AssertSame($"{code} generator state after 5 samples", RngFacts.OfPythonSpace(python.Object), Outcome.Returned(GeneratorProbe.StateOf(dotnet)));
         }
 
         /// <summary>
         ///     Membership agrees for points of the box's own dtype: inside, on the bounds, outside, of the wrong shape, and
-        ///     with a NaN; and a sample of the box is a member on both sides.
+        ///     with a NaN; and a sample of the box is a member on both sides. Each point reaches Gymnasium as a NumPy copy of
+        ///     the very array Gym.NET receives.
         /// </summary>
         [TestMethod]
         public void Contains_MatchesGymnasium() {
-            using PyHandle python = PyGym.Evaluate("spaces.Box(-1.0, 1.0, (3,), np.float32, seed=3)");
+            using PyRef python = PyRef.Of(() => ScalarBox(-1.0, 1.0, new long[] { 3 }, "float32", 3));
             var dotnet = new Box(-1f, 1f, new Shape(3), np.float32, seed: 3);
             var candidates = new (string Python, float[] DotNet)[] {
                 ("np.array([0.0, 0.5, -1.0], dtype=np.float32)", new[] { 0f, 0.5f, -1f }),
@@ -105,10 +135,13 @@ namespace Gym.Tests.Parity.Tests.Spaces {
             };
             foreach ((string candidate, float[] values) in candidates) {
                 using NDArray point = np.array(values);
-                ByteContract.AssertSame($"Box(-1, 1, (3,), float32).contains({candidate})", python.Invoke("contains", new PyExpression(candidate)), Outcome.Capture(() => dotnet.Contains(point)));
+                ByteContract.AssertSame($"Box(-1, 1, (3,), float32).contains({candidate})", Contains(python, point), Outcome.Capture(() => dotnet.Contains(point)));
             }
 
-            ByteContract.AssertSame("Box(-1, 1, (3,), float32).contains(sample())", python.Evaluate("x.contains(x.sample())"), Outcome.Capture(() => {
+            ByteContract.AssertSame("Box(-1, 1, (3,), float32).contains(sample())", Outcome.CapturePython(() => {
+                using PyObject sample = Python.gymnasium.spaces.space.Space.sample(python.Object);
+                return Python.gymnasium.spaces.space.Space.contains(python.Object, sample);
+            }), Outcome.Capture(() => {
                 using NDArray sample = dotnet.Sample();
                 return dotnet.Contains(sample);
             }));
@@ -121,10 +154,10 @@ namespace Gym.Tests.Parity.Tests.Spaces {
         [TestMethod]
         [OpenBugs("P2")]
         public void Contains_RequiresCastableDtypes_LikeGymnasium() {
-            using PyHandle python = PyGym.Evaluate("spaces.Box(-1.0, 1.0, (3,), np.float32)");
+            using PyRef python = PyRef.Of(() => ScalarBox(-1.0, 1.0, new long[] { 3 }, "float32", null));
             var dotnet = new Box(-1f, 1f, new Shape(3), np.float32);
             using NDArray point = np.array(new[] { 0.0, 0.5, -1.0 });
-            ByteContract.AssertSame("Box(-1, 1, (3,), float32).contains(float64 point)", python.Invoke("contains", point), Outcome.Capture(() => dotnet.Contains(point)));
+            ByteContract.AssertSame("Box(-1, 1, (3,), float32).contains(float64 point)", Contains(python, point), Outcome.Capture(() => dotnet.Contains(point)));
         }
 
         /// <summary>
@@ -134,9 +167,13 @@ namespace Gym.Tests.Parity.Tests.Spaces {
         [TestMethod]
         [OpenBugs("P2")]
         public void Contains_AcceptsAList_LikeGymnasium() {
-            using PyHandle python = PyGym.Evaluate("spaces.Box(-1.0, 1.0, (3,), np.float32)");
+            using PyRef python = PyRef.Of(() => ScalarBox(-1.0, 1.0, new long[] { 3 }, "float32", null));
             var dotnet = new Box(-1f, 1f, new Shape(3), np.float32);
-            ByteContract.AssertSame("Box(-1, 1, (3,), float32).contains([0.0, 0.5, -1.0])", python.Invoke("contains", new PyExpression("[0.0, 0.5, -1.0]")), Outcome.Capture(() => dotnet.Contains(new[] { 0.0, 0.5, -1.0 })));
+            double[] point = { 0.0, 0.5, -1.0 };
+            ByteContract.AssertSame("Box(-1, 1, (3,), float32).contains([0.0, 0.5, -1.0])", Outcome.CapturePython(() => {
+                using PyObject list = PyConvert.ToList(point.Cast<object?>());
+                return Python.gymnasium.spaces.space.Space.contains(python.Object, list);
+            }), Outcome.Capture(() => dotnet.Contains(point)));
         }
 
         /// <summary>
@@ -147,9 +184,41 @@ namespace Gym.Tests.Parity.Tests.Spaces {
         [TestMethod]
         [OpenBugs("P2")]
         public void Bounds_OfAFloat64Box_KeepDoublePrecision() {
-            using PyHandle python = PyGym.Evaluate("spaces.Box(-0.1, 0.1, (2,), np.float64)");
+            using PyRef python = PyRef.Of(() => ScalarBox(-0.1, 0.1, new long[] { 2 }, "float64", null));
             var dotnet = new Box(-0.1f, 0.1f, new Shape(2), np.float64);
-            ByteContract.AssertSame("Box(-0.1, 0.1, (2,), float64).low", python.Get("low"), Outcome.Returned(ValueFacts.Of(dotnet.Low)));
+            ByteContract.AssertSame("Box(-0.1, 0.1, (2,), float64).low", Outcome.CapturePython(() => Python.gymnasium.spaces.box.Box.low(python.Object)), Outcome.Returned(ValueFacts.Of(dotnet.Low)));
+        }
+
+        /// <summary><c>spaces.Box(low, high, shape, np.dtype(dtype), seed=seed)</c> with scalar bounds. Must run under the GIL.</summary>
+        /// <param name="low">The lower bound: a <see langword="double"/> for a Python float, a <see langword="long"/> for a Python int.</param>
+        /// <param name="high">The upper bound, likewise.</param>
+        /// <param name="shape">The shape.</param>
+        /// <param name="dtype">The NumPy dtype's name.</param>
+        /// <param name="seed">The seed, or <see langword="null"/> for an unseeded box.</param>
+        /// <returns>A new owned reference to the box.</returns>
+        /// <exception cref="PythonException">Thrown when the constructor raises.</exception>
+        private static PyObject ScalarBox(object low, object high, long[] shape, string dtype, long? seed) {
+            using PyObject type = Python.numpy.dtype(dtype);
+            return Python.gymnasium.spaces.Box(low, high, shape, type, seed);
+        }
+
+        /// <summary>The low bounds of the mixed box: one of each bound category.</summary>
+        /// <returns>A new float64 array the caller disposes.</returns>
+        private static NDArray MixedLow() => np.array(new[] { -1.0, 0.0, double.NegativeInfinity, double.NegativeInfinity });
+
+        /// <summary>The high bounds of the mixed box.</summary>
+        /// <returns>A new float64 array the caller disposes.</returns>
+        private static NDArray MixedHigh() => np.array(new[] { 1.0, double.PositiveInfinity, 0.0, double.PositiveInfinity });
+
+        /// <summary><c>space.contains(point)</c> on Gymnasium's side, with the point crossed as a NumPy copy of the .NET one.</summary>
+        /// <param name="space">The box.</param>
+        /// <param name="point">The point both sides test.</param>
+        /// <returns>The described answer, or what the check raised.</returns>
+        private static Outcome Contains(PyRef space, NDArray point) {
+            return Outcome.CapturePython(() => {
+                using PyObject pythonPoint = point.ToNumpyCopy();
+                return Python.gymnasium.spaces.space.Space.contains(space.Object, pythonPoint);
+            });
         }
     }
 }

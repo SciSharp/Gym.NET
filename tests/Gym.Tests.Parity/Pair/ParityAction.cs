@@ -1,4 +1,5 @@
 using System;
+using Gym.Tests.Parity.Interop;
 using Gym.Tests.Parity.Oracle;
 using NumSharp;
 using NumSharp.Interop.PythonNet;
@@ -64,7 +65,7 @@ namespace Gym.Tests.Parity.Pair {
         /// <returns>The action.</returns>
         /// <exception cref="NotSupportedException">Thrown for an action that is neither an integer nor an array.</exception>
         internal static ParityAction FromPython(PyObject python) {
-            ValueFacts facts = PyGym.Describe(python);
+            ValueFacts facts = ValueFacts.FromPython(python);
             switch (facts.Kind) {
                 case FactKind.Int:
                     return new ParityAction(python, (long)facts.Integer, false, facts);
@@ -83,20 +84,20 @@ namespace Gym.Tests.Parity.Pair {
         /// <param name="python">Gymnasium's sample; ownership passes to the action.</param>
         /// <param name="dotnet">Gym.NET's sample; ownership passes to the action when it is disposable.</param>
         /// <returns>The action.</returns>
-        internal static ParityAction Sampled(PyObject python, object dotnet) => new(python, dotnet, dotnet is IDisposable, PyGym.Describe(python));
+        internal static ParityAction Sampled(PyObject python, object dotnet) => new(python, dotnet, dotnet is IDisposable, ValueFacts.FromPython(python));
 
         /// <summary>The Python representation, created from the .NET value on first use. Must run under the GIL.</summary>
         /// <returns>The object, still owned by this action.</returns>
-        internal PyObject Python() {
-            _python ??= PyGym.ToPython(DotNet);
+        internal PyObject PythonValue() {
+            _python ??= PyConvert.ToPython(DotNet);
             return _python;
         }
 
         /// <summary>Releases the Python object under the GIL, and the .NET array when this action owns it.</summary>
         public void Dispose() {
             if (_python != null) {
-                using (Py.GIL())
-                    _python.Dispose();
+                PyObject python = _python;
+                PythonRuntime.Run(python.Dispose);
                 _python = null;
             }
 

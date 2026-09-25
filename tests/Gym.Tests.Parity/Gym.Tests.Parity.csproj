@@ -36,12 +36,6 @@
     <ProjectReference Include="..\..\src\Gym.Environments\Gym.Environments.csproj" />
   </ItemGroup>
 
-  <!-- The Python half of the oracle, loaded into the embedded interpreter as module gym_oracle. Embedded, so the suite
-       depends neither on the working directory nor on copy-to-output. -->
-  <ItemGroup>
-    <EmbeddedResource Include="Oracle\gym_oracle.py" LogicalName="Gym.Tests.Parity.Oracle.gym_oracle.py" />
-  </ItemGroup>
-
   <!-- NumSharp and its pythonnet bridge: the regular NuGet references, co-versioned. While NumSharpSource=Submodule (the
        default until a NumSharp release contains the DType API), eng/NumSharp.props replaces both with refs/NumSharp's
        source builds; -p:NumSharpSource=Package builds against them as they stand. The import stays last: an item Remove

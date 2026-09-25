@@ -62,13 +62,14 @@ where `gymnasium` and `numpy` were imported from, and whether `refs/Gymnasium` h
 
 | Piece | File | Role |
 |---|---|---|
-| `GymPythonSession` | `Session/GymPythonSession.cs` | One embedded CPython per process (`[AssemblyInitialize]`/`[AssemblyCleanup]`; CPython cannot re-initialize). Discovers Python (`Session/PythonDiscovery.cs`), fixes the process state through the C runtime (`Session/NativeEnvironment.cs`), puts `refs/Gymnasium` first on `sys.path`, loads the oracle, checks the stack against the manifest (`Session/StackManifest.cs`). |
-| `ParityTestBase` | `Session/ParityTestBase.cs` | Base class of every cell: requires the session, gives a scope with `np`, `gymnasium`, `spaces`, `seeding` imported, runs NumSharp's **leak gate** (`Session/LeakGate.cs`) after every test. |
-| `gym_oracle.py` | `Oracle/gym_oracle.py` (embedded resource) | The Python half. `describe()` reduces any value to tagged tuples of `str`/`int`/`bytes`/`bool` (dtype strings, shapes, C-order bytes, IEEE bytes), `invoke()` returns exceptions as data, `OracleEnv` wraps a `gymnasium.make` env, `POLICIES` holds the Python policies. |
-| `ValueFacts` | `Oracle/ValueFacts.cs` | The side-neutral description both halves reduce to: from Python via `describe`, from .NET via `ValueFacts.Of` (NDArray bytes through NumSharp's own `data.tobytes`, never through the bridge, so a match is not a tautology). |
+| `GymPythonSession` | `Session/GymPythonSession.cs` | One embedded CPython per process (`[AssemblyInitialize]`/`[AssemblyCleanup]`; CPython cannot re-initialize). Discovers Python (`Session/PythonDiscovery.cs`), fixes the process state through the C runtime (`Session/NativeEnvironment.cs`), runs the bootstrap snippet (`refs/Gymnasium` first on `sys.path`), reads the live stack through the tree and checks it against the manifest (`Session/StackManifest.cs`). |
+| `PythonRuntime` | `Interop/PythonRuntime.cs` | The pythonic skill's backend: `Initialize`/`Shutdown` (once per process), `Run` (every Python-touching body holds the GIL through it), cached `Import` (never dispose a module handle), `Builtins`, `PythonInteropException`. |
+| `Python` | `Interop/Pythonic.cs` | **The pythonic tree**: `Python.gymnasium.make(...)`, `Python.gymnasium.Env.step(env, a)`, `Python.gymnasium.spaces.Discrete(4, seed: 0)`, `Python.gymnasium.spaces.space.Space.sample(space)`, `Python.numpy.random.Generator.uniform(g, ...)`, `Python.pygame.gfxdraw.aapolygon(...)`. One row per fixed Python call; object members are nested classes taking the object; `evalStmts` runs a multi-statement snippet. |
+| `ParityTestBase` | `Session/ParityTestBase.cs` | Base class of every cell: requires the session, runs NumSharp's **leak gate** (`Session/LeakGate.cs`) after every test, `SkipUnless`, `SkipOffReferencePlatform`. |
+| `ValueFacts` | `Oracle/ValueFacts.cs` | The side-neutral description both halves reduce to: from Python via `FromPython` (arrays through NumSharp's `ToNDArray` import, scalars through NumPy's own `dtype.str`/`int()`, dtypes as their `dtype.str`), from .NET via `ValueFacts.Of` (NDArray bytes through NumSharp's own `data.tobytes`, never through the bridge). `SessionTests.ByteReaders_*` pin both directions against NumPy's own `tobytes()`. |
 | `ByteContract` | `Oracle/ByteContract.cs` | The comparer: every difference with both values, their bits, the ulp distance, the element index; exceptions by mapped type (`Oracle/Outcome.cs`, `ExceptionMap`) and message. |
-| `PyGym`, `PyHandle` | `Oracle/PyGym.cs` | Build Python objects from expressions (`PyGym.Evaluate("spaces.Discrete(4, seed=0)")`), call them with .NET arguments (arrays cross as `ToNumpyCopy`), get `Outcome`s back. |
-| `PyGymEnv` | `Oracle/PyGymEnv.cs` | A live Gymnasium env (`gymnasium.make(...)`, optionally `.unwrapped`). |
+| `Outcome.CapturePython`, `PyRef`, `PyConvert` | `Oracle/Outcome.cs`, `Interop/PyRef.cs`, `Oracle/PyConvert.cs` | Run a tree call under the GIL and describe its result or its exception; hold a Python object across calls (released under the GIL); convert CLR arguments (`None`, ints of any width, floats, strings, `NDArray` as `ToNumpyCopy`, dicts, lists, tuples). |
+| `PyGymEnv` | `Oracle/PyGymEnv.cs` | A live Gymnasium env (`gymnasium.make(...)`, optionally `.unwrapped`), driven through the tree; the `cartpole_balance` policy (Python's float64 arithmetic) and Gymnasium's own `lunar_lander.heuristic`. |
 | `GymPair` | `Pair/GymPair.cs` | The lockstep runner (plan §5): same seed, same actions (`Pair/ParityAction.cs`), every call verified in a fixed field order, first divergence thrown as `ParityException` (`Pair/Divergence.cs`). |
 | `IDotNetEnv`, `GymNetEnv` | `Pair/IDotNetEnv.cs`, `Pair/GymNetEnv.cs` | The .NET half. `GymNetEnv` bridges Gym.NET's legacy API to Gymnasium's contract without touching a value (the bridge is printed in every report). |
 | Action sources | `Pair/ActionSources.cs` | Open-loop, a Python policy on Gymnasium's own observations, or seeded sampling on both sides (samples compared before each step). |
@@ -86,17 +87,22 @@ where `gymnasium` and `numpy` were imported from, and whether `refs/Gymnasium` h
 ```csharp
 [TestMethod]
 public void Sample_MatchesGymnasium() {
-    using PyHandle python = PyGym.Evaluate("spaces.Discrete(4, seed=0)");   // live Gymnasium object
-    var dotnet = new Discrete(4, seed: 0);                                    // Gym.NET object
+    using PyRef python = PyRef.Of(() => Python.gymnasium.spaces.Discrete(4, seed: 0));   // live Gymnasium object
+    var dotnet = new Discrete(4, seed: 0);                                                // Gym.NET object
     for (int i = 1; i <= 10; i++)
         ByteContract.AssertSame($"Discrete(4, seed=0).sample() #{i}",
-            python.Invoke("sample"),                        // Gymnasium's outcome, described
-            Outcome.Capture(() => dotnet.Sample()));        // Gym.NET's outcome, described, result disposed
+            Outcome.CapturePython(() => Python.gymnasium.spaces.space.Space.sample(python.Object)),  // Gymnasium, described
+            Outcome.Capture(() => dotnet.Sample()));                                                // Gym.NET, described, disposed
     ByteContract.AssertSame("generator state",
-        python.Evaluate("x.np_random.bit_generator.state"),  // x is the handle's object
+        RngFacts.OfPythonSpace(python.Object),               // space.np_random.bit_generator.state
         Outcome.Returned(GeneratorProbe.StateOf(dotnet)));
 }
 ```
+
+A Python argument is built through the tree (`Python.numpy.int64(6)`), converted by `PyConvert.ToPython` (plain CLR
+values), or crossed from the very NumSharp array the .NET side receives (`point.ToNumpyCopy()`), so both sides get
+identical bits. A call the tree lacks gets a row in `Interop/Pythonic.cs` (Python spelling, XML docs, the caller owns
+the returned `PyObject`), not a string: only a multi-statement program goes through `Python.evalStmts`.
 
 ### A lockstep cell (an env)
 
@@ -114,8 +120,8 @@ State injection (one step of dynamics, isolated from reset and the generator): `
 ### Errors
 
 `Outcome` carries exceptions as data, so an error is a compared outcome, not a test failure:
-`PyGym.Invoke("seeding.np_random(-1)")` against `Outcome.Capture(() => Seeding.NpRandom(-1))` passes when Gym.NET
-throws `Gym.Exceptions.Error` with Gymnasium's message. `ExceptionMap` holds the port plan's §3.4 mapping
+`Outcome.CapturePython(() => Python.gymnasium.utils.seeding.np_random(seed))` (with `seed` a `PyInt` of -1) against
+`Outcome.Capture(() => Seeding.NpRandom(-1))` passes when Gym.NET throws `Gym.Exceptions.Error` with Gymnasium's message. `ExceptionMap` holds the port plan's §3.4 mapping
 (`ValueError` → `NumSharp.ValueError`, `gymnasium.error.X` → `Gym.Exceptions.X`, `AssertionError` →
 `Gym.Exceptions.AssertionError`).
 
@@ -135,9 +141,15 @@ throws `Gym.Exceptions.Error` with Gymnasium's message. `ExceptionMap` holds the
   `Contains_RequiresCastableDtypes_LikeGymnasium` open).
 - **Pin libm-dependent cells to the reference platform** with `SkipOffReferencePlatform(...)` (CartPole's `cos`/`sin`):
   strict on `win-x64`, Inconclusive elsewhere (port plan §14.9).
-- **GIL discipline** (NumSharp's): every `PyObject` is created and disposed under the GIL; the harness types take it
-  themselves; tests keep NumSharp arrays and CLR values outside it. Never dispose `PyObject.None`: pythonnet shares it
-  process-wide.
+- **The pythonic skill** (`refs/NumSharp/.claude/skills/pythonic`): Python is reached through the `Python.*` tree only;
+  each fixed call is a facade row, an object's members a nested class taking the object, a multi-statement program an
+  `evalStmts` snippet. Runtime-dispatched calls (type reflection, `dict.items()` walks) stay in `ValueFacts.FromPython`.
+  Inside `Gym.Tests.Parity` the class `Python` shadows the `Python.Runtime` namespace: reach pythonnet types through a
+  file-level `using Python.Runtime;`, and never name a member `Python` (it would shadow the tree in its class).
+- **GIL discipline** (NumSharp's): every `PyObject` is created and disposed inside `PythonRuntime.Run` (or
+  `Outcome.CapturePython`, `PyRef`, which take it themselves); tests keep NumSharp arrays and CLR values outside it. Spell
+  chains with `using` locals: an inline `a(b(x))` leaks `b(x)`. Never dispose `PyObject.None` (pythonnet shares it
+  process-wide; `PyConvert.ToPython(null)` gives an owned `None`) nor a module from `PythonRuntime.Import`.
 - **Dispose every NDArray.** The project builds with warnings as errors, so NumSharp's ownership analyzer (NDW012) fails
   the build on an array that is created and dropped.
 - **Test the harness before trusting it.** `Tests/Harness/HarnessSelfTests.cs` plants known defects and checks each is
@@ -149,7 +161,7 @@ throws `Gym.Exceptions.Error` with Gymnasium's message. `ExceptionMap` holds the
 
 | Area | Gated (must pass) | Open (`[OpenBugs]`) |
 |---|---|---|
-| Session | stack = manifest; Gymnasium from the submodule; deterministic interpreter; both byte readers agree | |
+| Session | stack = manifest; Gymnasium from the submodule; deterministic interpreter; both byte readers agree with NumPy's `tobytes()` (export: a strided NumSharp view; import: strided NumPy views of 12 dtypes) | |
 | Harness self-tests (§11) | faithful transcription passes 500 steps; `tau = 0.02f` at step 1 in the state; an extra draw at the reset through the generator alone; injected state without unseeded generators; one pixel off by one; info key order; float32 reward ulps; the leak gate; dtype width; the scalar rule; exception mapping | |
 | Seeding | `Seeding.NpRandom` = `seeding.np_random` for 9 seeds (0 … `long.MaxValue`) and 2^100 + 7: reported seed and PCG64 state; 15 A.6 draw patterns value for value with the state after each; negative seeds raise `Error` with Gymnasium's message; the unseeded 128-bit seed rebuilds the generator in NumPy | |
 | `Discrete` | samples (7 cases, `n` up to 2^40, negative and positive `start`) and generator state; masked samples; all-masked returns `start` without a draw; membership (15 candidates); `n`/`start`/dtype; `repr` of a plain space | `can_cast` in `contains` (P2); shape `()` (B-03); `repr` with `start` (P2); `n <= 0` validation (B-10) |
@@ -176,6 +188,6 @@ their ports (P1–P6).
   `ParityTestBase.CurrentContext` replaces it (tests run one at a time, `[DoNotParallelize]`).
 - **`dotnet sln add` (SDK 10) adds referenced projects and x64/x86 platforms** to the solution; add a project to
   `Gym.NET.sln` by hand.
-- **pythonnet's `As<byte[]>()` is slow for large buffers**: about 84 ms for a 600 × 400 × 3 frame (measured once, JIT
+- **`Python.numpy.ndarray.tobytes_t` (pythonnet's `As<byte[]>()`) is slow for large buffers**: about 84 ms for a 600 × 400 × 3 frame (measured once, JIT
   warm-up included). Fine for a handful of frames per test; for a frame every step of long trajectories, read the bytes
   through NumSharp's buffer import instead.

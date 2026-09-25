@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using Gym.Environments;
 using Gym.Environments.Envs.Aether;
 using Gym.Spaces;
+using Gym.Tests.Parity.Interop;
 using Gym.Tests.Parity.Oracle;
 using Gym.Tests.Parity.Pair;
 using Gym.Tests.Parity.Session;
@@ -25,16 +26,16 @@ namespace Gym.Tests.Parity.Tests.Envs {
         /// </summary>
         [TestMethod]
         public void GymNet_DiscreteActionSpace_MatchesGymnasium() {
-            using PyHandle python = PyGym.Evaluate("gymnasium.make('LunarLander-v3').unwrapped.action_space");
+            using PyRef python = PyRef.Of(() => CartPoleLiveParityTests.MadeSpace("LunarLander-v3", Python.gymnasium.Env.action_space));
             var space = (Discrete)new LunarLanderEnv(NullEnvViewer.Factory).ActionSpace;
-            ByteContract.AssertSame("LunarLander action_space.n", python.Get("n"), Outcome.Returned(ValueFacts.Of(space.N)));
-            ByteContract.AssertSame("LunarLander action_space.start", python.Get("start"), Outcome.Returned(ValueFacts.Of(space.Start)));
-            ByteContract.AssertSame("LunarLander action_space.dtype.str", python.Evaluate("x.dtype.str"), Outcome.Returned(ValueFacts.FromText(space.DType.str)));
+            ByteContract.AssertSame("LunarLander action_space.n", Outcome.CapturePython(() => Python.gymnasium.spaces.discrete.Discrete.n(python.Object)), Outcome.Returned(ValueFacts.Of(space.N)));
+            ByteContract.AssertSame("LunarLander action_space.start", Outcome.CapturePython(() => Python.gymnasium.spaces.discrete.Discrete.start(python.Object)), Outcome.Returned(ValueFacts.Of(space.Start)));
+            ByteContract.AssertSame("LunarLander action_space.dtype", Outcome.CapturePython(() => Python.gymnasium.spaces.space.Space.dtype(python.Object)), Outcome.Returned(ValueFacts.Of(space.DType)));
 
-            python.Invoke("seed", 11L).Expect("action_space.seed(11)");
+            Outcome.CapturePython(() => Python.gymnasium.spaces.space.Space.seed(python.Object, 11)).Expect("action_space.seed(11)");
             space.Seed(11);
             for (int i = 1; i <= 20; i++)
-                ByteContract.AssertSame($"LunarLander action_space.sample() #{i} after seed(11)", python.Invoke("sample"), Outcome.Capture(() => space.Sample()));
+                ByteContract.AssertSame($"LunarLander action_space.sample() #{i} after seed(11)", Outcome.CapturePython(() => Python.gymnasium.spaces.space.Space.sample(python.Object)), Outcome.Capture(() => space.Sample()));
         }
 
         /// <summary>
@@ -44,11 +45,12 @@ namespace Gym.Tests.Parity.Tests.Envs {
         [TestMethod]
         [OpenBugs("B-20")]
         public void GymNet_ContinuousActionSpace_MatchesGymnasium() {
-            using PyHandle python = PyGym.Evaluate("gymnasium.make('LunarLander-v3', continuous=True).unwrapped.action_space");
+            var kwargs = new Dictionary<string, object?> { ["continuous"] = true };
+            using PyRef python = PyRef.Of(() => CartPoleLiveParityTests.MadeSpace("LunarLander-v3", Python.gymnasium.Env.action_space, kwargs));
             var space = (Box)new LunarLanderEnv(NullEnvViewer.Factory, continuous: true).ActionSpace;
-            ByteContract.AssertSame("LunarLanderContinuous action_space.shape", python.Get("shape"), Outcome.Returned(Spaces.DiscreteLiveParityTests.ShapeFacts(space.Shape)));
-            ByteContract.AssertSame("LunarLanderContinuous action_space.low", python.Get("low"), Outcome.Returned(ValueFacts.Of(space.Low)));
-            ByteContract.AssertSame("LunarLanderContinuous action_space.high", python.Get("high"), Outcome.Returned(ValueFacts.Of(space.High)));
+            ByteContract.AssertSame("LunarLanderContinuous action_space.shape", Outcome.CapturePython(() => Python.gymnasium.spaces.space.Space.shape(python.Object)), Outcome.Returned(Spaces.DiscreteLiveParityTests.ShapeFacts(space.Shape)));
+            ByteContract.AssertSame("LunarLanderContinuous action_space.low", Outcome.CapturePython(() => Python.gymnasium.spaces.box.Box.low(python.Object)), Outcome.Returned(ValueFacts.Of(space.Low)));
+            ByteContract.AssertSame("LunarLanderContinuous action_space.high", Outcome.CapturePython(() => Python.gymnasium.spaces.box.Box.high(python.Object)), Outcome.Returned(ValueFacts.Of(space.High)));
         }
 
         /// <summary>
@@ -61,10 +63,11 @@ namespace Gym.Tests.Parity.Tests.Envs {
         [DataRow(false)]
         [DataRow(true)]
         public void GymNet_ObservationSpace_MatchesGymnasium(bool continuous) {
-            using PyHandle python = PyGym.Evaluate($"gymnasium.make('LunarLander-v3', continuous={(continuous ? "True" : "False")}).unwrapped.observation_space");
+            var kwargs = new Dictionary<string, object?> { ["continuous"] = continuous };
+            using PyRef python = PyRef.Of(() => CartPoleLiveParityTests.MadeSpace("LunarLander-v3", Python.gymnasium.Env.observation_space, kwargs));
             var space = (Box)new LunarLanderEnv(NullEnvViewer.Factory, continuous: continuous).ObservationSpace;
-            ByteContract.AssertSame("LunarLander observation_space.low", python.Get("low"), Outcome.Returned(ValueFacts.Of(space.Low)));
-            ByteContract.AssertSame("LunarLander observation_space.high", python.Get("high"), Outcome.Returned(ValueFacts.Of(space.High)));
+            ByteContract.AssertSame("LunarLander observation_space.low", Outcome.CapturePython(() => Python.gymnasium.spaces.box.Box.low(python.Object)), Outcome.Returned(ValueFacts.Of(space.Low)));
+            ByteContract.AssertSame("LunarLander observation_space.high", Outcome.CapturePython(() => Python.gymnasium.spaces.box.Box.high(python.Object)), Outcome.Returned(ValueFacts.Of(space.High)));
         }
 
         /// <summary>

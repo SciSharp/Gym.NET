@@ -8,6 +8,7 @@ using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Text;
 using NumSharp;
+using NumSharp.Interop.PythonNet;
 using Python.Runtime;
 
 namespace Gym.Tests.Parity.Oracle {
@@ -42,15 +43,16 @@ namespace Gym.Tests.Parity.Oracle {
     }
 
     /// <summary>
-    ///     A canonical, side-neutral description of one value, produced from Python by <c>gym_oracle.describe</c> and from
-    ///     .NET by <see cref="Of"/>. Comparing two descriptions (<see cref="ByteContract"/>) compares the bits each side
-    ///     produced: arrays by dtype, shape and C-order bytes, floats by their IEEE-754 bytes, integers by value.
+    ///     A canonical, side-neutral description of one value, produced from Python by <see cref="FromPython"/> and from .NET by
+    ///     <see cref="Of"/>. Comparing two descriptions (<see cref="ByteContract"/>) compares the bits each side produced:
+    ///     arrays by dtype, shape and C-order bytes, floats by their IEEE-754 bytes, integers by value.
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///     The two sides are read independently, as NumSharp's <c>ByteContract</c> does: Python bytes come from numpy's own
-    ///     <c>tobytes</c>, .NET bytes from NumSharp's <c>ndarray.data.tobytes</c>, and nothing passes through the pythonnet
-    ///     bridge's dtype mapping, so a match is a genuine cross-check rather than a tautology.
+    ///     The two sides reach the bytes by different paths: a Python array crosses through NumSharp's interop import
+    ///     (<c>ToNDArray</c>) first, a path Gym.NET's own arrays never take, so a fault in the crossing shows up as a difference
+    ///     rather than hiding one. <c>SessionTests.ByteReaders_AgreeOnAnExportedView</c> and
+    ///     <c>ByteReaders_AgreeOnAnImportedView</c> pin the crossing itself against NumPy's own <c>tobytes</c>.
     ///     </para>
     ///     <para>
     ///     Instances are immutable and hold no Python or NumSharp objects, so they can be kept after the GIL is released and
@@ -171,66 +173,154 @@ namespace Gym.Tests.Parity.Oracle {
         public static ValueFacts FromOther(string typeName, string repr) => new(FactKind.Other, typeName) { Text = repr };
 
         /// <summary>
-        ///     Reads a descriptor produced by <c>gym_oracle.describe</c>. Must run under the GIL; the descriptor stays owned by
-        ///     the caller.
+        ///     Describes a Python value: <c>None</c>, booleans (<c>bool</c>, <c>numpy.bool</c>), integers (Python <c>int</c>
+        ///     without a dtype, NumPy integer scalars with theirs), floats (Python <c>float</c> as <c>&lt;f8</c>, NumPy floating
+        ///     scalars at their width), arrays, dtypes (as their array-interface string), strings, dictionaries in iteration
+        ///     order, tuples and lists. Must run under the GIL; <paramref name="value"/> stays owned by the caller.
         /// </summary>
-        /// <param name="descriptor">The tagged tuple.</param>
+        /// <param name="value">The value.</param>
         /// <returns>The description.</returns>
-        /// <exception cref="InvalidOperationException">Thrown for a tag this reader does not know, i.e. the oracle and this reader drifted apart.</exception>
-        public static ValueFacts FromDescriptor(PyObject descriptor) {
-            string tag = Item<string>(descriptor, 0);
-            string typeName = Item<string>(descriptor, 1);
-            switch (tag) {
-                case "none":
-                    return NoneValue(typeName);
-                case "bool":
-                    return FromBool(Item<bool>(descriptor, 2), typeName);
-                case "int":
-                    return FromInteger(BigInteger.Parse(Item<string>(descriptor, 3), NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture), Item<string>(descriptor, 2), typeName);
-                case "float":
-                    return FromFloat(Item<string>(descriptor, 2), Item<byte[]>(descriptor, 3), typeName);
-                case "ndarray": {
-                    using PyObject shape = descriptor[3];
-                    var dimensions = new long[shape.Length()];
-                    for (int i = 0; i < dimensions.Length; i++)
-                        dimensions[i] = Item<long>(shape, i);
-                    return FromArray(Item<string>(descriptor, 2), dimensions, Item<byte[]>(descriptor, 4), typeName);
-                }
-                case "str":
-                    return FromText(Item<string>(descriptor, 2), typeName);
-                case "dict": {
-                    using PyObject entries = descriptor[2];
-                    var pairs = new List<KeyValuePair<ValueFacts, ValueFacts>>();
-                    long count = entries.Length();
-                    for (int i = 0; i < count; i++) {
-                        using PyObject entry = entries[i];
-                        using PyObject key = entry[0];
-                        using PyObject value = entry[1];
-                        pairs.Add(new KeyValuePair<ValueFacts, ValueFacts>(FromDescriptor(key), FromDescriptor(value)));
-                    }
+        /// <exception cref="PythonException">Thrown when a Python call made to inspect the value raises.</exception>
+        /// <remarks>
+        ///     <para>
+        ///     This is the suite's generic Python-to-CLR marshaling, which the pythonic skill keeps out of the <c>Python.*</c>
+        ///     tree: which attribute it reads depends on the value's type at run time.
+        ///     </para>
+        ///     <para>
+        ///     Arrays cross through NumSharp's interop (<c>ToNDArray</c>: one bulk, stride-honouring copy into a C-contiguous
+        ///     <see cref="NDArray"/>), then are read with NumSharp's own <c>data.tobytes</c>. The .NET side never goes through that
+        ///     import, so the two sides still share no code path: a faulty import would show as a difference, never hide one.
+        ///     </para>
+        /// </remarks>
+        public static ValueFacts FromPython(PyObject value) {
+            string typeName = PythonTypeName(value);
+            if (value.IsNone())
+                return NoneValue(typeName);
 
-                    return FromDict(pairs, typeName);
-                }
-                case "seq": {
-                    using PyObject items = descriptor[2];
-                    var described = new List<ValueFacts>();
-                    long count = items.Length();
-                    for (int i = 0; i < count; i++) {
-                        using PyObject item = items[i];
-                        described.Add(FromDescriptor(item));
-                    }
-
-                    return FromSequence(described, typeName);
-                }
-                case "other":
-                    return FromOther(typeName, Item<string>(descriptor, 2));
-                default:
-                    throw new InvalidOperationException($"gym_oracle.describe produced the unknown tag '{tag}'; Oracle/ValueFacts.cs and Oracle/gym_oracle.py must change together.");
+            // The cached module: never disposed here.
+            PyObject numpy = Interop.PythonRuntime.Import("numpy");
+            // bool first: Python's bool subclasses int, and numpy.bool is not a numpy.integer.
+            if (IsInstance(value, PythonRuntimeBuiltin("bool")) || IsInstance(value, numpy, "bool_"))
+                return FromBool(value.IsTrue(), typeName);
+            if (IsInstance(value, numpy, "ndarray")) {
+                using NDArray array = value.ToNDArray();
+                return FromArray(array.dtype.str, (long[])array.shape.Clone(), array.data.tobytes("C"), typeName);
             }
+
+            // A dtype is described by NumPy's own array-interface string (dtype.str: '<f4', '|u1'), the text NumSharp's
+            // DType.str spells, so a space's dtype compares with Gym.NET's without either side printing a repr.
+            if (IsInstance(value, numpy, "dtype")) {
+                using PyObject text = value.GetAttr("str");
+                return FromText(text.As<string>(), typeName);
+            }
+
+            if (IsInstance(value, numpy, "integer")) {
+                using PyObject asInt = Python.builtins.@int(value);
+                using var integer = new PyInt(asInt);
+                return FromInteger(integer.ToBigInteger(), DTypeStr(value), typeName);
+            }
+
+            // numpy.floating before float: numpy.float64 subclasses Python's float and must keep its NumPy dtype. The bytes
+            // are NumPy's own (the scalar as a one-element array, crossed like any array) rather than float(x) narrowed
+            // back: that round trip would quiet a signalling NaN, and a NaN payload is part of the bits compared.
+            if (IsInstance(value, numpy, "floating")) {
+                using PyObject wrapped = Python.numpy.atleast_1d(value);
+                using NDArray element = wrapped.ToNDArray();
+                return FromFloat(element.dtype.str, element.data.tobytes("C"), typeName);
+            }
+            if (IsInstance(value, PythonRuntimeBuiltin("int"))) {
+                using var integer = new PyInt(value);
+                return FromInteger(integer.ToBigInteger(), "", typeName);
+            }
+
+            if (IsInstance(value, PythonRuntimeBuiltin("float")))
+                return FromDouble(value.As<double>(), typeName);
+            if (IsInstance(value, PythonRuntimeBuiltin("str")))
+                return FromText(value.As<string>(), typeName);
+            if (IsInstance(value, PythonRuntimeBuiltin("dict"))) {
+                var pairs = new List<KeyValuePair<ValueFacts, ValueFacts>>();
+                using PyObject items = value.InvokeMethod("items");
+                using var iterator = PyIter.GetIter(items);
+                while (iterator.MoveNext()) {
+                    using PyObject item = iterator.Current;
+                    using PyObject key = item[0];
+                    using PyObject entry = item[1];
+                    pairs.Add(new KeyValuePair<ValueFacts, ValueFacts>(FromPython(key), FromPython(entry)));
+                }
+
+                return FromDict(pairs, typeName);
+            }
+
+            if (IsInstance(value, PythonRuntimeBuiltin("tuple")) || IsInstance(value, PythonRuntimeBuiltin("list"))) {
+                var items = new List<ValueFacts>();
+                using var iterator = PyIter.GetIter(value);
+                while (iterator.MoveNext()) {
+                    using PyObject item = iterator.Current;
+                    items.Add(FromPython(item));
+                }
+
+                return FromSequence(items, typeName);
+            }
+
+            return FromOther(typeName, value.Repr() ?? "");
         }
 
         /// <summary>
-        ///     Describes a .NET value the way <c>gym_oracle.describe</c> describes its Python counterpart: an
+        ///     A Python value's type as reports print it: <c>float</c>, <c>numpy.float32</c>, <c>numpy.ndarray</c>. Builtins go
+        ///     unqualified; everything else keeps its module. Must run under the GIL.
+        /// </summary>
+        /// <param name="value">The value.</param>
+        /// <returns>The type's name.</returns>
+        internal static string PythonTypeName(PyObject value) {
+            using PyType type = value.GetPythonType();
+            return QualifiedName(type);
+        }
+
+        /// <summary>A Python type's name as <see cref="PythonTypeName"/> prints it. Must run under the GIL.</summary>
+        /// <param name="type">The type object.</param>
+        /// <returns>The name.</returns>
+        internal static string QualifiedName(PyObject type) {
+            using PyObject module = type.GetAttr("__module__");
+            using PyObject name = type.GetAttr("__qualname__");
+            string moduleName = module.As<string>();
+            return moduleName == "builtins" ? name.As<string>() : $"{moduleName}.{name.As<string>()}";
+        }
+
+        /// <summary><c>isinstance(value, getattr(module, name))</c>, disposing the type object. Must run under the GIL.</summary>
+        /// <param name="value">The value.</param>
+        /// <param name="module">The module that defines the type.</param>
+        /// <param name="name">The type's name in it.</param>
+        /// <returns><see langword="true"/> when the value is an instance.</returns>
+        private static bool IsInstance(PyObject value, PyObject module, string name) {
+            using PyObject type = module.GetAttr(name);
+            return value.IsInstance(type);
+        }
+
+        /// <summary><c>isinstance(value, type)</c>, disposing <paramref name="type"/>. Must run under the GIL.</summary>
+        /// <param name="value">The value.</param>
+        /// <param name="type">The type object; disposed here.</param>
+        /// <returns><see langword="true"/> when the value is an instance.</returns>
+        private static bool IsInstance(PyObject value, PyObject type) {
+            using (type)
+                return value.IsInstance(type);
+        }
+
+        /// <summary>A built-in type (<c>int</c>, <c>dict</c>, ...) as a new reference. Must run under the GIL.</summary>
+        /// <param name="name">The type's name.</param>
+        /// <returns>A new owned reference.</returns>
+        private static PyObject PythonRuntimeBuiltin(string name) => Interop.PythonRuntime.Builtins.GetAttr(name);
+
+        /// <summary><c>value.dtype.str</c> of a NumPy scalar. Must run under the GIL.</summary>
+        /// <param name="value">The scalar.</param>
+        /// <returns>The array-interface type string.</returns>
+        private static string DTypeStr(PyObject value) {
+            using PyObject dtype = value.GetAttr("dtype");
+            using PyObject text = dtype.GetAttr("str");
+            return text.As<string>();
+        }
+
+        /// <summary>
+        ///     Describes a .NET value the way <see cref="FromPython"/> describes its Python counterpart: an
         ///     <see cref="NDArray"/> as an array, primitives with the dtype of their width, strings, dictionaries in
         ///     enumeration order, tuples and other sequences item by item.
         /// </summary>
@@ -282,6 +372,9 @@ namespace Gym.Tests.Parity.Oracle {
                     return FromDouble(d);
                 case string s:
                     return FromText(s, "string");
+                case DType dtype:
+                    // As FromPython describes numpy.dtype: by the array-interface string, '<f4', '|b1'.
+                    return FromText(dtype.str, "DType");
                 case Enum e:
                     return Of(Convert.ChangeType(e, Enum.GetUnderlyingType(e.GetType()), CultureInfo.InvariantCulture));
                 case IDictionary dictionary: {
@@ -379,16 +472,6 @@ namespace Gym.Tests.Parity.Oracle {
         /// <param name="value">The value.</param>
         /// <returns>Its round-trip text.</returns>
         internal static string FormatNumber(double value) => value.ToString("R", CultureInfo.InvariantCulture);
-
-        /// <summary>Reads item <paramref name="index"/> of a Python sequence as <typeparamref name="T"/>, disposing the item.</summary>
-        /// <typeparam name="T">The CLR type pythonnet converts the item to.</typeparam>
-        /// <param name="sequence">The sequence.</param>
-        /// <param name="index">The item's index.</param>
-        /// <returns>The converted item.</returns>
-        private static T Item<T>(PyObject sequence, int index) {
-            using PyObject item = sequence[index];
-            return item.As<T>();
-        }
     }
 
     /// <summary>

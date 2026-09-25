@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using Gym.Tests.Parity.Interop;
 using NumSharp;
 using NumSharp.Interop.PythonNet;
 using Python.Runtime;
@@ -58,12 +59,12 @@ namespace Gym.Tests.Parity.Session {
             GC.Collect();
             GC.WaitForPendingFinalizers();
             GC.Collect();
-            using (Py.GIL()) {
+            PythonRuntime.Run(() => {
                 Finalizer.Instance.Collect();
-                PythonEngine.RunSimpleString("import gc; gc.collect()");
+                Python.gc.collect();
                 using NDArray one = np.arange(1);
                 using PyObject copy = one.ToNumpyCopy();
-            }
+            });
         }
 
         /// <summary>Pumps until the counters stop moving, so a test starts from a quiet baseline rather than mid-release.</summary>

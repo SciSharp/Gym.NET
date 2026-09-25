@@ -1,11 +1,15 @@
+using System;
+using System.Collections.Generic;
 using Gym.Environments;
 using Gym.Environments.Envs.Classic;
 using Gym.Spaces;
+using Gym.Tests.Parity.Interop;
 using Gym.Tests.Parity.Oracle;
 using Gym.Tests.Parity.Pair;
 using Gym.Tests.Parity.Reference;
 using Gym.Tests.Parity.Session;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Python.Runtime;
 
 namespace Gym.Tests.Parity.Tests.Envs {
     /// <summary>
@@ -137,11 +141,11 @@ namespace Gym.Tests.Parity.Tests.Envs {
         [TestMethod]
         [OpenBugs("B-12")]
         public void GymNet_ObservationSpace_MatchesGymnasium() {
-            using PyHandle python = PyGym.Evaluate("gymnasium.make('CartPole-v1').unwrapped.observation_space");
+            using PyRef python = PyRef.Of(() => MadeSpace("CartPole-v1", Python.gymnasium.Env.observation_space));
             var space = (Box)new CartPoleEnv(NullEnvViewer.Factory).ObservationSpace;
-            ByteContract.AssertSame("CartPole observation_space.high", python.Get("high"), Outcome.Returned(ValueFacts.Of(space.High)));
-            ByteContract.AssertSame("CartPole observation_space.low", python.Get("low"), Outcome.Returned(ValueFacts.Of(space.Low)));
-            ByteContract.AssertSame("CartPole observation_space.bounded_above", python.Get("bounded_above"), Outcome.Returned(ValueFacts.Of(space.BoundedHigh)));
+            ByteContract.AssertSame("CartPole observation_space.high", Outcome.CapturePython(() => Python.gymnasium.spaces.box.Box.high(python.Object)), Outcome.Returned(ValueFacts.Of(space.High)));
+            ByteContract.AssertSame("CartPole observation_space.low", Outcome.CapturePython(() => Python.gymnasium.spaces.box.Box.low(python.Object)), Outcome.Returned(ValueFacts.Of(space.Low)));
+            ByteContract.AssertSame("CartPole observation_space.bounded_above", Outcome.CapturePython(() => Python.gymnasium.spaces.box.Box.bounded_above(python.Object)), Outcome.Returned(ValueFacts.Of(space.BoundedHigh)));
         }
 
         /// <summary>
@@ -150,17 +154,32 @@ namespace Gym.Tests.Parity.Tests.Envs {
         /// </summary>
         [TestMethod]
         public void GymNet_ActionSpace_MatchesGymnasium() {
-            using PyHandle python = PyGym.Evaluate("gymnasium.make('CartPole-v1').unwrapped.action_space");
+            using PyRef python = PyRef.Of(() => MadeSpace("CartPole-v1", Python.gymnasium.Env.action_space));
             var space = (Discrete)new CartPoleEnv(NullEnvViewer.Factory).ActionSpace;
-            ByteContract.AssertSame("CartPole action_space.n", python.Get("n"), Outcome.Returned(ValueFacts.Of(space.N)));
-            ByteContract.AssertSame("CartPole action_space.start", python.Get("start"), Outcome.Returned(ValueFacts.Of(space.Start)));
-            ByteContract.AssertSame("CartPole action_space.dtype.str", python.Evaluate("x.dtype.str"), Outcome.Returned(ValueFacts.FromText(space.DType.str)));
+            ByteContract.AssertSame("CartPole action_space.n", Outcome.CapturePython(() => Python.gymnasium.spaces.discrete.Discrete.n(python.Object)), Outcome.Returned(ValueFacts.Of(space.N)));
+            ByteContract.AssertSame("CartPole action_space.start", Outcome.CapturePython(() => Python.gymnasium.spaces.discrete.Discrete.start(python.Object)), Outcome.Returned(ValueFacts.Of(space.Start)));
+            ByteContract.AssertSame("CartPole action_space.dtype", Outcome.CapturePython(() => Python.gymnasium.spaces.space.Space.dtype(python.Object)), Outcome.Returned(ValueFacts.Of(space.DType)));
 
-            python.Invoke("seed", 5L).Expect("action_space.seed(5)");
+            Outcome.CapturePython(() => Python.gymnasium.spaces.space.Space.seed(python.Object, 5)).Expect("action_space.seed(5)");
             space.Seed(5);
             for (int i = 1; i <= 20; i++)
-                ByteContract.AssertSame($"CartPole action_space.sample() #{i} after seed(5)", python.Invoke("sample"), Outcome.Capture(() => space.Sample()));
-            ByteContract.AssertSame("CartPole action_space generator state", python.Evaluate("x.np_random.bit_generator.state"), Outcome.Returned(GeneratorProbe.StateOf(space)));
+                ByteContract.AssertSame($"CartPole action_space.sample() #{i} after seed(5)", Outcome.CapturePython(() => Python.gymnasium.spaces.space.Space.sample(python.Object)), Outcome.Capture(() => space.Sample()));
+            ByteContract.AssertSame("CartPole action_space generator state", RngFacts.OfPythonSpace(python.Object), Outcome.Returned(GeneratorProbe.StateOf(space)));
+        }
+
+        /// <summary>
+        ///     <c>gymnasium.make(env_id).unwrapped.&lt;space&gt;</c>: a space of the bare env, the counterpart of a Gym.NET env's
+        ///     own space. Must run under the GIL.
+        /// </summary>
+        /// <param name="envId">The registered id.</param>
+        /// <param name="space">The facade row that reads the space off the env (<c>Env.action_space</c> or <c>Env.observation_space</c>).</param>
+        /// <param name="kwargs">Constructor keyword arguments in Python spelling, or <see langword="null"/>.</param>
+        /// <returns>A new owned reference to the space; the envs themselves are released.</returns>
+        /// <exception cref="PythonException">Thrown when making the env or reading the space raises.</exception>
+        internal static PyObject MadeSpace(string envId, Func<PyObject, PyObject> space, IReadOnlyDictionary<string, object?>? kwargs = null) {
+            using PyObject made = Python.gymnasium.make(envId, kwargs: kwargs);
+            using PyObject unwrapped = Python.gymnasium.Env.unwrapped(made);
+            return space(unwrapped);
         }
     }
 }

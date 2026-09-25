@@ -78,13 +78,16 @@ tests/Gym.Tests.Parity/                 live-interop test project (net8.0;net10.
   Session/NativeEnvironment.cs          determinism variables through the C runtime (see below)
   Session/StackManifest.cs              tools/parity/manifest.json and the stack report
   Session/RepositoryLayout.cs           the checkout, the submodule's HEAD and its cleanliness
-  Session/ParityTestBase.cs             InteropTestBase port: Scope, Gil(), SkipUnless, SkipOffReferencePlatform
+  Session/ParityTestBase.cs             InteropTestBase port: session check, leak gate, SkipUnless, SkipOffReferencePlatform
   Session/LeakGate.cs                   NumSharp's LiveExports/LiveImports gate, run after every test
-  Oracle/gym_oracle.py                  the Python half: describe(), invoke(), OracleEnv, policies (embedded resource)
-  Oracle/ValueFacts.cs                  the side-neutral description of a value both halves reduce to
+  Interop/PythonRuntime.cs              the pythonic skill's backend: engine start/stop, Run (the GIL), cached Import
+  Interop/Pythonic.cs                   the pythonic tree: static class Python, one facade row per fixed Python call
+  Interop/PyRef.cs                      a Python object a test keeps across GIL sections, released under the GIL
+  Oracle/ValueFacts.cs                  the side-neutral description of a value both halves reduce to (FromPython, Of)
+  Oracle/PyConvert.cs                   CLR value -> Python value marshaling for facade arguments (None, ints, floats, arrays)
   Oracle/ByteContract.cs                the comparer: dtype, shape, bytes, float bits, ulps, key order, exceptions
   Oracle/Outcome.cs                     a call's value or exception; the Python -> .NET exception map (port plan §3.4)
-  Oracle/PyGym.cs, PyGymEnv.cs          live builders: objects from expressions, handles, gymnasium.make envs
+  Oracle/PyGymEnv.cs                    a live gymnasium.make env driven through the tree; the balancing policy
   Oracle/RngFacts.cs, GeneratorProbe.cs PCG64 state in NumPy's bit_generator.state shape
   Pair/GymPair.cs                       lockstep differential runner (§5)
   Pair/Divergence.cs                    first-divergence report (ParityException)
@@ -313,6 +316,17 @@ The positive control is as important: the faithful `CartPoleReference` runs 500 
 - **Byte-identical to Gymnasium today:** `Seeding.NpRandom` (reported seed and PCG64 state for 9 seeds up to `long.MaxValue` and for 2^100 + 7; the negative-seed `Error` and its message; an unseeded generator's 128-bit seed rebuilds it in NumPy); the 15 draw patterns of the port plan's A.6, value for value with the state after each; `Discrete` (samples, masked samples, membership, attributes); `Box` (bounds and their classification, `is_bounded`, samples in every bound category and dtype family, membership); CartPole's action space; LunarLander's discrete action space.
 - **The live form of the offline results:** the float64 CartPole transcription is bit-identical for 4 seeds × 500 steps and through termination; Gym.NET's CartPole now matches Gymnasium's reset state and generator (F2) and differs only by the missing float32 cast (B-13: "casting dotnet to <f4 would make them identical"); from the same state its float32 constants move the state at step 1 (B-11); its frames differ in 2,573, 2,747 and 2,659 pixels at A.9's three states, exactly A.9's counts (B-16).
 - **Found by the live suite:** Gym.NET's `Box(float low, float high, ...)` stores the bounds of a float64 box through `float`, so `Box(-0.1, 0.1, (2,), float64)` has `low` -0.10000000149011612 where Gymnasium has -0.1 (107374182 ulps; open, P2).
+
+**Rebuilt on the pythonic skill on 2026-09-25** (NumSharp's and OptunaSharp's `pythonic`): the Python half is no longer
+an embedded `gym_oracle.py` evaluated from expression strings, but a `static class Python` tree
+(`tests/Gym.Tests.Parity/Interop/Pythonic.cs`) with one facade row per fixed call (`Python.gymnasium.make(...)`,
+`Python.gymnasium.spaces.space.Space.sample(space)`, `Python.numpy.random.Generator.uniform(g, ...)`), an `evalStmts`
+snippet runner for the two small programs that must read as Python (the session bootstrap, a strided NumPy probe), and a
+`PythonRuntime` backend that owns the engine, the GIL entry point and the module cache. Values come back through
+`ValueFacts.FromPython` (NumSharp's `ToNDArray` import for arrays, NumPy's own `dtype.str`/`int()` for scalars), and the
+new session cell `ByteReaders_AgreeOnAnImportedView` pins that import against NumPy's own `tobytes()` for all twelve
+dtype families on a strided, negative-step view. Same verdicts afterwards: 131 cells, 104 gated passing, the same 27
+`[OpenBugs]` failing at the same divergences, net8.0 and net10.0.
 
 **Next steps:**
 1. Wire the suite into CI (port plan §14.8): a Windows reference job that runs `tools/parity/setup_venv.ps1`, then `dotnet test tests/Gym.Tests.Parity --filter "TestCategory!=OpenBugs"` with `GYMNET_PYTHONNET_REQUIRE_ENGINE=1`.

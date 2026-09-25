@@ -3,20 +3,23 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.InteropServices;
+using Gym.Tests.Parity.Interop;
+using Gym.Tests.Parity.Oracle;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using Python.Runtime;
 
 namespace Gym.Tests.Parity.Session {
     /// <summary>
-    ///     The one embedded CPython of the test process, with Gymnasium imported from <c>refs/Gymnasium</c> and the oracle
-    ///     module (<c>Oracle/gym_oracle.py</c>) loaded. <c>[AssemblyInitialize]</c> starts it and <c>[AssemblyCleanup]</c>
-    ///     stops it, because CPython and NumPy cannot be initialized again after <c>Py_Finalize</c> in the same process.
+    ///     The one embedded CPython of the test process, with Gymnasium imported from <c>refs/Gymnasium</c>.
+    ///     <c>[AssemblyInitialize]</c> starts it and <c>[AssemblyCleanup]</c> stops it, because CPython and NumPy cannot be
+    ///     initialized again after <c>Py_Finalize</c> in the same process.
     /// </summary>
     /// <remarks>
     ///     <para>
     ///     Port of NumSharp's <c>PythonSession</c> (<c>refs/NumSharp/test/NumSharp.Tests.Interop</c>), extended per
     ///     docs/plans/GYM_PARITY_INTEROP_TESTING.md §3–§4: a parity venv, deterministic interpreter settings, and a stack
-    ///     check against <c>tools/parity/manifest.json</c>.
+    ///     check against <c>tools/parity/manifest.json</c>. The engine itself is <see cref="PythonRuntime"/>, the pythonic
+    ///     skill's backend; everything the session asks Python goes through the <see cref="Python"/> tree.
     ///     </para>
     ///     <para>
     ///     Failures here never throw out of <see cref="Start"/>: an exception from an assembly initializer would abort the run
@@ -38,9 +41,6 @@ namespace Gym.Tests.Parity.Session {
         /// </summary>
         public const string AllowStackDriftVariable = "GYMNET_PARITY_ALLOW_STACK_DRIFT";
 
-        /// <summary>The name the oracle module is registered under in <c>sys.modules</c>.</summary>
-        public const string OracleModuleName = "gym_oracle";
-
         /// <summary>
         ///     Process state that must be fixed before the interpreter starts: a fixed string hash (set iteration order), no
         ///     bytecode written into the <c>refs/Gymnasium</c> submodule, headless pygame, and single-threaded BLAS so a
@@ -57,13 +57,23 @@ namespace Gym.Tests.Parity.Session {
             ("MKL_NUM_THREADS", "1"),
         };
 
-        /// <summary>Whether <c>PythonEngine.Initialize</c> ran, so <see cref="Stop"/> must shut it down even if the bootstrap failed.</summary>
-        private static bool _engineStarted;
+        /// <summary>
+        ///     The bootstrap, run once in the fresh interpreter (the pythonic skill's snippet flavor, since it must read as the
+        ///     Python it is). The interpreter's default <c>sys.path</c> is the base installation's; the probed one is what the
+        ///     chosen executable (a venv's, typically) really uses, so it is adopted when known. <c>refs/Gymnasium</c> goes
+        ///     first, and any other spelling of it is dropped, so that no installed <c>gymnasium</c> can shadow the submodule.
+        /// </summary>
+        private const string BootstrapStatements =
+            "import os, sys\n" +
+            "sys.dont_write_bytecode = True\n" +
+            "if probed_path is not None:\n" +
+            "    sys.path[:] = list(probed_path)\n" +
+            "_root = os.path.normcase(os.path.abspath(gymnasium_root))\n" +
+            "sys.path[:] = [gymnasium_root] + [p for p in sys.path if os.path.normcase(os.path.abspath(p)) != _root]\n" +
+            "import numpy, gymnasium\n" +
+            "imported = gymnasium.__file__\n";
 
-        /// <summary>The oracle module, owned by the session and disposed under the GIL in <see cref="Stop"/>.</summary>
-        private static PyObject? _oracle;
-
-        /// <summary>Whether the engine started and Gymnasium and the oracle imported. Stack drift does not affect it.</summary>
+        /// <summary>Whether the engine started and Gymnasium imported. Stack drift does not affect it.</summary>
         public static bool Available { get; private set; }
 
         /// <summary>Why <see cref="Available"/> is <see langword="false"/>; empty once the session is up.</summary>
@@ -99,10 +109,6 @@ namespace Gym.Tests.Parity.Session {
         /// </summary>
         public static bool OnReferencePlatform => Manifest != null && string.Equals(Platform, Manifest.ReferencePlatform, StringComparison.Ordinal);
 
-        /// <summary>The loaded oracle module (<c>gym_oracle</c>). Use it under the GIL, and only after <see cref="EnsureReady"/>.</summary>
-        /// <exception cref="InvalidOperationException">Thrown when the session is not available.</exception>
-        internal static PyObject Oracle => _oracle ?? throw new InvalidOperationException($"The Python session is not available: {Reason}");
-
         /// <summary>Whether a missing engine fails tests; read once from <see cref="RequireEngineVariable"/>.</summary>
         private static bool RequireEngine => ReadFlag(RequireEngineVariable, defaultValue: true);
 
@@ -110,8 +116,8 @@ namespace Gym.Tests.Parity.Session {
         private static bool AllowStackDrift => ReadFlag(AllowStackDriftVariable, defaultValue: false);
 
         /// <summary>
-        ///     Starts the engine: finds the checkout, the manifest and a Python, fixes the process state, initializes
-        ///     pythonnet, imports Gymnasium from the submodule, loads the oracle and checks the stack.
+        ///     Starts the engine: finds the checkout, the manifest and a Python, fixes the process state, initializes the
+        ///     runtime, imports Gymnasium from the submodule and checks the stack.
         /// </summary>
         /// <param name="context">The run's context (unused; MSTest requires the parameter).</param>
         [AssemblyInitialize]
@@ -130,20 +136,17 @@ namespace Gym.Tests.Parity.Session {
                     return;
                 }
 
+                // Through the C runtime, before the interpreter exists: CPython reads its settings once, at initialization.
                 foreach (var (name, value) in DeterministicEnvironment)
                     NativeEnvironment.Set(name, value);
 
-                Runtime.PythonDLL = Installation.LibraryPath;
-                PythonEngine.Initialize();
-                _engineStarted = true;
-                // Initialize leaves this thread holding the GIL; release it, so that test threads can take it with Py.GIL().
-                PythonEngine.BeginAllowThreads();
-
-                Dictionary<string, string> live;
-                using (Py.GIL()) {
-                    Bootstrap(Repository, Installation);
-                    live = ReadLiveStack();
-                }
+                PythonRuntime.Initialize(Installation.LibraryPath);
+                RepositoryLayout repository = Repository;
+                PythonInstallation installation = Installation;
+                Dictionary<string, string> live = PythonRuntime.Run(() => {
+                    Bootstrap(repository, installation);
+                    return ReadLiveStack();
+                });
 
                 Stack = CheckStack(Repository, Manifest, Installation, live);
                 Available = true;
@@ -155,25 +158,18 @@ namespace Gym.Tests.Parity.Session {
         }
 
         /// <summary>
-        ///     Shuts the engine down at the end of the run, after releasing the oracle module under the GIL. A failure is only
-        ///     traced: the test results are already final, and an exception here would hide them behind a cleanup error.
+        ///     Shuts the engine down at the end of the run. A failure is only traced: the test results are already final, and
+        ///     an exception here would hide them behind a cleanup error.
         /// </summary>
         [AssemblyCleanup]
         public static void Stop() {
-            if (!_engineStarted)
+            if (!PythonRuntime.IsInitialized)
                 return;
 
             try {
-                using (Py.GIL()) {
-                    _oracle?.Dispose();
-                    _oracle = null;
-                }
-
-                // pythonnet 3.0.x stashes runtime state with BinaryFormatter, which .NET 8+ removed; NoopFormatter opts out.
-                RuntimeData.FormatterType = typeof(NoopFormatter);
-                PythonEngine.Shutdown();
+                PythonRuntime.Shutdown();
             } catch (Exception e) {
-                Trace.WriteLine($"PythonEngine.Shutdown reported: {e.GetType().Name}: {e.Message}");
+                Trace.WriteLine($"PythonRuntime.Shutdown reported: {e.GetType().Name}: {e.Message}");
             }
         }
 
@@ -204,44 +200,19 @@ namespace Gym.Tests.Parity.Session {
         }
 
         /// <summary>
-        ///     Runs inside the fresh interpreter, under the GIL: stops bytecode from being written into the submodule, adopts
-        ///     the probed interpreter's <c>sys.path</c> with <c>refs/Gymnasium</c> in front, imports Gymnasium, and loads the
-        ///     oracle into <c>sys.modules</c>.
+        ///     Runs <see cref="BootstrapStatements"/> in the fresh interpreter, under the GIL: stops bytecode from being
+        ///     written into the submodule, adopts the probed interpreter's <c>sys.path</c> with <c>refs/Gymnasium</c> in front,
+        ///     and imports NumPy and Gymnasium.
         /// </summary>
         /// <param name="repository">The checkout.</param>
         /// <param name="installation">The embedded Python, whose probed <c>sys.path</c> is adopted when known.</param>
-        /// <exception cref="PythonException">Thrown when Gymnasium or the oracle fails to import.</exception>
-        /// <exception cref="InvalidOperationException">Thrown when the oracle resource is missing from the test assembly.</exception>
+        /// <exception cref="PythonException">Thrown when NumPy or Gymnasium fails to import.</exception>
         private static void Bootstrap(RepositoryLayout repository, PythonInstallation installation) {
-            using (PyModule scope = Py.CreateScope()) {
-                using (var gymnasiumRoot = new PyString(repository.GymnasiumRoot))
-                    scope.Set("gymnasium_root", gymnasiumRoot);
-                if (installation.SysPath is null) {
-                    // Bound in Python rather than through PyObject.None: that is pythonnet's shared instance, and the using
-                    // that disposes every other argument here would dispose it for the whole process.
-                    scope.Exec("probed_path = None");
-                } else {
-                    using PyList probedPath = ToPythonList(installation.SysPath);
-                    scope.Set("probed_path", probedPath);
-                }
-                // The interpreter's default sys.path is the base installation's; the probed one is what the chosen executable
-                // (a venv's, typically) really uses. refs/Gymnasium goes first so that no installed gymnasium can shadow it.
-                scope.Exec(
-                    "import os, sys\n" +
-                    "sys.dont_write_bytecode = True\n" +
-                    "if probed_path is not None:\n" +
-                    "    sys.path[:] = list(probed_path)\n" +
-                    "_root = os.path.normcase(os.path.abspath(gymnasium_root))\n" +
-                    "sys.path[:] = [gymnasium_root] + [p for p in sys.path if os.path.normcase(os.path.abspath(p)) != _root]\n" +
-                    "import numpy, gymnasium\n");
-            }
-
-            string source = ReadOracleSource();
-            _oracle = PyModule.FromString(OracleModuleName, source);
-            // Registered so that test scopes can `import gym_oracle` and Python code can reach the same module object.
-            using PyObject sys = Py.Import("sys");
-            using PyObject modules = sys.GetAttr("modules");
-            modules.SetItem(OracleModuleName, _oracle);
+            using var gymnasiumRoot = new PyString(repository.GymnasiumRoot);
+            // None through PyConvert (a new reference), never PyObject.None: that is pythonnet's shared instance, and this
+            // using would dispose it for the whole process.
+            using PyObject probedPath = installation.SysPath is null ? PyConvert.ToPython(null) : ToPythonList(installation.SysPath);
+            using PyObject imported = Python.evalStmts(BootstrapStatements, "imported", ("gymnasium_root", gymnasiumRoot), ("probed_path", probedPath));
         }
 
         /// <summary>Converts the probed <c>sys.path</c> to a Python list. Must run under the GIL.</summary>
@@ -257,34 +228,46 @@ namespace Gym.Tests.Parity.Session {
             return list;
         }
 
-        /// <summary>Reads <c>Oracle/gym_oracle.py</c> from the assembly's resources.</summary>
-        /// <returns>The module's source text.</returns>
-        /// <exception cref="InvalidOperationException">Thrown when the resource is missing, i.e. the csproj no longer embeds it.</exception>
-        private static string ReadOracleSource() {
-            const string resource = "Gym.Tests.Parity.Oracle.gym_oracle.py";
-            using Stream? stream = typeof(GymPythonSession).Assembly.GetManifestResourceStream(resource);
-            if (stream is null)
-                throw new InvalidOperationException($"The test assembly does not embed {resource}; see Gym.Tests.Parity.csproj.");
-            using var reader = new StreamReader(stream);
-            return reader.ReadToEnd();
-        }
-
-        /// <summary>Calls <c>gym_oracle.stack()</c>. Must run under the GIL.</summary>
-        /// <returns>The live values by key.</returns>
+        /// <summary>
+        ///     Reads the live versions the manifest pins, plus where <c>gymnasium</c> and <c>numpy</c> were imported from and
+        ///     whether string hashing is deterministic. A package that fails to import is reported as <c>missing (...)</c>
+        ///     rather than thrown, so the report lists every drift at once instead of stopping at the first. Must run under the
+        ///     GIL.
+        /// </summary>
+        /// <returns>The live values by key, in the manifest's spelling.</returns>
+        /// <exception cref="PythonException">Thrown when reading a core value (Gymnasium's, NumPy's, the interpreter's) fails.</exception>
         private static Dictionary<string, string> ReadLiveStack() {
-            var live = new Dictionary<string, string>(StringComparer.Ordinal);
-            using PyObject pairs = Oracle.InvokeMethod("stack");
-            using var tuple = PyTuple.AsTuple(pairs);
-            long count = tuple.Length();
-            for (int i = 0; i < count; i++) {
-                using PyObject pair = tuple[i];
-                using PyObject key = pair[0];
-                using PyObject value = pair[1];
-                live[key.As<string>()] = value.As<string>();
+            var live = new Dictionary<string, string>(StringComparer.Ordinal) {
+                ["gymnasium.version"] = Python.gymnasium.__version__,
+                ["gymnasium.file"] = Python.gymnasium.__file__,
+                ["python.version"] = Python.platform.python_version_t(),
+                ["python.hash_randomization"] = Python.sys.flags.hash_randomization.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                ["numpy.version"] = Python.numpy.__version__,
+                ["numpy.file"] = Python.numpy.__file__,
+            };
+
+            // pygame and Box2D are optional to the interpreter but pinned by the manifest: their absence is a drift to
+            // report with the rest, not a reason to abort the session.
+            try {
+                live["pygame.version"] = Python.pygame.version.ver;
+                live["pygame.sdl"] = Python.pygame.version.SDL;
+            } catch (PythonException error) {
+                live["pygame.version"] = live["pygame.sdl"] = Missing(error);
+            }
+
+            try {
+                live["box2d.version"] = Python.Box2D.__version__;
+            } catch (PythonException error) {
+                live["box2d.version"] = Missing(error);
             }
 
             return live;
         }
+
+        /// <summary>How the stack report shows a package that failed to import.</summary>
+        /// <param name="error">The import's error; its <c>Type</c> is the exception's own field and is not disposed.</param>
+        /// <returns><c>missing (Type: message)</c>.</returns>
+        private static string Missing(PythonException error) => $"missing ({ValueFacts.QualifiedName(error.Type)}: {error.Message})";
 
         /// <summary>
         ///     Compares the live stack with the manifest and adds the structural checks: Gymnasium comes from the submodule,
@@ -294,7 +277,7 @@ namespace Gym.Tests.Parity.Session {
         /// <param name="repository">The checkout.</param>
         /// <param name="manifest">The pins.</param>
         /// <param name="installation">The embedded Python.</param>
-        /// <param name="live">What <c>gym_oracle.stack()</c> reported.</param>
+        /// <param name="live">What <see cref="ReadLiveStack"/> reported.</param>
         /// <returns>Every check, pins first.</returns>
         private static StackReport CheckStack(RepositoryLayout repository, StackManifest manifest, PythonInstallation installation, IReadOnlyDictionary<string, string> live) {
             var items = new List<StackItem>();
@@ -303,7 +286,7 @@ namespace Gym.Tests.Parity.Session {
                 if (key == "gymnasium.commit")
                     actual = repository.ReadGymnasiumHead(out string detail) ?? $"unreadable ({detail})";
                 else
-                    actual = live.TryGetValue(key, out string? value) ? value : "not reported by gym_oracle.stack()";
+                    actual = live.TryGetValue(key, out string? value) ? value : "not read by the session";
                 items.Add(new StackItem(key, expected, actual, StackManifest.Matches(expected, actual)));
             }
 
@@ -317,13 +300,13 @@ namespace Gym.Tests.Parity.Session {
             else
                 items.Add(new StackItem("gymnasium.clean", "no local modifications", $"unverified: {changes}", Matches: true));
 
-            string hash = live.TryGetValue("python.hash_randomization", out string? h) ? h : "not reported";
+            string hash = live.TryGetValue("python.hash_randomization", out string? h) ? h : "not read";
             items.Add(new StackItem("python.hash_randomization", "0", hash, hash == "0"));
 
             items.Add(new StackItem("python.source", "", installation.Source, Matches: true));
             items.Add(new StackItem("python.library", "", installation.LibraryPath, Matches: true));
             // Which site-packages NumPy came from: with a venv it must be the venv's, not the base installation's.
-            string numpy = live.TryGetValue("numpy.file", out string? n) ? Path.GetDirectoryName(n) ?? n : "not reported";
+            string numpy = live.TryGetValue("numpy.file", out string? n) ? Path.GetDirectoryName(n) ?? n : "not read";
             items.Add(new StackItem("numpy.origin", "", numpy, Matches: true));
             items.Add(new StackItem("platform", manifest.ReferencePlatform, Platform, Matches: true));
             return new StackReport(items);

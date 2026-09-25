@@ -1,5 +1,6 @@
 using System;
 using System.Globalization;
+using Gym.Tests.Parity.Interop;
 using Gym.Tests.Parity.Oracle;
 using Python.Runtime;
 
@@ -37,11 +38,15 @@ namespace Gym.Tests.Parity.Pair {
         public static IActionSource Constant(long action) => new OpenLoopSource(_ => action, $"always {action.ToString(CultureInfo.InvariantCulture)}");
 
         /// <summary>
-        ///     A named <c>gym_oracle</c> policy evaluated on Gymnasium's own last observation, the way the port plan's A.7
-        ///     recorded its trajectories. Both sides receive the policy's action, so the comparison is of dynamics alone even
-        ///     when the .NET side's observations differ.
+        ///     A named policy evaluated on Gymnasium's own last observation, the way the port plan's A.7 recorded its
+        ///     trajectories. Both sides receive the policy's action, so the comparison is of dynamics alone even when the .NET
+        ///     side's observations differ.
         /// </summary>
-        /// <param name="policy">A key of <c>gym_oracle.POLICIES</c>.</param>
+        /// <param name="policy">
+        ///     A policy <see cref="PyGymEnv.Policy"/> knows: <c>cartpole_balance</c> (a proportional-derivative controller
+        ///     computed with Python's float64 arithmetic) or <c>lunar_lander_heuristic</c> (Gymnasium's own
+        ///     <c>lunar_lander.heuristic</c>).
+        /// </param>
         /// <returns>The source.</returns>
         public static IActionSource Policy(string policy) => new PolicySource(policy);
 
@@ -91,20 +96,20 @@ namespace Gym.Tests.Parity.Pair {
 
             /// <inheritdoc />
             public ParityAction Next(GymPair pair) {
-                ParityAction action;
-                using (Py.GIL()) {
+                ParityAction action = PythonRuntime.Run(() => {
                     PyObject python = pair.Python.SampleActionRaw();
                     object dotnet;
                     try {
                         dotnet = pair.DotNet.SampleAction();
                     } catch {
+                        // The Python sample has no owner yet: release it here, under the GIL, before the failure propagates.
                         python.Dispose();
                         throw;
                     }
 
                     // Takes ownership of both samples, so they are released even when the comparison below throws.
-                    action = ParityAction.Sampled(python, dotnet);
-                }
+                    return ParityAction.Sampled(python, dotnet);
+                });
 
                 var differences = ByteContract.Compare("action", action.Facts, ValueFacts.Of(action.DotNet));
                 if (differences.Count > 0) {

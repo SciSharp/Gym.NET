@@ -21,8 +21,9 @@ namespace Gym.Tests.Parity.Session {
         }
 
         /// <summary>
-        ///     The pinned values, keyed as <c>gym_oracle.stack()</c> reports them (<c>numpy.version</c>, ...) plus
-        ///     <c>gymnasium.commit</c>. A value ending in <c>.*</c> matches by prefix.
+        ///     The pinned values, keyed as <see cref="GymPythonSession"/> reads them from the live interpreter
+        ///     (<c>numpy.version</c>, ...) plus <c>gymnasium.commit</c>, which it reads from the submodule's checkout. A value
+        ///     ending in <c>.*</c> matches by prefix.
         /// </summary>
         public IReadOnlyDictionary<string, string> Stack { get; }
 

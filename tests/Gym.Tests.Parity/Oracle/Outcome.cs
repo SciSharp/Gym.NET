@@ -1,11 +1,13 @@
 using System;
 using System.Collections.Generic;
+using Gym.Tests.Parity.Interop;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using Python.Runtime;
 
 namespace Gym.Tests.Parity.Oracle {
     /// <summary>An exception one side raised, reduced to what parity compares: its type and its message.</summary>
     /// <param name="Type">
-    ///     The type: for Python as <c>gym_oracle.type_name</c> prints it (<c>ValueError</c>, <c>gymnasium.error.Error</c>), for
+    ///     The type: for Python as <c>ValueFacts.PythonTypeName</c> prints it (<c>ValueError</c>, <c>gymnasium.error.Error</c>), for
     ///     .NET its full name (<c>NumSharp.ValueError</c>).
     /// </param>
     /// <param name="Message">The message: Python's <c>str(exception)</c>, .NET's <see cref="Exception.Message"/>.</param>
@@ -78,6 +80,28 @@ namespace Gym.Tests.Parity.Oracle {
             }
         }
 
+        /// <summary>
+        ///     Runs a Gymnasium call (a <see cref="Python"/> facade row) under the GIL and describes what it did: the returned
+        ///     value, which is disposed after it is described, or the Python exception it raised, reduced to its type (as
+        ///     <see cref="ValueFacts.PythonTypeName"/> prints it) and <c>str(exception)</c>.
+        /// </summary>
+        /// <param name="call">The call; it returns a new reference that this method disposes.</param>
+        /// <returns>The outcome.</returns>
+        public static Outcome CapturePython(Func<PyObject> call) {
+            return PythonRuntime.Run(() => {
+                PyObject result;
+                try {
+                    result = call();
+                } catch (PythonException exception) {
+                    // Type is the exception's own field, not a new reference: disposing it would break the exception object.
+                    return Threw(new RaisedError(ValueFacts.QualifiedName(exception.Type), exception.Message));
+                }
+
+                using (result)
+                    return Returned(ValueFacts.FromPython(result));
+            });
+        }
+
         /// <summary>The returned value, or a test failure naming the exception when the call raised.</summary>
         /// <param name="context">What was called, for the failure message.</param>
         /// <returns>The value.</returns>
@@ -99,7 +123,7 @@ namespace Gym.Tests.Parity.Oracle {
     ///     <c>Gym.Exceptions</c>, and built-ins NumSharp lacks to <c>Gym.Exceptions</c> as well.
     /// </summary>
     public static class ExceptionMap {
-        /// <summary>Python built-ins that NumSharp ports, by the name <c>gym_oracle.type_name</c> prints for them.</summary>
+        /// <summary>Python built-ins that NumSharp ports, by the name <c>ValueFacts.PythonTypeName</c> prints for them.</summary>
         private static readonly Dictionary<string, string> BuiltIns = new(StringComparer.Ordinal) {
             ["ValueError"] = "NumSharp.ValueError",
             ["TypeError"] = "NumSharp.TypeError",
@@ -114,7 +138,7 @@ namespace Gym.Tests.Parity.Oracle {
         };
 
         /// <summary>The .NET type a Python exception type must correspond to.</summary>
-        /// <param name="pythonType">The Python type as <c>gym_oracle.type_name</c> prints it.</param>
+        /// <param name="pythonType">The Python type as <c>ValueFacts.PythonTypeName</c> prints it.</param>
         /// <returns>
         ///     The expected full .NET type name, or <see langword="null"/> when §3.4 has no rule for the type, in which case
         ///     only the messages can be compared.

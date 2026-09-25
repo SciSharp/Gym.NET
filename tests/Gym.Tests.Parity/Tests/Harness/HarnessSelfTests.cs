@@ -1,6 +1,8 @@
+using System.Collections.Generic;
 using System.Collections.Specialized;
 using System.Linq;
 using Gym.Tests.Parity.Frames;
+using Gym.Tests.Parity.Interop;
 using Gym.Tests.Parity.Oracle;
 using Gym.Tests.Parity.Pair;
 using Gym.Tests.Parity.Reference;
@@ -129,7 +131,9 @@ namespace Gym.Tests.Parity.Tests.Harness {
         /// </summary>
         [TestMethod]
         public void ByteContract_ReportsInfoKeysInADifferentOrder() {
-            ValueFacts python = Eval("{'lives': 3, 'score': 1.5}");
+            // {'lives': 3, 'score': 1.5}, built in that insertion order; the Python ints and float come from PyConvert.
+            var info = new Dictionary<string, object?> { ["lives"] = 3L, ["score"] = 1.5 };
+            ValueFacts python = Outcome.CapturePython(() => PyConvert.ToKwargs(info)).Expect("{'lives': 3, 'score': 1.5}");
 
             var swapped = new OrderedDictionary { { "score", 1.5 }, { "lives", 3L } };
             var failures = ByteContract.Compare("info", python, ValueFacts.Of(swapped));
@@ -147,13 +151,13 @@ namespace Gym.Tests.Parity.Tests.Harness {
         /// </summary>
         [TestMethod]
         public void ByteContract_ReportsAFloat32Reward_WithItsUlpDistance() {
-            ValueFacts python = Eval("0.1");
+            ValueFacts python = PythonFloat(0.1);
             var failures = ByteContract.Compare("reward", python, ValueFacts.Of(0.1f), FieldPolicy.Float64Value);
             TestContext.WriteLine(string.Join("\n", failures));
             Assert.AreEqual(1, failures.Count);
             StringAssert.Contains(failures[0].Detail, "107374182 ulp apart in float64");
             Assert.AreEqual(0, ByteContract.Compare("reward", python, ValueFacts.Of(0.1), FieldPolicy.Float64Value).Count, "The same double matches.");
-            Assert.AreEqual(0, ByteContract.Compare("reward", Eval("1.0"), ValueFacts.Of(1.0f), FieldPolicy.Float64Value).Count, "A float32 value that widens exactly matches under the float64-value policy.");
+            Assert.AreEqual(0, ByteContract.Compare("reward", PythonFloat(1.0), ValueFacts.Of(1.0f), FieldPolicy.Float64Value).Count, "A float32 value that widens exactly matches under the float64-value policy.");
         }
 
         /// <summary>
@@ -163,17 +167,26 @@ namespace Gym.Tests.Parity.Tests.Harness {
         [TestMethod]
         public void LeakGate_ReportsAnExportPythonStillHolds() {
             LeakGate.Baseline baseline = LeakGate.Capture();
+            // A Python list holding the exported view stands for any Python-side owner (an env storing an action): the C#
+            // handle is gone, but Python still pins the NumSharp buffer.
+            PyRef holder;
             using (NDArray values = np.arange(8.0)) {
-                using (Gil()) {
+                holder = PyRef.Of(() => {
                     using PyObject exported = values.ToNumpy();
-                    Scope.Set("held", exported);
-                }
+                    var list = new PyList();
+                    list.Append(exported);
+                    return list;
+                });
             }
 
-            Assert.IsFalse(LeakGate.WaitForReturn(baseline, 500, out string held), "A live export must keep the gate from settling.");
-            TestContext.WriteLine(held);
+            try {
+                Assert.IsFalse(LeakGate.WaitForReturn(baseline, 500, out string held), "A live export must keep the gate from settling.");
+                TestContext.WriteLine(held);
+            } finally {
+                // Releasing the list drops the last Python reference to the view; its weakref finalizer ends the export.
+                holder.Dispose();
+            }
 
-            Exec("del held");
             Assert.IsTrue(LeakGate.WaitForReturn(baseline, 10_000, out string released), $"Releasing the export must settle the gate: {released}.");
         }
 
@@ -183,7 +196,9 @@ namespace Gym.Tests.Parity.Tests.Harness {
         /// </summary>
         [TestMethod]
         public void ByteContract_ReportsADtypeWidth_EvenWhenTheValuesAgree() {
-            ValueFacts python = Eval("np.array([1.5, -2.25, 0.1], dtype=np.float32)");
+            // np.array([1.5, -2.25, 0.1], dtype=np.float32): NumPy rounds 0.1 to float32 exactly as the (float) cast does.
+            using NDArray narrow = np.array(new[] { 1.5f, -2.25f, 0.1f });
+            ValueFacts python = Outcome.CapturePython(() => narrow.ToNumpyCopy()).Expect("np.array([1.5, -2.25, 0.1], dtype=np.float32)");
             using NDArray wider = np.array(new[] { 1.5, -2.25, (double)0.1f });
             var failures = ByteContract.Compare("observation", python, ValueFacts.Of(wider));
             TestContext.WriteLine(string.Join("\n", failures));
@@ -198,7 +213,7 @@ namespace Gym.Tests.Parity.Tests.Harness {
         /// </summary>
         [TestMethod]
         public void ByteContract_TreatsANumpyScalarAsA0dArray_OfTheSameDtypeOnly() {
-            ValueFacts python = Eval("np.int64(3)");
+            ValueFacts python = Outcome.CapturePython(() => Python.numpy.int64(3)).Expect("np.int64(3)");
             using NDArray same = NDArray.Scalar<long>(3L);
             using NDArray narrower = NDArray.Scalar<int>(3);
             using NDArray vector = np.array(new[] { 3L });
@@ -207,13 +222,23 @@ namespace Gym.Tests.Parity.Tests.Harness {
             Assert.AreEqual(1, ByteContract.Compare("value", python, ValueFacts.Of(vector)).Count, "A scalar against a (1,) array is a difference.");
         }
 
+        /// <summary>A Python <c>float</c>, described as the Python side describes one (<c>&lt;f8</c> bits).</summary>
+        /// <param name="value">The value.</param>
+        /// <returns>The description.</returns>
+        private static ValueFacts PythonFloat(double value) {
+            return Outcome.CapturePython(() => PyConvert.ToPython(value)).Expect($"float({value.ToString("R", System.Globalization.CultureInfo.InvariantCulture)})");
+        }
+
         /// <summary>
         ///     Error parity: a Python <c>ValueError</c> matches a <c>NumSharp.ValueError</c> with the same message (port plan
         ///     §3.4), and is reported against the wrong .NET type, against a different message, and against a return.
         /// </summary>
         [TestMethod]
         public void ByteContract_ComparesRaisedExceptions_ByMappedTypeAndMessage() {
-            Outcome python = PyGym.Invoke("int", "x");
+            Outcome python = Outcome.CapturePython(() => {
+                using var text = new PyString("x");
+                return Python.builtins.@int(text);
+            });
             Assert.IsNotNull(python.Raised);
             string message = python.Raised!.Message;
 
