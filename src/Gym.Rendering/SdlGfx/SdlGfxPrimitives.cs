@@ -38,7 +38,7 @@ using System.Collections.Generic;
 
 namespace Gym.Rendering.SdlGfx {
     /// <summary>
-    ///     The SDL_gfx 2.0.26 primitives behind <c>pygame.gfxdraw</c>, ported instruction for instruction so every pixel
+    ///     The SDL_gfx 2.0.26 primitives behind <c>pygame.gfxdraw</c>, reproduced instruction for instruction so every pixel
     ///     matches what pygame-ce 2.5.8 draws: the same Sint16 coordinates and wrap-arounds, the same single-precision
     ///     clipping arithmetic, the same fixed-point anti-aliasing weights, the same blend rounding.
     /// </summary>
@@ -55,6 +55,7 @@ namespace Gym.Rendering.SdlGfx {
     ///     Return values keep SDL_gfx's convention: 0 for success, -1 for a rejected argument (a negative radius), which
     ///     <see cref="GfxDraw"/> turns into pygame's error.
     ///     </para>
+    ///     <para>Reference: <see href="https://github.com/pygame-community/pygame-ce/blob/2.5.8/src_c/SDL_gfx/SDL_gfxPrimitives.c">src_c/SDL_gfx/SDL_gfxPrimitives.c</see> (as vendored by pygame-ce 2.5.8).</para>
     /// </remarks>
     internal static class SdlGfxPrimitives {
         /// <summary>Anti-aliasing bits: the weight of an anti-aliased pixel is the top 8 bits of the error accumulator.</summary>

@@ -9,19 +9,19 @@ using NumSharp;
 
 namespace Gym.Tests.Parity.Pair {
     /// <summary>
-    ///     Puts a Gym.NET env (possibly a stack of wrappers) into a <see cref="GymPair"/> through Gymnasium's own contract,
-    ///     <see cref="IEnv"/>: <c>Reset(seed)</c> returns <c>(obs, info)</c>, <c>Step</c> the 5-tuple with a float64 reward.
-    ///     Nothing is adapted, so <see cref="Adaptations"/> is empty and every value compared is exactly what the port
-    ///     returns.
+    ///     Puts a Gym.NET env (possibly a stack of wrappers) into a <see cref="GymPair"/> through <see cref="IEnv"/>, the
+    ///     contract Gymnasium's envs follow too: <c>Reset(seed)</c> returns <c>(obs, info)</c>, <c>Step</c> the 5-tuple with a
+    ///     float64 reward. Nothing is adapted, so <see cref="Adaptations"/> is empty and every value compared is exactly what
+    ///     Gym.NET returns.
     /// </summary>
     /// <remarks>
     ///     <para>
     ///     Attributes are read and written the way the Python side does it, on the innermost env and by Python name
-    ///     (<c>env.unwrapped.state</c>), through the port's own attribute protocol (<see cref="PyAttributes"/>), so the cells
+    ///     (<c>env.unwrapped.state</c>), through Gym.NET's attribute protocol (<see cref="PyAttributes"/>), so the cells
     ///     exercise it too.
     ///     </para>
     ///     <para>
-    ///     Every observation is a fresh array since the core-API port (B-13 is fixed, and every env returns a new array per
+    ///     Every observation is a fresh array since the core-API work (B-13 is fixed, and every env returns a new array per
     ///     call), so this adapter describes and then disposes it, keeping NumSharp's leak gate meaningful.
     ///     </para>
     /// </remarks>

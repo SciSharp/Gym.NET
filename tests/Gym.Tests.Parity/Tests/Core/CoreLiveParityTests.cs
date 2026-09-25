@@ -17,8 +17,7 @@ using Python.Runtime;
 
 namespace Gym.Tests.Parity.Tests.Core {
     /// <summary>
-    ///     The core API (port plan P1) against <c>gymnasium/core.py</c>, <c>gymnasium/wrappers/common.py</c>,
-    ///     <c>gymnasium/envs/registration.py</c> and <c>gymnasium/utils/step_api_compatibility.py</c> @ 9e04324, live: the
+    ///     The core API (port plan P1) against Gymnasium's, live: the
     ///     wrapper stack <c>make</c> builds against Gym.NET's through truncation, <c>TimeLimit</c> and <c>OrderEnforcing</c>
     ///     call by call, the attribute protocol (<c>get_wrapper_attr</c>, plain <c>getattr</c>/<c>setattr</c>, read-only
     ///     properties), <c>np_random</c>/<c>np_random_seed</c>, <c>render()</c> without a render mode, <c>EnvSpec</c>'s
@@ -30,6 +29,8 @@ namespace Gym.Tests.Parity.Tests.Core {
     ///     validates, so every compared value is unaffected. Entry points name modules, which differ by design
     ///     (<c>gymnasium.core:Wrapper</c> against <c>Gym.Envs:Wrapper</c>), so spec cells use stacks whose wrappers edit the spec
     ///     rather than append a <c>WrapperSpec</c>, or build <c>WrapperSpec</c>s with the same strings on both sides.
+    ///     Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/core.py">gymnasium/core.py</see>, <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/wrappers/common.py">gymnasium/wrappers/common.py</see>,
+    ///     <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/envs/registration.py">gymnasium/envs/registration.py</see> and <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/utils/step_api_compatibility.py">gymnasium/utils/step_api_compatibility.py</see>.
     /// </remarks>
     [TestClass]
     public sealed class CoreLiveParityTests : ParityTestBase {

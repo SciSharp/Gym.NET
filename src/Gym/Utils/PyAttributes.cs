@@ -9,9 +9,9 @@ using NumSharp;
 
 namespace Gym.Utils {
     /// <summary>
-    ///     Names a property or field by the Python attribute it ports, where the default mapping (the snake_case form of the
-    ///     C# name) would not give it: <c>[PyName("_disable_render_order_enforcing")]</c>. A non-public member takes part in
-    ///     Python attribute access only when it carries this attribute.
+    ///     Names a property or field by the Python attribute it stands for, where the default mapping (the snake_case form
+    ///     of the C# name) would not give it: <c>[PyName("_disable_render_order_enforcing")]</c>. A non-public member takes
+    ///     part in Python attribute access only when it carries this attribute.
     /// </summary>
     [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field, AllowMultiple = false, Inherited = true)]
     public sealed class PyNameAttribute : Attribute {
@@ -34,7 +34,7 @@ namespace Gym.Utils {
     }
 
     /// <summary>
-    ///     Python's <c>hasattr</c>, <c>getattr</c> and <c>setattr</c> for .NET objects that port Python classes: the declared
+    ///     Python's <c>hasattr</c>, <c>getattr</c> and <c>setattr</c> for .NET objects that mirror Python classes: the declared
     ///     attributes are the public instance properties and fields (named by <see cref="PyNameAttribute"/>, or the
     ///     snake_case of the C# name: <c>NpRandomSeed</c> is <c>np_random_seed</c>) plus non-public members marked with
     ///     <see cref="PyNameAttribute"/>; objects implementing <see cref="IDynamicAttributes"/> also hold run-time ones.

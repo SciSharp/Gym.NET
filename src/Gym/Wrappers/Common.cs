@@ -11,10 +11,9 @@ using NumSharp;
 
 namespace Gym.Wrappers {
     /// <summary>
-    ///     Port of <c>TimeLimit</c> (<c>gymnasium/wrappers/common.py:42</c> @ 9e04324): truncates the episode once
-    ///     <see cref="MaxEpisodeSteps"/> steps have run since the last reset. This is where the <c>truncated</c> signal comes
-    ///     from for envs that have no limit of their own, as opposed to <c>terminated</c>, which the MDP decides.
-    ///     <c>make</c> adds it when the spec has <c>max_episode_steps</c>.
+    ///     Truncates the episode once <see cref="MaxEpisodeSteps"/> steps have run since the last reset. This is where the
+    ///     <c>truncated</c> signal comes from for envs that have no limit of their own, as opposed to <c>terminated</c>, which
+    ///     the MDP decides. <c>make</c> adds it when the spec has <c>max_episode_steps</c>.
     /// </summary>
     /// <typeparam name="TObs">The observation type, passed through.</typeparam>
     /// <typeparam name="TAct">The action type, passed through.</typeparam>
@@ -22,6 +21,7 @@ namespace Gym.Wrappers {
     ///     Stepping before the first reset steps the env and then raises Python's <see cref="TypeError"/> (the step counter is
     ///     still <c>None</c>), exactly as Gymnasium does; <c>OrderEnforcing</c> beneath it catches that mistake first in a
     ///     <c>make</c>-built stack. The step that reaches the limit returns <c>truncated=True</c> even when it also terminates.
+    ///     Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/wrappers/common.py#L42">gymnasium/wrappers/common.py</see>.
     /// </remarks>
     public class TimeLimit<TObs, TAct> : Wrapper<TObs, TAct>, IRecordConstructorArgs {
         /// <summary>Wraps <paramref name="env"/> with a step limit.</summary>
@@ -132,12 +132,13 @@ namespace Gym.Wrappers {
     }
 
     /// <summary>
-    ///     Port of <c>OrderEnforcing</c> (<c>gymnasium/wrappers/common.py:344</c> @ 9e04324): raises
-    ///     <see cref="ResetNeeded"/> when <c>step</c> or <c>render</c> is called before the first <c>reset</c>, which would
-    ///     otherwise fail somewhere inside the env. <c>make</c> adds it unless the spec disables <c>order_enforce</c>.
+    ///     Raises <see cref="ResetNeeded"/> when <c>step</c> or <c>render</c> is called before the first <c>reset</c>, a
+    ///     mistake that would otherwise fail somewhere inside the env with a less helpful error. <c>make</c> adds it unless the
+    ///     spec disables <c>order_enforce</c>.
     /// </summary>
     /// <typeparam name="TObs">The observation type, passed through.</typeparam>
     /// <typeparam name="TAct">The action type, passed through.</typeparam>
+    /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/wrappers/common.py#L344">gymnasium/wrappers/common.py</see>.</remarks>
     public class OrderEnforcing<TObs, TAct> : Wrapper<TObs, TAct>, IRecordConstructorArgs {
         /// <summary>Whether <see cref="Reset"/> ran (Python's <c>_has_reset</c>).</summary>
         [PyName("_has_reset")]

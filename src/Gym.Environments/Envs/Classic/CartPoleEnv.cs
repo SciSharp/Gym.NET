@@ -17,11 +17,10 @@ using Vector2 = Gym.Rendering.Vector2;
 
 namespace Gym.Environments.Envs.Classic {
     /// <summary>
-    ///     Port of Gymnasium's <c>CartPoleEnv</c> (<c>gymnasium/envs/classic_control/cartpole.py</c> @ 9e04324), CartPole-v1:
-    ///     a pole hinged on a cart that is pushed left (action 0) or right (action 1) with a fixed force, until the pole leans
-    ///     more than 12° or the cart leaves ±2.4. Byte for byte what Gymnasium computes: the same float64 dynamics in the same
-    ///     operation order, float32 observations, rewards, termination, warnings, errors, reset options, <c>rgb_array</c>
-    ///     pixels and human-mode pacing.
+    ///     CartPole-v1: a pole hinged on a cart that is pushed left (action 0) or right (action 1) with a fixed force, until
+    ///     the pole leans more than 12° or the cart leaves ±2.4. Byte for byte what Gymnasium's CartPole computes: the same
+    ///     float64 dynamics in the same operation order, float32 observations, rewards, termination, warnings, errors, reset
+    ///     options, <c>rgb_array</c> pixels and human-mode pacing.
     /// </summary>
     /// <remarks>
     ///     <para>
@@ -41,6 +40,7 @@ namespace Gym.Environments.Envs.Classic {
     ///     The unwrapped env never truncates: <c>TimeLimit</c> adds the 500-step limit of CartPole-v1, as <c>make</c> does.
     ///     Not thread-safe: step, reset and render an instance from one thread at a time.
     ///     </para>
+    ///     <para>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/envs/classic_control/cartpole.py#L20">gymnasium/envs/classic_control/cartpole.py</see>.</para>
     /// </remarks>
     public class CartPoleEnv : Env<NDArray, long> {
         /// <summary>
@@ -183,9 +183,9 @@ namespace Gym.Environments.Envs.Classic {
         public int? StepsBeyondTerminated { get; set; }
 
         /// <summary>
-        ///     Port of <c>reset(seed=seed, options=options)</c>: reseeds <see cref="Env{TObs, TAct}.NpRandom"/> when a seed is
-        ///     given, then draws the four state variables from <c>uniform(low, high, size=(4,))</c>, with <c>low</c>/<c>high</c>
-        ///     from the options (default ±0.05), and clears <see cref="StepsBeyondTerminated"/>. Renders in human mode.
+        ///     Starts an episode: reseeds <see cref="Env{TObs, TAct}.NpRandom"/> when a seed is given, then draws the four
+        ///     state variables from <c>uniform(low, high, size=(4,))</c>, with <c>low</c>/<c>high</c> from the options (default
+        ///     ±0.05), and clears <see cref="StepsBeyondTerminated"/>. Renders in human mode.
         /// </summary>
         /// <param name="seed">The seed of a fresh <c>Generator(PCG64(SeedSequence(seed)))</c>, or <see langword="null"/> to keep the current generator.</param>
         /// <param name="options">
@@ -201,7 +201,7 @@ namespace Gym.Environments.Envs.Classic {
         /// </exception>
         /// <remarks>
         ///     The seed is applied before the options are parsed, as <c>super().reset(seed=seed)</c> runs first: a reset that
-        ///     fails on its options still leaves the freshly seeded generator, undrawn.
+        ///     fails on its options still leaves the freshly seeded generator, undrawn. Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/envs/classic_control/cartpole.py#L228">gymnasium/envs/classic_control/cartpole.py</see>.
         /// </remarks>
         public override ResetResult<NDArray> Reset(BigInteger? seed = null, IReadOnlyDictionary<string, object?>? options = null) {
             SeedNpRandom(seed);
@@ -217,9 +217,8 @@ namespace Gym.Environments.Envs.Classic {
         }
 
         /// <summary>
-        ///     Port of <c>step(action)</c>: pushes the cart left (0) or right (1) with <see cref="ForceMag"/> and integrates one
-        ///     step of <see cref="Tau"/> seconds with Gymnasium's equations, operation for operation in float64. Renders in
-        ///     human mode.
+        ///     Pushes the cart left (0) or right (1) with <see cref="ForceMag"/> and integrates one step of <see cref="Tau"/>
+        ///     seconds with Gymnasium's equations, operation for operation in float64. Renders in human mode.
         /// </summary>
         /// <param name="action">An element of <c>Discrete(2)</c>: 0 or 1.</param>
         /// <returns>
@@ -231,7 +230,10 @@ namespace Gym.Environments.Envs.Classic {
         ///     and before the first reset (<c>Call reset before using step method.</c>), in that order.
         /// </exception>
         /// <exception cref="ValueError">Thrown when an assigned <see cref="State"/> does not hold exactly four values (Python's unpacking error).</exception>
-        /// <remarks>Stepping after termination warns once through <see cref="Logger.Warn"/>, as Gymnasium does, and keeps going.</remarks>
+        /// <remarks>
+        ///     Stepping after termination warns once through <see cref="Logger.Warn"/>, as Gymnasium does, and keeps going.
+        ///     Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/envs/classic_control/cartpole.py#L164">gymnasium/envs/classic_control/cartpole.py</see>.
+        /// </remarks>
         public override StepResult<NDArray> Step(long action) {
             // The asserts of the source, in its order: the action first, then the reset.
             AssertValidAction(action);
@@ -293,9 +295,9 @@ namespace Gym.Environments.Envs.Classic {
         }
 
         /// <summary>
-        ///     Port of <c>render()</c>: draws the frame pygame draws, with the same primitives in the same order (Gym.Rendering's
-        ///     SDL_gfx port), so the <c>rgb_array</c> pixels are Gymnasium's exactly. The track is at <c>y = 100</c> in a y-up
-        ///     world, flipped vertically at the end.
+        ///     Draws the frame Gymnasium's CartPole draws with pygame, with the same primitives in the same order (Gym.Rendering
+        ///     reproduces SDL_gfx), so the <c>rgb_array</c> pixels are Gymnasium's exactly. The track is at <c>y = 100</c> in a
+        ///     y-up world, flipped vertically at the end.
         /// </summary>
         /// <returns>
         ///     <c>rgb_array</c>: the <c>(400, 600, 3)</c> uint8 frame, a new array the caller owns. <c>human</c>: nothing, after
@@ -312,7 +314,7 @@ namespace Gym.Environments.Envs.Classic {
         /// <remarks>
         ///     Without a render mode, Gymnasium asserts the env has a spec and warns once (<c>You are calling render method
         ///     without specifying any render mode. ...</c>), naming the spec's id; an env built with its constructor has no
-        ///     spec, so it raises the bare <see cref="AssertionError"/>, as Python's does.
+        ///     spec, so it raises the bare <see cref="AssertionError"/>, as Python's does. Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/envs/classic_control/cartpole.py#L249">gymnasium/envs/classic_control/cartpole.py</see>.
         /// </remarks>
         public override RenderResult Render() {
             if (RenderMode is null) {
@@ -403,10 +405,11 @@ namespace Gym.Environments.Envs.Classic {
         }
 
         /// <summary>
-        ///     Port of <c>close()</c>: once something was rendered, shuts the human-mode window down and marks the env closed
-        ///     (<see cref="IsOpen"/>). Like Python's, it keeps <see cref="Screen"/>, so a later <c>rgb_array</c> render reuses
-        ///     it; a later human render opens a new window from the factory.
+        ///     Once something was rendered, shuts the human-mode window down and marks the env closed (<see cref="IsOpen"/>).
+        ///     Like Gymnasium's, it keeps <see cref="Screen"/>, so a later <c>rgb_array</c> render reuses it; a later human
+        ///     render opens a new window from the factory.
         /// </summary>
+        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/envs/classic_control/cartpole.py#L346">gymnasium/envs/classic_control/cartpole.py</see>.</remarks>
         public override void Close() {
             if (Screen is not null) {
                 // pygame.display.quit(); pygame.quit()

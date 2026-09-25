@@ -10,9 +10,10 @@ using NumSharp;
 namespace Gym.Tests.Envs.Classic {
     /// <summary>
     ///     <see cref="ClassicControlUtils"/> and CartPole's <c>Reset(seed, options)</c> against Gymnasium's answers (recorded
-    ///     from <c>refs/Gymnasium</c> @ 9e04324): which bounds are accepted, the messages of the rejected ones, and the order
-    ///     of seeding and parsing.
+    ///     from <c>refs/Gymnasium</c>): which bounds are accepted, the messages of the rejected ones, and the order of seeding
+    ///     and parsing.
     /// </summary>
+    /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/envs/classic_control/utils.py">gymnasium/envs/classic_control/utils.py</see>.</remarks>
     [TestClass]
     public class ClassicControlUtilsTests {
         /// <summary>Without options, or without the keys, the defaults are used; present keys win, numeric strings included.</summary>

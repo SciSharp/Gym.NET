@@ -7,15 +7,14 @@ using NumSharp;
 
 namespace Gym.Envs {
     /// <summary>
-    ///     Gymnasium's <c>metadata</c> dict: an <see cref="Info"/> with the keys Gymnasium reads spelled as they are in Python
+    ///     An env's <c>metadata</c> dict: an <see cref="Info"/> with the keys Gym reads spelled as they are in Python
     ///     (<c>"render_modes"</c>, <c>"render_fps"</c>), plus typed accessors for them. Iteration order, equality and
     ///     <c>repr</c> are a dict's, so <c>{'render_modes': ['human', 'rgb_array'], 'render_fps': 50}</c> prints and compares
     ///     as in Python.
     /// </summary>
     /// <remarks>
-    ///     Store Python lists as <see cref="List{T}"/> and Python ints as <see langword="long"/>, the forms the rest of the
-    ///     port and the parity suite read back as Python's; the typed accessors also accept any string sequence and any
-    ///     number.
+    ///     Store Python lists as <see cref="List{T}"/> and Python ints as <see langword="long"/>, the forms the rest of Gym.NET
+    ///     and the parity suite read back as Python's; the typed accessors also accept any string sequence and any number.
     /// </remarks>
     public class Metadata : Info {
         /// <summary>The key of the supported render modes, a list of strings.</summary>

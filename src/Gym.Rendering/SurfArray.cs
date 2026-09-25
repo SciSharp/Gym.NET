@@ -2,7 +2,11 @@ using System;
 using NumSharp;
 
 namespace Gym.Rendering {
-    /// <summary>Port of the part of <c>pygame.surfarray</c> Gymnasium's envs use to hand out <c>rgb_array</c> frames.</summary>
+    /// <summary>
+    ///     The part of <c>pygame.surfarray</c> Gymnasium's envs use to hand out <c>rgb_array</c> frames: a surface's pixels as
+    ///     a uint8 array in pygame's axis order, or already transposed into the frame an env returns.
+    /// </summary>
+    /// <remarks>Reference: <see href="https://github.com/pygame-community/pygame-ce/blob/2.5.8/src_py/surfarray.py#L187">src_py/surfarray.py</see> (pygame-ce 2.5.8).</remarks>
     public static class SurfArray {
         /// <summary>
         ///     <c>pygame.surfarray.array3d(surface)</c>, equivalently <c>np.array(pygame.surfarray.pixels3d(surface))</c>: a

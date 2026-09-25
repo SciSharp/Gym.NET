@@ -11,18 +11,19 @@ using NumSharp;
 
 namespace Gym.Tests.Ported {
     /// <summary>
-    ///     Port of <c>tests/testing_env.py</c> @ 9e04324: <see cref="GenericTestEnv"/>, the env Gymnasium's tests build with
-    ///     custom reset, step and render functions, and the default functions.
+    ///     The default functions of <see cref="GenericTestEnv"/>, the env Gymnasium's tests build with custom reset, step and
+    ///     render functions.
     /// </summary>
     /// <remarks>
     ///     <c>old_reset_func</c> and <c>old_step_func</c> (the pre-0.26 API, for the env checker's tests, P3) and
-    ///     <c>GenericTestVectorEnv</c> (P6) come with the code they test.
+    ///     <c>GenericTestVectorEnv</c> (P6) come with the code they test. Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/tests/testing_env.py">tests/testing_env.py</see>.
     /// </remarks>
     public static class TestingEnv {
         /// <summary>
-        ///     Port of <c>basic_reset_func</c>: seeds the env as <c>super().reset(seed=seed)</c> does, seeds the observation
-        ///     space with the env's <c>np_random_seed</c>, and returns a sample with <c>{"options": options}</c>.
+        ///     The default reset: seeds the env as <c>super().reset(seed=seed)</c> does, seeds the observation space with the
+        ///     env's <c>np_random_seed</c>, and returns a sample with <c>{"options": options}</c>.
         /// </summary>
+        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/tests/testing_env.py#L27">tests/testing_env.py (basic_reset_func)</see>.</remarks>
         /// <param name="self">The env.</param>
         /// <param name="seed">The reset seed.</param>
         /// <param name="options">The reset options, echoed in the info.</param>
@@ -33,7 +34,8 @@ namespace Gym.Tests.Ported {
             return new ResetResult<object?>(self.ObservationSpace.Sample(), new Info { ["options"] = options });
         }
 
-        /// <summary>Port of <c>basic_step_func</c>: a sample of the observation space, reward 0, not terminated or truncated, <c>{}</c>.</summary>
+        /// <summary>The default step: a sample of the observation space, reward 0, not terminated or truncated, <c>{}</c>.</summary>
+        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/tests/testing_env.py#L45">tests/testing_env.py (basic_step_func)</see>.</remarks>
         /// <param name="self">The env.</param>
         /// <param name="action">Ignored.</param>
         /// <returns>The transition.</returns>
@@ -41,21 +43,22 @@ namespace Gym.Tests.Ported {
             return new StepResult<object?>(self.ObservationSpace.Sample(), 0, false, false, new Info());
         }
 
-        /// <summary>Port of <c>basic_render_func</c>: renders nothing.</summary>
+        /// <summary>The default render: renders nothing.</summary>
+        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/tests/testing_env.py#L55">tests/testing_env.py (basic_render_func)</see>.</remarks>
         /// <param name="self">The env.</param>
         /// <returns><see cref="RenderResult.None"/>.</returns>
         public static RenderResult BasicRenderFunc(GenericTestEnv self) => RenderResult.None;
     }
 
     /// <summary>
-    ///     Port of <c>GenericTestEnv</c> (<c>tests/testing_env.py:55</c> @ 9e04324): an env whose reset, step and render are
-    ///     the functions given to the constructor, with <c>Box(0, 1, (1,))</c> spaces and the spec <c>TestingEnv-v0</c>
-    ///     (100 steps) unless told otherwise.
+    ///     An env whose reset, step and render are the functions given to the constructor, with <c>Box(0, 1, (1,))</c> spaces
+    ///     and the spec <c>TestingEnv-v0</c> (100 steps) unless told otherwise.
     /// </summary>
     /// <remarks>
     ///     Observations and actions are <see cref="object"/>, as the Python env takes and returns anything. Python binds the
     ///     functions with <c>types.MethodType</c>; here they are delegates that receive the env. A <see langword="null"/>
     ///     function keeps the method that raises <see cref="NotImplementedError"/>, as not binding one does.
+    ///     Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/tests/testing_env.py#L60">tests/testing_env.py (GenericTestEnv)</see>.
     /// </remarks>
     public sealed class GenericTestEnv : Env<object?, object?> {
         /// <summary>The sentinel of <c>DEFAULT_SPACE</c>: use <c>Box(0, 1, (1,))</c>.</summary>
@@ -71,7 +74,7 @@ namespace Gym.Tests.Ported {
         private readonly Func<GenericTestEnv, RenderResult>? _renderFunc;
 
         /// <summary>
-        ///     Port of <c>GenericTestEnv.__init__</c> with Python's defaults: a <see langword="null"/> argument means the default
+        ///     Builds the env with Gymnasium's defaults: a <see langword="null"/> argument means the default
         ///     (<c>DEFAULT_SPACE</c>, the basic functions). To leave a space unset or a function unbound, as passing Python's
         ///     <c>None</c> does, use the constructor that takes <c>explicitNulls</c>.
         /// </summary>
@@ -83,6 +86,7 @@ namespace Gym.Tests.Ported {
         /// <param name="metadata">The metadata; <see langword="null"/> is <c>{"render_modes": []}</c>.</param>
         /// <param name="renderMode">The render mode.</param>
         /// <param name="spec">The spec; <see langword="null"/> is <c>EnvSpec("TestingEnv-v0", "tests.testing_env:GenericTestEnv", max_episode_steps=100)</c>.</param>
+        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/tests/testing_env.py#L63">tests/testing_env.py (GenericTestEnv.__init__)</see>.</remarks>
         public GenericTestEnv(Space? actionSpace = null, Space? observationSpace = null,
             Func<GenericTestEnv, BigInteger?, IReadOnlyDictionary<string, object?>?, ResetResult<object?>>? resetFunc = null,
             Func<GenericTestEnv, object?, StepResult<object?>>? stepFunc = null, Func<GenericTestEnv, RenderResult>? renderFunc = null,
@@ -158,7 +162,8 @@ namespace Gym.Tests.Ported {
             return _renderFunc(this);
         }
 
-        /// <summary>Port of <c>DefaultTestSpace</c>: a sentinel type standing for "the default space", never sampled.</summary>
+        /// <summary>A sentinel type standing for "the default space", never sampled.</summary>
+        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/tests/testing_env.py#L20">tests/testing_env.py (DefaultTestSpace)</see>.</remarks>
         private sealed class DefaultTestSpace : Space {
             /// <summary>The sentinel.</summary>
             public DefaultTestSpace() : base(Shape.Scalar, np.float32) { }

@@ -2,6 +2,8 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using System.Threading;
+using System.Threading.Tasks;
 using Gym.Envs.Registration;
 using Gym.Exceptions;
 using Gym.Observations;
@@ -10,18 +12,19 @@ using NumSharp;
 
 namespace Gym.Envs {
     /// <summary>
-    ///     Gymnasium's <c>Env</c> contract over <see cref="object"/>: what code that holds envs of any observation and action
-    ///     type (wrappers over unknown envs, the registry, vector envs, the legacy adapter) programs against. Every env is an
+    ///     The env contract over <see cref="object"/>: what code that holds envs of any observation and action type (wrappers
+    ///     over unknown envs, the registry, vector envs, the legacy adapter) programs against. Every env is an
     ///     <see cref="Env{TObs, TAct}"/>, which implements it; its typed members are the ones to call when the types are known.
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///     Members map one to one to <c>gymnasium.Env</c> (<c>gymnasium/core.py:25</c> @ 9e04324) with the port plan's
-    ///     naming (§3.8): <c>step</c> is <see cref="Step"/>, <c>np_random_seed</c> is <see cref="NpRandomSeed"/>,
-    ///     <c>get_wrapper_attr</c> is <see cref="GetWrapperAttr"/>. <see cref="IDisposable.Dispose"/> calls
-    ///     <see cref="Close"/>, the <c>with</c> statement's <c>__exit__</c>.
+    ///     Members follow Gymnasium's <c>Env</c> one to one with the port plan's naming (§3.8): <c>step</c> is
+    ///     <see cref="Step"/>, <c>np_random_seed</c> is <see cref="NpRandomSeed"/>, <c>get_wrapper_attr</c> is
+    ///     <see cref="GetWrapperAttr"/>. <see cref="IDisposable.Dispose"/> calls <see cref="Close"/>, as leaving a Python
+    ///     <c>with</c> block does.
     ///     </para>
-    ///     <para>Not thread-safe, like Gymnasium's envs: step, reset and render an instance from one thread at a time.</para>
+    ///     <para>Not thread-safe: step, reset and render an instance from one thread at a time.</para>
+    ///     <para>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/core.py#L25">gymnasium/core.py</see>.</para>
     /// </remarks>
     public interface IEnv : IDisposable {
         /// <summary>
@@ -72,6 +75,16 @@ namespace Gym.Envs {
         /// <returns>The transition, its observation boxed.</returns>
         /// <exception cref="Exception">Whatever the env raises for the action: an <see cref="AssertionError"/> for an invalid one, a <see cref="ResetNeeded"/> from <c>OrderEnforcing</c>, ....</exception>
         StepResult<object?> Step(object? action);
+
+        /// <summary>
+        ///     Steps asynchronously with an action of any type (see <see cref="Env{TObs, TAct}.StepAsync"/>): by default the step
+        ///     runs on the calling thread and the task completes synchronously; an action that cannot be converted, like any
+        ///     error of the step, faults the task.
+        /// </summary>
+        /// <param name="action">An element of <see cref="ActionSpace"/>.</param>
+        /// <param name="cancellationToken">Checked before the step starts.</param>
+        /// <returns>A value task that completes with the transition, its observation boxed.</returns>
+        ValueTask<StepResult<object?>> StepAsync(object? action, CancellationToken cancellationToken = default);
 
         /// <summary>Starts an episode (<c>reset(seed=seed, options=options)</c>).</summary>
         /// <param name="seed">

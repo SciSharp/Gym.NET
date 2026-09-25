@@ -13,7 +13,7 @@ using Python.Runtime;
 
 namespace Gym.Tests.Parity.Tests.Rendering {
     /// <summary>
-    ///     <c>Gym.Rendering</c> against pygame-ce 2.5.8 itself, primitive by primitive: the SDL_gfx port
+    ///     <c>Gym.Rendering</c> against pygame-ce 2.5.8 itself, primitive by primitive: the SDL_gfx primitives
     ///     (<c>gfxdraw.aapolygon</c>, <c>filled_polygon</c>, <c>aacircle</c>, <c>filled_circle</c>, <c>hline</c>, <c>vline</c>),
     ///     <c>transform.flip</c>, <c>Vector2.rotate_rad</c>, and pygame's argument conversion errors. Every frame must be
     ///     identical to the last pixel, on seeded random shapes that also exercise clipping, translucent colours and Sint16

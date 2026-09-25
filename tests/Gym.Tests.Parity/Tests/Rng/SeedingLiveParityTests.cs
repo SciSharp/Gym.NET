@@ -14,10 +14,11 @@ using Python.Runtime;
 
 namespace Gym.Tests.Parity.Tests.Rng {
     /// <summary>
-    ///     <c>Gym.Utils.Seeding.NpRandom</c> against <c>gymnasium.utils.seeding.np_random</c> (port of <c>seeding.py</c>
-    ///     @ 9e04324), live: the reported seed, the full PCG64 state, the draw patterns Gymnasium's envs and spaces make
-    ///     (port plan Appendix A.6), and the error for a negative seed.
+    ///     <c>Gym.Utils.Seeding.NpRandom</c> against <c>gymnasium.utils.seeding.np_random</c>, live: the reported seed, the
+    ///     full PCG64 state, the draw patterns Gymnasium's envs and spaces make (port plan Appendix A.6), and the error for a
+    ///     negative seed.
     /// </summary>
+    /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/utils/seeding.py#L10">gymnasium/utils/seeding.py</see>.</remarks>
     [TestClass]
     public sealed class SeedingLiveParityTests : ParityTestBase {
         /// <summary>Seeds of A.6 and of the F2 golden, from 0 to beyond 64 bits' worth of Python int.</summary>
@@ -142,8 +143,8 @@ namespace Gym.Tests.Parity.Tests.Rng {
         }
 
         /// <summary>
-        ///     A negative seed raises Gymnasium's <c>gymnasium.error.Error</c> with its message, and Gym.NET throws the port,
-        ///     <c>Gym.Exceptions.Error</c>, with the same message.
+        ///     A negative seed raises Gymnasium's <c>gymnasium.error.Error</c> with its message, and Gym.NET throws its
+        ///     counterpart, <c>Gym.Exceptions.Error</c>, with the same message.
         /// </summary>
         /// <param name="seed">A negative seed, in decimal.</param>
         [TestMethod]

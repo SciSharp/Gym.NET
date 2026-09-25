@@ -6,11 +6,11 @@ using NumSharp;
 
 namespace Gym.Legacy {
     /// <summary>
-    ///     The baselines-style vector env contract Gym.NET had before the core-API port: several legacy envs stepped together.
+    ///     The baselines-style vector env contract Gym.NET had before the core-API work: several legacy envs stepped together.
     ///     <c>gymnasium.vector</c> (<c>VectorEnv</c>, <c>SyncVectorEnv</c>, <c>AsyncVectorEnv</c>) replaces it in P6.
     /// </summary>
     /// <remarks>
-    ///     Moved from <c>Gym.Envs</c> by the core-API port (P1). Its sub-envs are <see cref="ILegacyEnv"/>s: wrap ported envs
+    ///     Moved from <c>Gym.Envs</c> by the core-API work (P1). Its sub-envs are <see cref="ILegacyEnv"/>s: wrap current envs
     ///     in <see cref="LegacyEnvAdapter"/>.
     /// </remarks>
     [Obsolete("The baselines-style VecEnv is legacy (B-33: one action for every sub-env); gymnasium.vector replaces it (P6). Gym.Legacy is removed in 3.0.")]
@@ -21,8 +21,8 @@ namespace Gym.Legacy {
         /// <summary>The vector env's metadata.</summary>
         Dict Metadata { get; set; }
 
-        /// <summary><c>gym</c>'s <c>reward_range</c>.</summary>
-        (float From, float To) RewardRange { get; set; }
+        /// <summary><c>gym</c>'s <c>reward_range</c>, in float64 like the rewards.</summary>
+        (double From, double To) RewardRange { get; set; }
 
         /// <summary>The action space of one sub-env.</summary>
         Space ActionSpace { get; set; }

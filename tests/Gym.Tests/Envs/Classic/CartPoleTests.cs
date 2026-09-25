@@ -22,7 +22,7 @@ namespace Gym.Tests.Envs.Classic {
     /// </summary>
     /// <remarks>
     ///     The tests dispose the initial observations they do not keep. Every observation is a fresh float32 copy of the state
-    ///     (the port fixed B-13's aliasing), so disposing one never touches the env.
+    ///     (P1 fixed B-13's aliasing), so disposing one never touches the env.
     /// </remarks>
     [TestClass]
     public class CartPoleTests {

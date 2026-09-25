@@ -14,12 +14,12 @@ using NumSharp;
 namespace Gym.Tests.Parity {
     /// <summary>
     ///     L3 byte parity with Gymnasium itself: Gym.NET's seeded spaces and CartPole reset replay the committed golden that
-    ///     <c>tools/parity/gymnasium_rng.py</c> recorded from Gymnasium @ 9e04324 (<c>Parity/gymnasium_rng.golden.txt</c>, 783
+    ///     <c>tools/parity/gymnasium_rng.py</c> recorded from <c>refs/Gymnasium</c> (<c>Parity/gymnasium_rng.golden.txt</c>, 783
     ///     values over 9 seeds up to 2^40), and must match it bit for bit.
     /// </summary>
     /// <remarks>
     ///     Both sides draw from NumPy's <c>Generator(PCG64(SeedSequence(seed)))</c>: Gymnasium through
-    ///     <c>seeding.np_random</c>, Gym.NET through <see cref="Seeding.NpRandom"/> and NumSharp's port of the generator. What
+    ///     <c>seeding.np_random</c>, Gym.NET through <see cref="Seeding.NpRandom"/> and NumSharp's implementation of the generator. What
     ///     the golden does not cover yet: CartPole's dynamics (float32 constants, P4), LunarLander (another physics engine
     ///     and draw order, P8), and the spaces Gym.NET does not have.
     /// </remarks>
@@ -136,7 +136,7 @@ namespace Gym.Tests.Parity {
                 using (NDArray s = new Box(0f, 255f, new Shape(8), np.uint8, seed: seed).Sample())
                     Emit(lines, $"box.uint8.s{seed}", s.ToArray<byte>().Select(v => v.ToString(CultureInfo.InvariantCulture)));
 
-                // The golden records Gymnasium's float64 state (env.unwrapped.state) and its float32 observation; the port keeps
+                // The golden records Gymnasium's float64 state (env.unwrapped.state) and its float32 observation; Gym.NET keeps
                 // the state in CartPoleEnv.State and hands out the float32 copy, as Gymnasium does (B-13 fixed).
                 var cartPole = new CartPoleEnv();
                 using (NDArray reset = cartPole.Reset(seed: seed).Observation)

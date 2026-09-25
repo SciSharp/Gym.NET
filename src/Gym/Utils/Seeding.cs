@@ -6,21 +6,21 @@ using NumSharp;
 
 namespace Gym.Utils {
     /// <summary>
-    ///     Port of <c>gymnasium/utils/seeding.py</c> @ 9e04324: the one way Gym.NET's envs and spaces create their random
-    ///     number generators. Every generator is NumPy's <c>Generator(PCG64(SeedSequence(seed)))</c>, NumSharp's bit-exact
-    ///     port of it, so a Gym.NET space or env seeded with <c>s</c> draws exactly what Gymnasium's draws for seed
-    ///     <c>s</c>, provided it makes the same calls.
+    ///     The one way Gym.NET's envs and spaces create their random number generators. Every generator is NumPy's
+    ///     <c>Generator(PCG64(SeedSequence(seed)))</c>, which NumSharp implements bit for bit, so a Gym.NET space or env
+    ///     seeded with <c>s</c> draws exactly what Gymnasium's draws for seed <c>s</c>, provided it makes the same calls.
     /// </summary>
     /// <remarks>
     ///     A generator is owned by whoever stores it and is not synchronized: give every env and space its own instance, as
     ///     Gymnasium gives each its own <c>np_random</c>. It replaces the former <c>LegacySeeding</c>, which built NumPy's
     ///     legacy <c>RandomState</c> (MT19937), a different generator family that Gymnasium no longer uses.
+    ///     Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/utils/seeding.py">gymnasium/utils/seeding.py</see>.
     /// </remarks>
     public static class Seeding {
         /// <summary>
-        ///     Port of <c>seeding.np_random(seed)</c>: a new generator, and the seed it was built from. Seeded with a value,
-        ///     it is reproducible; unseeded (<see langword="null"/>), it draws fresh OS entropy, as Gymnasium does when a
-        ///     seed is not given.
+        ///     A new generator, and the seed it was built from. Seeded with a value, it is reproducible; unseeded
+        ///     (<see langword="null"/>), it draws fresh OS entropy, as Gymnasium does when a seed is not given, and the returned
+        ///     seed is then the only way to reproduce it.
         /// </summary>
         /// <param name="seed">
         ///     Any non-negative integer, of any size, like Gymnasium's Python-int seeds (every C# integer type converts
@@ -37,9 +37,9 @@ namespace Gym.Utils {
         ///     "Seed must be greater or equal to zero, actual value: …".
         /// </exception>
         /// <remarks>
-        ///     Mirrors <c>seeding.py:10</c>: validate, build <c>SeedSequence(seed)</c>, report <c>seed_seq.entropy</c>, and
-        ///     wrap <c>PCG64(seed_seq)</c> in a <c>Generator</c>. Gymnasium's other check, "Seed must be a python integer",
-        ///     cannot fail for a typed integer.
+        ///     The steps are Gymnasium's <c>np_random</c>: validate, build <c>SeedSequence(seed)</c>, report
+        ///     <c>seed_seq.entropy</c>, and wrap <c>PCG64(seed_seq)</c> in a <c>Generator</c>. Gymnasium's other check, "Seed
+        ///     must be a python integer", cannot fail for a typed integer. Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/utils/seeding.py#L10">gymnasium/utils/seeding.py</see>.
         /// </remarks>
         public static (Generator Rng, BigInteger Seed) NpRandom(BigInteger? seed = null) {
             if (seed is { Sign: < 0 })
@@ -57,7 +57,7 @@ namespace Gym.Utils {
         /// </summary>
         /// <param name="seedSeq">The sequence a generator was built from.</param>
         /// <returns>The entropy as a non-negative integer.</returns>
-        /// <exception cref="InvalidOperationException">Thrown for an entropy form this port never creates.</exception>
+        /// <exception cref="InvalidOperationException">Thrown for an entropy form Gym.NET never creates.</exception>
         private static BigInteger Entropy(SeedSequence seedSeq) {
             switch (seedSeq.entropy) {
                 case long l:

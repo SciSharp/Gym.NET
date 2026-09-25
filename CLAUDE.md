@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 1. Project Overview
 
-Gym.NET is a native C# (.NET) port of OpenAI Gym / Farama Gymnasium, providing a standardized reinforcement learning environment toolkit and benchmark suite. It is part of the SciSharp STACK ecosystem and uses `NumSharp` for multidimensional tensor/array operations and `SixLabors.ImageSharp` for rendering.
+Gym.NET is a native C# (.NET) reinforcement learning environment toolkit and benchmark suite, API-compatible with Farama Gymnasium (the successor of OpenAI Gym) and aligned with it byte for byte. It is its own codebase: Gymnasium is the reference it measures itself against, not an identity it claims. It is part of the SciSharp STACK ecosystem and uses `NumSharp` for multidimensional tensor/array operations and `SixLabors.ImageSharp` for rendering.
 
 - **Canonical SOT Submodule:** `refs/Gymnasium` (Farama Foundation Gymnasium Git submodule for behavioral, mathematical, and algorithmic parity).
 
@@ -17,16 +17,16 @@ The repository is structured around the `Gym.NET.sln` solution:
 ```
 refs/Gym.NET/
 ├── src/
-│   ├── Gym/                       # Core API (port of gymnasium/core.py), spaces, wrappers, utilities, legacy shim
-│   │   ├── Envs/                  # IEnv, Env<TObs, TAct>, Wrapper family (+ IWrapper), Info, Metadata, RenderResult, EnvExtensions (StepAsync)
+│   ├── Gym/                       # Core API (env contract, wrappers, results, errors), spaces, utilities, legacy shim
+│   │   ├── Envs/                  # IEnv, Env<TObs, TAct> (Step, ValueTask StepAsync), Wrapper family (+ IWrapper), Info, Metadata, RenderResult
 │   │   │   └── Registration/      # EnvSpec, WrapperSpec, EnvCreator, EnvRegistry (parse_env_id/get_env_id; make & registry in P3)
 │   │   ├── Spaces/                # Space (base), Box (bounded/continuous), Discrete
 │   │   ├── Observations/          # StepResult<TObs> (5-tuple), ResetResult<TObs>, DoneStepResult<TObs> (pre-0.26 4-tuple)
-│   │   ├── Wrappers/              # Common.cs: TimeLimit, OrderEnforcing (port of gymnasium/wrappers/common.py)
+│   │   ├── Wrappers/              # Common.cs: TimeLimit, OrderEnforcing (reference: gymnasium/wrappers/common.py)
 │   │   ├── Legacy/                # [Obsolete] pre-0.26 API: Step, ILegacyEnv, LegacyEnvAdapter, VecEnv family
 │   │   ├── Internal/              # Dict (legacy info type), CircularQueue, Dynamic/Merging/Reflection helpers
 │   │   ├── Utils/                 # Seeding (PCG64), PyBuiltins, PyMath (F3), PyAttributes, PyEquality, PyCopy, StepApiCompatibility, RecordConstructorArgs, Warnings
-│   │   ├── Logger.cs              # Port of gymnasium.logger (colourised warnings, Python's default filters)
+│   │   ├── Logger.cs              # Warnings as gymnasium.logger issues them (colourised, Python's default filters)
 │   │   └── Exceptions/            # Every gymnasium.error class (Error, ResetNeeded, ...), AssertionError, NotImplementedError, ImportError; legacy InvalidActionError etc.
 │   │
 │   ├── Gym.Rendering/             # pygame-compatible rasterizer: Surface, GfxDraw (SDL_gfx 2.0.26 port), Transform, SurfArray, Vector2
@@ -53,16 +53,18 @@ refs/Gym.NET/
 
 ### Core Design Patterns & Mechanisms
 
-- **Environment Contract (`Env<TObs, TAct>` / `IEnv`), Gymnasium's since the core-API port (P1):**
-  - `ResetResult<TObs> Reset(BigInteger? seed = null, options = null)`: `(obs, info)`; a seed reseeds `NpRandom` with Gymnasium's `Generator(PCG64(SeedSequence(seed)))`, `null` keeps the stream. Implementations start with `SeedNpRandom(seed)`, the port of `super().reset(seed=seed)`.
+- **Environment Contract (`Env<TObs, TAct>` / `IEnv`), Gymnasium's shape since the core-API work (P1):**
+  - `ResetResult<TObs> Reset(BigInteger? seed = null, options = null)`: `(obs, info)`; a seed reseeds `NpRandom` with Gymnasium's `Generator(PCG64(SeedSequence(seed)))`, `null` keeps the stream. Implementations start with `SeedNpRandom(seed)` (Gymnasium's `super().reset(seed=seed)`).
   - `StepResult<TObs> Step(TAct action)`: `(obs, reward (float64), terminated, truncated, info)`; `IEnv.Step(object)` converts untyped actions (`ConvertAction`).
+  - `ValueTask<StepResult<TObs>> StepAsync(TAct action, CancellationToken ct = default)` (and `IEnv.StepAsync(object)`): runs `Step` on the calling thread and completes synchronously, never through `Task.Run`; a failure or a cancellation before the step surfaces through the task. Override it only for an env with real asynchronous work; wrappers do not forward it, so a wrapper's `Step` override always applies.
   - `RenderResult Render()`: per the `render_mode` fixed at construction (`RenderResult.Rgb` for `rgb_array`; `human` renders inside reset/step and returns `None`).
   - `NpRandom` (lazy, entropy-seeded on first use) / `NpRandomSeed` (-1 once a generator is assigned), `Metadata`, `Spec`, `Unwrapped`, `Close()` / `Dispose()`.
   - Python attributes by Python name: `HasWrapperAttr`/`GetWrapperAttr`/`SetWrapperAttr` and `Gym.Utils.PyAttributes` (`[PyName("_x")]` or snake_case of the property).
 - **Wrappers:** `Wrapper<TWObs, TWAct, TObs, TAct>` (and `Wrapper<TObs, TAct>`) forward to `Env`; `ObservationWrapper`, `RewardWrapper`, `ActionWrapper` add the hooks; `TimeLimit` and `OrderEnforcing` live in `Gym.Wrappers`. Until `make` lands (P3), build its stack by hand: `new TimeLimit<NDArray, long>(new OrderEnforcing<NDArray, long>(new CartPoleEnv()), 500)`.
 - **Pluggable Viewer Architecture:** Environments accept an `IEnvironmentViewerFactoryDelegate` used for `render_mode="human"` (`NullEnvViewer.Factory` headless, `AvaloniaEnvViewer.Factory`, `WinFormEnvViewer.Factory`); human frames are paced by `Gym.Rendering.Clock` at `metadata["render_fps"]`.
-- **Legacy API (`Gym.Legacy`, `[Obsolete]`):** `LegacyEnvAdapter` exposes a ported env through the pre-0.26 4-tuple API (`Seed(s)` + `Reset()` is `Reset(seed: s)`); the baselines-style `IVecEnv` / `VecEnv` / `DummyVecEnv` work over `ILegacyEnv` until `gymnasium.vector` (P6).
+- **Legacy API (`Gym.Legacy`, `[Obsolete]`):** `LegacyEnvAdapter` exposes any env through the pre-0.26 4-tuple API (`Seed(s)` + `Reset()` is `Reset(seed: s)`; the reward stays float64, as everywhere in Gym.NET); the baselines-style `IVecEnv` / `VecEnv` / `DummyVecEnv` work over `ILegacyEnv` until `gymnasium.vector` (P6).
 - **Observation & Action Spaces:** Strongly-typed bounds checking and random sampling via `Box` (multi-dimensional continuous floats/bounds) and `Discrete` (categorical integer actions); `Seed(BigInteger)`.
+- **Documentation voice:** XML docs describe Gym.NET's own members (what they do, what they cost, their footguns) and never say "Port of ...". A member based on Gymnasium carries its source as a pinned GitHub permalink in `<remarks>`, e.g. `Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/core.py#L25">gymnasium/core.py</see>.`; pygame-ce, CPython and NumPy sources are referenced the same way at their pinned tags (port plan §3.1 rule 2).
 
 ---
 

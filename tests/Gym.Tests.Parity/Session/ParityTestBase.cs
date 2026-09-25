@@ -8,7 +8,7 @@ namespace Gym.Tests.Parity.Session {
     ///     the test if it leaked a NumSharp ↔ numpy conversion.
     /// </summary>
     /// <remarks>
-    ///     Port of NumSharp's <c>InteropTestBase</c>. GIL discipline carries over unchanged, spelled the pythonic skill's way:
+    ///     Adapted from NumSharp's <c>InteropTestBase</c>. GIL discipline carries over unchanged, spelled the pythonic skill's way:
     ///     every <see cref="PyObject"/> is created and disposed inside <see cref="PythonRuntime.Run(System.Action)"/> (pythonnet's
     ///     final decref needs the GIL), tests keep NumSharp arrays and plain CLR values outside it, and the harness types
     ///     (<see cref="Oracle.Outcome.CapturePython"/>, <see cref="PyRef"/>, <c>GymPair</c>) take the GIL themselves. Python is

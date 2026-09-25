@@ -3,17 +3,20 @@ using System;
 
 namespace Gym.Exceptions {
     /// <summary>
-    ///     Port of Python's built-in <c>NotImplementedError</c>, what Gymnasium's abstract-by-convention methods raise:
-    ///     <c>Env.render</c> of an env that does not render, <c>ObservationWrapper.observation</c> not overridden. Derives from
+    ///     A method a subclass is expected to provide was called on a class that does not: <c>Render</c> of an env that does
+    ///     not render, for example. Python's <c>NotImplementedError</c>; it derives from
     ///     <see cref="NotImplementedException"/>, the closest .NET exception, so either catch works.
     /// </summary>
-    /// <remarks>NumSharp, whose ports of Python's built-ins Gym.NET reuses (decision D17), has no <c>NotImplementedError</c>.</remarks>
+    /// <remarks>
+    ///     NumSharp, whose Python built-in exceptions Gym.NET reuses (decision D17), has no <c>NotImplementedError</c>.
+    ///     Reference: <see href="https://docs.python.org/3.12/library/exceptions.html#NotImplementedError">NotImplementedError</see>.
+    /// </remarks>
     public class NotImplementedError : NotImplementedException {
         /// <summary>An error without a message; its <see cref="Exception.Message"/> is empty, as Python's <c>str(error)</c> is.</summary>
         public NotImplementedError() : base("") { }
 
-        /// <summary>An error with the message the Python source raises it with.</summary>
-        /// <param name="message">The message, ported verbatim.</param>
+        /// <summary>An error with a message; Gym raises it where Gymnasium does, with Gymnasium's text.</summary>
+        /// <param name="message">The message; Gym's own raise sites pass Gymnasium's text verbatim.</param>
         public NotImplementedError(string message) : base(message) { }
 
         /// <summary>An error with a message and the exception that caused it.</summary>
@@ -23,17 +26,20 @@ namespace Gym.Exceptions {
     }
 
     /// <summary>
-    ///     Port of Python's built-in <c>ImportError</c>, the base of Gymnasium's <see cref="DeprecatedWrapper"/>. There is no
-    ///     module system to import from in .NET; the type exists so that the ported hierarchy, and <c>catch</c> clauses written
-    ///     against it, keep Gymnasium's shape.
+    ///     Python's <c>ImportError</c>, the base of <see cref="DeprecatedWrapper"/>. There is no module system to import from
+    ///     in .NET; the type exists so that the error hierarchy, and <c>catch</c> clauses written against it, keep their
+    ///     shape.
     /// </summary>
-    /// <remarks>NumSharp has no <c>ImportError</c> (decision D17 puts the built-ins it lacks here).</remarks>
+    /// <remarks>
+    ///     NumSharp has no <c>ImportError</c> (decision D17 puts the built-ins it lacks here).
+    ///     Reference: <see href="https://docs.python.org/3.12/library/exceptions.html#ImportError">ImportError</see>.
+    /// </remarks>
     public class ImportError : Exception {
         /// <summary>An error without a message; its <see cref="Exception.Message"/> is empty, as Python's <c>str(error)</c> is.</summary>
         public ImportError() : base("") { }
 
-        /// <summary>An error with the message the Python source raises it with.</summary>
-        /// <param name="message">The message, ported verbatim.</param>
+        /// <summary>An error with a message; Gym raises it where Gymnasium does, with Gymnasium's text.</summary>
+        /// <param name="message">The message; Gym's own raise sites pass Gymnasium's text verbatim.</param>
         public ImportError(string message) : base(message) { }
 
         /// <summary>An error with a message and the exception that caused it.</summary>

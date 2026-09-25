@@ -55,7 +55,7 @@ Seeds 0, 1, 42 and 1000 throughout. "Today" is Gym.NET's own code. "Projection" 
 |---|---:|---:|
 | First 8 `random()` doubles of the seeded generator | 32 / 32 values, 4 / 4 seeds | 32 / 32, 4 / 4 |
 
-- **How both sides seed:** Gymnasium goes through `seeding.np_random(seed)`, and Gym.NET through its port, `Gym.Utils.Seeding.NpRandom`. Both use the same validation, the same message ("Seed must be greater or equal to zero, actual value: …", raised as a port of `gymnasium.error.Error`), and the same generator.
+- **How both sides seed:** Gymnasium goes through `seeding.np_random(seed)`, and Gym.NET through its own `Gym.Utils.Seeding.NpRandom`. Both use the same validation, the same message ("Seed must be greater or equal to zero, actual value: …", raised as `Gym.Exceptions.Error`, Gym.NET's counterpart of `gymnasium.error.Error`), and the same generator.
 - **Seed range:** `Seeding.NpRandom` takes any non-negative integer as a `BigInteger?`, because Gymnasium's seeds are Python ints of any size, and the seed it reports for an unseeded generator is 128-bit entropy. The envs' and spaces' `Seed(long)` take any non-negative `long`; the legacy ceiling of 2^32 − 1 is gone.
 - **Upstream NumSharp item:** NumSharp holds that unseeded entropy as four 32-bit words, where NumPy holds the integer they encode. It is reported as that integer, and passing it back rebuilds the stream, except in the 1-in-2^32 case where the top word is zero.
 - **Still missing (P1/P2):** lazy seeding, the `np_random`/`np_random_seed` properties, and `Space.seed` returning its seed.

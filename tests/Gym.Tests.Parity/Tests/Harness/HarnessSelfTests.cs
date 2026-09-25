@@ -16,8 +16,8 @@ namespace Gym.Tests.Parity.Tests.Harness {
     /// <summary>
     ///     Plan §11: a parity harness that cannot fail is worthless, and one that cannot pass is useless. Each test here plants
     ///     a known defect (or none) and checks that the harness reports exactly it: the right call, the right field, nothing
-    ///     else. They run against live Gymnasium but never against Gym.NET's product code, so they stay valid whatever the
-    ///     port's state.
+    ///     else. They run against live Gymnasium but never against Gym.NET's product code, so they stay valid whatever state
+    ///     Gym.NET is in.
     /// </summary>
     [TestClass]
     public sealed class HarnessSelfTests : ParityTestBase {

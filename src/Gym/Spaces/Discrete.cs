@@ -4,6 +4,11 @@ using Gym.Utils;
 using NumSharp;
 
 namespace Gym.Spaces {
+    /// <summary>
+    ///     The integers <c>{Start, ..., Start + N - 1}</c>: a categorical action or observation, such as CartPole's two
+    ///     pushes or LunarLander's four engine choices.
+    /// </summary>
+    /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/spaces/discrete.py#L27">gymnasium/spaces/discrete.py</see>.</remarks>
     public class Discrete : Space {
         /// <summary>The number of elements, <see cref="long"/> like Gymnasium's <c>np.int64</c> <c>n</c>.</summary>
         public long N { get; }
@@ -61,10 +66,10 @@ namespace Gym.Spaces {
         ///     nothing, as in Gymnasium.
         /// </returns>
         /// <remarks>
-        ///     Port of the mask and uniform branches of <c>gymnasium/spaces/discrete.py:127</c> @ 9e04324, with the same
-        ///     generator calls (<c>choice(np.where(mask == 1)[0])</c> and <c>integers(n, dtype=int64)</c>), so a space seeded
-        ///     like Gymnasium's samples the same values. Not ported yet (P2): the probability mask, the mask assertions, and
-        ///     sampling in a dtype other than int64 (Gymnasium draws in the space's dtype, int64 by default).
+        ///     The mask and uniform branches make Gymnasium's generator calls (<c>choice(np.where(mask == 1)[0])</c> and
+        ///     <c>integers(n, dtype=int64)</c>), so a space seeded like Gymnasium's samples the same values. Not supported yet
+        ///     (P2): the probability mask, the mask assertions, and sampling in a dtype other than int64 (Gymnasium draws in
+        ///     the space's dtype, int64 by default). Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/spaces/discrete.py#L127">gymnasium/spaces/discrete.py</see>.
         /// </remarks>
         public override NDArray Sample(NDArray mask = null) {
             // `mask != null` is element-wise in NumSharp (an NDArray<bool>, not a bool), which made every call throw (B-01).
@@ -109,8 +114,8 @@ namespace Gym.Spaces {
         /// <param name="ndArray">The candidate: a boxed integer of any width, a <see cref="bool"/>, an enum member, or a 0-d integer array.</param>
         /// <returns><see langword="true"/> when the candidate converts to an integer inside the space.</returns>
         /// <remarks>
-        ///     Mirrors <c>gymnasium/spaces/discrete.py:198</c> @ 9e04324, except that Gymnasium also requires
-        ///     <c>np.can_cast(x.dtype, self.dtype)</c>, which rejects, for example, a uint64 value in an int64 space (P2).
+        ///     Accepts what Gymnasium accepts, except that Gymnasium also requires <c>np.can_cast(x.dtype, self.dtype)</c>,
+        ///     which rejects, for example, a uint64 value in an int64 space (P2). Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/spaces/discrete.py#L198">gymnasium/spaces/discrete.py</see>.
         /// </remarks>
         public override bool Contains(object ndArray) {
             try {
@@ -210,13 +215,16 @@ namespace Gym.Spaces {
         }
 
         /// <summary>
-        ///     Port of <c>Space.seed(seed)</c>: gives this space a fresh generator, <c>Generator(PCG64(SeedSequence(seed)))</c>,
-        ///     so it samples what Gymnasium's space samples after <c>space.seed(seed)</c>. A generator the space shared (for
-        ///     example with its env) is left untouched.
+        ///     Gives this space a fresh generator, <c>Generator(PCG64(SeedSequence(seed)))</c>, so it samples what Gymnasium's
+        ///     space samples after <c>space.seed(seed)</c>. A generator the space shared (for example with its env) is left
+        ///     untouched, so reseeding the space never moves the env's stream.
         /// </summary>
         /// <param name="seed">Any non-negative seed.</param>
         /// <exception cref="Error">Thrown when <paramref name="seed"/> is negative, with Gymnasium's message.</exception>
-        /// <remarks>Gymnasium's <c>seed</c> also accepts no seed and returns the one it used; that shape of the API arrives with P2.</remarks>
+        /// <remarks>
+        ///     Gymnasium's <c>seed</c> also accepts no seed and returns the one it used; that shape of the API arrives with P2.
+        ///     Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/spaces/space.py#L112">gymnasium/spaces/space.py</see>.
+        /// </remarks>
         public override void Seed(System.Numerics.BigInteger seed) {
             NpRandom = Seeding.NpRandom(seed).Rng;
         }

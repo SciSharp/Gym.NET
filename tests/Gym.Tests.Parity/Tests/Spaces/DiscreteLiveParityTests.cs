@@ -12,10 +12,11 @@ using Python.Runtime;
 
 namespace Gym.Tests.Parity.Tests.Spaces {
     /// <summary>
-    ///     Gym.NET's <see cref="Discrete"/> against <c>gymnasium.spaces.Discrete</c> (<c>gymnasium/spaces/discrete.py</c> @
-    ///     9e04324), live: seeded samples with and without a mask and the generator state behind them, membership over a
-    ///     matrix of candidates, the attributes, the shape, the <c>repr</c> and the constructor's validation.
+    ///     Gym.NET's <see cref="Discrete"/> against <c>gymnasium.spaces.Discrete</c>, live: seeded samples with and without a
+    ///     mask and the generator state behind them, membership over a matrix of candidates, the attributes, the shape, the
+    ///     <c>repr</c> and the constructor's validation.
     /// </summary>
+    /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/spaces/discrete.py#L27">gymnasium/spaces/discrete.py</see>.</remarks>
     [TestClass]
     public sealed class DiscreteLiveParityTests : ParityTestBase {
         /// <summary>Sampling cases: <c>(n, start, seed)</c>, including an <c>n</c> above 2^31 and one of 2^40.</summary>

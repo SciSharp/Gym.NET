@@ -8,12 +8,13 @@ using NumSharp;
 
 namespace Gym.Legacy {
     /// <summary>
-    ///     The base of the baselines-style vector envs Gym.NET had before the core-API port (see <see cref="IVecEnv"/>):
+    ///     The base of the baselines-style vector envs Gym.NET had before the core-API work (see <see cref="IVecEnv"/>):
     ///     holds the sub-envs, their shared spaces, and the seeding and attribute helpers.
     /// </summary>
     /// <remarks>
-    ///     Moved from <c>Gym.Envs</c> by the core-API port (P1). <see cref="StepAsync"/> now runs on the thread pool: the
-    ///     <c>DistributedScheduler</c> it used relied on <c>Thread.Abort</c> and threw on .NET 5+ (B-34).
+    ///     Moved from <c>Gym.Envs</c> by the core-API work (P1). <see cref="StepAsync"/> returns a <see cref="ValueTask{TResult}"/>
+    ///     that completes on the calling thread; the <c>DistributedScheduler</c> it ran on relied on <c>Thread.Abort</c> and
+    ///     threw on .NET 5+ (B-34).
     /// </remarks>
     [Obsolete("The baselines-style VecEnv is legacy (B-33: one action for every sub-env); gymnasium.vector replaces it (P6). Gym.Legacy is removed in 3.0.")]
     public abstract class VecEnv : IVecEnv {
@@ -31,8 +32,8 @@ namespace Gym.Legacy {
         /// <summary>The vector env's metadata.</summary>
         public Dict Metadata { get; set; }
 
-        /// <summary><c>gym</c>'s <c>reward_range</c>.</summary>
-        public (float From, float To) RewardRange { get; set; }
+        /// <summary><c>gym</c>'s <c>reward_range</c>, in float64 like the rewards.</summary>
+        public (double From, double To) RewardRange { get; set; }
 
         /// <summary>The action space of one sub-env.</summary>
         public Space ActionSpace { get; set; }
@@ -96,11 +97,20 @@ namespace Gym.Legacy {
         //         You should not call this if a step_async run is
         //         already pending.
         //
-        /// <summary>Runs <see cref="Step(long)"/> on the thread pool; await it before the next call.</summary>
+        /// <summary>
+        ///     Steps every sub-env asynchronously. The default completes with <see cref="Step(long)"/>, run on the calling thread;
+        ///     <see cref="VecEnvWrapper"/> awaits each sub-env's own <see cref="ILegacyEnv.StepAsync"/> instead.
+        /// </summary>
         /// <param name="action">The discrete action sent to every sub-env.</param>
-        /// <returns>A task that completes with one step result per sub-env, or faults with what a step threw.</returns>
-        public Task<Step[]> StepAsync(long action) {
-            return Task.Run(() => Step(action));
+        /// <returns>A value task that completes with one step result per sub-env, or is faulted with what a step threw.</returns>
+        /// <remarks>Exceptions surface when the task is awaited, never from this call. Await it before the next call.</remarks>
+        public virtual ValueTask<Step[]> StepAsync(long action) {
+            try {
+                return new ValueTask<Step[]>(Step(action));
+            } catch (Exception exception) {
+                // An asynchronous method reports failure through its task, so the caller's await, not this call, throws.
+                return ValueTask.FromException<Step[]>(exception);
+            }
         }
 
         //

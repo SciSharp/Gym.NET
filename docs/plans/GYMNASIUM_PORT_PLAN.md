@@ -179,7 +179,7 @@ These rules apply to every ported file. They exist because each one was violated
 ### 3.1 Source fidelity
 
 1. **One C# file per Python module.** `gymnasium/spaces/box.py` → `src/Gym/Spaces/Box.cs`. Keep definition order, helper functions and branch structure. A reviewer should be able to read both files side by side.
-2. **Cite the source.** Every ported type and member carries `<remarks>Port of <c>gymnasium/spaces/box.py:64</c> @ 9e04324.</remarks>`. When Gymnasium is re-pinned, the citations make a diff-driven update possible (§14.10).
+2. **Reference the source, in Gym.NET's own voice.** Gym.NET is its own codebase: a summary says what the member does and why it matters, never "Port of ...". A type or member based on Gymnasium carries its source as a pinned GitHub permalink in `<remarks>`: `Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/spaces/box.py#L64">gymnasium/spaces/box.py</see>.` The permalink carries the pinned commit, so when Gymnasium is re-pinned the references make a diff-driven update possible (§14.10). pygame-ce, CPython and NumPy sources are referenced the same way, at their pinned tags.
 3. **Port behavior, including quirks.** Python's `height[-1]` wraps; `min`/`max` compare the way Python compares; asserts raise. Don't fix upstream behavior. If upstream is buggy, port the bug and file it upstream; record the fix as an explicit, flagged deviation only if the maintainer approves.
 4. **No restructuring for style.** PR #24's PRD mandates Object Calisthenics (no `else`, methods of at most 15 lines, one dot per line). That rule is rejected for ported code: it makes line-by-line verification against the source impossible. It may apply to Gym.NET-only additions.
 
@@ -453,16 +453,16 @@ using Gym.Envs;
 namespace Gym.Observations;
 
 /// <summary>
-/// The first observation of an episode and its diagnostics, as returned by <c>reset</c>.
-/// Port of the <c>(obs, info)</c> tuple returned by <c>gymnasium.Env.reset</c> (gymnasium/core.py:25 @ 9e04324).
+/// The first observation of an episode and its diagnostics, as returned by <c>reset</c>: <c>(obs, info)</c>.
 /// </summary>
+/// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/core.py#L116">gymnasium/core.py (Env.reset)</see>.</remarks>
 /// <typeparam name="TObs">Observation type; always an element of the env's observation space.</typeparam>
 /// <param name="Observation">The initial observation.</param>
 /// <param name="Info">Auxiliary diagnostics. Insertion order is observable (Python dict semantics).</param>
 public readonly record struct ResetResult<TObs>(TObs Observation, Info Info);
 
 /// <summary>
-/// One environment transition. Port of the <c>(obs, reward, terminated, truncated, info)</c> tuple.
+/// One environment transition, <c>(obs, reward, terminated, truncated, info)</c>.
 /// </summary>
 /// <typeparam name="TObs">Observation type; always an element of the env's observation space.</typeparam>
 /// <param name="Observation">Observation after the action was applied.</param>
@@ -491,13 +491,14 @@ using NumSharp;
 namespace Gym.Envs;
 
 /// <summary>
-/// Base class of every environment. Port of <c>gymnasium.Env</c> (gymnasium/core.py:25 @ 9e04324).
+/// Base class of every environment: an MDP driven through reset and step.
 /// </summary>
 /// <typeparam name="TObs">Observation element type (see the space table in the port plan §6.1).</typeparam>
 /// <typeparam name="TAct">Action element type.</typeparam>
 /// <remarks>
-/// Implementations must call <see cref="SeedNpRandom"/> at the start of <see cref="Reset"/>, the port of
+/// Implementations must call <see cref="SeedNpRandom"/> at the start of <see cref="Reset"/>, as Gymnasium's envs call
 /// <c>super().reset(seed=seed)</c>. Skipping it breaks seeding determinism, the property every golden test relies on.
+/// Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/core.py#L25">gymnasium/core.py</see>.
 /// </remarks>
 public abstract class Env<TObs, TAct> : IEnv, IDisposable
 {
@@ -561,7 +562,7 @@ public abstract class Env<TObs, TAct> : IEnv, IDisposable
     /// <summary>Calls <see cref="Close"/>; lets <c>using</c> play the role of Python's context manager.</summary>
     public void Dispose() { Close(); GC.SuppressFinalize(this); }
 
-    /// <summary>Port of <c>super().reset(seed=seed)</c>: reseeds only when a seed is given.</summary>
+    /// <summary>Reseeds <see cref="NpRandom"/> only when a seed is given, as Gymnasium's <c>super().reset(seed=seed)</c> does.</summary>
     /// <param name="seed">The seed passed to <see cref="Reset"/>.</param>
     /// <exception cref="Error">Thrown for negative seeds.</exception>
     protected void SeedNpRandom(long? seed)
@@ -844,7 +845,7 @@ Bump the submodule, then:
 
 - Typed generic API (`Env<TObs, TAct>`) and C# idioms (`IDisposable`, record results).
 - Human-mode viewers (Avalonia, WinForms), behind `HumanRendering`.
-- Async stepping. `StepAsync` becomes an extension over `Task.Run`, or is served by `AsyncVectorEnv`; the `DistributedScheduler` family is removed because it relies on `Thread.Abort`.
+- Async stepping. `StepAsync` is a `ValueTask` member of `Env<TObs, TAct>` and `IEnv` that runs `Step` on the calling thread and completes synchronously unless an env overrides it (never `Task.Run`, which would hide a thread hop and a thread-pool dependency behind every step); parallel stepping is `AsyncVectorEnv`'s job (P6). The `DistributedScheduler` family is removed because it relies on `Thread.Abort`.
 - Discrete-action enums such as `LunarLanderDiscreteActions`, as helpers that map to `long` actions.
 
 **Drop:**
@@ -892,8 +893,8 @@ A reasonable first release (2.0) is P0–P7: core, spaces, registry, wrappers, v
 `test_time_limit.py`) and green on net8.0 and net10.0, and the live parity suite compares the core API with Gymnasium call
 by call (`Tests/Core/CoreLiveParityTests.cs`, `Tests/Utils/PyMathLiveParityTests.cs`). What landed:
 
-- `IEnv` and `Env<TObs, TAct>` (§6.3): lazy `NpRandom`/`NpRandomSeed` (-1 once assigned), `SeedNpRandom` as the port of
-  `super().reset(seed=seed)`, `Unwrapped`, `Spec`, `RenderMode`, `Metadata` (default `{"render_modes": []}`), `Close`/
+- `IEnv` and `Env<TObs, TAct>` (§6.3): lazy `NpRandom`/`NpRandomSeed` (-1 once assigned), `SeedNpRandom` (Gymnasium's
+  `super().reset(seed=seed)`), `Unwrapped`, `Spec`, `RenderMode`, `Metadata` (default `{"render_modes": []}`), `Close`/
   `Dispose`, `__str__`, and the attribute protocol (`HasWrapperAttr`/`GetWrapperAttr`/`SetWrapperAttr`) on Python names
   through `Gym.Utils.PyAttributes` (`[PyName]`, snake_case, run-time attributes, Python's `AttributeError` messages).
 - `Wrapper<TWObs, TWAct, TObs, TAct>` (and `Wrapper<TObs, TAct>`, `IWrapper`), `ObservationWrapper`, `RewardWrapper`,
@@ -911,7 +912,11 @@ by call (`Tests/Core/CoreLiveParityTests.cs`, `Tests/Utils/PyMathLiveParityTests
   `step` and paced by `Gym.Rendering.Clock` (pygame's `Clock.tick`), `rgb_array` frames as `RenderResult.Rgb`.
 - The pre-0.26 API moved to `Gym.Legacy` (§16): `Step`, `ILegacyEnv`, `LegacyEnvAdapter` (built on
   `StepApiCompatibility`), and the baselines-style `VecEnv` family, all `[Obsolete]`. `GoalEnv` and the
-  `DistributedScheduler` threading are deleted; `StepAsync` is a `Task.Run` extension.
+  `DistributedScheduler` threading are deleted.
+- Follow-up the same day: `StepAsync` is a `ValueTask` member of `Env<TObs, TAct>`/`IEnv` (and of the legacy
+  `ILegacyEnv`/`VecEnv`) that completes on the calling thread; the `Task.Run` extensions are gone. The legacy
+  `Step.Reward` and `RewardRange` are float64, so no reward in Gym.NET is narrowed to float32. Documentation speaks in
+  Gym.NET's own voice, with pinned GitHub references in `<remarks>` instead of "Port of ..." (§3.1 rule 2).
 
 Open ends P1 leaves on purpose: spaces stay the non-generic `Space` until P2 (`Space<T>`), and `Metadata.AutoresetMode`
 arrives with the vector API's `AutoresetMode` (P6).
@@ -1194,7 +1199,7 @@ gated cell of the live parity suite (`tests/Gym.Tests.Parity`, `CartPoleLivePari
 | B-31 | `src/Gym/Envs/Env.cs:34` | `Unwrapped` is protected; no wrapper attribute access | Source read | P1; **fixed** 2026-09-25: public `Unwrapped` and the attribute protocol on Python names (`TestGetSetWrapperAttr`, `WrapperAttributes_MatchGymnasium`) |
 | B-32 | `Env.cs:56`–`59` | `GoalEnv.Reset()` returns `null` | Source read | P1 (deleted); **fixed** 2026-09-25: `GoalEnv` deleted |
 | B-33 | `src/Gym/Envs/VecEnvWrapper.cs:22`–`24` | `Step(int)` sends the same action to every sub-env | Source read | P6 (deleted); moved to `Gym.Legacy` (`[Obsolete]`) by P1 |
-| B-34 | `src/Gym/Internal/Threading/DistributedThread.cs:114`–`137`, `DistributedQueuedTaskScheduler.cs:194` | `Thread.Abort`/`ResetAbort`/compressed stack throw on .NET 5+ | A.12 | P1 (deleted); **fixed** 2026-09-25: `Internal/Threading` deleted, `StepAsync` runs on `Task.Run` (`StepAsync_StepsOnTheThreadPool`) |
+| B-34 | `src/Gym/Internal/Threading/DistributedThread.cs:114`–`137`, `DistributedQueuedTaskScheduler.cs:194` | `Thread.Abort`/`ResetAbort`/compressed stack throw on .NET 5+ | A.12 | P1 (deleted); **fixed** 2026-09-25: `Internal/Threading` deleted, `StepAsync` is a `ValueTask` member that completes on the calling thread (`StepAsync_CompletesWithTheStep`) |
 | B-35 | `CartPoleEnv.cs:83`–`88`, `LunarLanderEnv.cs:779`–`784` | Viewer creation blocks on async inside `lock (this)` | A.3 | P7 |
 | B-36 | `examples/ReinforcementLearning/*` | Doesn't build (`NU1201`) | A.12 | P10 |
 | B-37 | `tests/Gym.Tests/Envs/Aether/LunarLanderEnvironment.cs:65` | The only determinism assertion runs in Debug builds only | Source read | P0 |

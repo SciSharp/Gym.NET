@@ -8,13 +8,13 @@ using SixLabors.ImageSharp;
 
 namespace Gym.Legacy {
     /// <summary>
-    ///     The env contract Gym.NET had before the core-API port, <c>gym</c> 0.21's: <c>Reset()</c> returns only the
+    ///     The env contract Gym.NET had before the core-API work (P1), <c>gym</c> 0.21's: <c>Reset()</c> returns only the
     ///     observation, <c>Step</c> the 4-tuple <see cref="Step"/>, <c>Seed</c> reseeds separately, and <c>Render</c> takes the
-    ///     mode per call. Code written against it runs on a ported env through <see cref="LegacyEnvAdapter"/>.
+    ///     mode per call. Code written against it runs on any current env through <see cref="LegacyEnvAdapter"/>.
     /// </summary>
     /// <remarks>
-    ///     This was <c>Gym.Envs.IEnv</c>; that name now belongs to Gymnasium's contract. Kept for one major version (port plan
-    ///     §16), with the migration: <c>Reset()</c> → <c>Reset(seed)</c>, <c>Step(a).Done</c> →
+    ///     This was <c>Gym.Envs.IEnv</c>; that name now belongs to the current, Gymnasium-shaped contract. Kept for one major
+    ///     version (port plan §16), with the migration: <c>Reset()</c> → <c>Reset(seed)</c>, <c>Step(a).Done</c> →
     ///     <c>terminated || truncated</c>, <c>Seed(s)</c> → <c>Reset(seed: s)</c>, <c>Render("rgb_array")</c> →
     ///     <c>render_mode</c> at construction.
     /// </remarks>
@@ -23,8 +23,8 @@ namespace Gym.Legacy {
         /// <summary>The env's metadata as the legacy <see cref="Dict"/>.</summary>
         Dict Metadata { get; set; }
 
-        /// <summary>The range rewards fall in, <c>gym</c>'s <c>reward_range</c> (Gymnasium 1.x removed it).</summary>
-        (float From, float To) RewardRange { get; set; }
+        /// <summary>The range rewards fall in, <c>gym</c>'s <c>reward_range</c> (Gymnasium 1.x removed it), in float64 like the rewards.</summary>
+        (double From, double To) RewardRange { get; set; }
 
         /// <summary>The action space.</summary>
         Space ActionSpace { get; set; }
@@ -41,10 +41,10 @@ namespace Gym.Legacy {
         /// <returns>The 4-tuple transition.</returns>
         Step Step(object action);
 
-        /// <summary>Runs one step on the thread pool.</summary>
+        /// <summary>Runs one step asynchronously; by default it completes synchronously, on the calling thread.</summary>
         /// <param name="action">The action.</param>
-        /// <returns>A task completing with the transition.</returns>
-        Task<Step> StepAsync(object action);
+        /// <returns>A value task completing with the transition, or faulted with what the step threw.</returns>
+        ValueTask<Step> StepAsync(object action);
 
         /// <summary>Renders the current state.</summary>
         /// <param name="mode">The render mode.</param>

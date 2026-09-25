@@ -3,15 +3,15 @@ using System;
 
 namespace Gym.Exceptions {
     /// <summary>
-    ///     Port of Python's built-in <c>AssertionError</c>: what a Gymnasium <c>assert</c> raises, such as CartPole's
-    ///     <c>assert self.action_space.contains(action)</c>. Unlike <c>Debug.Assert</c>, it is thrown in Release builds too, so
-    ///     an invalid action can never be silently treated as a valid one.
+    ///     A failed assertion, Python's <c>AssertionError</c>: what the envs throw where Gymnasium's asserts, such as CartPole's
+    ///     check that an action belongs to its action space. Unlike <c>Debug.Assert</c>, it is thrown in Release builds too,
+    ///     so an invalid action can never be silently treated as a valid one.
     /// </summary>
     /// <remarks>
-    ///     NumSharp ports Python's built-ins that NumPy raises (<c>ValueError</c>, <c>TypeError</c>, ...) and Gym.NET reuses
-    ///     them (port plan decision D17); NumSharp has no <c>AssertionError</c>, so it lives here. Messages are the Python
-    ///     source's f-strings rendered with Python's formatting (see <see cref="Gym.Utils.PyBuiltins"/>), because callers and
-    ///     ported tests match on them verbatim.
+    ///     NumSharp provides the Python built-ins that NumPy raises (<c>ValueError</c>, <c>TypeError</c>, ...) and Gym.NET
+    ///     reuses them (port plan decision D17); NumSharp has no <c>AssertionError</c>, so it lives here. Messages are the
+    ///     assert's f-string rendered with Python's formatting (see <see cref="Gym.Utils.PyBuiltins"/>), because callers and
+    ///     tests match on them verbatim. Reference: <see href="https://docs.python.org/3.12/library/exceptions.html#AssertionError">AssertionError</see>.
     /// </remarks>
     public class AssertionError : Exception {
         /// <summary>

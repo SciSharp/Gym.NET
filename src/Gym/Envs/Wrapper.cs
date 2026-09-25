@@ -24,9 +24,9 @@ namespace Gym.Envs {
     }
 
     /// <summary>
-    ///     Port of <c>gymnasium.Wrapper</c> (<c>gymnasium/core.py:290</c> @ 9e04324): wraps an env to change parts of its
-    ///     behaviour while forwarding the rest. Every member forwards to <see cref="Env"/> unless the wrapper overrides it;
-    ///     spaces and metadata can be replaced on the wrapper alone, without touching the env beneath.
+    ///     Wraps an env to change parts of its behaviour while forwarding the rest. Every member forwards to
+    ///     <see cref="Env"/> unless the wrapper overrides it; spaces and metadata can be replaced on the wrapper alone, without
+    ///     touching the env beneath.
     /// </summary>
     /// <typeparam name="TWObs">The observation type the wrapper returns.</typeparam>
     /// <typeparam name="TWAct">The action type the wrapper takes.</typeparam>
@@ -46,6 +46,7 @@ namespace Gym.Envs {
     ///     forwarding passes values through unchanged and throws <see cref="InvalidCastException"/> when a value is not also of
     ///     the other type.
     ///     </para>
+    ///     <para>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/core.py#L290">gymnasium/core.py</see>.</para>
     /// </remarks>
     public class Wrapper<TWObs, TWAct, TObs, TAct> : Env<TWObs, TWAct>, IWrapper {
         /// <summary>Wraps <paramref name="env"/>.</summary>
@@ -216,10 +217,11 @@ namespace Gym.Envs {
         /// <returns>The name its <see cref="WrapperSpec"/> records.</returns>
         public virtual string ClassName() => PyAttributes.PyTypeName(GetType());
 
-        /// <summary>Port of <c>Wrapper.has_wrapper_attr</c>: whether this wrapper or any layer beneath it has the attribute.</summary>
+        /// <summary>Whether this wrapper or any layer beneath it has the Python attribute <paramref name="name"/>.</summary>
         /// <param name="name">The attribute, in Python spelling.</param>
         /// <returns><see langword="true"/> when some layer has it.</returns>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="name"/> is <see langword="null"/>.</exception>
+        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/core.py#L408">gymnasium/core.py</see>.</remarks>
         public override bool HasWrapperAttr(string name) {
             if (PyAttributes.HasAttr(this, name))
                 return true;
@@ -227,8 +229,8 @@ namespace Gym.Envs {
         }
 
         /// <summary>
-        ///     Port of <c>Wrapper.get_wrapper_attr</c>: the attribute from this wrapper when it has it, else from the first
-        ///     layer beneath that does.
+        ///     The Python attribute <paramref name="name"/> from this wrapper when it has it, else from the first layer beneath
+        ///     that does.
         /// </summary>
         /// <param name="name">The attribute, in Python spelling.</param>
         /// <returns>The value, boxed.</returns>
@@ -238,6 +240,7 @@ namespace Gym.Envs {
         ///     as the cause (<c>raise ... from e</c>); NumSharp's <see cref="AttributeError"/> has no constructor taking an
         ///     inner exception, so the chain is not kept.
         /// </exception>
+        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/core.py#L415">gymnasium/core.py</see>.</remarks>
         public override object? GetWrapperAttr(string name) {
             if (PyAttributes.HasAttr(this, name))
                 return PyAttributes.GetAttr(this, name);
@@ -249,9 +252,9 @@ namespace Gym.Envs {
         }
 
         /// <summary>
-        ///     Port of <c>Wrapper.set_wrapper_attr</c>: assigns the attribute on this wrapper when it has it, else on the first
-        ///     layer beneath that has it (asking them with <c>force=False</c>); when no layer has it and
-        ///     <paramref name="force"/> is set, creates it on this wrapper.
+        ///     Assigns the Python attribute <paramref name="name"/> on this wrapper when it has it, else on the first layer
+        ///     beneath that has it (asking them with <c>force=False</c>); when no layer has it and <paramref name="force"/> is
+        ///     set, creates it on this wrapper.
         /// </summary>
         /// <param name="name">The attribute, in Python spelling.</param>
         /// <param name="value">The value.</param>
@@ -260,6 +263,7 @@ namespace Gym.Envs {
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="name"/> is <see langword="null"/>.</exception>
         /// <exception cref="AttributeError">Thrown when the attribute found is read-only.</exception>
         /// <exception cref="TypeError">Thrown when the value does not fit the attribute's type.</exception>
+        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/core.py#L434">gymnasium/core.py</see>.</remarks>
         public override bool SetWrapperAttr(string name, object? value, bool force = true) {
             if (PyAttributes.HasAttr(this, name)) {
                 PyAttributes.SetAttr(this, name, value);
@@ -277,8 +281,9 @@ namespace Gym.Envs {
             return false;
         }
 
-        /// <summary>Port of <c>Wrapper.__str__</c> (and <c>__repr__</c>): <c>&lt;TimeLimit&lt;OrderEnforcing&lt;CartPoleEnv&lt;CartPole-v1&gt;&gt;&gt;&gt;</c>.</summary>
+        /// <summary>The stack's description: <c>&lt;TimeLimit&lt;OrderEnforcing&lt;CartPoleEnv&lt;CartPole-v1&gt;&gt;&gt;&gt;</c>.</summary>
         /// <returns>The wrapper's class name followed by the env's text.</returns>
+        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/core.py#L459">gymnasium/core.py</see>.</remarks>
         public override string ToString() => $"<{PyAttributes.PyTypeName(GetType())}{Env}>";
 
         /// <summary>
@@ -314,13 +319,14 @@ namespace Gym.Envs {
     }
 
     /// <summary>
-    ///     Port of <c>gymnasium.ObservationWrapper</c> (<c>gymnasium/core.py:532</c> @ 9e04324): transforms every observation
-    ///     <see cref="Reset"/> and <see cref="Step"/> return through <see cref="Observation"/>. If the transformation changes
-    ///     the observation space, assign the new one to <see cref="Env{TObs, TAct}.ObservationSpace"/> in the constructor.
+    ///     Transforms every observation <see cref="Reset"/> and <see cref="Step"/> return through <see cref="Observation"/>.
+    ///     If the transformation changes the observation space, assign the new one to
+    ///     <see cref="Env{TObs, TAct}.ObservationSpace"/> in the constructor.
     /// </summary>
     /// <typeparam name="TWObs">The transformed observation type.</typeparam>
     /// <typeparam name="TObs">The env's observation type.</typeparam>
     /// <typeparam name="TAct">The action type, passed through.</typeparam>
+    /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/core.py#L534">gymnasium/core.py</see>.</remarks>
     public abstract class ObservationWrapper<TWObs, TObs, TAct> : Wrapper<TWObs, TAct, TObs, TAct> {
         /// <summary>Wraps <paramref name="env"/>.</summary>
         /// <param name="env">The env whose observations are transformed.</param>
@@ -351,12 +357,10 @@ namespace Gym.Envs {
         public abstract TWObs Observation(TObs observation);
     }
 
-    /// <summary>
-    ///     Port of <c>gymnasium.RewardWrapper</c> (<c>gymnasium/core.py:579</c> @ 9e04324): transforms every reward
-    ///     <see cref="Step"/> returns through <see cref="Reward"/>.
-    /// </summary>
+    /// <summary>Transforms every reward <see cref="Step"/> returns through <see cref="Reward"/>.</summary>
     /// <typeparam name="TObs">The observation type, passed through.</typeparam>
     /// <typeparam name="TAct">The action type, passed through.</typeparam>
+    /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/core.py#L578">gymnasium/core.py</see>.</remarks>
     public abstract class RewardWrapper<TObs, TAct> : Wrapper<TObs, TAct, TObs, TAct> {
         /// <summary>Wraps <paramref name="env"/>.</summary>
         /// <param name="env">The env whose rewards are transformed.</param>
@@ -378,13 +382,13 @@ namespace Gym.Envs {
     }
 
     /// <summary>
-    ///     Port of <c>gymnasium.ActionWrapper</c> (<c>gymnasium/core.py:612</c> @ 9e04324): transforms every action through
-    ///     <see cref="Action"/> before the env sees it. If the wrapper takes actions from another space, assign it to
-    ///     <see cref="Env{TObs, TAct}.ActionSpace"/> in the constructor.
+    ///     Transforms every action through <see cref="Action"/> before the env sees it. If the wrapper takes actions from
+    ///     another space, assign it to <see cref="Env{TObs, TAct}.ActionSpace"/> in the constructor.
     /// </summary>
     /// <typeparam name="TObs">The observation type, passed through.</typeparam>
     /// <typeparam name="TWAct">The action type the wrapper takes.</typeparam>
     /// <typeparam name="TAct">The env's action type.</typeparam>
+    /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/core.py#L613">gymnasium/core.py</see>.</remarks>
     public abstract class ActionWrapper<TObs, TWAct, TAct> : Wrapper<TObs, TWAct, TObs, TAct> {
         /// <summary>Wraps <paramref name="env"/>.</summary>
         /// <param name="env">The env whose actions are transformed.</param>

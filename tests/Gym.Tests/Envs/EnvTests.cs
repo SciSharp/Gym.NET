@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using System.Threading;
 using System.Threading.Tasks;
 using Gym.Environments.Envs.Classic;
 using Gym.Envs;
@@ -13,10 +14,10 @@ using NumSharp;
 
 namespace Gym.Tests.Envs {
     /// <summary>
-    ///     Pins the action conversion of the untyped <see cref="IEnv.Step"/> (formerly <c>Env&lt;TAction&gt;</c>'s), the
-    ///     thread-pool <see cref="EnvExtensions.StepAsync{TObs, TAct}"/> that replaced the <c>DistributedScheduler</c>
-    ///     (B-34), and the <see langword="long"/> surface of the legacy <see cref="VecEnv"/> behind
-    ///     <see cref="LegacyEnvAdapter"/>. A minimal recording env stands in for an enum-typed env.
+    ///     Pins the action conversion of the untyped <see cref="IEnv.Step"/> (formerly <c>Env&lt;TAction&gt;</c>'s),
+    ///     <see cref="Env{TObs, TAct}.StepAsync"/> (a <see cref="ValueTask{TResult}"/> completing on the calling thread; it
+    ///     replaced the <c>DistributedScheduler</c>, B-34), and the <see langword="long"/> surface of the legacy
+    ///     <see cref="VecEnv"/> behind <see cref="LegacyEnvAdapter"/>. A minimal recording env stands in for an enum-typed env.
     /// </summary>
     [TestClass]
     public class EnvTests {
@@ -80,18 +81,32 @@ namespace Gym.Tests.Envs {
         }
 
         /// <summary>
-        ///     <see cref="EnvExtensions.StepAsync{TObs, TAct}"/> steps on the thread pool, typed and untyped; the removed
-        ///     <c>DistributedScheduler</c> threw on machines with 32 or more logical CPUs before scheduling anything (B-34).
+        ///     <see cref="Env{TObs, TAct}.StepAsync"/> completes synchronously with the step, typed and untyped, without a
+        ///     thread-pool hop; errors (an unconvertible action) fault the task rather than throw from the call, and a canceled
+        ///     token cancels it before the env is touched. The removed <c>DistributedScheduler</c> threw on machines with 32 or
+        ///     more logical CPUs before scheduling anything (B-34).
         /// </summary>
         /// <returns>The test's task.</returns>
         [TestMethod]
-        public async Task StepAsync_StepsOnTheThreadPool() {
+        public async Task StepAsync_CompletesWithTheStep() {
             var env = new RecordingEnv();
+            IEnv untyped = env;
 
-            await env.StepAsync(Move.Right);
+            ValueTask<StepResult<NDArray>> pending = env.StepAsync(Move.Right);
+            Assert.IsTrue(pending.IsCompletedSuccessfully, "The default completes on the calling thread.");
+            await pending;
             Assert.AreEqual(Move.Right, env.Last);
-            await ((IEnv)env).StepAsync(0L);
+            await untyped.StepAsync(0L);
             Assert.AreEqual(Move.Left, env.Last);
+
+            ValueTask<StepResult<object?>> faulted = untyped.StepAsync("left");
+            Assert.IsTrue(faulted.IsFaulted, "An unconvertible action faults the task instead of throwing from the call.");
+            await Assert.ThrowsExactlyAsync<TypeError>(async () => await faulted);
+
+            using var cancellation = new CancellationTokenSource();
+            cancellation.Cancel();
+            Assert.IsTrue(env.StepAsync(Move.Right, cancellation.Token).IsCanceled);
+            Assert.AreEqual(Move.Left, env.Last, "A canceled step never reaches the env.");
         }
 
 #pragma warning disable CS0618 // The legacy API is what these tests pin.

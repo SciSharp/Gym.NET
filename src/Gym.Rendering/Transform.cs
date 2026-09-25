@@ -1,7 +1,8 @@
 using System;
 
 namespace Gym.Rendering {
-    /// <summary>Port of the part of <c>pygame.transform</c> Gymnasium's envs use.</summary>
+    /// <summary>The part of <c>pygame.transform</c> Gymnasium's envs use: <see cref="Flip"/>, which turns a y-up drawing into a frame.</summary>
+    /// <remarks>Reference: <see href="https://github.com/pygame-community/pygame-ce/blob/2.5.8/src_c/transform.c#L770">src_c/transform.c</see> (pygame-ce 2.5.8).</remarks>
     public static class Transform {
         /// <summary>
         ///     <c>pygame.transform.flip(surface, flip_x, flip_y)</c>: a new surface, mirrored left-right and/or top-bottom. The

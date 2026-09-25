@@ -3,6 +3,8 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Numerics;
+using System.Threading;
+using System.Threading.Tasks;
 using Gym.Envs.Registration;
 using Gym.Exceptions;
 using Gym.Observations;
@@ -12,9 +14,8 @@ using NumSharp;
 
 namespace Gym.Envs {
     /// <summary>
-    ///     Port of <c>gymnasium.Env</c> (<c>gymnasium/core.py:25</c> @ 9e04324), the base class of every environment: an MDP
-    ///     driven through <see cref="Step"/> and <see cref="Reset"/>, with spaces, metadata, a render mode, a lazily created
-    ///     generator and Gymnasium's attribute protocol (<see cref="GetWrapperAttr"/>, ...).
+    ///     The base class of every environment: an MDP driven through <see cref="Step"/> and <see cref="Reset"/>, with spaces,
+    ///     metadata, a render mode, a lazily created generator and the attribute protocol (<see cref="GetWrapperAttr"/>, ...).
     /// </summary>
     /// <typeparam name="TObs">The observation type: <see cref="NDArray"/> for <c>Box</c> spaces, <see langword="long"/> for <c>Discrete</c> (port plan §6.1).</typeparam>
     /// <typeparam name="TAct">The action type, likewise.</typeparam>
@@ -22,7 +23,7 @@ namespace Gym.Envs {
     ///     <para>
     ///     Implementing an env: set <see cref="ActionSpace"/>, <see cref="ObservationSpace"/> and, when it renders,
     ///     <see cref="Metadata"/> and <see cref="RenderMode"/> in the constructor; begin <see cref="Reset"/> with
-    ///     <see cref="SeedNpRandom"/>, the port of <c>super().reset(seed=seed)</c>, and draw every random number from
+    ///     <see cref="SeedNpRandom"/> (Gymnasium's <c>super().reset(seed=seed)</c>), and draw every random number from
     ///     <see cref="NpRandom"/>. Skipping the seeding call breaks reproducibility, which every parity test relies on.
     ///     </para>
     ///     <para>
@@ -35,8 +36,9 @@ namespace Gym.Envs {
     ///     <para>
     ///     Deviations that follow from C#: <see cref="Metadata"/> is per instance (Python's class attribute is shared by every
     ///     instance of the class, so mutating one env's changed all of them); spaces are the non-generic <see cref="Space"/>
-    ///     until the spaces port (P2) makes them <c>Space&lt;T&gt;</c>.
+    ///     until the spaces work (P2) makes them <c>Space&lt;T&gt;</c>.
     ///     </para>
+    ///     <para>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/core.py#L25">gymnasium/core.py</see>.</para>
     /// </remarks>
     public abstract class Env<TObs, TAct> : IEnv, IDynamicAttributes {
         /// <summary>The metadata; a fresh <c>{"render_modes": []}</c> until the env assigns its own.</summary>
@@ -155,8 +157,36 @@ namespace Gym.Envs {
         /// </summary>
         /// <param name="action">An element of <see cref="ActionSpace"/>.</param>
         /// <returns>The observation, reward, <c>terminated</c>, <c>truncated</c> and info.</returns>
-        /// <exception cref="AssertionError">Thrown by ported envs for an invalid action or a step before the first reset, as their asserts are.</exception>
+        /// <exception cref="AssertionError">Thrown by Gym's envs for an invalid action or a step before the first reset, where Gymnasium's envs fail an <c>assert</c>.</exception>
         public abstract StepResult<TObs> Step(TAct action);
+
+        /// <summary>
+        ///     Steps asynchronously: completes with what <see cref="Step"/> returns. The default runs <see cref="Step"/> on the
+        ///     calling thread and completes synchronously, with no thread-pool hop and no allocation; an env whose dynamics are
+        ///     genuinely asynchronous (a remote simulator, a batched GPU step) overrides it.
+        /// </summary>
+        /// <param name="action">An element of <see cref="ActionSpace"/>.</param>
+        /// <param name="cancellationToken">Checked before the step starts; a step that has started runs to completion.</param>
+        /// <returns>
+        ///     A value task that completes with the transition, is faulted with what <see cref="Step"/> threw, or is canceled
+        ///     when <paramref name="cancellationToken"/> was already canceled.
+        /// </returns>
+        /// <remarks>
+        ///     Exceptions surface when the task is awaited, never from this call, as for any asynchronous method. Wrappers
+        ///     inherit this default, so awaiting a wrapper runs the wrapper's own <see cref="Step"/> (and, through it, the env
+        ///     beneath, synchronously); a wrapper that must keep an asynchronous env asynchronous overrides <c>StepAsync</c> as
+        ///     well. Not thread-safe, like <see cref="Step"/>: await each call before issuing the next on the same env.
+        /// </remarks>
+        public virtual ValueTask<StepResult<TObs>> StepAsync(TAct action, CancellationToken cancellationToken = default) {
+            if (cancellationToken.IsCancellationRequested)
+                return ValueTask.FromCanceled<StepResult<TObs>>(cancellationToken);
+            try {
+                return new ValueTask<StepResult<TObs>>(Step(action));
+            } catch (Exception exception) {
+                // An asynchronous method reports failure through its task, so the caller's await, not this call, throws.
+                return ValueTask.FromException<StepResult<TObs>>(exception);
+            }
+        }
 
         /// <summary>
         ///     Starts an episode (<c>reset(seed=seed, options=options)</c>). Implementations call <see cref="SeedNpRandom"/>
@@ -194,24 +224,26 @@ namespace Gym.Envs {
         }
 
         /// <summary>
-        ///     Port of <c>has_wrapper_attr</c>: whether this env has the Python attribute <paramref name="name"/> (Python's
-        ///     <c>hasattr</c>: declared members by Python name, then run-time attributes).
+        ///     Whether this env has the Python attribute <paramref name="name"/> (Python's <c>hasattr</c>: declared members by
+        ///     Python name, then run-time attributes).
         /// </summary>
         /// <param name="name">The attribute, in Python spelling.</param>
         /// <returns><see langword="true"/> when reading it would succeed.</returns>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="name"/> is <see langword="null"/>.</exception>
+        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/core.py#L270">gymnasium/core.py</see>.</remarks>
         public virtual bool HasWrapperAttr(string name) => PyAttributes.HasAttr(this, name);
 
-        /// <summary>Port of <c>get_wrapper_attr</c>: Python's <c>getattr(self, name)</c>.</summary>
+        /// <summary>The Python attribute <paramref name="name"/> of this env, as Python's <c>getattr(self, name)</c> reads it.</summary>
         /// <param name="name">The attribute, in Python spelling.</param>
         /// <returns>The value, boxed.</returns>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="name"/> is <see langword="null"/>.</exception>
         /// <exception cref="AttributeError">Thrown when the env has no such attribute (<c>'CartPoleEnv' object has no attribute 'x'</c>).</exception>
+        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/core.py#L274">gymnasium/core.py</see>.</remarks>
         public virtual object? GetWrapperAttr(string name) => PyAttributes.GetAttr(this, name);
 
         /// <summary>
-        ///     Port of <c>set_wrapper_attr</c> on an env: assigns the attribute when <paramref name="force"/> is set or the env
-        ///     has it, creating a run-time attribute for a new name.
+        ///     Assigns the Python attribute <paramref name="name"/> when <paramref name="force"/> is set or the env has it,
+        ///     creating a run-time attribute for a new name.
         /// </summary>
         /// <param name="name">The attribute, in Python spelling.</param>
         /// <param name="value">The value; numbers convert to a numeric attribute's type.</param>
@@ -220,6 +252,7 @@ namespace Gym.Envs {
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="name"/> is <see langword="null"/>.</exception>
         /// <exception cref="AttributeError">Thrown for a read-only attribute (<c>property 'np_random_seed' of 'CartPoleEnv' object has no setter</c>).</exception>
         /// <exception cref="TypeError">Thrown when the value does not fit the attribute's type.</exception>
+        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/core.py#L278">gymnasium/core.py</see>.</remarks>
         public virtual bool SetWrapperAttr(string name, object? value, bool force = true) {
             if (force || PyAttributes.HasAttr(this, name)) {
                 PyAttributes.SetAttr(this, name, value);
@@ -230,10 +263,11 @@ namespace Gym.Envs {
         }
 
         /// <summary>
-        ///     Port of <c>Env.__str__</c>: <c>&lt;CartPoleEnv instance&gt;</c> without a spec, <c>&lt;CartPoleEnv&lt;CartPole-v1&gt;&gt;</c>
-        ///     with one.
+        ///     The env's description: <c>&lt;CartPoleEnv instance&gt;</c> without a spec, <c>&lt;CartPoleEnv&lt;CartPole-v1&gt;&gt;</c>
+        ///     with one; wrapper descriptions embed it.
         /// </summary>
-        /// <returns>The text Gymnasium prints, which wrapper descriptions embed.</returns>
+        /// <returns>The text, the same as Gymnasium prints for the env.</returns>
+        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/core.py#L249">gymnasium/core.py</see>.</remarks>
         public override string ToString() {
             EnvSpec? spec = Spec;
             string name = PyAttributes.PyTypeName(GetType());
@@ -241,12 +275,13 @@ namespace Gym.Envs {
         }
 
         /// <summary>
-        ///     The first line of every <see cref="Reset"/>, the port of <c>super().reset(seed=seed)</c>: reseeds
+        ///     The first line of every <see cref="Reset"/> (Gymnasium's <c>super().reset(seed=seed)</c>): reseeds
         ///     <see cref="NpRandom"/> and records <see cref="NpRandomSeed"/> when a seed is given; without one, the generator,
         ///     and with it the random stream, carries on.
         /// </summary>
         /// <param name="seed">The seed passed to <see cref="Reset"/>, or <see langword="null"/>.</param>
         /// <exception cref="Error">Thrown for a negative seed: <c>Seed must be greater or equal to zero, actual value: -1</c>.</exception>
+        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/core.py#L116">gymnasium/core.py</see>.</remarks>
         protected void SeedNpRandom(BigInteger? seed) {
             // Initialize the RNG if the seed is manually passed.
             if (seed is not null)
@@ -296,6 +331,18 @@ namespace Gym.Envs {
         /// <returns>The transition with its observation boxed.</returns>
         StepResult<object?> IEnv.Step(object? action) {
             StepResult<TObs> result = Step(ConvertAction(action));
+            return new StepResult<object?>(result.Observation, result.Reward, result.Terminated, result.Truncated, result.Info);
+        }
+
+        /// <summary>
+        ///     The untyped asynchronous step: converts the action and awaits <see cref="StepAsync(TAct, CancellationToken)"/>, so
+        ///     an action that cannot be converted faults the returned task instead of throwing here.
+        /// </summary>
+        /// <param name="action">The action.</param>
+        /// <param name="cancellationToken">Checked before the step starts.</param>
+        /// <returns>A value task that completes with the transition, its observation boxed.</returns>
+        async ValueTask<StepResult<object?>> IEnv.StepAsync(object? action, CancellationToken cancellationToken) {
+            StepResult<TObs> result = await StepAsync(ConvertAction(action), cancellationToken).ConfigureAwait(false);
             return new StepResult<object?>(result.Observation, result.Reward, result.Terminated, result.Truncated, result.Info);
         }
 

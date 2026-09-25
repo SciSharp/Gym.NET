@@ -115,7 +115,7 @@ namespace Gym.Tests.Spaces
 
         /// <summary>
         ///     Defect B-09 is gone: integer boxes sample their upper bound as well, because Gymnasium draws from
-        ///     <c>[low, high + 1)</c> and floors. The pre-Gymnasium port drew from <c>[low, high)</c> and never produced high.
+        ///     <c>[low, high + 1)</c> and floors. Gym.NET's earlier sampler drew from <c>[low, high)</c> and never produced high.
         /// </summary>
         [TestMethod]
         public void IntegerBox_SamplesReachTheUpperBound()

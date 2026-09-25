@@ -9,8 +9,9 @@ namespace Gym.Utils {
     /// <summary>
     ///     Python's and NumPy's scalar arithmetic where it differs from C#'s (port plan §3.2 and §5.3, workstream F3): floor
     ///     division and modulo that follow the divisor's sign, <c>min</c>/<c>max</c> whose NaN results depend on argument
-    ///     order, <c>round</c> with half-to-even and exact decimal rounding, and NumPy's <c>clip</c> and <c>sign</c>. Ported
-    ///     math calls these wherever the Gymnasium source uses the Python operator or function, so results match bit for bit.
+    ///     order, <c>round</c> with half-to-even and exact decimal rounding, and NumPy's <c>clip</c> and <c>sign</c>. Gym's
+    ///     env math calls these wherever Gymnasium's source uses the Python operator or function, so results match
+    ///     Gymnasium's bit for bit; the C# operator there would drift on negative operands, NaNs and ties.
     /// </summary>
     /// <remarks>
     ///     <para>
@@ -23,6 +24,10 @@ namespace Gym.Utils {
     ///     The float operations reproduce CPython 3.12's <c>floatobject.c</c> operation for operation on top of the reference
     ///     platform's C <c>fmod</c> (UCRT), including the sign of the NaN a non-finite dividend produces, so even the NaN bit
     ///     patterns match. The live parity suite checks every member against the embedded interpreter.
+    ///     </para>
+    ///     <para>
+    ///     Reference: <see href="https://github.com/python/cpython/blob/v3.12.12/Objects/floatobject.c">Objects/floatobject.c</see> and <see href="https://github.com/python/cpython/blob/v3.12.12/Python/bltinmodule.c#L1745">Python/bltinmodule.c</see> (CPython
+    ///     3.12), <see href="https://github.com/numpy/numpy/blob/v2.4.2/numpy/_core/src/umath/clip.cpp">numpy/_core/src/umath/clip.cpp</see> (NumPy 2.4.2).
     ///     </para>
     /// </remarks>
     public static class PyMath {
@@ -204,7 +209,7 @@ namespace Gym.Utils {
         /// <remarks>
         ///     Matches NumPy 2.4.2 bit for bit, NaN payloads and signed zeros included, over every combination of
         ///     <c>{0, -0, 1, -1, 0.5, nan, inf, -inf}</c>; the textbook <c>min(max(x, low), high)</c> does not (it turns
-        ///     <c>clip(0.0, -0.0, 1)</c> into <c>-0.0</c>).
+        ///     <c>clip(0.0, -0.0, 1)</c> into <c>-0.0</c>). Reference: <see href="https://github.com/numpy/numpy/blob/v2.4.2/numpy/_core/src/umath/clip.cpp#L150">numpy/_core/src/umath/clip.cpp</see>.
         /// </remarks>
         public static double Clip(double x, double low, double high) {
             // NumPy's floating-point max/min keep a NaN first operand, else prefer it on ties.
@@ -250,9 +255,11 @@ namespace Gym.Utils {
         ///     <c>rounded value too large to represent</c> (<c>round(1.7976931348623157e308, -308)</c>).
         /// </exception>
         /// <remarks>
-        ///     Port of CPython 3.12's <c>float___round___impl</c> and <c>double_round</c>, which round to a decimal string with
+        ///     CPython 3.12's <c>float___round___impl</c> and <c>double_round</c> round to a decimal string with
         ///     <c>_Py_dg_dtoa</c> mode 3 and parse it back with <c>_Py_dg_strtod</c>; here the decimal rounding is exact
-        ///     <see cref="BigInteger"/> arithmetic and the parse is .NET's correctly rounded <see cref="double.Parse(string, NumberStyles, IFormatProvider)"/>.
+        ///     <see cref="BigInteger"/> arithmetic and the parse is .NET's correctly rounded
+        ///     <see cref="double.Parse(string, NumberStyles, IFormatProvider)"/>, which reach the same double. Reference:
+        ///     <see href="https://github.com/python/cpython/blob/v3.12.12/Objects/floatobject.c#L962">Objects/floatobject.c</see>.
         /// </remarks>
         public static double Round(double x, int ndigits) {
             // NaNs and infinities round to themselves.
@@ -289,8 +296,8 @@ namespace Gym.Utils {
 
         /// <summary>
         ///     <c>np.float32(x)</c>: the float64 value rounded to the nearest float32, ties to even (IEEE), exactly C#'s
-        ///     <c>(float)x</c>. Spelled out so ported code shows the cast the source makes, where the §3.2 rules allow no
-        ///     other narrowing.
+        ///     <c>(float)x</c>. Spelled out so code that follows a Gymnasium source shows the cast that source makes, where the
+        ///     §3.2 rules allow no other narrowing.
         /// </summary>
         /// <param name="x">The float64 value.</param>
         /// <returns>The float32 value.</returns>

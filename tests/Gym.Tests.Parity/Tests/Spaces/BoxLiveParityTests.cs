@@ -13,10 +13,11 @@ using Python.Runtime;
 
 namespace Gym.Tests.Parity.Tests.Spaces {
     /// <summary>
-    ///     Gym.NET's <see cref="Box"/> against <c>gymnasium.spaces.Box</c> (<c>gymnasium/spaces/box.py</c> @ 9e04324), live:
-    ///     the bounds and their classification, <c>is_bounded</c>, seeded samples in every bound category and dtype family
-    ///     with the generator state behind them, and membership.
+    ///     Gym.NET's <see cref="Box"/> against <c>gymnasium.spaces.Box</c>, live: the bounds and their classification,
+    ///     <c>is_bounded</c>, seeded samples in every bound category and dtype family with the generator state behind them,
+    ///     and membership.
     /// </summary>
+    /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/spaces/box.py#L64">gymnasium/spaces/box.py</see>.</remarks>
     [TestClass]
     public sealed class BoxLiveParityTests : ParityTestBase {
         /// <summary>
@@ -100,9 +101,10 @@ namespace Gym.Tests.Parity.Tests.Spaces {
         }
 
         /// <summary>
-        ///     Five seeded samples (dtype, shape, bytes) and the generator state after them are Gymnasium's: the port of
-        ///     <c>box.py:404</c> makes the same draws in the same order, casts, floors and clips alike.
+        ///     Five seeded samples (dtype, shape, bytes) and the generator state after them are Gymnasium's:
+        ///     <see cref="Box.Sample"/> makes Gymnasium's draws in Gymnasium's order, and casts, floors and clips alike.
         /// </summary>
+        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/spaces/box.py#L404">gymnasium/spaces/box.py (Box.sample)</see>.</remarks>
         /// <param name="box">The index into <see cref="Boxes"/>.</param>
         /// <param name="seed">The box's seed.</param>
         [TestMethod]

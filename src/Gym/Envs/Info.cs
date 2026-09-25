@@ -7,7 +7,7 @@ using NumSharp;
 
 namespace Gym.Envs {
     /// <summary>
-    ///     Gymnasium's <c>info</c> dict (and the base of <see cref="Metadata"/>): a <c>string → object</c> map that behaves like
+    ///     The <c>info</c> dict of resets and steps (and the base of <see cref="Metadata"/>): a <c>string → object</c> map that behaves like
     ///     a Python <c>dict</c>. Iteration follows insertion order, re-assigning a key keeps its place, and equality ignores
     ///     order and compares values as Python's <c>==</c> does (<see cref="PyEquality"/>). Keys keep Gymnasium's spelling
     ///     byte for byte (<c>"TimeLimit.truncated"</c>, <c>"episode"</c>).
@@ -15,7 +15,7 @@ namespace Gym.Envs {
     /// <remarks>
     ///     <para>
     ///     A missing key raises <see cref="KeyError"/> with Python's message (<c>'x'</c>), not
-    ///     <see cref="KeyNotFoundException"/>, because ported tests catch Python's error. <see cref="Get"/> and
+    ///     <see cref="KeyNotFoundException"/>, so code and tests that expect Python's error catch it. <see cref="Get"/> and
     ///     <see cref="Pop(string, object)"/> are the defaulting forms, as on a Python dict.
     ///     </para>
     ///     <para>

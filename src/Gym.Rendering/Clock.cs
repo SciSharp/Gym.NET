@@ -4,9 +4,9 @@ using System.Threading;
 
 namespace Gym.Rendering {
     /// <summary>
-    ///     Port of <c>pygame.time.Clock</c> (pygame-ce 2.5.8, <c>src_c/time.c</c>): paces a render loop. Human-mode rendering
-    ///     calls <see cref="Tick"/> with <c>metadata["render_fps"]</c> once per frame, which sleeps just long enough to hold
-    ///     that frame rate, so a human-mode episode plays at the env's intended speed.
+    ///     Paces a render loop the way <c>pygame.time.Clock</c> does. Human-mode rendering calls <see cref="Tick"/> with
+    ///     <c>metadata["render_fps"]</c> once per frame, which sleeps just long enough to hold that frame rate, so a
+    ///     human-mode episode plays at the env's intended speed.
     /// </summary>
     /// <remarks>
     ///     <para>
@@ -15,6 +15,7 @@ namespace Gym.Rendering {
     ///     including its float32 frame-time computation and whole-millisecond sleeps, so the pacing matches.
     ///     </para>
     ///     <para>Not thread-safe: tick a clock from the thread that renders.</para>
+    ///     <para>Reference: <see href="https://github.com/pygame-community/pygame-ce/blob/2.5.8/src_c/time.c#L691">src_c/time.c</see> (pygame-ce 2.5.8).</para>
     /// </remarks>
     public sealed class Clock {
         /// <summary>The monotonic time base, SDL's millisecond tick counter.</summary>
@@ -44,8 +45,8 @@ namespace Gym.Rendering {
         }
 
         /// <summary>
-        ///     Port of <c>Clock.tick(framerate)</c>: marks a frame; with a positive <paramref name="framerate"/>, first sleeps
-        ///     until <c>1000 / framerate</c> ms have passed since the previous tick.
+        ///     Marks a frame; with a positive <paramref name="framerate"/>, first sleeps until <c>1000 / framerate</c> ms have
+        ///     passed since the previous tick, so the loop runs no faster than that rate.
         /// </summary>
         /// <param name="framerate">The frame rate to hold, frames per second; 0 (the default) does not sleep.</param>
         /// <returns>The milliseconds since the previous tick, the sleep included.</returns>
@@ -53,6 +54,7 @@ namespace Gym.Rendering {
         ///     pygame reads the rate as a C <c>float</c> and computes <c>(int)((1.0f / framerate) * 1000.0f)</c>, so the frame
         ///     time is whole milliseconds (20 ms at 50 fps). A negative or infinite rate gives a delay clamped at zero, as in
         ///     pygame, and nothing sleeps; so does NaN, for which pygame's C conversion is undefined.
+        ///     Reference: <see href="https://github.com/pygame-community/pygame-ce/blob/2.5.8/src_c/time.c#L535">src_c/time.c</see>.
         /// </remarks>
         public long Tick(double framerate = 0) {
             float rate = (float)framerate;
@@ -86,16 +88,19 @@ namespace Gym.Rendering {
             return _timePassed;
         }
 
-        /// <summary>Port of <c>Clock.get_time()</c>: the milliseconds between the last two ticks, the pacing sleep included.</summary>
+        /// <summary>The milliseconds between the last two ticks, the pacing sleep included (pygame's <c>Clock.get_time()</c>).</summary>
         /// <returns>The time in milliseconds.</returns>
+        /// <remarks>Reference: <see href="https://github.com/pygame-community/pygame-ce/blob/2.5.8/src_c/time.c#L616">src_c/time.c</see>.</remarks>
         public long GetTime() => _timePassed;
 
-        /// <summary>Port of <c>Clock.get_rawtime()</c>: the milliseconds between the last two ticks, without the pacing sleep.</summary>
+        /// <summary>The milliseconds between the last two ticks, without the pacing sleep (pygame's <c>Clock.get_rawtime()</c>).</summary>
         /// <returns>The time in milliseconds.</returns>
+        /// <remarks>Reference: <see href="https://github.com/pygame-community/pygame-ce/blob/2.5.8/src_c/time.c#L622">src_c/time.c</see>.</remarks>
         public long GetRawTime() => _rawPassed;
 
-        /// <summary>Port of <c>Clock.get_fps()</c>: the frame rate averaged over the last ten ticks, 0 until ten have run.</summary>
+        /// <summary>The frame rate averaged over the last ten ticks, 0 until ten have run (pygame's <c>Clock.get_fps()</c>).</summary>
         /// <returns>Frames per second.</returns>
+        /// <remarks>Reference: <see href="https://github.com/pygame-community/pygame-ce/blob/2.5.8/src_c/time.c#L610">src_c/time.c</see>.</remarks>
         public float GetFps() => _fps;
 
         /// <summary>

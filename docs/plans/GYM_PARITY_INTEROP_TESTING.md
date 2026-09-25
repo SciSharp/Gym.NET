@@ -328,7 +328,7 @@ new session cell `ByteReaders_AgreeOnAnImportedView` pins that import against Nu
 dtype families on a strided, negative-step view. Same verdicts afterwards: 131 cells, 104 gated passing, the same 27
 `[OpenBugs]` failing at the same divergences, net8.0 and net10.0.
 
-**CartPole byte-for-byte on 2026-09-25.** Gym.NET's `CartPoleEnv` was re-ported from `cartpole.py` (float64 attributes as
+**CartPole byte-for-byte on 2026-09-25.** Gym.NET's `CartPoleEnv` was rewritten against `cartpole.py` (float64 attributes as
 settable properties, the source's operation order, float32 observation copies, `±inf` observation bounds,
 `AssertionError`s with Python's messages, `sutton_barto_reward`, both integrators, `Reset(seed, options)` with
 `maybe_parse_reset_bounds`, the post-termination warning through a new `Gym.Logger`), and renders with a new

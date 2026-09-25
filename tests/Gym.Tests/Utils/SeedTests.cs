@@ -13,11 +13,12 @@ using NumSharp;
 
 namespace Gym.Tests.Utils {
     /// <summary>
-    ///     Pins Gym.NET's port of Gymnasium's seeding (<c>gymnasium/utils/seeding.py</c>): any non-negative seed is valid, a
-    ///     negative one raises Gymnasium's <see cref="Error"/> with its message, and the reported seed is the one given, or
-    ///     128-bit entropy for an unseeded generator. The legacy <c>RandomState</c> rules (a 2^32 - 1 ceiling, NumPy's
-    ///     <c>ValueError</c>) no longer apply.
+    ///     Pins Gym.NET's seeding, which follows Gymnasium's: any non-negative seed is valid, a negative one raises
+    ///     Gymnasium's <see cref="Error"/> with its message, and the reported seed is the one given, or 128-bit entropy for an
+    ///     unseeded generator. The legacy <c>RandomState</c> rules (a 2^32 - 1 ceiling, NumPy's <c>ValueError</c>) no longer
+    ///     apply.
     /// </summary>
+    /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/utils/seeding.py">gymnasium/utils/seeding.py</see>.</remarks>
     [TestClass]
     public class SeedTests {
         /// <summary>Gymnasium's message for a negative seed, before the value.</summary>
@@ -27,9 +28,10 @@ namespace Gym.Tests.Utils {
         private static readonly long[] LargeSeeds = { (1L << 31) + 5, (1L << 32) - 1, 1L << 32, 1L << 40, long.MaxValue };
 
         /// <summary>
-        ///     Port of Gymnasium's <c>test_valid_seeds</c> (<c>tests/utils/test_seeding.py</c>), extended with large seeds:
-        ///     <c>np_random(seed)</c> reports the seed it was given, including one beyond <see cref="long"/>.
+        ///     Gymnasium's <c>test_valid_seeds</c>, extended with large seeds: <c>np_random(seed)</c> reports the seed it was
+        ///     given, including one beyond <see cref="long"/>.
         /// </summary>
+        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/tests/utils/test_seeding.py#L17">tests/utils/test_seeding.py (test_valid_seeds)</see>.</remarks>
         [TestMethod]
         public void NpRandom_ValidSeeds_ReportTheSeed()
         {
@@ -41,9 +43,10 @@ namespace Gym.Tests.Utils {
         }
 
         /// <summary>
-        ///     Port of Gymnasium's <c>test_invalid_seeds</c> for -1 (a string cannot reach a typed seed): a negative seed
-        ///     raises <see cref="Error"/> with Gymnasium's message.
+        ///     Gymnasium's <c>test_invalid_seeds</c> for -1 (a string cannot reach a typed seed): a negative seed raises
+        ///     <see cref="Error"/> with Gymnasium's message.
         /// </summary>
+        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/tests/utils/test_seeding.py#L7">tests/utils/test_seeding.py (test_invalid_seeds)</see>.</remarks>
         [TestMethod]
         public void NpRandom_NegativeSeed_ThrowsGymnasiumError()
         {
@@ -124,7 +127,7 @@ namespace Gym.Tests.Utils {
         /// <summary>
         ///     A seeded reset gives LunarLander a new generator, as Gymnasium's <c>super().reset(seed=seed)</c> does: an action
         ///     space created with the constructor's <c>random_state</c> keeps drawing from that generator, whose next sample is
-        ///     what it would have been without the reset. (Before the core-API port, <c>Seed(s)</c> reseeded the shared
+        ///     what it would have been without the reset. (Before the core-API work, <c>Seed(s)</c> reseeded the shared
         ///     generator in place, which Gymnasium never does.)
         /// </summary>
         [TestMethod]

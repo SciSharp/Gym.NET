@@ -2,6 +2,7 @@
 #pragma warning disable CS0618 // The legacy API is what these tests pin.
 using System;
 using System.Linq;
+using System.Threading.Tasks;
 using Gym.Environments.Envs.Classic;
 using Gym.Envs;
 using Gym.Exceptions;
@@ -13,7 +14,7 @@ using SixLabors.ImageSharp;
 
 namespace Gym.Tests.Legacy {
     /// <summary>
-    ///     Pins <see cref="LegacyEnvAdapter"/>, the pre-0.26 API over a ported env (port plan §16): <c>Seed(s)</c> then
+    ///     Pins <see cref="LegacyEnvAdapter"/>, the pre-0.26 API over a current env (port plan §16): <c>Seed(s)</c> then
     ///     <c>Reset()</c> is <c>Reset(seed: s)</c>, a step is the done API of <c>step_api_compatibility</c>, and rendering
     ///     takes only the construction-time mode.
     /// </summary>
@@ -48,7 +49,7 @@ namespace Gym.Tests.Legacy {
                 step = terminating.Step(1);
             } while (!step.Done);
             Assert.AreEqual(false, step.Information!["TimeLimit.truncated"]);
-            Assert.AreEqual(1f, step.Reward);
+            Assert.AreEqual(1.0, step.Reward, "The reward stays float64.");
 
             var truncating = new LegacyEnvAdapter(new TimeLimit<NDArray, long>(new CartPoleEnv(), 2));
             truncating.Seed(0);
@@ -59,6 +60,36 @@ namespace Gym.Tests.Legacy {
             step = truncating.Step(1);
             Assert.IsTrue(step.Done);
             Assert.AreEqual(true, step.Information!["TimeLimit.truncated"]);
+        }
+
+        /// <summary>
+        ///     <see cref="LegacyEnvAdapter.StepAsync"/> awaits the env's own <c>StepAsync</c>: the same transition as
+        ///     <see cref="LegacyEnvAdapter.Step"/>, completed on the calling thread; a step error faults the task.
+        /// </summary>
+        /// <returns>The test's task.</returns>
+        [TestMethod]
+        public async Task StepAsync_MatchesStep() {
+            var synchronous = new LegacyEnvAdapter(new CartPoleEnv());
+            var asynchronous = new LegacyEnvAdapter(new CartPoleEnv());
+            synchronous.Seed(7);
+            asynchronous.Seed(7);
+            synchronous.Reset().Dispose();
+            asynchronous.Reset().Dispose();
+
+            for (int i = 0; i < 20; i++) {
+                ValueTask<Step> pending = asynchronous.StepAsync(i % 2);
+                Assert.IsTrue(pending.IsCompletedSuccessfully);
+                Step expected = synchronous.Step(i % 2), actual = await pending;
+                // Field by field: the legacy Step compares its Dict by reference.
+                Assert.IsTrue(np.array_equal(expected.Observation, actual.Observation), $"step {i}");
+                Assert.AreEqual(expected.Reward, actual.Reward);
+                Assert.AreEqual(expected.Done, actual.Done);
+                CollectionAssert.AreEquivalent(expected.Information!.ToList(), actual.Information!.ToList());
+            }
+
+            ValueTask<Step> invalid = asynchronous.StepAsync(5);
+            Assert.IsTrue(invalid.IsFaulted, "CartPole's assertion faults the task.");
+            await Assert.ThrowsExactlyAsync<AssertionError>(async () => await invalid);
         }
 
         /// <summary>Rendering takes only the env's own render mode; an <c>rgb_array</c> frame comes back as an image.</summary>

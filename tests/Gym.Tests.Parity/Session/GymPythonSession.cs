@@ -16,7 +16,7 @@ namespace Gym.Tests.Parity.Session {
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///     Port of NumSharp's <c>PythonSession</c> (<c>refs/NumSharp/test/NumSharp.Tests.Interop</c>), extended per
+    ///     Adapted from NumSharp's <c>PythonSession</c> (<c>refs/NumSharp/test/NumSharp.Tests.Interop</c>), extended per
     ///     docs/plans/GYM_PARITY_INTEROP_TESTING.md §3–§4: a parity venv, deterministic interpreter settings, and a stack
     ///     check against <c>tools/parity/manifest.json</c>. The engine itself is <see cref="PythonRuntime"/>, the pythonic
     ///     skill's backend; everything the session asks Python goes through the <see cref="Python"/> tree.

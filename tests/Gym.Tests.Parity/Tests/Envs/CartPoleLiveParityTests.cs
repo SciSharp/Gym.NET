@@ -20,9 +20,9 @@ using Python.Runtime;
 
 namespace Gym.Tests.Parity.Tests.Envs {
     /// <summary>
-    ///     CartPole-v1 against Gymnasium's <c>CartPoleEnv</c> (<c>gymnasium/envs/classic_control/cartpole.py</c> @ 9e04324),
-    ///     live and in lockstep: first the float64 reference transcription (the harness's positive control), then Gym.NET's
-    ///     own <see cref="CartPoleEnv"/>, the port, across its whole surface: reset (with options), dynamics (both
+    ///     CartPole-v1 against Gymnasium's <c>CartPoleEnv</c>, live and in lockstep: first the float64 reference
+    ///     transcription (the harness's positive control), then Gym.NET's own <see cref="CartPoleEnv"/> across its whole
+    ///     surface: reset (with options), dynamics (both
     ///     integrators, a changed <c>tau</c>), rewards (both reward schemes), termination and what follows it, the warning,
     ///     assertion messages, spaces, metadata, and <c>rgb_array</c> frames, including states pygame cannot draw.
     /// </summary>
@@ -30,7 +30,7 @@ namespace Gym.Tests.Parity.Tests.Envs {
     ///     Every lockstep here compares the float64 <c>state</c> after each call too (Gymnasium's <c>env.unwrapped.state</c>,
     ///     Gym.NET's <see cref="CartPoleEnv.State"/>), so dynamics are compared at full precision even where the float32
     ///     observation would round a difference away. Cells that step or draw a rotated pole are pinned to the reference
-    ///     platform: they rest on the platform's <c>cos</c>/<c>sin</c>.
+    ///     platform: they rest on the platform's <c>cos</c>/<c>sin</c>. Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/envs/classic_control/cartpole.py#L20">gymnasium/envs/classic_control/cartpole.py</see>.
     /// </remarks>
     [TestClass]
     public sealed class CartPoleLiveParityTests : ParityTestBase {

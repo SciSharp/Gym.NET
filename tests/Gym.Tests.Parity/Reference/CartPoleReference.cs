@@ -7,14 +7,13 @@ using NumSharp;
 
 namespace Gym.Tests.Parity.Reference {
     /// <summary>
-    ///     A test-local, float64 transcription of Gymnasium's CartPole (<c>gymnasium/envs/classic_control/cartpole.py</c> @
-    ///     9e04324): the harness's positive control. It must match live Gymnasium bit for bit, which proves the harness can
+    ///     A test-local, float64 transcription of Gymnasium's CartPole: the harness's positive control. It must match live Gymnasium bit for bit, which proves the harness can
     ///     report parity at all; its deliberately broken variants must be reported at the exact call they break, which proves
     ///     it can report divergence (plan §11).
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///     Not product code, and not a stand-in for the P4 port: it exists so the harness is tested against something whose
+    ///     Not product code, and not a stand-in for Gym.NET's <c>CartPoleEnv</c>: it exists so the harness is tested against something whose
     ///     correctness is known independently of Gym.NET. It is the same transcription the port plan's A.7 (and the parity
     ///     audit) found bit-identical offline, now checked live.
     ///     </para>
@@ -24,9 +23,10 @@ namespace Gym.Tests.Parity.Reference {
     ///     <c>np.square</c>, the source's evaluation order, and <c>Generator(PCG64(SeedSequence(seed)))</c> with
     ///     <c>uniform(-0.05, 0.05, size=4)</c> for the reset, as <c>seeding.np_random</c> and <c>reset</c> do.
     ///     </para>
+    ///     <para>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/envs/classic_control/cartpole.py#L20">gymnasium/envs/classic_control/cartpole.py</see>.</para>
     /// </remarks>
     public sealed class CartPoleReference : IDotNetEnv {
-        // cartpole.py:131-146, CartPoleEnv.__init__: instance attributes, all Python floats.
+        // CartPoleEnv.__init__ (cartpole.py, lines 124-136 at the pinned commit): instance attributes, all Python floats.
         /// <summary><c>self.gravity</c>.</summary>
         private const double Gravity = 9.8;
 
@@ -105,9 +105,9 @@ namespace Gym.Tests.Parity.Reference {
 
         /// <inheritdoc />
         /// <remarks>
-        ///     cartpole.py:207-229: <c>super().reset(seed=seed)</c> sets <c>np_random</c> to <c>seeding.np_random(seed)[0]</c>;
-        ///     then <c>self.state = self.np_random.uniform(low=-0.05, high=0.05, size=(4,))</c>, and the observation is its
-        ///     float32 copy with an empty info.
+        ///     Gymnasium's <c>reset</c>: <c>super().reset(seed=seed)</c> sets <c>np_random</c> to
+        ///     <c>seeding.np_random(seed)[0]</c>; then <c>self.state = self.np_random.uniform(low=-0.05, high=0.05, size=(4,))</c>,
+        ///     and the observation is its float32 copy with an empty info. Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/envs/classic_control/cartpole.py#L228">gymnasium/envs/classic_control/cartpole.py (CartPoleEnv.reset)</see>.
         /// </remarks>
         public CallResult Reset(long seed) {
             _npRandom = new Generator(new PCG64(new SeedSequence(seed)));
@@ -122,7 +122,10 @@ namespace Gym.Tests.Parity.Reference {
         }
 
         /// <inheritdoc />
-        /// <remarks>cartpole.py:164-205, CartPoleEnv.step, one statement per Python statement, in the source's order.</remarks>
+        /// <remarks>
+        ///     Gymnasium's <c>CartPoleEnv.step</c>, one statement per Python statement, in the source's order.
+        ///     Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/envs/classic_control/cartpole.py#L164">gymnasium/envs/classic_control/cartpole.py (CartPoleEnv.step)</see>.
+        /// </remarks>
         public CallResult Step(object action) {
             long a = Convert.ToInt64(action, CultureInfo.InvariantCulture);
             if (_state is null)

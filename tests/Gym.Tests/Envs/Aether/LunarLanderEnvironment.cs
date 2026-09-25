@@ -68,7 +68,7 @@ namespace Gym.Tests.Envs.Aether {
                 while (true) {
                     object a = PID(env, (float[]) state);
                     var (observation, reward, terminated, truncated, information) = env.Step(a);
-                    // The reward is float32 arithmetic widened to float64 (P8 ports Gymnasium's float64), so narrowing is exact.
+                    // The reward is float32 arithmetic widened to float64 (P8 moves it to Gymnasium's float64), so narrowing is exact.
                     total_reward += (float)reward;
                     steps++;
                     if (VERBOSE && (steps % 1000 == 0)) {

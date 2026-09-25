@@ -10,16 +10,17 @@ using NumSharp;
 
 namespace Gym.Tests.Ported.Wrappers {
     /// <summary>
-    ///     Port of <c>tests/wrappers/test_time_limit.py</c> @ 9e04324.
+    ///     Gymnasium's <c>TimeLimit</c> tests, run against <see cref="TimeLimit{TObs, TAct}"/>.
     /// </summary>
     /// <remarks>
-    ///     Two substitutions, until the code they need is ported: <c>gym.make("CartPole-v1")</c> is built by hand as
+    ///     Two substitutions, until Gym.NET has the code they need: <c>gym.make("CartPole-v1")</c> is built by hand as
     ///     <c>make</c> would (P3), and <c>PendulumEnv</c>, used because it never terminates (P4), is a
-    ///     <see cref="GenericTestEnv"/>, whose default step never terminates either.
+    ///     <see cref="GenericTestEnv"/>, whose default step never terminates either. Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/tests/wrappers/test_time_limit.py">tests/wrappers/test_time_limit.py</see>.
     /// </remarks>
     [TestClass]
     public class TestTimeLimit {
-        /// <summary>Port of <c>test_time_limit_reset_info</c>: the reset observation belongs to the space and the info is a dict.</summary>
+        /// <summary>The reset observation belongs to the space and the info is a dict.</summary>
+        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/tests/wrappers/test_time_limit.py#L10">tests/wrappers/test_time_limit.py (test_time_limit_reset_info)</see>.</remarks>
         [TestMethod]
         public void TestTimeLimitResetInfo() {
             var env = new TimeLimit<NDArray, long>(MakeCartPole(), 100);
@@ -29,7 +30,8 @@ namespace Gym.Tests.Ported.Wrappers {
             Assert.IsNotNull(info);
         }
 
-        /// <summary>Port of <c>test_time_limit_wrapper</c>: an env that never terminates is truncated after exactly the limit.</summary>
+        /// <summary>An env that never terminates is truncated after exactly the limit.</summary>
+        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/tests/wrappers/test_time_limit.py#L20">tests/wrappers/test_time_limit.py (test_time_limit_wrapper)</see>.</remarks>
         /// <param name="doubleWrap">Wrap twice with the same limit.</param>
         [TestMethod]
         [DataRow(false)]
@@ -53,9 +55,9 @@ namespace Gym.Tests.Ported.Wrappers {
         }
 
         /// <summary>
-        ///     Port of <c>test_termination_on_last_step</c>: termination at the last timestep; truncation due to the timeout
-        ///     happens at the same step.
+        ///     Termination at the last timestep; truncation due to the timeout happens at the same step.
         /// </summary>
+        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/tests/wrappers/test_time_limit.py#L41">tests/wrappers/test_time_limit.py (test_termination_on_last_step)</see>.</remarks>
         /// <param name="doubleWrap">Wrap twice with the same limit.</param>
         [TestMethod]
         [DataRow(false)]
@@ -74,9 +76,9 @@ namespace Gym.Tests.Ported.Wrappers {
         }
 
         /// <summary>
-        ///     Port of <c>test_max_episode_steps</c>: the limit shows in the spec, and a limit that is not a positive integer is
-        ///     refused with Gymnasium's messages.
+        ///     The limit shows in the spec, and a limit that is not a positive integer is refused with Gymnasium's messages.
         /// </summary>
+        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/tests/wrappers/test_time_limit.py#L62">tests/wrappers/test_time_limit.py (test_max_episode_steps)</see>.</remarks>
         [TestMethod]
         public void TestMaxEpisodeSteps() {
             var env = new TimeLimit<NDArray, long>(MakeCartPole(), 500);

@@ -6,13 +6,14 @@ using NumSharp;
 
 namespace Gym.Environments.Envs.Classic {
     /// <summary>
-    ///     Port of <c>gymnasium/envs/classic_control/utils.py</c> @ 9e04324: the reset-option parsing every classic-control
-    ///     env shares, so <c>Reset(seed, options)</c> accepts and rejects exactly what Gymnasium's <c>reset</c> does.
+    ///     The reset-option parsing every classic-control env shares, so <c>Reset(seed, options)</c> accepts and rejects
+    ///     exactly what Gymnasium's <c>reset</c> does, with the same messages.
     /// </summary>
+    /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/envs/classic_control/utils.py">gymnasium/envs/classic_control/utils.py</see>.</remarks>
     public static class ClassicControlUtils {
         /// <summary>
-        ///     Port of <c>verify_number_and_cast(x)</c>: Python's <c>float(x)</c>, with its <c>ValueError</c> and
-        ///     <c>TypeError</c> turned into one <see cref="ValueError"/> that names the option.
+        ///     Converts a reset option with Python's <c>float(x)</c>, turning its <c>ValueError</c> and <c>TypeError</c> into
+        ///     one <see cref="ValueError"/> that names the option.
         /// </summary>
         /// <param name="x">The option's value: a number, a numeric string (<c>"-0.5"</c>, <c>"1_0"</c>), a 0-d array...</param>
         /// <returns>The value as a float.</returns>
@@ -21,9 +22,10 @@ namespace Gym.Environments.Envs.Classic {
         ///     (<c>{x}</c> is Python's <c>str(x)</c>, see <see cref="PyBuiltins.Str"/>).
         /// </exception>
         /// <exception cref="OverflowException">
-        ///     Thrown, as Python's <c>OverflowError</c>, for an integer beyond the float range: the source catches only
+        ///     Thrown, as Python's <c>OverflowError</c>, for an integer beyond the float range: Gymnasium catches only
         ///     <c>ValueError</c> and <c>TypeError</c>, so this one propagates unchanged.
         /// </exception>
+        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/envs/classic_control/utils.py#L8">gymnasium/envs/classic_control/utils.py</see>.</remarks>
         public static double VerifyNumberAndCast(object? x) {
             try {
                 return PyBuiltins.Float(x);
@@ -34,8 +36,8 @@ namespace Gym.Environments.Envs.Classic {
         }
 
         /// <summary>
-        ///     Port of <c>maybe_parse_reset_bounds(options, default_low, default_high)</c>: the bounds a reset draws its initial
-        ///     state from, <c>options["low"]</c> and <c>options["high"]</c> where given, the defaults otherwise.
+        ///     The bounds a reset draws its initial state from: <c>options["low"]</c> and <c>options["high"]</c> where given,
+        ///     the defaults otherwise.
         /// </summary>
         /// <param name="options">The reset options (Python's <c>options</c> dict), or <see langword="null"/> for the defaults. Other keys are ignored.</param>
         /// <param name="defaultLow">The lower bound when <c>"low"</c> is absent.</param>
@@ -50,6 +52,7 @@ namespace Gym.Environments.Envs.Classic {
         /// <remarks>
         ///     Equal bounds are accepted, and NaN passes the comparison (<c>nan &gt; x</c> is false), exactly as in Python; a NaN or
         ///     infinite bound then fails in the generator's <c>uniform</c> instead (<c>high - low range exceeds valid bounds</c>).
+        ///     Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/envs/classic_control/utils.py#L17">gymnasium/envs/classic_control/utils.py</see>.
         /// </remarks>
         public static (double Low, double High) MaybeParseResetBounds(IReadOnlyDictionary<string, object?>? options, double defaultLow, double defaultHigh) {
             if (options is null)

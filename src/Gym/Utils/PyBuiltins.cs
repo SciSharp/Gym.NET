@@ -12,7 +12,7 @@ namespace Gym.Utils {
     /// <summary>
     ///     Python's built-in conversions and representations, as the Gymnasium source relies on them: <c>float(x)</c> for
     ///     option parsing, <c>int(x)</c> of a float for pixel coordinates, and <c>repr</c>/<c>str</c>/<c>type</c> for the
-    ///     messages of asserts and errors, which callers and ported tests match verbatim.
+    ///     messages of asserts and errors, which callers and tests match verbatim.
     /// </summary>
     /// <remarks>
     ///     <para>

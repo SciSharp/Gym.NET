@@ -6,10 +6,9 @@ using NumSharp;
 
 namespace Gym.Utils {
     /// <summary>
-    ///     Port of <c>gymnasium/utils/step_api_compatibility.py</c> @ 9e04324 for single envs: converts a transition between
-    ///     the pre-0.26 "done" step API, <c>(obs, reward, done, info)</c>, and the terminated/truncated API,
-    ///     <c>(obs, reward, terminated, truncated, info)</c>. The two are told apart by <c>info["TimeLimit.truncated"]</c>,
-    ///     which the old API used to mark a time-limit ending.
+    ///     Converts a single env's transition between the pre-0.26 "done" step API, <c>(obs, reward, done, info)</c>, and
+    ///     the terminated/truncated API, <c>(obs, reward, terminated, truncated, info)</c>. The two are told apart by
+    ///     <c>info["TimeLimit.truncated"]</c>, which the old API used to mark a time-limit ending.
     /// </summary>
     /// <remarks>
     ///     <para>
@@ -19,18 +18,19 @@ namespace Gym.Utils {
     ///     </para>
     ///     <para>
     ///     The <c>is_vector_env=True</c> forms (a list of infos, or a dict of arrays with <c>"_"</c> masks) come with the
-    ///     vector API (P6). Like the source, both conversions edit the given info in place: the done conversion adds
+    ///     vector API (P6). As in Gymnasium, both conversions edit the given info in place: the done conversion adds
     ///     <c>"TimeLimit.truncated"</c>, the terminated/truncated conversion removes it.
     ///     </para>
+    ///     <para>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/utils/step_api_compatibility.py">gymnasium/utils/step_api_compatibility.py</see>.</para>
     /// </remarks>
     public static class StepApiCompatibility {
         /// <summary>The info key the done API uses to mark a truncation (<c>"TimeLimit.truncated"</c>).</summary>
         public const string TimeLimitTruncatedKey = "TimeLimit.truncated";
 
         /// <summary>
-        ///     Port of <c>convert_to_terminated_truncated_step_api</c> for a single env: splits <c>done</c> into
-        ///     <c>terminated = done and not truncated</c> and <c>truncated = done and truncated</c>, where <c>truncated</c> is
-        ///     popped from <c>info["TimeLimit.truncated"]</c> (absent means <see langword="false"/>).
+        ///     Splits a done-API transition's <c>done</c> into <c>terminated = done and not truncated</c> and
+        ///     <c>truncated = done and truncated</c>, where <c>truncated</c> is popped from <c>info["TimeLimit.truncated"]</c>
+        ///     (absent means <see langword="false"/>), so a time-limit ending stays distinguishable from a terminal state.
         /// </summary>
         /// <typeparam name="TObs">The observation type.</typeparam>
         /// <param name="stepReturns">The done-API transition; its info loses the <c>"TimeLimit.truncated"</c> key.</param>
@@ -39,6 +39,7 @@ namespace Gym.Utils {
         /// <remarks>
         ///     Python's <c>and</c> returns an operand (so <c>done</c> of <c>0</c> stays <c>0</c>); the flags here are
         ///     <see langword="bool"/>, the truth value of that operand. The popped value counts by Python truthiness.
+        ///     Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/utils/step_api_compatibility.py#L27">gymnasium/utils/step_api_compatibility.py</see>.
         /// </remarks>
         public static StepResult<TObs> ConvertToTerminatedTruncatedStepApi<TObs>(DoneStepResult<TObs> stepReturns) {
             (TObs observations, double rewards, bool dones, Info infos) = stepReturns;
@@ -49,14 +50,15 @@ namespace Gym.Utils {
         }
 
         /// <summary>
-        ///     Port of <c>convert_to_done_step_api</c> for a single env: merges the flags into <c>done = terminated or
-        ///     truncated</c> and, when the episode ended, records <c>info["TimeLimit.truncated"] = truncated and not
-        ///     terminated</c>.
+        ///     Merges a transition's flags into <c>done = terminated or truncated</c> and, when the episode ended, records
+        ///     <c>info["TimeLimit.truncated"] = truncated and not terminated</c>, so legacy consumers can still tell a time limit
+        ///     from a terminal state.
         /// </summary>
         /// <typeparam name="TObs">The observation type.</typeparam>
         /// <param name="stepReturns">The terminated/truncated transition; its info gains the key when the episode ended.</param>
         /// <returns>The same transition in the done API.</returns>
         /// <exception cref="ArgumentNullException">Thrown when the transition's info is <see langword="null"/>.</exception>
+        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/utils/step_api_compatibility.py#L82">gymnasium/utils/step_api_compatibility.py</see>.</remarks>
         public static DoneStepResult<TObs> ConvertToDoneStepApi<TObs>(StepResult<TObs> stepReturns) {
             (TObs observations, double rewards, bool terminated, bool truncated, Info infos) = stepReturns;
             if (infos is null)

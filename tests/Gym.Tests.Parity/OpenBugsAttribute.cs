@@ -6,18 +6,18 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace Gym.Tests.Parity {
     /// <summary>
-    ///     Marks a parity test that asserts Gymnasium's answer and fails today, because Gym.NET has not ported that behavior
+    ///     Marks a parity test that asserts Gymnasium's answer and fails today, because Gym.NET does not match that behavior
     ///     yet. Shorthand for <c>[TestCategory("OpenBugs")]</c>, NumSharp's category for the same purpose, with the ids of
     ///     the open defects attached.
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///     The test's expectation is Gymnasium's, never today's Gym.NET output: when the port lands, the same test passes
+    ///     The test's expectation is Gymnasium's, never today's Gym.NET output: when Gym.NET's fix lands, the same test passes
     ///     unchanged. Excluded from gated runs with <c>--filter "TestCategory!=OpenBugs"</c>; run the open gaps alone with
     ///     <c>--filter "TestCategory=OpenBugs"</c>, which prints each one's first divergence.
     ///     </para>
     ///     <para>
-    ///     Lifecycle, as in NumSharp: the port fixes the defect, the test starts passing, then the attribute is removed so the
+    ///     Lifecycle, as in NumSharp: a change fixes the defect, the test starts passing, then the attribute is removed so the
     ///     cell becomes a gate. Forgetting that last step leaves the fix unguarded, because gated runs still skip the test.
     ///     This is for real gaps only. A deliberate, documented deviation from Gymnasium is not an open bug.
     ///     </para>

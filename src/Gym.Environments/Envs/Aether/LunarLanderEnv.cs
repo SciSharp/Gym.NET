@@ -35,7 +35,7 @@ namespace Gym.Environments.Envs.Aether
         FireRightThruster = 3
     }
 
-    /// <summary>
+    // Gymnasium's description of LunarLander, kept as plain comments (the class's XML summary follows it):
     //    ## Description
     //    This environment is a classic rocket trajectory optimization problem.
     //    According to Pontryagin's maximum principle, it is optimal to fire the
@@ -146,7 +146,16 @@ namespace Gym.Environments.Envs.Aether
 
     //    ## Credits
     //    Created by Oleg Klimov
+    /// <summary>
+    ///     LunarLander: land a craft on the pad between the flags with discrete engine choices
+    ///     (<see cref="LunarLanderDiscreteActions"/>) or, in continuous mode, main and lateral throttles in [-1, 1]. Episodes
+    ///     are Gym.NET's own simulation, on Aether.Physics2D rather than Box2D, so they differ from Gymnasium's until P8.
     /// </summary>
+    /// <remarks>
+    ///     The comment above is Gymnasium's description of the environment. Where Gym.NET's lander still departs from it
+    ///     (the physics engine, v2 geometry and observation bounds, the draw order), the live parity suite keeps the gaps as
+    ///     open bugs (F6, B-17, B-18). Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/envs/box2d/lunar_lander.py#L79">gymnasium/envs/box2d/lunar_lander.py</see>.
+    /// </remarks>
     public class LunarLanderEnv : Env<NDArray, object>
     {
         private IEnvironmentViewerFactoryDelegate _viewerFactory;
@@ -664,8 +673,8 @@ namespace Gym.Environments.Envs.Aether
         /// </param>
         /// <returns>
         ///     The new observation (a fresh float32 array of shape (8,)), the float32 reward widened to float64,
-        ///     <c>terminated</c> (the legacy done flag), <c>truncated=False</c>, and the pre-port diagnostics (Gymnasium's info
-        ///     is empty; P8 drops them).
+        ///     <c>terminated</c> (the legacy done flag), <c>truncated=False</c>, and the diagnostics Gym.NET's lander has always
+        ///     returned (Gymnasium's info is empty; P8 drops them).
         /// </returns>
         /// <exception cref="InvalidActionError">Thrown when a discrete action is outside the action space.</exception>
         /// <exception cref="ArgumentException">Thrown when a discrete action does not denote an integer.</exception>
@@ -900,14 +909,14 @@ namespace Gym.Environments.Envs.Aether
             {
                 Render();
             }
-            // The reward is float32 arithmetic (P8 ports Gymnasium's float64); widening it is exact.
+            // The reward is float32 arithmetic (P8 moves it to Gymnasium's float64); widening it is exact.
             return new StepResult<NDArray>(observation, reward, terminated, false, information);
         }
 
         /// <summary>
         ///     Renders the current state as <see cref="Env{TObs, TAct}.RenderMode"/> says: <c>"human"</c> shows the frame in the
         ///     viewer and returns nothing, <c>"rgb_array"</c> returns it as a <c>(400, 600, 3)</c> uint8 array. The drawing is
-        ///     the pre-port ImageSharp approximation, not pygame's pixels (P8).
+        ///     Gym.NET's ImageSharp approximation, not pygame's pixels (P8).
         /// </summary>
         /// <returns>The frame in <c>rgb_array</c> mode; <see cref="RenderResult.None"/> otherwise.</returns>
         /// <exception cref="Gym.Exceptions.AssertionError">Thrown without a render mode when the env has no spec (<c>assert self.spec is not None</c>).</exception>

@@ -12,7 +12,11 @@ namespace Gym.Tests.Envs.Registration {
     /// </summary>
     [TestClass]
     public class EnvSpecTests {
-        /// <summary>Port of <c>parse_env_id</c> over namespaced, versioned and unversioned ids, and <c>get_env_id</c> back.</summary>
+        /// <summary>
+        ///     <c>ParseEnvId</c> splits namespaced, versioned and unversioned ids as Gymnasium's <c>parse_env_id</c> does, and
+        ///     <c>GetEnvId</c> joins them back.
+        /// </summary>
+        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/envs/registration.py#L259">gymnasium/envs/registration.py (parse_env_id)</see>.</remarks>
         [TestMethod]
         public void ParseEnvId_SplitsLikeGymnasium() {
             Assert.AreEqual((null, "CartPole", 1L), EnvRegistry.ParseEnvId("CartPole-v1"));

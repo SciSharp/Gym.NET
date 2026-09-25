@@ -5,8 +5,8 @@ using System.IO;
 
 namespace Gym.Utils {
     /// <summary>
-    ///     The Python warning classes Gymnasium issues through <see cref="Logger"/>: <c>UserWarning</c> (the default of
-    ///     <c>warnings.warn</c>) and <c>DeprecationWarning</c> (<c>logger.deprecation</c>).
+    ///     The Python warning classes <see cref="Logger"/> issues, as Gymnasium's logger does: <c>UserWarning</c> (the
+    ///     default of <c>warnings.warn</c>) and <c>DeprecationWarning</c> (<see cref="Logger.Deprecation"/>).
     /// </summary>
     public enum WarningCategory {
         /// <summary>Python's <c>UserWarning</c>, shown once per call site by Python's default filter.</summary>
@@ -31,18 +31,18 @@ namespace Gym.Utils {
     }
 
     /// <summary>
-    ///     The part of Python's <c>warnings</c> module that Gymnasium's <see cref="Logger"/> depends on: its default filters,
-    ///     where shown warnings go, and <c>catch_warnings(record=True)</c> for tests. Gymnasium never throws where it only
-    ///     warns, so neither does this: a warning is text on the error stream (or a record), never an exception.
+    ///     The part of Python's <c>warnings</c> module that <see cref="Logger"/> depends on: its default filters, where shown
+    ///     warnings go, and <c>catch_warnings(record=True)</c> for tests. Gymnasium never throws where it only warns, so
+    ///     neither does Gym: a warning is text on the error stream (or a record), never an exception.
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///     Filters, as Python applies them to what Gymnasium issues: a <see cref="WarningCategory.UserWarning"/> is shown the
+    ///     Filters, as Python applies them to Gymnasium's warnings: a <see cref="WarningCategory.UserWarning"/> is shown the
     ///     first time a given message is issued from a given call site and suppressed after that (Python's <c>default</c>
     ///     action, keyed on the text, the category and the location); a <see cref="WarningCategory.DeprecationWarning"/> is
-    ///     shown the first time a given message is issued from anywhere (the <c>once</c> filter <c>gymnasium/logger.py</c>
-    ///     installs for <c>^gymnasium\.</c> modules). So CartPole's "already returned terminated = True" warning appears once
-    ///     per process, not once per episode, exactly as in Python.
+    ///     shown the first time a given message is issued from anywhere (the <c>once</c> filter Gymnasium's logger installs
+    ///     for its modules). So CartPole's "already returned terminated = True" warning appears once per process, not once
+    ///     per episode, exactly as in Python. Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/logger.py#L14">gymnasium/logger.py</see>.
     ///     </para>
     ///     <para>
     ///     Python forgets which warnings it has shown whenever the filters change (<c>_filters_mutated</c>), which leaving a
@@ -68,7 +68,8 @@ namespace Gym.Utils {
 
         /// <summary>
         ///     Where shown warnings are written, one <see cref="WarningMessage.ToString"/> line each; <see langword="null"/>
-        ///     restores <see cref="Console.Error"/>. The port of replacing <c>sys.stderr</c> or <c>warnings.showwarning</c>.
+        ///     restores <see cref="Console.Error"/>. Assign it to route warnings into a log or a test's buffer, as Python code
+        ///     replaces <c>sys.stderr</c> or <c>warnings.showwarning</c>.
         /// </summary>
         public static TextWriter? Output {
             get {
@@ -117,9 +118,9 @@ namespace Gym.Utils {
         }
 
         /// <summary>
-        ///     Starts recording every warning instead of showing it, the port of
-        ///     <c>with warnings.catch_warnings(record=True): warnings.simplefilter("always")</c>. Dispose the result to stop;
-        ///     that also clears the shown-warnings registry, as leaving Python's block does.
+        ///     Starts recording every warning instead of showing it, as Python's
+        ///     <c>with warnings.catch_warnings(record=True): warnings.simplefilter("always")</c> block does. Dispose the result
+        ///     to stop; that also clears the shown-warnings registry, as leaving Python's block does.
         /// </summary>
         /// <returns>The catcher; its <see cref="WarningCatcher.Records"/> grow while it is the innermost active one.</returns>
         public static WarningCatcher Catch() {

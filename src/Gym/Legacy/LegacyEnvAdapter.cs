@@ -16,17 +16,17 @@ using SixLabors.ImageSharp.PixelFormats;
 
 namespace Gym.Legacy {
     /// <summary>
-    ///     Runs a ported env behind the pre-0.26 API (<see cref="ILegacyEnv"/>), so code written for Gym.NET's former
-    ///     contract keeps working during the migration (port plan §16). Built on Gymnasium's
-    ///     <c>step_api_compatibility</c>: every step is converted with <see cref="StepApiCompatibility.ConvertToDoneStepApi{TObs}"/>.
+    ///     Runs any <see cref="IEnv"/> behind the pre-0.26 API (<see cref="ILegacyEnv"/>), so code written for Gym.NET's
+    ///     former contract keeps working during the migration (port plan §16). Every step is converted with
+    ///     <see cref="StepApiCompatibility.ConvertToDoneStepApi{TObs}"/>.
     /// </summary>
     /// <remarks>
     ///     <para>
     ///     The mapping: <see cref="Seed"/> records the seed for the next <see cref="Reset"/>, which passes it to
-    ///     <c>Reset(seed)</c> (where Gymnasium seeds); <see cref="Reset"/> returns the observation and drops the info;
-    ///     <see cref="Step"/> reports <c>terminated || truncated</c> as <see cref="Legacy.Step.Done"/>, marks a truncation in
-    ///     <c>Information["TimeLimit.truncated"]</c>, and narrows the float64 reward to float32; <see cref="Render"/> only
-    ///     accepts the env's construction-time render mode.
+    ///     <c>Reset(seed)</c> (where the env seeds); <see cref="Reset"/> returns the observation and drops the info;
+    ///     <see cref="Step"/> and <see cref="StepAsync"/> report <c>terminated || truncated</c> as
+    ///     <see cref="Legacy.Step.Done"/>, mark a truncation in <c>Information["TimeLimit.truncated"]</c> and keep the
+    ///     float64 reward; <see cref="Render"/> only accepts the env's construction-time render mode.
     ///     </para>
     ///     <para>
     ///     A scalar observation (a <c>Discrete</c> observation space) is handed out as a 0-d array, since the legacy API only
@@ -39,7 +39,7 @@ namespace Gym.Legacy {
         private BigInteger? _pendingSeed;
 
         /// <summary>Adapts <paramref name="env"/>, which the adapter owns from now on (disposing the adapter closes it).</summary>
-        /// <param name="env">The ported env, possibly wrapped.</param>
+        /// <param name="env">The env, possibly wrapped; any <see cref="IEnv"/> works, whatever its observation and action types.</param>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="env"/> is <see langword="null"/>.</exception>
         public LegacyEnvAdapter(IEnv env) {
             Env = env ?? throw new ArgumentNullException(nameof(env));
@@ -71,7 +71,7 @@ namespace Gym.Legacy {
         }
 
         /// <summary><c>gym</c>'s <c>reward_range</c>, <c>(-inf, inf)</c> unless assigned; nothing reads it.</summary>
-        public (float From, float To) RewardRange { get; set; } = (float.NegativeInfinity, float.PositiveInfinity);
+        public (double From, double To) RewardRange { get; set; } = (double.NegativeInfinity, double.PositiveInfinity);
 
         /// <summary>The env's action space.</summary>
         public Space ActionSpace {
@@ -102,18 +102,18 @@ namespace Gym.Legacy {
         /// <param name="action">The action, converted by the env.</param>
         /// <returns>The legacy transition.</returns>
         /// <exception cref="NotSupportedException">Thrown when the observation is neither an array nor a number.</exception>
-        public Step Step(object action) {
-            DoneStepResult<object?> done = StepApiCompatibility.ConvertToDoneStepApi(Env.Step(action));
-            var information = new Dict();
-            foreach (KeyValuePair<string, object?> entry in done.Info)
-                information[entry.Key] = entry.Value!;
-            return new Step(ToArray(done.Observation), (float)done.Reward, done.Done, information);
-        }
+        public Step Step(object action) => ToLegacyStep(Env.Step(action));
 
-        /// <summary>Runs <see cref="Step"/> on the thread pool; await it before the next call on the same env.</summary>
-        /// <param name="action">The action.</param>
-        /// <returns>A task completing with the legacy transition, or faulting with what the step threw.</returns>
-        public Task<Step> StepAsync(object action) => Task.Run(() => Step(action));
+        /// <summary>
+        ///     Steps the env through its <see cref="IEnv.StepAsync"/> (which completes on the calling thread unless the env is
+        ///     genuinely asynchronous) and converts the transition to the done API; await it before the next call.
+        /// </summary>
+        /// <param name="action">The action, converted by the env.</param>
+        /// <returns>A value task completing with the legacy transition, or faulted with what the step threw.</returns>
+        public async ValueTask<Step> StepAsync(object action) {
+            StepResult<object?> result = await Env.StepAsync(action).ConfigureAwait(false);
+            return ToLegacyStep(result);
+        }
 
         /// <summary>
         ///     Renders the env when <paramref name="mode"/> is its construction-time render mode: an <c>rgb_array</c> frame as
@@ -161,6 +161,18 @@ namespace Gym.Legacy {
         public void Dispose() {
             Env.Close();
             GC.SuppressFinalize(this);
+        }
+
+        /// <summary>The done-API form of a transition, with the info copied into the legacy <see cref="Dict"/>.</summary>
+        /// <param name="result">The transition; its info gains <c>"TimeLimit.truncated"</c> when the episode ended.</param>
+        /// <returns>The legacy transition.</returns>
+        /// <exception cref="NotSupportedException">Thrown when the observation is neither an array nor a number.</exception>
+        private static Step ToLegacyStep(StepResult<object?> result) {
+            DoneStepResult<object?> done = StepApiCompatibility.ConvertToDoneStepApi(result);
+            var information = new Dict();
+            foreach (KeyValuePair<string, object?> entry in done.Info)
+                information[entry.Key] = entry.Value!;
+            return new Step(ToArray(done.Observation), done.Reward, done.Done, information);
         }
 
         /// <summary>The legacy form of an observation: an array as is, a number as a 0-d array of its type.</summary>

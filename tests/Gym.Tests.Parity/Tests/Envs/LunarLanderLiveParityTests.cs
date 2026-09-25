@@ -9,13 +9,13 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace Gym.Tests.Parity.Tests.Envs {
     /// <summary>
-    ///     LunarLander-v3 against Gymnasium's <c>LunarLander</c> (<c>gymnasium/envs/box2d/lunar_lander.py</c> @ 9e04324), live:
-    ///     the spaces, and whole episodes of Gymnasium's own heuristic in lockstep.
+    ///     LunarLander-v3 against Gymnasium's <c>LunarLander</c>, live: the spaces, and whole episodes of Gymnasium's own
+    ///     heuristic in lockstep.
     /// </summary>
     /// <remarks>
     ///     Gym.NET's lander is a different simulation today, not a divergent copy: Aether.Physics2D instead of Box2D 2.3.10
     ///     (F6), v2 geometry and observation bounds, its own draw order (B-17, B-18). Its episodes are open bugs until P8; the
-    ///     cells are here so the port has its gate waiting.
+    ///     cells are here so P8 has its gate waiting. Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/envs/box2d/lunar_lander.py#L79">gymnasium/envs/box2d/lunar_lander.py</see>.
     /// </remarks>
     [TestClass]
     public sealed class LunarLanderLiveParityTests : ParityTestBase {

@@ -2,9 +2,9 @@ using System;
 
 namespace Gym.Rendering {
     /// <summary>
-    ///     Port of <c>pygame.Surface((width, height))</c> as Gymnasium's envs create it: a 32-bit surface without per-pixel
-    ///     alpha (SDL's XRGB8888, masks <c>0xff0000</c>, <c>0xff00</c>, <c>0xff</c>, alpha mask 0), black when created, with
-    ///     pygame's <c>(x, y)</c> addressing and its whole area as the clip rectangle.
+    ///     A drawing surface as Gymnasium's envs create one with <c>pygame.Surface((width, height))</c>: 32 bits per pixel
+    ///     without per-pixel alpha (SDL's XRGB8888, masks <c>0xff0000</c>, <c>0xff00</c>, <c>0xff</c>, alpha mask 0), black
+    ///     when created, with pygame's <c>(x, y)</c> addressing and its whole area as the clip rectangle.
     /// </summary>
     /// <remarks>
     ///     <para>
@@ -14,6 +14,7 @@ namespace Gym.Rendering {
     ///     format with different blending, and are not modelled.
     ///     </para>
     ///     <para>Not thread-safe: draw on a surface from one thread at a time, as with pygame.</para>
+    ///     <para>Reference: <see href="https://github.com/pygame-community/pygame-ce/blob/2.5.8/src_c/surface.c#L471">src_c/surface.c</see> (pygame-ce 2.5.8).</para>
     /// </remarks>
     public sealed class Surface {
         /// <summary>The pixels, <c>0x00RRGGBB</c>, row-major: pixel <c>(x, y)</c> is at <c>y * Width + x</c>.</summary>

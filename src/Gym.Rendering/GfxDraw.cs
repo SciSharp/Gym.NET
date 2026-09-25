@@ -7,8 +7,8 @@ using NumSharp;
 
 namespace Gym.Rendering {
     /// <summary>
-    ///     Port of <c>pygame.gfxdraw</c> (pygame-ce 2.5.8): the primitives Gymnasium's envs draw with, including pygame's
-    ///     conversion of the Python arguments, so the same inputs give the same pixels or the same error.
+    ///     The <c>pygame.gfxdraw</c> primitives Gymnasium's envs draw with (pygame-ce 2.5.8), including pygame's conversion
+    ///     of the Python arguments, so the same inputs give the same pixels or the same error.
     /// </summary>
     /// <remarks>
     ///     <para>
@@ -29,6 +29,7 @@ namespace Gym.Rendering {
     ///     <c>ValueError</c> is <see cref="ValueError"/>. On Linux and macOS a C long has 64 bits, so pygame there reports the
     ///     Sint16 range message for values between 2^31 and 2^63; Gym.NET follows the reference platform everywhere.
     ///     </para>
+    ///     <para>Reference: <see href="https://github.com/pygame-community/pygame-ce/blob/2.5.8/src_c/gfxdraw.c">src_c/gfxdraw.c</see> (pygame-ce 2.5.8).</para>
     /// </remarks>
     public static class GfxDraw {
         /// <summary>
@@ -191,9 +192,9 @@ namespace Gym.Rendering {
     }
 
     /// <summary>
-    ///     Port of <c>pygame.error</c> as the gfxdraw functions raise it when an SDL_gfx primitive returns -1 (a negative
-    ///     radius). pygame's message is <c>SDL_GetError()</c>, whatever SDL error happened to be set last, so it cannot be
-    ///     reproduced; this message names the primitive instead.
+    ///     The <c>pygame.error</c> the gfxdraw functions raise when an SDL_gfx primitive returns -1 (a negative radius).
+    ///     pygame's message is <c>SDL_GetError()</c>, whatever SDL error happened to be set last, so it cannot be reproduced;
+    ///     this message names the primitive instead.
     /// </summary>
     public sealed class SdlError : Exception {
         /// <summary>An SDL failure with a message.</summary>

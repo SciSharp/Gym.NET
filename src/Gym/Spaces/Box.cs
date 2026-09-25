@@ -14,6 +14,12 @@ namespace Gym.Spaces {
         Below,
         Above
     }
+    /// <summary>
+    ///     A box in R^n, bounded or not per element: every point is an array of <see cref="Space.Shape"/> and
+    ///     <see cref="Space.DType"/> whose elements lie within <see cref="Low"/> and <see cref="High"/>. It describes
+    ///     continuous observations and actions, such as CartPole's observation or LunarLander's continuous engines.
+    /// </summary>
+    /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/spaces/box.py#L64">gymnasium/spaces/box.py</see>.</remarks>
     public class Box : Space, IEquatable<Box> {
         /// <summary>
         ///     The generator this box samples from: NumPy's <c>Generator(PCG64)</c>, Gymnasium's <c>np_random</c>. The box owns
@@ -135,9 +141,10 @@ namespace Gym.Spaces {
         /// </returns>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="low"/> or <paramref name="high"/> is <see langword="null"/>.</exception>
         /// <exception cref="ValueError">
-        ///     Thrown when the shapes differ, with the message of <c>gymnasium/spaces/box.py:179</c> @ 9e04324 (shapes are
-        ///     printed as Python tuples, so a 1-D shape reads <c>(3,)</c>).
+        ///     Thrown when the shapes differ, with Gymnasium's message (shapes are printed as Python tuples, so a 1-D shape
+        ///     reads <c>(3,)</c>).
         /// </exception>
+        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/spaces/box.py#L177">gymnasium/spaces/box.py</see>.</remarks>
         private static Shape RequireSameShape(NDArray low, NDArray high) {
             if (low is null) throw new ArgumentNullException(nameof(low));
             if (high is null) throw new ArgumentNullException(nameof(high));
@@ -146,7 +153,7 @@ namespace Gym.Spaces {
             return new Shape((long[]) low.shape.Clone());
         }
 
-        /// <summary>Formats dimensions the way Python prints a tuple, for messages ported verbatim from Gymnasium.</summary>
+        /// <summary>Formats dimensions the way Python prints a tuple, so a message that quotes a shape reads exactly as Gymnasium's.</summary>
         /// <param name="dimensions">The dimensions to format.</param>
         /// <returns><c>()</c>, <c>(3,)</c> or <c>(2, 3)</c>: Python's trailing comma marks a one-element tuple.</returns>
         private static string PythonTuple(long[] dimensions) {
@@ -205,17 +212,17 @@ namespace Gym.Spaces {
         /// <exception cref="NotSupportedException">Thrown when <paramref name="mask"/> is not <see langword="null"/>.</exception>
         /// <remarks>
         ///     <para>
-        ///     Port of <c>gymnasium/spaces/box.py:404</c> @ 9e04324. It makes the same generator calls in the same order
-        ///     (standard normal, exponential, exponential, uniform) with the same arguments, so a box seeded like Gymnasium's
-        ///     samples the same bits. Boxes that are not floating-point shift <c>high</c> by one
-        ///     (<c>high.astype(int64) + 1</c>), floor, clip integer dtypes to their range (int64 with Gymnasium's margin of 2
-        ///     and its second clip to the bounds), then cast.
+        ///     It makes Gymnasium's generator calls in Gymnasium's order (standard normal, exponential, exponential, uniform)
+        ///     with the same arguments, so a box seeded like Gymnasium's samples the same bits. Boxes that are not
+        ///     floating-point shift <c>high</c> by one (<c>high.astype(int64) + 1</c>), floor, clip integer dtypes to their
+        ///     range (int64 with Gymnasium's margin of 2 and its second clip to the bounds), then cast.
         ///     </para>
         ///     <para>
-        ///     The pre-Gymnasium port drew <c>normal(0.5, 1)</c> for unbounded elements (B-08) and never reached <c>high</c> in
-        ///     integer boxes (B-09); both follow Gymnasium now. Not ported yet (P2): the probability-mask argument, and
+        ///     Gym.NET's earlier sampler drew <c>normal(0.5, 1)</c> for unbounded elements (B-08) and never reached <c>high</c>
+        ///     in integer boxes (B-09); both match Gymnasium now. Not supported yet (P2): the probability-mask argument, and
         ///     Gymnasium's <c>error.Error</c> for a mask instead of <see cref="NotSupportedException"/>.
         ///     </para>
+        ///     <para>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/spaces/box.py#L404">gymnasium/spaces/box.py</see>.</para>
         /// </remarks>
         public override NDArray Sample(NDArray mask = null) {
             // `mask != null` would be an element-wise comparison in NumSharp (an NDArray<bool>, not a bool).
@@ -305,15 +312,16 @@ namespace Gym.Spaces {
         }
 
         /// <summary>
-        ///     The last steps of Gymnasium's <c>Box.sample</c> (<c>box.py:459</c>): floor every dtype of kind i, u or b, clip
-        ///     integer dtypes to their range so the cast cannot wrap, cast to <see cref="Space.DType"/>, and clip int64 once
-        ///     more to the bounds.
+        ///     Turns a float64 sample into the box's dtype the way Gymnasium's <c>Box.sample</c> ends: floor every dtype of kind
+        ///     i, u or b, clip integer dtypes to their range so the cast cannot wrap, cast to <see cref="Space.DType"/>, and
+        ///     clip int64 once more to the bounds.
         /// </summary>
         /// <param name="sample">The float64 sample; it is not modified.</param>
         /// <returns>A new array of <see cref="Space.DType"/>.</returns>
         /// <remarks>
         ///     Testing the kind, rather than a list of dtypes, also covers uint8: <c>np.@byte</c> is int8 in NumSharp. Boolean
         ///     boxes are floored but not clipped, because <c>np.issubdtype(bool, np.integer)</c> is false.
+        ///     Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/spaces/box.py#L459">gymnasium/spaces/box.py</see>.
         /// </remarks>
         private NDArray CastSample(NDArray sample) {
             if (DType.kind is not ('i' or 'u' or 'b'))
@@ -351,11 +359,10 @@ namespace Gym.Spaces {
         /// <returns><see langword="true"/> when the shape matches and <c>Low &lt;= x &lt;= High</c> holds element-wise.</returns>
         /// <exception cref="NotSupportedException">Thrown when <paramref name="ndArray"/> is not an <see cref="NDArray"/>.</exception>
         /// <remarks>
-        ///     Mirrors the shape and bound checks of <c>gymnasium/spaces/box.py:483</c> @ 9e04324, reduced with
-        ///     <c>np.all</c> (defect B-06: the former <c>x &gt;= Low &amp;&amp; x &lt;= High</c> relied on NumSharp.Lite converting
-        ///     arrays to <see cref="bool"/> and threw for every box that was not 0-d). Gymnasium's
-        ///     <c>np.can_cast(x.dtype, self.dtype)</c> check is not ported yet (P2), so a float64 point can belong to a
-        ///     float32 box.
+        ///     Checks the shape, then the bounds reduced with <c>np.all</c>, as Gymnasium does (defect B-06: the former
+        ///     <c>x &gt;= Low &amp;&amp; x &lt;= High</c> relied on NumSharp.Lite converting arrays to <see cref="bool"/> and threw
+        ///     for every box that was not 0-d). Gymnasium's <c>np.can_cast(x.dtype, self.dtype)</c> check is not implemented
+        ///     yet (P2), so a float64 point can belong to a float32 box. Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/spaces/box.py#L483">gymnasium/spaces/box.py</see>.
         /// </remarks>
         public override bool Contains(object ndArray) {
             if (ndArray is NDArray x)
@@ -376,13 +383,16 @@ namespace Gym.Spaces {
         }
 
         /// <summary>
-        ///     Port of <c>Space.seed(seed)</c>: gives this box a fresh generator, <c>Generator(PCG64(SeedSequence(seed)))</c>,
-        ///     so it samples what Gymnasium's box samples after <c>box.seed(seed)</c>. A generator the box shared with other
-        ///     spaces is left untouched.
+        ///     Gives this box a fresh generator, <c>Generator(PCG64(SeedSequence(seed)))</c>, so it samples what Gymnasium's box
+        ///     samples after <c>box.seed(seed)</c>. A generator the box shared with other spaces is left untouched, so reseeding
+        ///     one space never moves another's stream.
         /// </summary>
         /// <param name="seed">Any non-negative seed.</param>
         /// <exception cref="Error">Thrown when <paramref name="seed"/> is negative, with Gymnasium's message.</exception>
-        /// <remarks>Gymnasium's <c>seed</c> also accepts no seed and returns the one it used; that shape of the API arrives with P2.</remarks>
+        /// <remarks>
+        ///     Gymnasium's <c>seed</c> also accepts no seed and returns the one it used; that shape of the API arrives with P2.
+        ///     Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/spaces/space.py#L112">gymnasium/spaces/space.py</see>.
+        /// </remarks>
         public override void Seed(System.Numerics.BigInteger seed) {
             NpRandom = Seeding.NpRandom(seed).Rng;
         }
@@ -403,9 +413,9 @@ namespace Gym.Spaces {
         /// <param name="other">The box to compare with; may be <see langword="null"/>.</param>
         /// <returns><see langword="true"/> when both boxes describe the same set of points with the same dtype.</returns>
         /// <remarks>
-        ///     Gymnasium's <c>Box.__eq__</c> (<c>gymnasium/spaces/box.py:524</c> @ 9e04324) compares the bounds with
-        ///     <c>np.allclose</c>; the exact comparison stays until P2 ports it. Because the comparison is exact, a box with a
-        ///     NaN bound equals only itself.
+        ///     Gymnasium's <c>Box.__eq__</c> compares the bounds with <c>np.allclose</c>; the exact comparison stays until P2
+        ///     adopts it. Because the comparison is exact, a box with a NaN bound equals only itself.
+        ///     Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/spaces/box.py#L524">gymnasium/spaces/box.py</see>.
         /// </remarks>
         public bool Equals(Box other) {
             if (ReferenceEquals(null, other)) return false;

@@ -7,13 +7,13 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace Gym.Tests.Ported.Utils {
     /// <summary>
-    ///     Port of <c>tests/utils/test_step_api_compatibility.py</c> @ 9e04324, single-env cases (<c>is_vector_env=False</c>);
-    ///     the vector cases come with the vector API (P6).
+    ///     Gymnasium's step-API compatibility tests, run against <see cref="StepApiCompatibility"/>: the single-env cases
+    ///     (<c>is_vector_env=False</c>); the vector cases come with the vector API (P6).
     /// </summary>
     /// <remarks>
     ///     The Python tuples' <c>0, 0</c> observation and reward are <c>0L</c> and <c>0.0</c>; <c>data_equivalence</c> of the
     ///     round trip is the field-wise comparison of the result types (<see cref="PyEquality"/> for the infos). As in the
-    ///     Python test, one info object flows through both conversions, which edit it in place.
+    ///     Python test, one info object flows through both conversions, which edit it in place. Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/tests/utils/test_step_api_compatibility.py">tests/utils/test_step_api_compatibility.py</see>.
     /// </remarks>
     [TestClass]
     public class TestStepApiCompatibility {
@@ -28,9 +28,10 @@ namespace Gym.Tests.Ported.Utils {
         }
 
         /// <summary>
-        ///     Port of <c>test_to_done_step_api</c> (single env): converting a done-API transition splits <c>done</c> by
-        ///     <c>"TimeLimit.truncated"</c>, removes that key, and converting back restores the original.
+        ///     Converting a done-API transition splits <c>done</c> by <c>"TimeLimit.truncated"</c>, removes that key, and
+        ///     converting back restores the original.
         /// </summary>
+        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/tests/utils/test_step_api_compatibility.py#L57">tests/utils/test_step_api_compatibility.py (test_to_done_step_api)</see>.</remarks>
         /// <param name="done">The done flag.</param>
         /// <param name="infoEntries">The info.</param>
         /// <param name="expectedTerminated">The expected <c>terminated</c>.</param>
@@ -60,10 +61,10 @@ namespace Gym.Tests.Ported.Utils {
         }
 
         /// <summary>
-        ///     Port of <c>test_to_terminated_truncated_step_api</c> (single env): converting a terminated/truncated transition
-        ///     merges the flags into <c>done</c> and records <c>"TimeLimit.truncated"</c> only when the episode ended; converting
-        ///     back restores the original.
+        ///     Converting a terminated/truncated transition merges the flags into <c>done</c> and records
+        ///     <c>"TimeLimit.truncated"</c> only when the episode ended; converting back restores the original.
         /// </summary>
+        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/tests/utils/test_step_api_compatibility.py#L115">tests/utils/test_step_api_compatibility.py (test_to_terminated_truncated_step_api)</see>.</remarks>
         /// <param name="terminated">The terminated flag.</param>
         /// <param name="truncated">The truncated flag.</param>
         /// <param name="infoEntries">The info.</param>
@@ -87,9 +88,10 @@ namespace Gym.Tests.Ported.Utils {
         }
 
         /// <summary>
-        ///     Port of <c>test_edge_case</c> (single env): <c>terminated=True</c> and <c>truncated=True</c> cannot be encoded
-        ///     in the done API; it becomes <c>done=True</c> with <c>{"TimeLimit.truncated": False}</c>.
+        ///     <c>terminated=True</c> and <c>truncated=True</c> cannot be encoded in the done API; it becomes <c>done=True</c>
+        ///     with <c>{"TimeLimit.truncated": False}</c>.
         /// </summary>
+        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/tests/utils/test_step_api_compatibility.py#L148">tests/utils/test_step_api_compatibility.py (test_edge_case)</see>.</remarks>
         [TestMethod]
         public void TestEdgeCase() {
             (_, _, bool done, Info info) = StepApiCompatibility.ConvertToDoneStepApi(new StepResult<object?>(0L, 0.0, true, true, new Info()));
