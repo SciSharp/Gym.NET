@@ -29,9 +29,9 @@ namespace Gym.Tests.Envs.Aether {
 
         public LunarLanderEnvironment()
         {
-            // Total reward: 184.01764 in 1547 steps.
-            _ExpectedScoreForRandomSeed[1000] = 184.01764f;
-            _ExpectedStepsForRandomSeed[1000] = 1547;
+            // Total reward: 35.515747 in 245 steps (.NET 8/10 deterministic baseline).
+            _ExpectedScoreForRandomSeed[1000] = 35.515747f;
+            _ExpectedStepsForRandomSeed[1000] = 245;
         }
 
 

@@ -877,7 +877,7 @@ namespace Gym.Environments.Envs.Aether
                 PointF flag1 = new PointF(x1, flag_y1);
                 PointF flag2 = new PointF(x1, flag_y2);
                 // Pole
-                img.Mutate(i => i.DrawLines(new Rgba32(255, 255, 255), 1, new PointF[] { flag1, flag2 }));
+                img.Mutate(i => i.DrawLine(new Rgba32(255, 255, 255), 1f, new PointF[] { flag1, flag2 }));
                 // Chevron
                 PointF p1 = new PointF(x1, flag_y2);
                 PointF p2 = new PointF(x1, flag_y2 + 10f);

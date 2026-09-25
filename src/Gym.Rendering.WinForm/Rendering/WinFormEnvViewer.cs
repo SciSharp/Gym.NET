@@ -36,8 +36,16 @@ namespace Gym.Rendering.WinForm {
             var thread = new Thread(() => {
                 var v = new WinFormEnvViewer(width + 12, height + 12, title);
                 taskResult.SetResult(v);
-                v.ShowDialog();
+                if (SystemInformation.UserInteractive) {
+                    Application.Run(v);
+                } else {
+                    // Non-interactive / headless environment
+                    v.CreateControl();
+                    Application.Run(new ApplicationContext());
+                }
             });
+            thread.SetApartmentState(ApartmentState.STA);
+            thread.IsBackground = true;
             thread.Start();
             thread.Name = $"Viewer{(string.IsNullOrEmpty(title) ? "" : $"-{title}")}";
 
@@ -117,6 +125,7 @@ namespace Gym.Rendering.WinForm {
 
             Close();
             Dispose();
+            Application.ExitThread();
         }
 
         protected override void OnClosing(CancelEventArgs e) {
