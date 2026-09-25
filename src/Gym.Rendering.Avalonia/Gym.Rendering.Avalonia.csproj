@@ -23,18 +23,29 @@
     <FileVersion>0.1.0.2</FileVersion>
     <ApplicationIcon />
     <StartupObject />
+    <!-- Avalonia 11+ source-generates a partial class (InitializeComponent + named-element fields) for every x:Class
+         XAML. The code-behind here is hand-written, non-partial and calls AvaloniaXamlLoader.Load itself (the Avalonia
+         0.10 model), so the generated half would collide with it (CS0260). The XAML is still compiled. -->
+    <AvaloniaNameGeneratorIsEnabled>false</AvaloniaNameGeneratorIsEnabled>
   </PropertyGroup>
   <ItemGroup>
     <Compile Update="**\*.xaml.cs">
       <DependentUpon>%(Filename)</DependentUpon>
     </Compile>
-    <AvaloniaResource Include="**\*.xaml">
+    <!-- Avalonia 11+ compiles only AvaloniaXaml items, and its default glob covers *.axaml, not *.xaml. Declaring the
+         .xaml files as AvaloniaXaml keeps them compiled (AvaloniaXamlLoader.Load needs precompiled XAML at runtime);
+         as AvaloniaResource they would only be embedded, and the viewer would fail to load. -->
+    <AvaloniaXaml Include="**\*.xaml">
       <SubType>Designer</SubType>
-    </AvaloniaResource>
+    </AvaloniaXaml>
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="Avalonia" Version="0.10.22" />
-    <PackageReference Include="Avalonia.Desktop" Version="0.10.22" />
+    <PackageReference Include="Avalonia" Version="12.1.3" />
+    <PackageReference Include="Avalonia.Desktop" Version="12.1.3" />
+    <!-- Since Avalonia 11 the built-in "Default" theme ships separately as SimpleTheme; without a theme
+         a Window has no control template and renders nothing, so the viewer would stay blank. -->
+    <PackageReference Include="Avalonia.Themes.Simple" Version="12.1.3" />
+    <!-- Last Apache-2.0 ImageSharp line; 3.x+ is Split-licensed and fails Release builds without a Six Labors key. -->
     <PackageReference Include="SixLabors.ImageSharp" Version="2.1.13" />
   </ItemGroup>
   <ItemGroup>

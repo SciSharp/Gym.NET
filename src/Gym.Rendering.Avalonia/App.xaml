@@ -1,8 +1,12 @@
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             x:Class="Gym.Rendering.Avalonia.App">
+             x:Class="Gym.Rendering.Avalonia.App"
+             RequestedThemeVariant="Light">
+    <!-- Avalonia 11 removed Avalonia.Themes.Default. Its successor is SimpleTheme (package Avalonia.Themes.Simple),
+         and the BaseLight accent became the Light theme variant. Without a theme a Window has no control template,
+         so the viewer would stay blank. Light is pinned so frames keep the old white window background even when
+         the OS runs in dark mode. -->
     <Application.Styles>
-        <StyleInclude Source="avares://Avalonia.Themes.Default/DefaultTheme.xaml"/>
-        <StyleInclude Source="avares://Avalonia.Themes.Default/Accents/BaseLight.xaml"/>
+        <SimpleTheme />
     </Application.Styles>
 </Application>
