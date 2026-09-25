@@ -648,7 +648,9 @@ namespace Gym.Environments.Envs.Aether
         /// <exception cref="ArgumentException">Thrown when a discrete action does not denote an integer.</exception>
         /// <exception cref="OverflowException">Thrown when an unsigned 64-bit discrete action exceeds <see cref="long.MaxValue"/>.</exception>
         /// <exception cref="IndexError">
-        ///     Thrown when a continuous action is 0-d, which is what the continuous action space samples today (B-20).
+        ///     Thrown when a continuous action has fewer than two elements: a 0-d action, which is what the continuous action
+        ///     space samples today (B-20), or a single throttle. The messages are NumPy's for <c>action[0]</c> and
+        ///     <c>action[1]</c>.
         /// </exception>
         public override Step Step(object action)
         {
@@ -686,6 +688,14 @@ namespace Gym.Environments.Envs.Aether
                 // np.abs(c_action[1]), ...) allocated about five 0-d arrays per step and no longer compile: NumSharp's
                 // array-to-scalar conversions are explicit and its comparisons return NDArray<bool>. Scalar float32 math is
                 // bit-identical: the same IEEE operations, and a NaN throttle fires no engine either way.
+                // GetSingle does not bounds-check: NumSharp guards it with a Debug.Assert only (which kills the process in
+                // a Debug build), and a Release build reads past the buffer. So an action with fewer than two elements is
+                // rejected first, with the IndexError NumPy raises for action[0] and action[1]. The continuous action
+                // space itself samples 0-d actions today (B-20).
+                if (c_action.ndim == 0)
+                    throw new IndexError("too many indices for array: array is 0-dimensional, but 1 were indexed");
+                if (c_action.shape[0] < 2)
+                    throw new IndexError($"index 1 is out of bounds for axis 0 with size {c_action.shape[0]}");
                 mainThrottle = c_action.GetSingle(0);
                 lateralThrottle = c_action.GetSingle(1);
             }

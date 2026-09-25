@@ -251,5 +251,26 @@ namespace Gym.Tests.Envs.Aether {
         {
             Run(NullEnvViewer.Factory, seed, continuous);
         }
+
+        /// <summary>
+        ///     A continuous action with fewer than two throttles is rejected with NumPy's <see cref="IndexError"/>, before
+        ///     the env reads the throttles. The reads are unchecked (NumSharp's <c>GetSingle</c>): a Debug build of NumSharp
+        ///     fails an assertion that terminates the process, and a Release build would read past the action's buffer. The
+        ///     0-d case is what <c>ActionSpace.Sample()</c> returns today (B-20).
+        /// </summary>
+        [TestMethod]
+        public void Step_ContinuousActionWithFewerThanTwoThrottles_ThrowsIndexError()
+        {
+            var env = new LunarLanderEnv(NullEnvViewer.Factory, continuous: true, random_state: LegacySeeding.RandomState(0));
+            env.Reset().Dispose();
+
+            using NDArray sampled = env.ActionSpace.Sample();
+            var zeroD = Assert.ThrowsExactly<IndexError>(() => env.Step(sampled));
+            Assert.AreEqual("too many indices for array: array is 0-dimensional, but 1 were indexed", zeroD.Message);
+
+            using NDArray single = np.array(new float[] { 0.5f });
+            var oneThrottle = Assert.ThrowsExactly<IndexError>(() => env.Step(single));
+            Assert.AreEqual("index 1 is out of bounds for axis 0 with size 1", oneThrottle.Message);
+        }
     }
 }
