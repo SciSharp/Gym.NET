@@ -52,7 +52,7 @@ namespace Gym.Tests.Envs.Classic {
         /// </summary>
         [TestMethod]
         public void CartPoleReset_WithOptions_DrawsGymnasiumsState() {
-            var env = new CartPoleEnv(NullEnvViewer.Factory);
+            var env = new CartPoleEnv();
             (NDArray observation, _) = env.Reset(123, new Dictionary<string, object> { ["low"] = -0.1, ["high"] = 0.1 });
             using (observation) {
                 int[] bits = Array.ConvertAll(observation.ToArray<float>(), BitConverter.SingleToInt32Bits);
@@ -66,7 +66,7 @@ namespace Gym.Tests.Envs.Classic {
         /// </summary>
         [TestMethod]
         public void CartPoleReset_ThatFails_HasAlreadyReseeded() {
-            var env = new CartPoleEnv(NullEnvViewer.Factory);
+            var env = new CartPoleEnv();
             env.Reset(1).Observation.Dispose();
             double[] before = env.State;
 

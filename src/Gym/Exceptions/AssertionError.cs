@@ -14,8 +14,11 @@ namespace Gym.Exceptions {
     ///     ported tests match on them verbatim.
     /// </remarks>
     public class AssertionError : Exception {
-        /// <summary>An assertion failure without a message (a bare <c>assert condition</c>).</summary>
-        public AssertionError() { }
+        /// <summary>
+        ///     An assertion failure without a message (a bare <c>assert condition</c>). Its <see cref="Exception.Message"/> is
+        ///     empty, as Python's <c>str(AssertionError())</c> is.
+        /// </summary>
+        public AssertionError() : base("") { }
 
         /// <summary>An assertion failure with the message the Python <c>assert</c> statement carries.</summary>
         /// <param name="message">The message, rendered exactly as Python renders the assert's f-string.</param>

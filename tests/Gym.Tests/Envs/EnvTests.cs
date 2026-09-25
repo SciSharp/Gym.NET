@@ -1,99 +1,111 @@
+#nullable enable
 using System;
-using Gym.Environments;
+using System.Collections.Generic;
+using System.Numerics;
+using System.Threading.Tasks;
 using Gym.Environments.Envs.Classic;
 using Gym.Envs;
+using Gym.Legacy;
 using Gym.Observations;
 using Gym.Spaces;
-using Gym.Utils;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using NumSharp;
-using SixLabors.ImageSharp;
 
 namespace Gym.Tests.Envs {
     /// <summary>
-    ///     Pins the action conversion of <see cref="Env{TAction}"/> and the <see langword="long"/> surface of
-    ///     <see cref="VecEnv"/>. No env in the repository derives from <see cref="Env{TAction}"/>, so a minimal recording env
-    ///     stands in for one.
+    ///     Pins the action conversion of the untyped <see cref="IEnv.Step"/> (formerly <c>Env&lt;TAction&gt;</c>'s), the
+    ///     thread-pool <see cref="EnvExtensions.StepAsync{TObs, TAct}"/> that replaced the <c>DistributedScheduler</c>
+    ///     (B-34), and the <see langword="long"/> surface of the legacy <see cref="VecEnv"/> behind
+    ///     <see cref="LegacyEnvAdapter"/>. A minimal recording env stands in for an enum-typed env.
     /// </summary>
     [TestClass]
     public class EnvTests {
         /// <summary>An action enum backed by <see cref="long"/>: the former <c>(TAction)(object)action</c> could not unbox even a boxed int into it.</summary>
         private enum Move : long { Left = 0, Right = 1 }
 
-        /// <summary>The smallest <see cref="Env{TAction}"/>: it records the last typed action it was stepped with.</summary>
-        private sealed class RecordingEnv : Env<Move> {
-            /// <summary>The typed action of the last <see cref="Step(Move)"/> call.</summary>
-            public Move Last { get; private set; }
-
+        /// <summary>The smallest enum-typed env: it records the last typed action it was stepped with.</summary>
+        private sealed class RecordingEnv : Env<NDArray, Move> {
             /// <summary>Two moves, drawn from a fixed seed so tests are reproducible.</summary>
             public RecordingEnv() {
                 ActionSpace = new Discrete(2, seed: 0);
             }
 
+            /// <summary>The typed action of the last <see cref="Step(Move)"/> call.</summary>
+            public Move Last { get; private set; }
+
             /// <summary>Records <paramref name="action"/>.</summary>
             /// <param name="action">The converted action.</param>
-            /// <returns>An empty step.</returns>
-            public override Step Step(Move action) {
+            /// <returns>A transition with no observation and an empty info.</returns>
+            public override StepResult<NDArray> Step(Move action) {
                 Last = action;
-                return new Step();
+                return new StepResult<NDArray>(null!, 0.0, false, false, new Info());
             }
 
             /// <summary>Not used by these tests.</summary>
+            /// <param name="seed">Ignored.</param>
+            /// <param name="options">Ignored.</param>
             /// <returns>Nothing; always throws.</returns>
             /// <exception cref="NotSupportedException">Always.</exception>
-            public override NDArray Reset() => throw new NotSupportedException();
-
-            /// <summary>Not used by these tests.</summary>
-            /// <param name="mode">Ignored.</param>
-            /// <returns>Nothing; always throws.</returns>
-            /// <exception cref="NotSupportedException">Always.</exception>
-            public override Image Render(string mode = "human") => throw new NotSupportedException();
-
-            /// <summary>Nothing to release.</summary>
-            public override void CloseEnvironment() { }
-
-            /// <summary>Seeds the action space; the env itself draws nothing.</summary>
-            /// <param name="seed">Any non-negative seed.</param>
-            public override void Seed(long seed) => ActionSpace.Seed(seed);
+            public override ResetResult<NDArray> Reset(BigInteger? seed = null, IReadOnlyDictionary<string, object?>? options = null) => throw new NotSupportedException();
         }
 
         /// <summary>
         ///     Trap 1: an untyped action of any integer width, a sampled 0-d int64 array, and a typed member all reach
-        ///     <see cref="Env{TAction}.Step(TAction)"/> as the member with that value.
+        ///     <see cref="Env{TObs, TAct}.Step"/> as the member with that value.
         /// </summary>
         [TestMethod]
-        public void Step_UntypedAction_ConvertsToTheEnumMember()
-        {
+        public void Step_UntypedAction_ConvertsToTheEnumMember() {
             var env = new RecordingEnv();
+            IEnv untyped = env;
 
-            foreach (object action in new object[] { 1, 1L, (byte)1, NDArray.Scalar<long>(1L), Move.Right })
-            {
+            foreach (object action in new object[] { 1, 1L, (byte)1, NDArray.Scalar<long>(1L), Move.Right }) {
                 env.Step(Move.Left);
-                env.Step(action);
+                untyped.Step(action);
                 Assert.AreEqual(Move.Right, env.Last, $"{action} ({action.GetType().Name})");
             }
 
             using var sampled = env.ActionSpace.Sample();
-            env.Step((object) sampled);
-            Assert.AreEqual((Move) (long) sampled, env.Last);
+            untyped.Step(sampled);
+            Assert.AreEqual((Move)(long)sampled, env.Last);
         }
 
-        // Env.StepAsync shares ToAction with Step(object) but is not tested here: DistributedScheduler.Default throws on
-        // machines with 32 or more logical CPUs (DistributedThread._validateProcessorAffinity overflows int computing
-        // 1 << ProcessorCount), before any work is scheduled. That threading is deleted in P1 (B-34).
+        /// <summary>An untyped action that denotes no integer is refused with Python's <c>TypeError</c>, naming the value.</summary>
+        [TestMethod]
+        public void Step_UntypedAction_NotAnInteger_RaisesTypeError() {
+            IEnv env = new RecordingEnv();
+
+            var error = Assert.ThrowsExactly<TypeError>(() => env.Step("left"));
+
+            StringAssert.Contains(error.Message, "'left' (<class 'str'>)");
+        }
 
         /// <summary>
-        ///     <see cref="VecEnv.Step(long)"/> boxes the action as <see langword="long"/>, which an env that casts
-        ///     <c>(int)action</c> could not unbox; with <see cref="Discrete.ToInt64"/> it steps. Seeds above
-        ///     <see cref="int.MaxValue"/> reach every sub-env.
+        ///     <see cref="EnvExtensions.StepAsync{TObs, TAct}"/> steps on the thread pool, typed and untyped; the removed
+        ///     <c>DistributedScheduler</c> threw on machines with 32 or more logical CPUs before scheduling anything (B-34).
+        /// </summary>
+        /// <returns>The test's task.</returns>
+        [TestMethod]
+        public async Task StepAsync_StepsOnTheThreadPool() {
+            var env = new RecordingEnv();
+
+            await env.StepAsync(Move.Right);
+            Assert.AreEqual(Move.Right, env.Last);
+            await ((IEnv)env).StepAsync(0L);
+            Assert.AreEqual(Move.Left, env.Last);
+        }
+
+#pragma warning disable CS0618 // The legacy API is what these tests pin.
+        /// <summary>
+        ///     <see cref="VecEnv.Step(long)"/> boxes the action as <see langword="long"/>, which reaches CartPole through
+        ///     <see cref="LegacyEnvAdapter"/> and the untyped step's conversion. Seeds above <see cref="int.MaxValue"/> reach
+        ///     every sub-env, as the seed of their next reset.
         /// </summary>
         [TestMethod]
-        public void DummyVecEnv_StepsWithLongActionAndSeedsAboveInt32()
-        {
-            var vec = new DummyVecEnv(new CartPoleEnv(NullEnvViewer.Factory, Seeding.NpRandom(0).Rng));
+        public void DummyVecEnv_StepsWithLongActionAndSeedsAboveInt32() {
+            var vec = new DummyVecEnv(new LegacyEnvAdapter(new CartPoleEnv()));
 
             vec.Seed((1L << 31) + 5);
-            vec.Seed(new[] { (long) uint.MaxValue });
+            vec.Seed(new[] { (long)uint.MaxValue });
             // CartPole's Reset hands out a copy of its state, so the initial observations are safe to release.
             foreach (var observation in vec.Reset())
                 observation.Dispose();
@@ -101,6 +113,8 @@ namespace Gym.Tests.Envs {
 
             Assert.AreEqual(1, steps.Length);
             Assert.IsNotNull(steps[0].Observation);
+            Assert.AreEqual(uint.MaxValue, (long)((LegacyEnvAdapter)vec.Environments[0]).Env.NpRandomSeed);
         }
+#pragma warning restore CS0618
     }
 }

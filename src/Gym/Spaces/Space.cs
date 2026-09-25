@@ -39,16 +39,18 @@ namespace Gym.Spaces {
         ///     reproducible and independent of every other space and env, including any that shared its previous generator.
         /// </summary>
         /// <param name="seed">
-        ///     Any non-negative seed, as in Gymnasium (a Python int with no upper bound); <see langword="long"/> covers every
-        ///     seed up to 2^63 - 1.
+        ///     Any non-negative seed, as in Gymnasium (a Python int with no upper bound), so an env's 128-bit
+        ///     <c>np_random_seed</c> can seed a space (<c>space.seed(env.np_random_seed)</c>); every C# integer converts
+        ///     implicitly.
         /// </param>
         /// <exception cref="Gym.Exceptions.Error">Thrown when <paramref name="seed"/> is negative, with Gymnasium's message.</exception>
         /// <remarks>
         ///     The generator is Gymnasium's, <c>Generator(PCG64(SeedSequence(seed)))</c> (<see cref="Gym.Utils.Seeding"/>).
         ///     This is the only way to make an unseeded space reproducible: seeding the process-wide <c>np.random</c> has no
         ///     effect on spaces, each of which draws from its own generator (entropy-seeded unless one was given), as in
-        ///     Gymnasium.
+        ///     Gymnasium. The parameter was a <see langword="long"/> until the core-API port (P1); overrides must take a
+        ///     <see cref="System.Numerics.BigInteger"/> now.
         /// </remarks>
-        public abstract void Seed(long seed);
+        public abstract void Seed(System.Numerics.BigInteger seed);
     }
 }

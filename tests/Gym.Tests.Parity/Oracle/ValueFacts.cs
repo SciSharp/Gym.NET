@@ -383,6 +383,13 @@ namespace Gym.Tests.Parity.Oracle {
                         pairs.Add(new KeyValuePair<ValueFacts, ValueFacts>(Of(entry.Key), Of(entry.Value)));
                     return FromDict(pairs, dictionary.GetType().Name);
                 }
+                case IEnumerable<KeyValuePair<string, object?>> entries: {
+                    // Gym.NET's Info and Metadata: Python dicts that are not non-generic IDictionary, in insertion order.
+                    var pairs = new List<KeyValuePair<ValueFacts, ValueFacts>>();
+                    foreach (KeyValuePair<string, object?> entry in entries)
+                        pairs.Add(new KeyValuePair<ValueFacts, ValueFacts>(Of(entry.Key), Of(entry.Value)));
+                    return FromDict(pairs, value.GetType().Name);
+                }
                 case ITuple tuple: {
                     var items = new List<ValueFacts>(tuple.Length);
                     for (int i = 0; i < tuple.Length; i++)

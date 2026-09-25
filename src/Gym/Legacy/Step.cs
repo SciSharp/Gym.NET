@@ -3,15 +3,39 @@ using Gym.Collections;
 using JetBrains.Annotations;
 using NumSharp;
 
-namespace Gym.Observations {
+namespace Gym.Legacy {
+    /// <summary>
+    ///     The pre-0.26 transition Gym.NET returned before the core-API port: <c>(observation, reward, done, info)</c> with a
+    ///     float32 reward and a single <see cref="Done"/> flag. <see cref="LegacyEnvAdapter"/> produces it from a ported env
+    ///     through Gymnasium's <c>step_api_compatibility</c>.
+    /// </summary>
+    /// <remarks>
+    ///     Moved from <c>Gym.Observations</c> by the core-API port (P1); kept for one major version (port plan §16).
+    ///     <see cref="Done"/> merges termination and truncation (<c>Information["TimeLimit.truncated"]</c> tells them apart),
+    ///     and the float32 <see cref="Reward"/> rounds Gymnasium's float64 rewards.
+    /// </remarks>
+    [Obsolete("The 4-tuple step API is legacy: Env<TObs, TAct>.Step returns Gym.Observations.StepResult<TObs> (done is terminated || truncated, the reward is float64). Gym.Legacy is removed in 3.0.")]
     public class Step : IEquatable<Step>, ICloneable {
+        /// <summary>The observation after the action.</summary>
         public NDArray Observation { get; set; }
+
+        /// <summary>The reward, narrowed to float32 (Gymnasium's rewards are float64).</summary>
         public float Reward { get; set; }
+
+        /// <summary>Whether the episode ended, by termination or truncation (<c>terminated or truncated</c>).</summary>
         public bool Done { get; set; }
+
+        /// <summary>The diagnostics; <c>"TimeLimit.truncated"</c> is set when the episode ended, true for a truncation.</summary>
         [CanBeNull] public Dict Information { get; set; }
 
+        /// <summary>An empty transition, filled through the setters.</summary>
         public Step() { }
 
+        /// <summary>A transition of the four values.</summary>
+        /// <param name="observation">The observation after the action.</param>
+        /// <param name="reward">The reward.</param>
+        /// <param name="done">Whether the episode ended.</param>
+        /// <param name="information">The diagnostics, or <see langword="null"/>.</param>
         public Step(NDArray observation, float reward, bool done, Dict information) {
             Observation = observation;
             Done = done;
@@ -21,6 +45,11 @@ namespace Gym.Observations {
 
         #region Generated
 
+        /// <summary>Deconstructs like Python's 4-tuple: <c>var (obs, reward, done, info) = step;</c>.</summary>
+        /// <param name="observation">The observation.</param>
+        /// <param name="reward">The reward.</param>
+        /// <param name="done">Whether the episode ended.</param>
+        /// <param name="information">The diagnostics.</param>
         public void Deconstruct(out NDArray observation, out float reward, out bool done, out Dict information) {
             observation = Observation;
             reward = Reward;

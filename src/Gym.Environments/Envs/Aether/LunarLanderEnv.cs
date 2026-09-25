@@ -1,5 +1,5 @@
-﻿using Gym.Collections;
-using Gym.Envs;
+﻿using Gym.Envs;
+using Gym.Envs.Registration;
 using Gym.Observations;
 using Gym.Spaces;
 using Gym.Utils;
@@ -18,7 +18,6 @@ using SixLabors.ImageSharp.Processing;
 using SixLabors.ImageSharp.Drawing;
 using SixLabors.ImageSharp.Drawing.Processing;
 using System.Linq;
-using Gym.Threading;
 using SixLabors.ImageSharp.ColorSpaces;
 using Gym.Exceptions;
 using System.Diagnostics;
@@ -148,7 +147,7 @@ namespace Gym.Environments.Envs.Aether
     //    ## Credits
     //    Created by Oleg Klimov
     /// </summary>
-    public class LunarLanderEnv : Env
+    public class LunarLanderEnv : Env<NDArray, object>
     {
         private IEnvironmentViewerFactoryDelegate _viewerFactory;
         private IEnvViewer _viewer;
@@ -353,11 +352,6 @@ namespace Gym.Environments.Envs.Aether
         public bool UseWind { get; private set; } = false;
         public float WindPower { get; private set; } = 15f;
         public float TurbulencePower { get; private set; } = 1.5f;
-        /// <summary>
-        ///     The env's generator, NumPy's <c>Generator(PCG64)</c> as in Gymnasium; shared with the action space when the caller
-        ///     passed one in.
-        /// </summary>
-        private Generator RandomState { get; set; }
 
         /// <summary>
         /// True when the filled circles are drawn for the side and main thrusters
@@ -380,7 +374,10 @@ namespace Gym.Environments.Envs.Aether
         private ContactDetector _Contacts;
         private float _PrevShaping;
 
-        public LunarLanderEnv(IEnvViewer viewer) : this((IEnvironmentViewerFactoryDelegate)null)
+        /// <summary>Creates a discrete lander in <c>human</c> render mode, rendering into an existing viewer.</summary>
+        /// <param name="viewer">The viewer, Gymnasium's display window.</param>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="viewer"/> is <see langword="null"/>.</exception>
+        public LunarLanderEnv(IEnvViewer viewer) : this((IEnvironmentViewerFactoryDelegate)null, render_mode: "human")
         {
             _viewer = viewer ?? throw new ArgumentNullException(nameof(viewer));
         }
@@ -390,30 +387,42 @@ namespace Gym.Environments.Envs.Aether
         ///     generator (the wind and turbulence phases), even when wind is disabled (B-18), so it changes the stream every
         ///     later <see cref="Reset"/> and <see cref="Step"/> sees.
         /// </summary>
-        /// <param name="viewerFactory">Creates the viewer on the first <see cref="Render"/>; <see langword="null"/> means <see cref="NullEnvViewer"/>.</param>
+        /// <param name="viewerFactory">Creates the human-mode viewer on the first human render; <see langword="null"/> means <see cref="NullEnvViewer"/>.</param>
         /// <param name="continuous">Selects the continuous action space (two throttles) instead of four discrete actions.</param>
         /// <param name="gravity">The world's vertical gravity, within [-12, 0].</param>
         /// <param name="enable_wind">Applies wind and turbulence while the lander is airborne.</param>
         /// <param name="wind_power">The maximum linear wind force, within [0, 20].</param>
         /// <param name="turbulence_power">The maximum rotational wind torque, within [0, 2].</param>
         /// <param name="random_state">
-        ///     The generator this env draws from (<see cref="Gym.Utils.Seeding.NpRandom"/> makes one). The same instance
-        ///     is handed to the action space, so both share one stream. <see langword="null"/> gives the env a generator of its
-        ///     own, seeded from OS entropy, and the action space another.
+        ///     The generator this env draws from (<see cref="Gym.Utils.Seeding.NpRandom"/> makes one), assigned to
+        ///     <see cref="Env{TObs, TAct}.NpRandom"/> (so <c>NpRandomSeed</c> is -1). The same instance is handed to the action
+        ///     space, so both share one stream. <see langword="null"/> gives the env a generator of its own, seeded from OS
+        ///     entropy, and the action space another. A seeded <see cref="Reset"/> replaces the env's, not the space's.
+        /// </param>
+        /// <param name="render_mode">
+        ///     Gymnasium's <c>render_mode</c>: <see langword="null"/> (no rendering), <c>"human"</c> (rendered into the viewer
+        ///     after every step) or <c>"rgb_array"</c> (<see cref="Render"/> returns the frame).
         /// </param>
         /// <exception cref="ArgumentException">Thrown when <paramref name="gravity"/> is outside [-12, 0].</exception>
         /// <exception cref="WarningException">
         ///     Thrown when <paramref name="wind_power"/> or <paramref name="turbulence_power"/> is outside its recommended range,
         ///     where Gymnasium only warns (B-27).
         /// </exception>
-        public LunarLanderEnv(IEnvironmentViewerFactoryDelegate viewerFactory, bool continuous = false, float gravity = -10f, bool enable_wind = false, float wind_power = 15f, float turbulence_power = 1.5f, Generator random_state=null)
+        public LunarLanderEnv(IEnvironmentViewerFactoryDelegate viewerFactory = null, bool continuous = false, float gravity = -10f, bool enable_wind = false, float wind_power = 15f, float turbulence_power = 1.5f, Generator random_state = null, string render_mode = null)
         {
-            RandomState = random_state;
-            if (RandomState == null)
+            // Gymnasium's class attribute: {"render_modes": ["human", "rgb_array"], "render_fps": FPS}.
+            Metadata = new Metadata
             {
-                // B-29: the process-wide np.random, the fallback before per-instance generators, let a second env perturb the
-                // first and was not safe to draw from on two threads.
-                RandomState = Seeding.NpRandom().Rng;
+                [Metadata.RenderModesKey] = new List<string> { "human", "rgb_array" },
+                [Metadata.RenderFpsKey] = (long)FPS
+            };
+            RenderMode = render_mode;
+            // B-29: the process-wide np.random, the fallback before per-instance generators, let a second env perturb the
+            // first and was not safe to draw from on two threads. Without a generator, the base creates one from OS entropy
+            // on the first draw below.
+            if (random_state != null)
+            {
+                NpRandom = random_state;
             }
             _viewerFactory = viewerFactory;
             ContinuousMode = continuous;
@@ -437,8 +446,8 @@ namespace Gym.Environments.Envs.Aether
             }
 
             // Gymnasium: self.np_random.integers(-9999, 9999), drawn in reset rather than here (B-18).
-            _wind_idx = TakeInt64(RandomState.integers(-9999, 9999));
-            _torque_idx = TakeInt64(RandomState.integers(-9999, 9999));
+            _wind_idx = TakeInt64(NpRandom.integers(-9999, 9999));
+            _torque_idx = TakeInt64(NpRandom.integers(-9999, 9999));
 
             NDArray low = np.array(new float[] { -1.5f, -1.5f, -5f, -5f, (float)-Math.PI, -5f, 0f, 0f });
             NDArray high = np.array(new float[] { 1.5f, 1.5f, 5f, 5f, (float)Math.PI, 5f, 1f, 1f });
@@ -455,7 +464,7 @@ namespace Gym.Environments.Envs.Aether
         }
 
         /// <summary>
-        ///     Reads a 0-d floating-point draw from <see cref="RandomState"/> and releases the array at once. NumSharp returns a
+        ///     Reads a 0-d floating-point draw from <see cref="Env{TObs, TAct}.NpRandom"/> and releases the array at once. NumSharp returns a
         ///     scalar draw as a 0-d array whose conversion to a C# scalar is explicit; routing every draw through here keeps the
         ///     draw sites one-liners and keeps the per-step draws off the finalizer.
         /// </summary>
@@ -471,7 +480,7 @@ namespace Gym.Environments.Envs.Aether
         }
 
         /// <summary>
-        ///     Reads a 0-d integer draw from <see cref="RandomState"/> and releases the array at once; the integer
+        ///     Reads a 0-d integer draw from <see cref="Env{TObs, TAct}.NpRandom"/> and releases the array at once; the integer
         ///     counterpart of <see cref="TakeDouble"/>.
         /// </summary>
         /// <param name="draw">A 0-d integer array that the caller hands over; it is disposed before this method returns.</param>
@@ -552,9 +561,13 @@ namespace Gym.Environments.Envs.Aether
         ///     Rebuilds the world and the lander, then performs the zero step. It draws, in order: the initial force (x then y),
         ///     the 12 terrain heights, and the zero step's two dispersion values. Gymnasium draws the terrain first (B-17).
         /// </summary>
-        /// <returns>The zero step's observation: a fresh float32 array of shape (8,).</returns>
-        public override NDArray Reset()
+        /// <param name="seed">Reseeds <see cref="Env{TObs, TAct}.NpRandom"/> first when given (Gymnasium's <c>super().reset(seed=seed)</c>).</param>
+        /// <param name="options">Ignored, as Gymnasium's LunarLander ignores them.</param>
+        /// <returns>The zero step's observation (a fresh float32 array of shape (8,)) and an empty info, <c>(obs, {})</c>.</returns>
+        /// <exception cref="Gym.Exceptions.Error">Thrown for a negative seed, with Gymnasium's message.</exception>
+        public override ResetResult<NDArray> Reset(System.Numerics.BigInteger? seed = null, IReadOnlyDictionary<string, object> options = null)
         {
+            SeedNpRandom(seed);
             Destroy();
             _World = new World(new Vector2(0f, Gravity));
             _World.ContactManager.BeginContact = new BeginContactDelegate(_Contacts.BeginContact);
@@ -562,7 +575,7 @@ namespace Gym.Environments.Envs.Aether
             _Lander = new LunarLanderBody(2,_World);
             // C# evaluates arguments left to right, so x is still drawn before y. Each float64 draw is narrowed to float32
             // once, as the implicit NDArray -> float conversion it replaces did.
-            _Lander.Fuselage.Unit.ApplyForce(new Vector2((float)TakeDouble(RandomState.uniform(-INITIAL_RANDOM, INITIAL_RANDOM)), (float)TakeDouble(RandomState.uniform(-INITIAL_RANDOM, INITIAL_RANDOM))));
+            _Lander.Fuselage.Unit.ApplyForce(new Vector2((float)TakeDouble(NpRandom.uniform(-INITIAL_RANDOM, INITIAL_RANDOM)), (float)TakeDouble(NpRandom.uniform(-INITIAL_RANDOM, INITIAL_RANDOM))));
             GameOver = false;
             _PrevShaping = float.MinValue;
             float w = VIEWPORT_W / SCALE;
@@ -573,7 +586,7 @@ namespace Gym.Environments.Envs.Aether
             float[] height = new float[CHUNKS + 1];
             for (int i = 0; i < height.Length; i++)
             {
-                height[i] = (float)TakeDouble(RandomState.uniform(0f, h / 2f));
+                height[i] = (float)TakeDouble(NpRandom.uniform(0f, h / 2f));
             }
             float[] chunk_x = new float[CHUNKS];
             for (int i = 0; i < CHUNKS; i++)
@@ -632,12 +645,12 @@ namespace Gym.Environments.Envs.Aether
             _Lander.Fuselage.Unit.Position += dv;
             _Lander.Legs[0].Unit.Position += dv;
             _Lander.Legs[1].Unit.Position += dv;
-            // Do the zero step
+            // Do the zero step: self.step(np.array([0, 0]) if self.continuous else 0)[0], {}
             if (ContinuousMode)
             {
-                return Step(np.array(new float[] { 0f, 0f })).Observation;
+                return new ResetResult<NDArray>(Step(np.array(new float[] { 0f, 0f })).Observation, new Info());
             }
-            return Step(0).Observation;
+            return new ResetResult<NDArray>(Step(0).Observation, new Info());
         }
 
         /// <summary>
@@ -649,7 +662,11 @@ namespace Gym.Environments.Envs.Aether
         ///     or the 0-d array <c>ActionSpace.Sample()</c> returns. Continuous mode: an <see cref="NDArray"/> of shape (2,)
         ///     holding the main and lateral throttles, clipped to [-1, 1].
         /// </param>
-        /// <returns>The new observation (a fresh float32 array of shape (8,)), the reward, the done flag and diagnostics.</returns>
+        /// <returns>
+        ///     The new observation (a fresh float32 array of shape (8,)), the float32 reward widened to float64,
+        ///     <c>terminated</c> (the legacy done flag), <c>truncated=False</c>, and the pre-port diagnostics (Gymnasium's info
+        ///     is empty; P8 drops them).
+        /// </returns>
         /// <exception cref="InvalidActionError">Thrown when a discrete action is outside the action space.</exception>
         /// <exception cref="ArgumentException">Thrown when a discrete action does not denote an integer.</exception>
         /// <exception cref="OverflowException">Thrown when an unsigned 64-bit discrete action exceeds <see cref="long.MaxValue"/>.</exception>
@@ -658,7 +675,7 @@ namespace Gym.Environments.Envs.Aether
         ///     space samples today (B-20), or a single throttle. The messages are NumPy's for <c>action[0]</c> and
         ///     <c>action[1]</c>.
         /// </exception>
-        public override Step Step(object action)
+        public override StepResult<NDArray> Step(object action)
         {
             long i_action = -1;
             NDArray c_action = null;
@@ -716,8 +733,8 @@ namespace Gym.Environments.Envs.Aether
             Vector2 side = new Vector2(-tip.Y, tip.X);
             // Divided in float64 and narrowed once, bit-identical to the float64 NumSharp expression (draw / SCALE) whose
             // implicit conversion to float no longer compiles.
-            float disp_x = (float)(TakeDouble(RandomState.uniform(-1f, 1f)) / SCALE);
-            float disp_y = (float)(TakeDouble(RandomState.uniform(-1f, 1f)) / SCALE);
+            float disp_x = (float)(TakeDouble(NpRandom.uniform(-1f, 1f)) / SCALE);
+            float disp_y = (float)(TakeDouble(NpRandom.uniform(-1f, 1f)) / SCALE);
 
             bool fire_main = false;
             bool fire_thruster = false;
@@ -844,21 +861,20 @@ namespace Gym.Environments.Envs.Aether
             Vector2 vel = _Lander.Fuselage.Unit.LinearVelocity;
             vel.X *= (VIEWPORT_W / SCALE / 2F) / FPS;
             vel.Y *= (VIEWPORT_H / SCALE / 2F) / FPS;
-            Step step = new Step();
-            step.Information = new Dict();
-            step.Information["pos"] = pos;
-            step.Information["velocity"] = vel;
-            step.Information["angle"] = _Lander.Fuselage.Unit.Rotation;
-            step.Information["omega"] = 20f * _Lander.Fuselage.Unit.AngularVelocity / FPS;
-            step.Information["LeftContact"] = _Lander.Legs[0].Contact;
-            step.Information["RightContact"] = _Lander.Legs[1].Contact;
-            step.Observation = new float[] { pos.X, pos.Y, vel.X, vel.Y, _Lander.Fuselage.Unit.Rotation, (float)step.Information["omega"], _Lander.Legs[0].Contact ? 1f : 0f, _Lander.Legs[1].Contact ? 1f : 0f };
+            var information = new Info();
+            information["pos"] = pos;
+            information["velocity"] = vel;
+            information["angle"] = _Lander.Fuselage.Unit.Rotation;
+            information["omega"] = 20f * _Lander.Fuselage.Unit.AngularVelocity / FPS;
+            information["LeftContact"] = _Lander.Legs[0].Contact;
+            information["RightContact"] = _Lander.Legs[1].Contact;
+            NDArray observation = new float[] { pos.X, pos.Y, vel.X, vel.Y, _Lander.Fuselage.Unit.Rotation, (float)information["omega"], _Lander.Legs[0].Contact ? 1f : 0f, _Lander.Legs[1].Contact ? 1f : 0f };
             float reward = 0f;
             // (float)Math.Sqrt of the float32 argument equals NumSharp's float32 np.sqrt: a float64 square root narrowed to
             // float32 is correctly rounded (float64 carries more than 2 * 24 + 2 bits), and it allocates no 0-d array.
             float shaping = -100f * (float)Math.Sqrt(pos.X * pos.X + pos.Y * pos.Y);
             shaping += -100f * (float)Math.Sqrt(vel.X * vel.X + vel.Y * vel.Y);
-            shaping += -100f * Math.Abs((float)step.Information["angle"]);
+            shaping += -100f * Math.Abs((float)information["angle"]);
             shaping += 10f * (_Lander.Legs[0].Contact ? 1f : 0f);
             shaping += 10f * (_Lander.Legs[1].Contact ? 1f : 0f);
             if (_PrevShaping != float.MinValue)
@@ -868,24 +884,44 @@ namespace Gym.Environments.Envs.Aether
             _PrevShaping = shaping;
             reward -= m_power * 0.3f;
             reward -= s_power * 0.03f;
-            step.Done = false;
+            bool terminated = false;
             if (GameOver || pos.X > 1f)
             {
-                step.Done = true;
+                terminated = true;
                 reward = -100;
             }
             if (!_Lander.Fuselage.Unit.Awake)
             {
-                step.Done = true;
+                terminated = true;
                 reward = 100;
             }
-            step.Reward = reward;
-            return (step);
+
+            if (RenderMode == "human")
+            {
+                Render();
+            }
+            // The reward is float32 arithmetic (P8 ports Gymnasium's float64); widening it is exact.
+            return new StepResult<NDArray>(observation, reward, terminated, false, information);
         }
 
-        public override Image Render(string mode = "human")
+        /// <summary>
+        ///     Renders the current state as <see cref="Env{TObs, TAct}.RenderMode"/> says: <c>"human"</c> shows the frame in the
+        ///     viewer and returns nothing, <c>"rgb_array"</c> returns it as a <c>(400, 600, 3)</c> uint8 array. The drawing is
+        ///     the pre-port ImageSharp approximation, not pygame's pixels (P8).
+        /// </summary>
+        /// <returns>The frame in <c>rgb_array</c> mode; <see cref="RenderResult.None"/> otherwise.</returns>
+        /// <exception cref="Gym.Exceptions.AssertionError">Thrown without a render mode when the env has no spec (<c>assert self.spec is not None</c>).</exception>
+        public override RenderResult Render()
         {
-            if (_viewer == null) {
+            if (RenderMode == null)
+            {
+                EnvSpec spec = Spec ?? throw new AssertionError();
+                Logger.Warn("You are calling render method without specifying any render mode. You can specify the render_mode at initialization, "
+                            + $"e.g. gym.make(\"{spec.Id}\", render_mode=\"rgb_array\")");
+                return RenderResult.None;
+            }
+
+            if (RenderMode == "human" && _viewer == null) {
                 lock (this) {
                     //to prevent double initalization.
                     if (_viewer == null) {
@@ -995,39 +1031,50 @@ namespace Gym.Environments.Envs.Aether
                 img.Mutate(i => i.DrawPolygon(new Rgba32(204, 204, 0), 1f, new PointF[] { p1, p2, p3}));
             }
 
-            _viewer.Render(img);
-            return img;
+            if (RenderMode == "human")
+            {
+                // The viewer copies the frame synchronously, so it is released right after.
+                using (img)
+                {
+                    _viewer.Render(img);
+                }
+                return RenderResult.None;
+            }
+            if (RenderMode == "rgb_array")
+            {
+                using (img)
+                {
+                    return new RenderResult.Rgb(ToRgbArray(img));
+                }
+            }
+            img.Dispose();
+            return RenderResult.None;
         }
 
-        public override void CloseEnvironment()
+        /// <summary>The <c>(height, width, 3)</c> uint8 array of an RGBA image's colour channels, rows top to bottom.</summary>
+        /// <param name="image">The image.</param>
+        /// <returns>A new array the caller owns.</returns>
+        private static NDArray ToRgbArray(Image<Rgba32> image)
+        {
+            var pixels = new Rgba32[image.Width * image.Height];
+            image.CopyPixelDataTo(pixels);
+            var rgb = new byte[pixels.Length * 3];
+            for (int i = 0, j = 0; i < pixels.Length; i++, j += 3)
+            {
+                rgb[j] = pixels[i].R;
+                rgb[j + 1] = pixels[i].G;
+                rgb[j + 2] = pixels[i].B;
+            }
+            return new NDArray(rgb, new NumSharp.Shape(image.Height, image.Width, 3));
+        }
+
+        /// <summary>Closes the human-mode viewer; a later human render opens a new one from the factory.</summary>
+        public override void Close()
         {
             if (_viewer != null) {
                 _viewer.CloseEnvironment();
                 _viewer = null;
             }
-        }
-
-        /// <summary>
-        ///     Reseeds the env's generator in place to the state of Gymnasium's <c>seeding.np_random(seed)</c>. In place, unlike
-        ///     the spaces' <c>Seed</c>: when the env was created with a <c>random_state</c>, its action space draws from that
-        ///     same instance and is reseeded too; without one, the action space has a generator of its own and is not.
-        /// </summary>
-        /// <param name="seed">Any non-negative seed.</param>
-        /// <exception cref="Gym.Exceptions.Error">Thrown when <paramref name="seed"/> is negative, with Gymnasium's message.</exception>
-        /// <remarks>
-        ///     The wind and turbulence phases were drawn in the constructor (B-18), so reseeding does not redraw them; only the
-        ///     draws of later <see cref="Reset"/> and <see cref="Step"/> calls follow the new seed.
-        /// </remarks>
-        public override void Seed(long seed)
-        {
-            var reseeded = Seeding.NpRandom(seed).Rng;
-            // NumPy's Generator has no reseed method. Copying a freshly seeded PCG64's complete state (NumPy's
-            // bit_generator.state: state, increment and the buffered 32-bit half) reseeds the shared instance for everyone
-            // holding it. A caller-supplied generator on another bit generator is replaced instead.
-            if (RandomState.bit_generator is PCG64 shared && reseeded.bit_generator is PCG64 fresh)
-                shared.state = fresh.state;
-            else
-                RandomState = reseeded;
         }
     }
 }

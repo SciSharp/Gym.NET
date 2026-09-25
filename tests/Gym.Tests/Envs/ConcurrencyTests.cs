@@ -1,9 +1,11 @@
+#nullable enable
 using System;
 using System.Threading;
 using System.Threading.Tasks;
 using Gym.Environments;
 using Gym.Environments.Envs.Aether;
 using Gym.Environments.Envs.Classic;
+using Gym.Envs;
 using Gym.Spaces;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using NumSharp;
@@ -59,15 +61,15 @@ namespace Gym.Tests.Envs {
             var env = new LunarLanderEnv(NullEnvViewer.Factory);
             start.SignalAndWait();
             // LunarLander's observations are fresh arrays every step, so this loop owns and releases them.
-            env.Reset().Dispose();
+            env.Reset().Observation.Dispose();
             for (int i = 0; i < 500; i++)
             {
                 env.ObservationSpace.Sample().Dispose();
                 using NDArray action = env.ActionSpace.Sample();
                 var step = env.Step(action);
                 step.Observation.Dispose();
-                if (step.Done)
-                    env.Reset().Dispose();
+                if (step.Terminated || step.Truncated)
+                    env.Reset().Observation.Dispose();
             }
         }
 
@@ -75,16 +77,18 @@ namespace Gym.Tests.Envs {
         /// <param name="start">Released once every thread is ready, so the threads overlap.</param>
         private static void RunCartPole(Barrier start)
         {
-            var env = new CartPoleEnv(NullEnvViewer.Factory);
+            IEnv env = new CartPoleEnv();
             start.SignalAndWait();
-            // Reset hands out a copy; a step's observation is still the env's own state (B-13), so it is not disposed.
-            env.Reset().Dispose();
+            // Every observation is a fresh float32 copy of the state (B-13 is fixed), so the loop releases them all.
+            ((NDArray)env.Reset().Observation!).Dispose();
             for (int i = 0; i < 2000; i++)
             {
                 env.ObservationSpace.Sample().Dispose();
                 using NDArray action = env.ActionSpace.Sample();
-                if (env.Step(action).Done)
-                    env.Reset().Dispose();
+                var step = env.Step(action);
+                ((NDArray)step.Observation!).Dispose();
+                if (step.Terminated || step.Truncated)
+                    ((NDArray)env.Reset().Observation!).Dispose();
             }
         }
 

@@ -69,7 +69,7 @@ namespace Gym.Tests.Parity {
                 var envGenerator = Seeding.NpRandom(seed).Rng;
                 var env = new LunarLanderEnv(NullEnvViewer.Factory, random_state: envGenerator);
                 // The zero step inside Reset is the first of the 21 dispersion pairs; 20 explicit steps make the rest.
-                env.Reset().Dispose();
+                env.Reset().Observation.Dispose();
                 for (int i = 0; i < 20; i++)
                     env.Step((long) LunarLanderDiscreteActions.Nothing).Observation.Dispose();
 
@@ -138,8 +138,8 @@ namespace Gym.Tests.Parity {
 
                 // The golden records Gymnasium's float64 state (env.unwrapped.state) and its float32 observation; the port keeps
                 // the state in CartPoleEnv.State and hands out the float32 copy, as Gymnasium does (B-13 fixed).
-                var cartPole = new CartPoleEnv(NullEnvViewer.Factory, Seeding.NpRandom(seed).Rng);
-                using (NDArray reset = cartPole.Reset())
+                var cartPole = new CartPoleEnv();
+                using (NDArray reset = cartPole.Reset(seed: seed).Observation)
                 {
                     Emit(lines, $"cartpole.reset.state.s{seed}", cartPole.State!.Select(F64));
                     Emit(lines, $"cartpole.reset.obs.s{seed}", reset.ToArray<float>().Select(F32));

@@ -7,7 +7,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using Gym.Environments;
-using Gym.Threading;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using Image = SixLabors.ImageSharp.Image;
@@ -128,10 +127,31 @@ namespace Gym.Rendering.WinForm {
             Application.ExitThread();
         }
 
+        /// <summary>
+        ///     Releases the displayed frame and the ready signal as the window closes. Failures are swallowed
+        ///     (<see cref="TryDispose"/>): closing must finish even when a half-released frame throws.
+        /// </summary>
+        /// <param name="e">The closing event's arguments, passed on to the base form first.</param>
         protected override void OnClosing(CancelEventArgs e) {
             base.OnClosing(e);
-            PictureFrame.Image.TryDispose();
-            _ready.TryDispose();
+            TryDispose(PictureFrame.Image);
+            TryDispose(_ready);
+        }
+
+        /// <summary>
+        ///     Disposes <paramref name="disposable"/> when it is not <see langword="null"/>, swallowing whatever the disposal
+        ///     throws: the window is closing, and a half-released frame or event must not keep it open. This was the
+        ///     <c>TryDispose</c> extension of <c>Gym.Threading</c>, removed with that namespace (B-34).
+        /// </summary>
+        /// <param name="disposable">The object to release, or <see langword="null"/>.</param>
+        private static void TryDispose(IDisposable disposable) {
+            if (disposable == null)
+                return;
+            try {
+                disposable.Dispose();
+            } catch {
+                // ignored: see the summary.
+            }
         }
     }
 }

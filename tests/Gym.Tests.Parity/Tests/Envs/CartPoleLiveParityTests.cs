@@ -3,8 +3,8 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Numerics;
-using Gym.Environments;
 using Gym.Environments.Envs.Classic;
+using Gym.Envs;
 using Gym.Spaces;
 using Gym.Tests.Parity.Frames;
 using Gym.Tests.Parity.Interop;
@@ -17,7 +17,6 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 using NumSharp;
 using NumSharp.Interop.PythonNet;
 using Python.Runtime;
-using SixLabors.ImageSharp;
 
 namespace Gym.Tests.Parity.Tests.Envs {
     /// <summary>
@@ -124,7 +123,7 @@ namespace Gym.Tests.Parity.Tests.Envs {
             TestContext.WriteLine($"{run}; then 5 more steps past termination, identical");
         }
 
-        /// <summary>Gym.NET's reset, <c>Seed(seed)</c> then <c>Reset()</c>, against <c>reset(seed=seed)</c>: observation, info, state and generator.</summary>
+        /// <summary>Gym.NET's <c>Reset(seed)</c> against <c>reset(seed=seed)</c>: observation, info, state and generator.</summary>
         /// <param name="seed">The reset seed.</param>
         [TestMethod]
         [DataRow(0L)]
@@ -132,7 +131,7 @@ namespace Gym.Tests.Parity.Tests.Envs {
         [DataRow(42L)]
         [DataRow(1234L)]
         public void GymNet_Reset_MatchesGymnasium(long seed) {
-            using var pair = new GymPair(PyGymEnv.Make("CartPole-v1"), new GymNetEnv(new CartPoleEnv(NullEnvViewer.Factory)), stateAttribute: "state");
+            using var pair = new GymPair(PyGymEnv.Make("CartPole-v1"), new GymNetEnv(new CartPoleEnv()), stateAttribute: "state");
             pair.Reset(seed);
         }
 
@@ -145,7 +144,7 @@ namespace Gym.Tests.Parity.Tests.Envs {
         [DataRow(1234L)]
         public void GymNet_Episode_MatchesGymnasium(long seed) {
             SkipOffReferencePlatform("CartPole's cos/sin");
-            using var pair = new GymPair(PyGymEnv.Make("CartPole-v1"), new GymNetEnv(new CartPoleEnv(NullEnvViewer.Factory)), stateAttribute: "state");
+            using var pair = new GymPair(PyGymEnv.Make("CartPole-v1"), new GymNetEnv(new CartPoleEnv()), stateAttribute: "state");
             PairRun run = pair.Run(seed, ActionSources.Policy("cartpole_balance"), maxSteps: 500);
             Assert.AreEqual(500, run.Steps);
         }
@@ -163,7 +162,7 @@ namespace Gym.Tests.Parity.Tests.Envs {
         [DataRow(2026L)]
         public void GymNet_RandomEpisodes_MatchGymnasium(long seed) {
             SkipOffReferencePlatform("CartPole's cos/sin");
-            using var pair = new GymPair(PyGymEnv.Make("CartPole-v1"), new GymNetEnv(new CartPoleEnv(NullEnvViewer.Factory)), stateAttribute: "state");
+            using var pair = new GymPair(PyGymEnv.Make("CartPole-v1"), new GymNetEnv(new CartPoleEnv()), stateAttribute: "state");
             PairRun run = pair.Run(seed, ActionSources.Sampled(seed), maxSteps: 500);
             Assert.IsTrue(run.Ended, "Random actions must topple the pole.");
             StepPastTermination(pair, 5);
@@ -176,7 +175,7 @@ namespace Gym.Tests.Parity.Tests.Envs {
         [TestMethod]
         public void GymNet_ThroughAndPastTermination_MatchesGymnasium() {
             SkipOffReferencePlatform("CartPole's cos/sin");
-            using var pair = new GymPair(PyGymEnv.Make("CartPole-v1"), new GymNetEnv(new CartPoleEnv(NullEnvViewer.Factory)), stateAttribute: "state");
+            using var pair = new GymPair(PyGymEnv.Make("CartPole-v1"), new GymNetEnv(new CartPoleEnv()), stateAttribute: "state");
             PairRun run = pair.Run(3, ActionSources.Constant(1), maxSteps: 500);
             Assert.IsTrue(run.Ended);
             for (int i = 0; i < 5; i++) {
@@ -194,7 +193,7 @@ namespace Gym.Tests.Parity.Tests.Envs {
         public void GymNet_SuttonBartoReward_MatchesGymnasium() {
             SkipOffReferencePlatform("CartPole's cos/sin");
             var kwargs = new Dictionary<string, object?> { ["sutton_barto_reward"] = true };
-            using var pair = new GymPair(PyGymEnv.Make("CartPole-v1", kwargs), new GymNetEnv(new CartPoleEnv(NullEnvViewer.Factory, null, suttonBartoReward: true)), stateAttribute: "state");
+            using var pair = new GymPair(PyGymEnv.Make("CartPole-v1", kwargs), new GymNetEnv(new CartPoleEnv(suttonBartoReward: true)), stateAttribute: "state");
             PairRun run = pair.Run(5, ActionSources.Constant(0), maxSteps: 500);
             Assert.IsTrue(run.Ended);
             StepPastTermination(pair, 5);
@@ -209,7 +208,7 @@ namespace Gym.Tests.Parity.Tests.Envs {
             SkipOffReferencePlatform("CartPole's cos/sin");
             PyGymEnv python = PyGymEnv.Make("CartPole-v1");
             python.WithUnwrapped(env => Python.gymnasium.envs.classic_control.cartpole.CartPoleEnv.kinematics_integrator(env, "semi-implicit"));
-            var cartPole = new CartPoleEnv(NullEnvViewer.Factory) { KinematicsIntegrator = "semi-implicit" };
+            var cartPole = new CartPoleEnv { KinematicsIntegrator = "semi-implicit" };
             using var pair = new GymPair(python, new GymNetEnv(cartPole), stateAttribute: "state");
             pair.Run(42, ActionSources.Policy("cartpole_balance"), maxSteps: 500);
         }
@@ -220,7 +219,7 @@ namespace Gym.Tests.Parity.Tests.Envs {
             SkipOffReferencePlatform("CartPole's cos/sin");
             PyGymEnv python = PyGymEnv.Make("CartPole-v1");
             python.WithUnwrapped(env => Python.gymnasium.envs.classic_control.cartpole.CartPoleEnv.tau(env, 0.05));
-            var cartPole = new CartPoleEnv(NullEnvViewer.Factory) { Tau = 0.05 };
+            var cartPole = new CartPoleEnv { Tau = 0.05 };
             using var pair = new GymPair(python, new GymNetEnv(cartPole), stateAttribute: "state");
             pair.Run(7, ActionSources.Sampled(7), maxSteps: 500);
         }
@@ -232,7 +231,7 @@ namespace Gym.Tests.Parity.Tests.Envs {
         [TestMethod]
         public void GymNet_Dynamics_MatchGymnasium_FromAnInjectedState() {
             SkipOffReferencePlatform("CartPole's cos/sin");
-            using var pair = new GymPair(PyGymEnv.Make("CartPole-v1"), new GymNetEnv(new CartPoleEnv(NullEnvViewer.Factory)), stateAttribute: "state");
+            using var pair = new GymPair(PyGymEnv.Make("CartPole-v1"), new GymNetEnv(new CartPoleEnv()), stateAttribute: "state");
             pair.InjectState("state", 0.01, -0.02, 0.03, 0.04);
             for (int i = 0; i < 51; i++) {
                 using var action = ParityAction.Discrete((i / 3) % 2);
@@ -241,7 +240,7 @@ namespace Gym.Tests.Parity.Tests.Envs {
         }
 
         /// <summary>
-        ///     <c>reset(seed=..., options=...)</c> against Gym.NET's <see cref="CartPoleEnv.Reset(long?, IReadOnlyDictionary{string, object})"/>
+        ///     <c>reset(seed=..., options=...)</c> against Gym.NET's <see cref="CartPoleEnv.Reset(BigInteger?, IReadOnlyDictionary{string, object})"/>
         ///     for every case of <see cref="ResetOptions"/>, seeded and unseeded: the observation and info, or the exception
         ///     (<c>ValueError</c> for rejected options, <c>OverflowError</c> from the generator or an unconvertible int), then
         ///     the float64 state and the generator state, which a failed reset leaves freshly seeded and undrawn.
@@ -252,7 +251,7 @@ namespace Gym.Tests.Parity.Tests.Envs {
                 using PyObject made = Python.gymnasium.make("CartPole-v1");
                 return Python.gymnasium.Env.unwrapped(made);
             });
-            var dotnet = new CartPoleEnv(NullEnvViewer.Factory);
+            var dotnet = new CartPoleEnv();
             long seed = 100;
             foreach ((string text, Dictionary<string, object?> options) in ResetOptions) {
                 foreach (bool seeded in new[] { true, false }) {
@@ -317,7 +316,8 @@ namespace Gym.Tests.Parity.Tests.Envs {
                 return Python.gymnasium.Env.unwrapped(made);
             });
             Outcome.CapturePython(() => Python.gymnasium.Env.reset(python.Object, 0)).Expect("reset(seed=0)");
-            var dotnet = new CartPoleEnv(NullEnvViewer.Factory);
+            var dotnet = new CartPoleEnv();
+            IEnv untyped = dotnet;
             dotnet.Reset(0L).Observation.Dispose();
 
             foreach ((string text, Func<PyObject> gymnasium, Func<object?> value) in cases) {
@@ -326,7 +326,7 @@ namespace Gym.Tests.Parity.Tests.Envs {
                     return Python.gymnasium.Env.step(python.Object, action);
                 });
                 Assert.IsNotNull(pythonStep.Raised, $"Gymnasium must reject step({text}).");
-                ByteContract.AssertSame($"step({text})", pythonStep, Outcome.Capture(() => dotnet.Step(value()!)));
+                ByteContract.AssertSame($"step({text})", pythonStep, Outcome.Capture(() => untyped.Step(value())));
             }
         }
 
@@ -347,7 +347,7 @@ namespace Gym.Tests.Parity.Tests.Envs {
                     using PyObject made = Python.gymnasium.make("CartPole-v1");
                     return Python.gymnasium.Env.unwrapped(made);
                 });
-                var dotnet = new CartPoleEnv(NullEnvViewer.Factory);
+                IEnv dotnet = new CartPoleEnv();
                 Outcome pythonStep = Outcome.CapturePython(() => {
                     using PyObject action = gymnasium();
                     return Python.gymnasium.Env.step(python.Object, action);
@@ -367,7 +367,7 @@ namespace Gym.Tests.Parity.Tests.Envs {
                 using PyObject made = Python.gymnasium.make("CartPole-v1");
                 return Python.gymnasium.Env.unwrapped(made);
             });
-            var dotnet = new CartPoleEnv(NullEnvViewer.Factory);
+            var dotnet = new CartPoleEnv();
             Outcome.CapturePython(() => Python.gymnasium.Env.reset(python.Object, 3)).Expect("reset(seed=3)");
             dotnet.Reset(3L).Observation.Dispose();
 
@@ -379,7 +379,7 @@ namespace Gym.Tests.Parity.Tests.Envs {
                     return Python.gymnasium.Env.step(python.Object, action);
                 }).Expect("step(1)");
                 terminated = step.Items[2].Boolean;
-                Assert.AreEqual(terminated, dotnet.Step(1L).Done, "Both sides must terminate on the same step.");
+                Assert.AreEqual(terminated, dotnet.Step(1L).Terminated, "Both sides must terminate on the same step.");
             }
 
             const string stepsAfterTermination =
@@ -411,7 +411,7 @@ namespace Gym.Tests.Parity.Tests.Envs {
         [DataRow(2)]
         public void GymNet_Frame_MatchesGymnasium(int state) {
             SkipOffReferencePlatform("the pole's rotation (cos/sin)");
-            using var pair = new GymPair(PyGymEnv.Make("CartPole-v1", renderMode: "rgb_array"), new GymNetEnv(new CartPoleEnv(NullEnvViewer.Factory)), stateAttribute: "state");
+            using var pair = new GymPair(PyGymEnv.Make("CartPole-v1", renderMode: "rgb_array"), new GymNetEnv(new CartPoleEnv(renderMode: "rgb_array")), stateAttribute: "state");
             pair.InjectState("state", FrameStates[state]);
             pair.CompareFrame($"state {state}");
         }
@@ -426,9 +426,9 @@ namespace Gym.Tests.Parity.Tests.Envs {
         [DataRow(42L)]
         public void GymNet_FramesAlongEpisodes_MatchGymnasium(long seed) {
             SkipOffReferencePlatform("CartPole's cos/sin");
-            using (var pair = new GymPair(PyGymEnv.Make("CartPole-v1", renderMode: "rgb_array"), new GymNetEnv(new CartPoleEnv(NullEnvViewer.Factory)), stateAttribute: "state"))
+            using (var pair = new GymPair(PyGymEnv.Make("CartPole-v1", renderMode: "rgb_array"), new GymNetEnv(new CartPoleEnv(renderMode: "rgb_array")), stateAttribute: "state"))
                 pair.Run(seed, ActionSources.Policy("cartpole_balance"), maxSteps: 500, frameEvery: 10);
-            using (var pair = new GymPair(PyGymEnv.Make("CartPole-v1", renderMode: "rgb_array"), new GymNetEnv(new CartPoleEnv(NullEnvViewer.Factory)), stateAttribute: "state"))
+            using (var pair = new GymPair(PyGymEnv.Make("CartPole-v1", renderMode: "rgb_array"), new GymNetEnv(new CartPoleEnv(renderMode: "rgb_array")), stateAttribute: "state"))
                 pair.Run(seed, ActionSources.Sampled(seed), maxSteps: 500, frameEvery: 1);
         }
 
@@ -441,7 +441,7 @@ namespace Gym.Tests.Parity.Tests.Envs {
             SkipOffReferencePlatform("the pole's rotation (cos/sin)");
             foreach (double[] state in ExtremeStates) {
                 using PyGymEnv python = PyGymEnv.Make("CartPole-v1", renderMode: "rgb_array");
-                var dotnet = new CartPoleEnv(NullEnvViewer.Factory);
+                var dotnet = new CartPoleEnv(renderMode: "rgb_array");
                 python.SetAttribute("state", state);
                 dotnet.State = (double[])state.Clone();
                 string what = $"render() at state [{string.Join(", ", state.Select(v => PyBuiltins.FloatRepr(v)))}]";
@@ -449,11 +449,11 @@ namespace Gym.Tests.Parity.Tests.Envs {
             }
         }
 
-        /// <summary><c>render()</c> before any reset returns <c>None</c>; Gym.NET returns <see langword="null"/>.</summary>
+        /// <summary><c>render()</c> before any reset returns <c>None</c>; Gym.NET returns <see cref="RenderResult.None"/>.</summary>
         [TestMethod]
         public void GymNet_RenderBeforeReset_ReturnsNone() {
             using PyGymEnv python = PyGymEnv.Make("CartPole-v1", renderMode: "rgb_array");
-            var dotnet = new CartPoleEnv(NullEnvViewer.Factory);
+            var dotnet = new CartPoleEnv(renderMode: "rgb_array");
             RenderOutcome pythonOutcome = python.TryRender();
             Assert.IsTrue(pythonOutcome.ReturnedNone, $"Gymnasium's render() before reset returned {pythonOutcome}.");
             RenderOutcome.AssertSame("render() before reset", pythonOutcome, RenderOutcome.Capture(() => RenderGymNet(dotnet)));
@@ -463,7 +463,7 @@ namespace Gym.Tests.Parity.Tests.Envs {
         [TestMethod]
         public void GymNet_ObservationSpace_MatchesGymnasium() {
             using PyRef python = PyRef.Of(() => MadeSpace("CartPole-v1", Python.gymnasium.Env.observation_space));
-            var space = (Box)new CartPoleEnv(NullEnvViewer.Factory).ObservationSpace;
+            var space = (Box)new CartPoleEnv().ObservationSpace;
             ByteContract.AssertSame("CartPole observation_space.high", Outcome.CapturePython(() => Python.gymnasium.spaces.box.Box.high(python.Object)), Outcome.Returned(ValueFacts.Of(space.High)));
             ByteContract.AssertSame("CartPole observation_space.low", Outcome.CapturePython(() => Python.gymnasium.spaces.box.Box.low(python.Object)), Outcome.Returned(ValueFacts.Of(space.Low)));
             ByteContract.AssertSame("CartPole observation_space.bounded_above", Outcome.CapturePython(() => Python.gymnasium.spaces.box.Box.bounded_above(python.Object)), Outcome.Returned(ValueFacts.Of(space.BoundedHigh)));
@@ -479,7 +479,7 @@ namespace Gym.Tests.Parity.Tests.Envs {
         [TestMethod]
         public void GymNet_ActionSpace_MatchesGymnasium() {
             using PyRef python = PyRef.Of(() => MadeSpace("CartPole-v1", Python.gymnasium.Env.action_space));
-            var space = (Discrete)new CartPoleEnv(NullEnvViewer.Factory).ActionSpace;
+            var space = (Discrete)new CartPoleEnv().ActionSpace;
             ByteContract.AssertSame("CartPole action_space.n", Outcome.CapturePython(() => Python.gymnasium.spaces.discrete.Discrete.n(python.Object)), Outcome.Returned(ValueFacts.Of(space.N)));
             ByteContract.AssertSame("CartPole action_space.start", Outcome.CapturePython(() => Python.gymnasium.spaces.discrete.Discrete.start(python.Object)), Outcome.Returned(ValueFacts.Of(space.Start)));
             ByteContract.AssertSame("CartPole action_space.dtype", Outcome.CapturePython(() => Python.gymnasium.spaces.space.Space.dtype(python.Object)), Outcome.Returned(ValueFacts.Of(space.DType)));
@@ -499,7 +499,7 @@ namespace Gym.Tests.Parity.Tests.Envs {
                 using PyObject unwrapped = Python.gymnasium.Env.unwrapped(made);
                 return Python.gymnasium.Env.metadata(unwrapped);
             });
-            ByteContract.AssertSame("CartPole metadata", python, Outcome.Returned(ValueFacts.Of(new CartPoleEnv(NullEnvViewer.Factory).Metadata)));
+            ByteContract.AssertSame("CartPole metadata", python, Outcome.Returned(ValueFacts.Of(new CartPoleEnv().Metadata)));
         }
 
         /// <summary>
@@ -537,12 +537,21 @@ namespace Gym.Tests.Parity.Tests.Envs {
             return ValueFacts.Of(state);
         }
 
-        /// <summary>Gym.NET's <c>render("rgb_array")</c> as a frame, or <see langword="null"/> when it returned none.</summary>
-        /// <param name="env">The env.</param>
+        /// <summary>Gym.NET's <c>render()</c> of an <c>rgb_array</c> env as a frame, or <see langword="null"/> when it returned <c>None</c>.</summary>
+        /// <param name="env">The env, built with <c>render_mode="rgb_array"</c>.</param>
         /// <returns>The frame, or <see langword="null"/>.</returns>
+        /// <exception cref="InvalidOperationException">Thrown when the rendering is neither a frame nor <c>None</c>.</exception>
         private static Frame? RenderGymNet(CartPoleEnv env) {
-            using Image? image = env.Render("rgb_array");
-            return image is null ? null : Frame.FromImage(image);
+            switch (env.Render()) {
+                case RenderResult.NoneResult:
+                    return null;
+                case RenderResult.Rgb rgb: {
+                    using NDArray frame = rgb.Frame;
+                    return new Frame((int)frame.shape[0], (int)frame.shape[1], frame.ToArray<byte>());
+                }
+                case var other:
+                    throw new InvalidOperationException($"CartPole in rgb_array mode rendered {other}.");
+            }
         }
     }
 }

@@ -150,6 +150,113 @@ namespace Gym.Tests.Parity {
                 using PyObject function = PythonRuntime.Builtins.GetAttr("repr");
                 return function.Invoke(x);
             }
+
+            /// <summary><c>str(x)</c>: the informal text, which for an env is <c>Env.__str__</c> (<c>&lt;TimeLimit&lt;...&gt;&gt;</c>).</summary>
+            /// <param name="x">The value; stays owned by the caller.</param>
+            /// <returns>A new owned reference to the <c>str</c>.</returns>
+            /// <exception cref="PythonException">Thrown when <c>str()</c> raises.</exception>
+            internal static PyObject str(PyObject x) {
+                using PyObject function = PythonRuntime.Builtins.GetAttr("str");
+                return function.Invoke(x);
+            }
+
+            /// <summary><c>getattr(obj, name)</c>: plain attribute access (<c>env.gravity</c>), which a wrapper does not forward.</summary>
+            /// <param name="obj">The object; stays owned by the caller.</param>
+            /// <param name="name">The attribute.</param>
+            /// <returns>A new owned reference to the value.</returns>
+            /// <exception cref="PythonException">Thrown when the object has no such attribute (<c>AttributeError</c>).</exception>
+            internal static PyObject getattr(PyObject obj, string name) {
+                using PyObject function = PythonRuntime.Builtins.GetAttr("getattr");
+                using var attribute = new PyString(name);
+                return function.Invoke(obj, attribute);
+            }
+
+            /// <summary><c>setattr(obj, name, value)</c>: plain attribute assignment (<c>env.gravity = 5.0</c>).</summary>
+            /// <param name="obj">The object; stays owned by the caller.</param>
+            /// <param name="name">The attribute.</param>
+            /// <param name="value">The value; stays owned by the caller.</param>
+            /// <returns>A new owned reference to <c>None</c>, so the call can be captured like any other.</returns>
+            /// <exception cref="PythonException">Thrown when the assignment raises (a property without a setter).</exception>
+            internal static PyObject setattr(PyObject obj, string name, PyObject value) {
+                using PyObject function = PythonRuntime.Builtins.GetAttr("setattr");
+                using var attribute = new PyString(name);
+                return function.Invoke(obj, attribute, value);
+            }
+
+            /// <summary><c>divmod(a, b)</c>: <c>(a // b, a % b)</c>.</summary>
+            /// <param name="a">The dividend; stays owned by the caller.</param>
+            /// <param name="b">The divisor; stays owned by the caller.</param>
+            /// <returns>A new owned reference to the pair.</returns>
+            /// <exception cref="PythonException">Thrown for a zero divisor (<c>ZeroDivisionError</c>).</exception>
+            internal static PyObject divmod(PyObject a, PyObject b) {
+                using PyObject function = PythonRuntime.Builtins.GetAttr("divmod");
+                return function.Invoke(a, b);
+            }
+
+            /// <summary><c>round(x)</c>: the nearest int, ties to even.</summary>
+            /// <param name="x">The number; stays owned by the caller.</param>
+            /// <returns>A new owned reference to the int.</returns>
+            /// <exception cref="PythonException">Thrown for NaN (<c>ValueError</c>) and the infinities (<c>OverflowError</c>).</exception>
+            internal static PyObject round(PyObject x) {
+                using PyObject function = PythonRuntime.Builtins.GetAttr("round");
+                return function.Invoke(x);
+            }
+
+            /// <summary><c>round(x, ndigits)</c>: the float rounded to <paramref name="ndigits"/> decimal places.</summary>
+            /// <param name="x">The number; stays owned by the caller.</param>
+            /// <param name="ndigits">The number of places; stays owned by the caller.</param>
+            /// <returns>A new owned reference to the float.</returns>
+            /// <exception cref="PythonException">Thrown when the result overflows (<c>OverflowError</c>).</exception>
+            internal static PyObject round(PyObject x, PyObject ndigits) {
+                using PyObject function = PythonRuntime.Builtins.GetAttr("round");
+                return function.Invoke(x, ndigits);
+            }
+
+            /// <summary><c>min(a, b)</c>.</summary>
+            /// <param name="a">The first value; stays owned by the caller.</param>
+            /// <param name="b">The second value; stays owned by the caller.</param>
+            /// <returns>A new owned reference to the one Python picks.</returns>
+            /// <exception cref="PythonException">Thrown when the values cannot be compared.</exception>
+            internal static PyObject min(PyObject a, PyObject b) {
+                using PyObject function = PythonRuntime.Builtins.GetAttr("min");
+                return function.Invoke(a, b);
+            }
+
+            /// <summary><c>max(a, b)</c>.</summary>
+            /// <param name="a">The first value; stays owned by the caller.</param>
+            /// <param name="b">The second value; stays owned by the caller.</param>
+            /// <returns>A new owned reference to the one Python picks.</returns>
+            /// <exception cref="PythonException">Thrown when the values cannot be compared.</exception>
+            internal static PyObject max(PyObject a, PyObject b) {
+                using PyObject function = PythonRuntime.Builtins.GetAttr("max");
+                return function.Invoke(a, b);
+            }
+        }
+
+        /// <summary><c>import operator</c>: Python's operators as functions, so <c>a // b</c> and <c>a % b</c> are facade rows.</summary>
+        internal static class @operator {
+            /// <summary>The cached module; never dispose it.</summary>
+            private static PyObject Module => PythonRuntime.Import("operator");
+
+            /// <summary><c>operator.floordiv(a, b)</c>, Python's <c>a // b</c>.</summary>
+            /// <param name="a">The dividend; stays owned by the caller.</param>
+            /// <param name="b">The divisor; stays owned by the caller.</param>
+            /// <returns>A new owned reference to the quotient.</returns>
+            /// <exception cref="PythonException">Thrown for a zero divisor (<c>ZeroDivisionError</c>).</exception>
+            internal static PyObject floordiv(PyObject a, PyObject b) {
+                using PyObject function = Module.GetAttr("floordiv");
+                return function.Invoke(a, b);
+            }
+
+            /// <summary><c>operator.mod(a, b)</c>, Python's <c>a % b</c>.</summary>
+            /// <param name="a">The dividend; stays owned by the caller.</param>
+            /// <param name="b">The divisor; stays owned by the caller.</param>
+            /// <returns>A new owned reference to the remainder.</returns>
+            /// <exception cref="PythonException">Thrown for a zero divisor (<c>ZeroDivisionError</c>).</exception>
+            internal static PyObject mod(PyObject a, PyObject b) {
+                using PyObject function = Module.GetAttr("mod");
+                return function.Invoke(a, b);
+            }
         }
 
         /// <summary><c>import numpy as np</c>: the few NumPy calls the suite makes directly (arrays cross through NumSharp's interop).</summary>
@@ -233,6 +340,26 @@ namespace Gym.Tests.Parity {
             /// <exception cref="PythonException">Thrown when the call fails.</exception>
             internal static PyObject atleast_1d(PyObject x) {
                 using PyObject function = Module.GetAttr("atleast_1d");
+                return function.Invoke(x);
+            }
+
+            /// <summary><c>np.clip(a, a_min, a_max)</c>.</summary>
+            /// <param name="a">The value; stays owned by the caller.</param>
+            /// <param name="a_min">The lower bound; stays owned by the caller.</param>
+            /// <param name="a_max">The upper bound; stays owned by the caller.</param>
+            /// <returns>A new owned reference: a NumPy scalar for scalar arguments.</returns>
+            /// <exception cref="PythonException">Thrown when the call fails.</exception>
+            internal static PyObject clip(PyObject a, PyObject a_min, PyObject a_max) {
+                using PyObject function = Module.GetAttr("clip");
+                return function.Invoke(a, a_min, a_max);
+            }
+
+            /// <summary><c>np.sign(x)</c>.</summary>
+            /// <param name="x">The value; stays owned by the caller.</param>
+            /// <returns>A new owned reference: a NumPy scalar for a scalar argument.</returns>
+            /// <exception cref="PythonException">Thrown when the call fails.</exception>
+            internal static PyObject sign(PyObject x) {
+                using PyObject function = Module.GetAttr("sign");
                 return function.Invoke(x);
             }
 
@@ -526,6 +653,115 @@ namespace Gym.Tests.Parity {
                 /// <returns>A new owned reference.</returns>
                 /// <exception cref="PythonException">Thrown when the attribute lookup fails.</exception>
                 internal static PyObject np_random(PyObject env) => env.GetAttr("np_random");
+
+                /// <summary><c>env.np_random = value</c>: after it, <c>np_random_seed</c> is -1.</summary>
+                /// <param name="env">The env.</param>
+                /// <param name="value">The generator; stays owned by the caller (the env keeps its own reference).</param>
+                /// <exception cref="PythonException">Thrown when the assignment fails.</exception>
+                internal static void np_random(PyObject env, PyObject value) => env.SetAttr("np_random", value);
+
+                /// <summary><c>env.np_random_seed</c>. Like <c>np_random</c>, reading it creates a generator when none exists.</summary>
+                /// <param name="env">The env.</param>
+                /// <returns>A new owned reference to the int.</returns>
+                /// <exception cref="PythonException">Thrown when the attribute lookup fails.</exception>
+                internal static PyObject np_random_seed(PyObject env) => env.GetAttr("np_random_seed");
+
+                /// <summary><c>env.spec</c>: the env's spec, or for a wrapper its env's extended with the wrapper.</summary>
+                /// <param name="env">The env.</param>
+                /// <returns>A new owned reference to the <c>EnvSpec</c>, or <c>None</c>.</returns>
+                /// <exception cref="PythonException">Thrown when computing the spec raises.</exception>
+                internal static PyObject spec(PyObject env) => env.GetAttr("spec");
+
+                /// <summary><c>env.spec = value</c>, what <c>make</c> does to the unwrapped env.</summary>
+                /// <param name="env">The env (a wrapper refuses: its <c>spec</c> has no setter).</param>
+                /// <param name="value">The spec; stays owned by the caller.</param>
+                /// <exception cref="PythonException">Thrown when the assignment raises.</exception>
+                internal static void spec(PyObject env, PyObject value) => env.SetAttr("spec", value);
+
+                /// <summary><c>env.render_mode</c>.</summary>
+                /// <param name="env">The env.</param>
+                /// <returns>A new owned reference to the <c>str</c>, or <c>None</c>.</returns>
+                /// <exception cref="PythonException">Thrown when the attribute lookup fails.</exception>
+                internal static PyObject render_mode(PyObject env) => env.GetAttr("render_mode");
+
+                /// <summary><c>env.has_wrapper_attr(name)</c>.</summary>
+                /// <param name="env">The env.</param>
+                /// <param name="name">The attribute.</param>
+                /// <returns>A new owned reference to the bool.</returns>
+                /// <exception cref="PythonException">Thrown when the call raises.</exception>
+                internal static PyObject has_wrapper_attr(PyObject env, string name) {
+                    using PyObject method = env.GetAttr("has_wrapper_attr");
+                    using var attribute = new PyString(name);
+                    return method.Invoke(attribute);
+                }
+
+                /// <summary><c>env.get_wrapper_attr(name)</c>.</summary>
+                /// <param name="env">The env.</param>
+                /// <param name="name">The attribute.</param>
+                /// <returns>A new owned reference to the value.</returns>
+                /// <exception cref="PythonException">Thrown when no layer has the attribute (<c>AttributeError</c>).</exception>
+                internal static PyObject get_wrapper_attr(PyObject env, string name) {
+                    using PyObject method = env.GetAttr("get_wrapper_attr");
+                    using var attribute = new PyString(name);
+                    return method.Invoke(attribute);
+                }
+
+                /// <summary><c>env.set_wrapper_attr(name, value, force=force)</c>.</summary>
+                /// <param name="env">The env.</param>
+                /// <param name="name">The attribute.</param>
+                /// <param name="value">The value; stays owned by the caller.</param>
+                /// <param name="force">Create the attribute on the outermost layer when no layer has it.</param>
+                /// <returns>A new owned reference to the bool: whether a layer was assigned.</returns>
+                /// <exception cref="PythonException">Thrown when the assignment raises.</exception>
+                internal static PyObject set_wrapper_attr(PyObject env, string name, PyObject value, bool force = true) {
+                    using PyObject method = env.GetAttr("set_wrapper_attr");
+                    using var attribute = new PyString(name);
+                    using var arguments = new PyDict();
+                    using PyObject forceValue = force.ToPython();
+                    arguments["force"] = forceValue;
+                    return method.Invoke(new[] { attribute, value }, arguments);
+                }
+            }
+
+            /// <summary><c>gymnasium.wrappers</c>: the wrapper constructors (their members live in <c>gymnasium.wrappers.common</c>).</summary>
+            internal static class wrappers {
+                /// <summary>The cached module; never dispose it.</summary>
+                private static PyObject Module => PythonRuntime.Import("gymnasium.wrappers");
+
+                /// <summary><c>wrappers.TimeLimit(env, max_episode_steps)</c>.</summary>
+                /// <param name="env">The env; the wrapper keeps its own reference.</param>
+                /// <param name="max_episode_steps">The limit, any Python value (<c>None</c> and negatives are refused); stays owned by the caller.</param>
+                /// <returns>A new owned reference to the wrapper.</returns>
+                /// <exception cref="PythonException">Thrown for a limit that is not a positive int (<c>TypeError</c>, <c>ValueError</c>).</exception>
+                internal static PyObject TimeLimit(PyObject env, PyObject max_episode_steps) {
+                    using PyObject constructor = Module.GetAttr("TimeLimit");
+                    return constructor.Invoke(env, max_episode_steps);
+                }
+
+                /// <summary><c>wrappers.OrderEnforcing(env, disable_render_order_enforcing=...)</c>.</summary>
+                /// <param name="env">The env; the wrapper keeps its own reference.</param>
+                /// <param name="disable_render_order_enforcing">Allow <c>render()</c> before the first reset.</param>
+                /// <returns>A new owned reference to the wrapper.</returns>
+                /// <exception cref="PythonException">Thrown when the construction fails.</exception>
+                internal static PyObject OrderEnforcing(PyObject env, bool disable_render_order_enforcing = false) {
+                    using PyObject constructor = Module.GetAttr("OrderEnforcing");
+                    using var arguments = new PyDict();
+                    using PyObject flag = disable_render_order_enforcing.ToPython();
+                    arguments["disable_render_order_enforcing"] = flag;
+                    return constructor.Invoke(new[] { env }, arguments);
+                }
+
+                /// <summary><c>gymnasium.wrappers.common</c>, where the common wrappers are defined.</summary>
+                internal static class common {
+                    /// <summary><c>OrderEnforcing</c> instance members.</summary>
+                    internal static class OrderEnforcing {
+                        /// <summary><c>env.has_reset</c>.</summary>
+                        /// <param name="env">The wrapper.</param>
+                        /// <returns>A new owned reference to the bool.</returns>
+                        /// <exception cref="PythonException">Thrown when the attribute lookup fails.</exception>
+                        internal static PyObject has_reset(PyObject env) => env.GetAttr("has_reset");
+                    }
+                }
             }
 
             /// <summary><c>gymnasium.spaces</c>.</summary>
@@ -733,12 +969,121 @@ namespace Gym.Tests.Parity {
                         return seed is null ? function.Invoke() : function.Invoke(seed);
                     }
                 }
+
+                /// <summary><c>gymnasium.utils.step_api_compatibility</c>: conversions between the done and terminated/truncated step APIs.</summary>
+                internal static class step_api_compatibility {
+                    /// <summary>The cached module; never dispose it.</summary>
+                    private static PyObject Module => PythonRuntime.Import("gymnasium.utils.step_api_compatibility");
+
+                    /// <summary><c>convert_to_done_step_api(step_returns)</c> for a single env.</summary>
+                    /// <param name="step_returns">A 5-tuple (or a 4-tuple, passed through); stays owned by the caller, and its info is edited in place.</param>
+                    /// <returns>A new owned reference to the 4-tuple.</returns>
+                    /// <exception cref="PythonException">Thrown when the conversion raises.</exception>
+                    internal static PyObject convert_to_done_step_api(PyObject step_returns) {
+                        using PyObject function = Module.GetAttr("convert_to_done_step_api");
+                        return function.Invoke(step_returns);
+                    }
+
+                    /// <summary><c>convert_to_terminated_truncated_step_api(step_returns)</c> for a single env.</summary>
+                    /// <param name="step_returns">A 4-tuple (or a 5-tuple, passed through); stays owned by the caller, and its info is edited in place.</param>
+                    /// <returns>A new owned reference to the 5-tuple.</returns>
+                    /// <exception cref="PythonException">Thrown when the conversion raises.</exception>
+                    internal static PyObject convert_to_terminated_truncated_step_api(PyObject step_returns) {
+                        using PyObject function = Module.GetAttr("convert_to_terminated_truncated_step_api");
+                        return function.Invoke(step_returns);
+                    }
+                }
             }
 
             /// <summary><c>gymnasium.envs</c>, the env families.</summary>
             internal static class envs {
+                /// <summary><c>gymnasium.envs.registration</c>: the id grammar and the spec dataclasses.</summary>
+                internal static class registration {
+                    /// <summary>The cached module; never dispose it.</summary>
+                    private static PyObject Module => PythonRuntime.Import("gymnasium.envs.registration");
+
+                    /// <summary><c>parse_env_id(env_id)</c>.</summary>
+                    /// <param name="env_id">The id.</param>
+                    /// <returns>A new owned reference to <c>(namespace, name, version)</c>.</returns>
+                    /// <exception cref="PythonException">Thrown for a malformed id (<c>gymnasium.error.Error</c>).</exception>
+                    internal static PyObject parse_env_id(string env_id) {
+                        using PyObject function = Module.GetAttr("parse_env_id");
+                        using var id = new PyString(env_id);
+                        return function.Invoke(id);
+                    }
+
+                    /// <summary><c>get_env_id(ns, name, version)</c>.</summary>
+                    /// <param name="ns">The namespace, or <see langword="null"/>.</param>
+                    /// <param name="name">The name.</param>
+                    /// <param name="version">The version, or <see langword="null"/>.</param>
+                    /// <returns>A new owned reference to the id.</returns>
+                    /// <exception cref="PythonException">Thrown when the call fails.</exception>
+                    internal static PyObject get_env_id(string? ns, string name, long? version) {
+                        using PyObject function = Module.GetAttr("get_env_id");
+                        using PyObject nsValue = Oracle.PyConvert.ToPython(ns);
+                        using var nameValue = new PyString(name);
+                        using PyObject versionValue = Oracle.PyConvert.ToPython(version);
+                        return function.Invoke(nsValue, nameValue, versionValue);
+                    }
+
+                    /// <summary><c>WrapperSpec(name, entry_point, kwargs)</c>.</summary>
+                    /// <param name="name">The wrapper's class name.</param>
+                    /// <param name="entry_point">Its location.</param>
+                    /// <param name="kwargs">Its arguments (a dict) or <c>None</c>; stays owned by the caller.</param>
+                    /// <returns>A new owned reference to the dataclass.</returns>
+                    /// <exception cref="PythonException">Thrown when the construction fails.</exception>
+                    internal static PyObject WrapperSpec(string name, string entry_point, PyObject kwargs) {
+                        using PyObject constructor = Module.GetAttr("WrapperSpec");
+                        using var nameValue = new PyString(name);
+                        using var entryPoint = new PyString(entry_point);
+                        return constructor.Invoke(nameValue, entryPoint, kwargs);
+                    }
+
+                    /// <summary>
+                    ///     <c>EnvSpec</c> instance members. The constructor, kwarg-heavy, is a snippet
+                    ///     (<see cref="evalStmts"/>) in the cells that build specs.
+                    /// </summary>
+                    internal static class EnvSpec {
+                        /// <summary><c>spec.pprint(disable_print=True, include_entry_points=..., print_all=...)</c>.</summary>
+                        /// <param name="spec">The spec.</param>
+                        /// <param name="include_entry_points">Also print the entry points.</param>
+                        /// <param name="print_all">Print every field, defaults included.</param>
+                        /// <returns>A new owned reference to the text (<c>disable_print=True</c> returns it).</returns>
+                        /// <exception cref="PythonException">Thrown when printing fails.</exception>
+                        internal static PyObject pprint(PyObject spec, bool include_entry_points = false, bool print_all = false) {
+                            using PyObject method = spec.GetAttr("pprint");
+                            using var arguments = new PyDict();
+                            using PyObject disable = true.ToPython();
+                            using PyObject entryPoints = include_entry_points.ToPython();
+                            using PyObject all = print_all.ToPython();
+                            arguments["disable_print"] = disable;
+                            arguments["include_entry_points"] = entryPoints;
+                            arguments["print_all"] = all;
+                            return method.Invoke(Array.Empty<PyObject>(), arguments);
+                        }
+                    }
+                }
+
                 /// <summary><c>gymnasium.envs.classic_control</c>.</summary>
                 internal static class classic_control {
+                    /// <summary>
+                    ///     <c>classic_control.CartPoleEnv(sutton_barto_reward=..., render_mode=...)</c>: the bare env, as its constructor
+                    ///     builds it (no spec, no wrappers); its members are under <c>classic_control.cartpole.CartPoleEnv</c>.
+                    /// </summary>
+                    /// <param name="render_mode">The render mode, or <see langword="null"/>.</param>
+                    /// <param name="sutton_barto_reward">Sutton and Barto's reward scheme.</param>
+                    /// <returns>A new owned reference to the env.</returns>
+                    /// <exception cref="PythonException">Thrown when the construction fails.</exception>
+                    internal static PyObject CartPoleEnv(string? render_mode = null, bool sutton_barto_reward = false) {
+                        using PyObject constructor = PythonRuntime.Import("gymnasium.envs.classic_control").GetAttr("CartPoleEnv");
+                        using var arguments = new PyDict();
+                        using PyObject mode = Oracle.PyConvert.ToPython(render_mode);
+                        using PyObject reward = sutton_barto_reward.ToPython();
+                        arguments["render_mode"] = mode;
+                        arguments["sutton_barto_reward"] = reward;
+                        return constructor.Invoke(Array.Empty<PyObject>(), arguments);
+                    }
+
                     /// <summary><c>gymnasium.envs.classic_control.cartpole</c>.</summary>
                     internal static class cartpole {
                         /// <summary><c>CartPoleEnv</c> instance attributes (on the unwrapped env).</summary>

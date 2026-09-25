@@ -135,9 +135,12 @@ namespace Gym.Tests.Parity.Oracle {
             // NumSharp throws .NET's own OverflowException for NumPy's OverflowError ("high - low range exceeds valid
             // bounds"), so Gym.NET does the same for Gymnasium's and pygame's, and one Python type keeps one .NET type.
             ["OverflowError"] = "System.OverflowException",
-            // Not in NumSharp: the port plan puts them in Gym.Exceptions (D17), where the ports will define them.
+            // .NET's own counterpart, which PyMath throws with Python's messages, as OverflowError maps to OverflowException.
+            ["ZeroDivisionError"] = "System.DivideByZeroException",
+            // Not in NumSharp: the port plan puts them in Gym.Exceptions (D17), where the ports define them.
             ["AssertionError"] = "Gym.Exceptions.AssertionError",
             ["NotImplementedError"] = "Gym.Exceptions.NotImplementedError",
+            ["ImportError"] = "Gym.Exceptions.ImportError",
         };
 
         /// <summary>The .NET type a Python exception type must correspond to.</summary>

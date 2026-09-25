@@ -1,7 +1,10 @@
 #nullable enable
 using System;
+using System.Collections;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Numerics;
+using System.Runtime.CompilerServices;
 using System.Text;
 using NumSharp;
 
@@ -19,6 +22,8 @@ namespace Gym.Utils {
     ///     <c>float32</c>/<c>float16</c> scalars (Python has no such built-in). A 0-d <see cref="NDArray"/> is the NumPy scalar
     ///     of its dtype (<c>np.int64(3)</c>), because NumSharp has no scalar types and Gym.NET returns 0-d arrays where
     ///     Gymnasium returns NumPy scalars (<c>Discrete.sample()</c>); any other <see cref="NDArray"/> is an <c>ndarray</c>.
+    ///     A dictionary (<see cref="IDictionary"/>, or string-keyed pairs such as <see cref="Gym.Envs.Info"/>) is a
+    ///     <c>dict</c>, a <see cref="ITuple"/> a <c>tuple</c>, and a .NET array or other <see cref="IList"/> a <c>list</c>.
     ///     Other .NET objects have no Python counterpart: they print through <see cref="object.ToString"/> and their .NET type
     ///     name.
     ///     </para>
@@ -110,7 +115,75 @@ namespace Gym.Utils {
                 case NDArray array:
                     return array.ndim == 0 ? NumpyScalarRepr(array) : np.array_repr(array);
                 default:
-                    return IntegerText(value) ?? value.ToString() ?? "";
+                    return IntegerText(value) ?? ContainerRepr(value) ?? value.ToString() ?? "";
+            }
+        }
+
+        /// <summary>
+        ///     Python's <c>repr</c> of a container's counterpart: a dictionary (<see cref="IDictionary"/>, or any sequence of
+        ///     string-keyed pairs such as <see cref="Gym.Envs.Info"/>) as a <c>dict</c>, <c>{'render_fps': 50}</c>; a
+        ///     <see cref="ITuple"/> as a <c>tuple</c>, <c>(1, 2)</c> or <c>(1,)</c>; an <see cref="IList"/> (a .NET array or
+        ///     list) as a <c>list</c>, <c>['human', 'rgb_array']</c>. Items print through <see cref="Repr"/>, recursively.
+        /// </summary>
+        /// <param name="value">A value that is not a string, a number or an array (those are handled before).</param>
+        /// <returns>The text, or <see langword="null"/> when the value is not one of these containers.</returns>
+        /// <remarks>
+        ///     Other enumerables (sets, lazy sequences) are left to <see cref="object.ToString"/>: enumerating an arbitrary
+        ///     sequence to print it could be unbounded or have side effects. A container that holds itself recurses without
+        ///     end; Python prints <c>{...}</c> there, which no Gymnasium message relies on.
+        /// </remarks>
+        private static string? ContainerRepr(object value) {
+            switch (value) {
+                case IDictionary dictionary: {
+                    var text = new StringBuilder("{");
+                    bool first = true;
+                    foreach (DictionaryEntry entry in dictionary) {
+                        if (!first)
+                            text.Append(", ");
+                        first = false;
+                        text.Append(Repr(entry.Key)).Append(": ").Append(Repr(entry.Value));
+                    }
+
+                    return text.Append('}').ToString();
+                }
+                case IEnumerable<KeyValuePair<string, object?>> pairs: {
+                    // Info and other generic string-keyed maps that are not a non-generic IDictionary.
+                    var text = new StringBuilder("{");
+                    bool first = true;
+                    foreach (KeyValuePair<string, object?> pair in pairs) {
+                        if (!first)
+                            text.Append(", ");
+                        first = false;
+                        text.Append(StrRepr(pair.Key)).Append(": ").Append(Repr(pair.Value));
+                    }
+
+                    return text.Append('}').ToString();
+                }
+                case ITuple tuple: {
+                    var text = new StringBuilder("(");
+                    for (int i = 0; i < tuple.Length; i++) {
+                        if (i > 0)
+                            text.Append(", ");
+                        text.Append(Repr(tuple[i]));
+                    }
+
+                    // A one-element tuple keeps its trailing comma, as Python prints (1,).
+                    if (tuple.Length == 1)
+                        text.Append(',');
+                    return text.Append(')').ToString();
+                }
+                case IList list: {
+                    var text = new StringBuilder("[");
+                    for (int i = 0; i < list.Count; i++) {
+                        if (i > 0)
+                            text.Append(", ");
+                        text.Append(Repr(list[i]));
+                    }
+
+                    return text.Append(']').ToString();
+                }
+                default:
+                    return null;
             }
         }
 
@@ -269,6 +342,13 @@ namespace Gym.Utils {
                     return "str";
                 case NDArray array:
                     return array.ndim == 0 && NumpyScalarName(array) is { } name ? $"numpy.{name}" : "numpy.ndarray";
+                case IDictionary or IEnumerable<KeyValuePair<string, object?>>:
+                    // The containers ContainerRepr prints as Python's built-ins are named like them.
+                    return "dict";
+                case ITuple:
+                    return "tuple";
+                case IList:
+                    return "list";
                 default:
                     return IntegerText(value) != null ? "int" : value.GetType().FullName ?? value.GetType().Name;
             }

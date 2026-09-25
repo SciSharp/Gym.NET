@@ -17,14 +17,17 @@ The repository is structured around the `Gym.NET.sln` solution:
 ```
 refs/Gym.NET/
 ├── src/
-│   ├── Gym/                       # Core abstractions, spaces, vector environments, threading
-│   │   ├── Envs/                  # IEnv, Env, GoalEnv, VecEnv, DummyVecEnv, VecEnvWrapper
+│   ├── Gym/                       # Core API (port of gymnasium/core.py), spaces, wrappers, utilities, legacy shim
+│   │   ├── Envs/                  # IEnv, Env<TObs, TAct>, Wrapper family (+ IWrapper), Info, Metadata, RenderResult, EnvExtensions (StepAsync)
+│   │   │   └── Registration/      # EnvSpec, WrapperSpec, EnvCreator, EnvRegistry (parse_env_id/get_env_id; make & registry in P3)
 │   │   ├── Spaces/                # Space (base), Box (bounded/continuous), Discrete
-│   │   ├── Observations/          # Step (Observation, Reward, Done, Information)
-│   │   ├── Internal/              # Dict, CircularQueue, DistributedScheduler, Threading
-│   │   ├── Utils/                 # Seeding (PCG64), PyBuiltins (Python float/int/repr semantics), Warnings
+│   │   ├── Observations/          # StepResult<TObs> (5-tuple), ResetResult<TObs>, DoneStepResult<TObs> (pre-0.26 4-tuple)
+│   │   ├── Wrappers/              # Common.cs: TimeLimit, OrderEnforcing (port of gymnasium/wrappers/common.py)
+│   │   ├── Legacy/                # [Obsolete] pre-0.26 API: Step, ILegacyEnv, LegacyEnvAdapter, VecEnv family
+│   │   ├── Internal/              # Dict (legacy info type), CircularQueue, Dynamic/Merging/Reflection helpers
+│   │   ├── Utils/                 # Seeding (PCG64), PyBuiltins, PyMath (F3), PyAttributes, PyEquality, PyCopy, StepApiCompatibility, RecordConstructorArgs, Warnings
 │   │   ├── Logger.cs              # Port of gymnasium.logger (colourised warnings, Python's default filters)
-│   │   └── Exceptions/            # Error, AssertionError, InvalidActionError, AlreadySteppingError, NotSteppingError
+│   │   └── Exceptions/            # Every gymnasium.error class (Error, ResetNeeded, ...), AssertionError, NotImplementedError, ImportError; legacy InvalidActionError etc.
 │   │
 │   ├── Gym.Rendering/             # pygame-compatible rasterizer: Surface, GfxDraw (SDL_gfx 2.0.26 port), Transform, SurfArray, Vector2
 │   ├── Gym.Environments/          # Concrete environment implementations
@@ -50,15 +53,16 @@ refs/Gym.NET/
 
 ### Core Design Patterns & Mechanisms
 
-- **Environment Contract (`IEnv` / `Env`):** Standard RL lifecycle methods:
-  - `NDArray Reset()`: Resets the state and returns the initial observation.
-  - `Step Step(object action)`: Steps environment dynamics; returns `(Observation, Reward, Done, Information)`.
-  - `Image Render(string mode = "human")`: Generates/renders frame via `SixLabors.ImageSharp`.
-  - `void Seed(long seed)`: Seeds the env's generator with Gymnasium's seeding, `Generator(PCG64(SeedSequence(seed)))` (`Gym.Utils.Seeding.NpRandom`); any non-negative seed, as in Gymnasium.
-  - `void CloseEnvironment()` / `Dispose()`: Releases rendering and physics resources.
-- **Pluggable Viewer Architecture:** Environments accept an `IEnvironmentViewerFactoryDelegate` allowing execution in headless mode (`NullEnvViewer.Factory`) or interactive GUI mode (`AvaloniaEnvViewer.Factory`, `WinFormEnvViewer.Factory`).
-- **Vectorized Environments (`IVecEnv` / `VecEnv` / `DummyVecEnv`):** Synchronous/asynchronous batch stepping across multiple parallel environment instances.
-- **Observation & Action Spaces:** Strongly-typed bounds checking and random sampling via `Box` (multi-dimensional continuous floats/bounds) and `Discrete` (categorical integer actions).
+- **Environment Contract (`Env<TObs, TAct>` / `IEnv`), Gymnasium's since the core-API port (P1):**
+  - `ResetResult<TObs> Reset(BigInteger? seed = null, options = null)`: `(obs, info)`; a seed reseeds `NpRandom` with Gymnasium's `Generator(PCG64(SeedSequence(seed)))`, `null` keeps the stream. Implementations start with `SeedNpRandom(seed)`, the port of `super().reset(seed=seed)`.
+  - `StepResult<TObs> Step(TAct action)`: `(obs, reward (float64), terminated, truncated, info)`; `IEnv.Step(object)` converts untyped actions (`ConvertAction`).
+  - `RenderResult Render()`: per the `render_mode` fixed at construction (`RenderResult.Rgb` for `rgb_array`; `human` renders inside reset/step and returns `None`).
+  - `NpRandom` (lazy, entropy-seeded on first use) / `NpRandomSeed` (-1 once a generator is assigned), `Metadata`, `Spec`, `Unwrapped`, `Close()` / `Dispose()`.
+  - Python attributes by Python name: `HasWrapperAttr`/`GetWrapperAttr`/`SetWrapperAttr` and `Gym.Utils.PyAttributes` (`[PyName("_x")]` or snake_case of the property).
+- **Wrappers:** `Wrapper<TWObs, TWAct, TObs, TAct>` (and `Wrapper<TObs, TAct>`) forward to `Env`; `ObservationWrapper`, `RewardWrapper`, `ActionWrapper` add the hooks; `TimeLimit` and `OrderEnforcing` live in `Gym.Wrappers`. Until `make` lands (P3), build its stack by hand: `new TimeLimit<NDArray, long>(new OrderEnforcing<NDArray, long>(new CartPoleEnv()), 500)`.
+- **Pluggable Viewer Architecture:** Environments accept an `IEnvironmentViewerFactoryDelegate` used for `render_mode="human"` (`NullEnvViewer.Factory` headless, `AvaloniaEnvViewer.Factory`, `WinFormEnvViewer.Factory`); human frames are paced by `Gym.Rendering.Clock` at `metadata["render_fps"]`.
+- **Legacy API (`Gym.Legacy`, `[Obsolete]`):** `LegacyEnvAdapter` exposes a ported env through the pre-0.26 4-tuple API (`Seed(s)` + `Reset()` is `Reset(seed: s)`); the baselines-style `IVecEnv` / `VecEnv` / `DummyVecEnv` work over `ILegacyEnv` until `gymnasium.vector` (P6).
+- **Observation & Action Spaces:** Strongly-typed bounds checking and random sampling via `Box` (multi-dimensional continuous floats/bounds) and `Discrete` (categorical integer actions); `Seed(BigInteger)`.
 
 ---
 

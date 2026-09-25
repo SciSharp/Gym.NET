@@ -1,101 +1,324 @@
-﻿using System;
-using System.Threading.Tasks;
-using Gym.Collections;
+#nullable enable
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Numerics;
+using Gym.Envs.Registration;
+using Gym.Exceptions;
 using Gym.Observations;
 using Gym.Spaces;
-using Gym.Threading;
+using Gym.Utils;
 using NumSharp;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
 
-// ReSharper disable once CheckNamespace
 namespace Gym.Envs {
-    public abstract class Env : IDisposable, IEnv {
-        public Dict Metadata { get; set; }
-        public (float From, float To) RewardRange { get; set; }
+    /// <summary>
+    ///     Port of <c>gymnasium.Env</c> (<c>gymnasium/core.py:25</c> @ 9e04324), the base class of every environment: an MDP
+    ///     driven through <see cref="Step"/> and <see cref="Reset"/>, with spaces, metadata, a render mode, a lazily created
+    ///     generator and Gymnasium's attribute protocol (<see cref="GetWrapperAttr"/>, ...).
+    /// </summary>
+    /// <typeparam name="TObs">The observation type: <see cref="NDArray"/> for <c>Box</c> spaces, <see langword="long"/> for <c>Discrete</c> (port plan §6.1).</typeparam>
+    /// <typeparam name="TAct">The action type, likewise.</typeparam>
+    /// <remarks>
+    ///     <para>
+    ///     Implementing an env: set <see cref="ActionSpace"/>, <see cref="ObservationSpace"/> and, when it renders,
+    ///     <see cref="Metadata"/> and <see cref="RenderMode"/> in the constructor; begin <see cref="Reset"/> with
+    ///     <see cref="SeedNpRandom"/>, the port of <c>super().reset(seed=seed)</c>, and draw every random number from
+    ///     <see cref="NpRandom"/>. Skipping the seeding call breaks reproducibility, which every parity test relies on.
+    ///     </para>
+    ///     <para>
+    ///     Python attributes map to properties (port plan §3.8), which Gymnasium's attribute functions reach by their Python
+    ///     names through <see cref="PyAttributes"/>: <c>np_random_seed</c> is <see cref="NpRandomSeed"/>, and non-public
+    ///     state carries <see cref="PyNameAttribute"/> (<c>_np_random</c>). Like a Python instance, an env also holds
+    ///     attributes created at run time (<c>set_wrapper_attr(name, value, force=True)</c>, <c>env.x = 1</c> through
+    ///     <see cref="PyAttributes.SetAttr"/>).
+    ///     </para>
+    ///     <para>
+    ///     Deviations that follow from C#: <see cref="Metadata"/> is per instance (Python's class attribute is shared by every
+    ///     instance of the class, so mutating one env's changed all of them); spaces are the non-generic <see cref="Space"/>
+    ///     until the spaces port (P2) makes them <c>Space&lt;T&gt;</c>.
+    ///     </para>
+    /// </remarks>
+    public abstract class Env<TObs, TAct> : IEnv, IDynamicAttributes {
+        /// <summary>The metadata; a fresh <c>{"render_modes": []}</c> until the env assigns its own.</summary>
+        private Metadata _metadata = new() { [Metadata.RenderModesKey] = new List<string>() };
 
-        public Space ActionSpace { get; set; }
-        public Space ObservationSpace { get; set; }
+        /// <summary>The action space, <see langword="null"/> while unset (reading it then raises <see cref="AttributeError"/>).</summary>
+        private Space? _actionSpace;
 
-        public abstract NDArray Reset();
-        public abstract Step Step(object action);
+        /// <summary>The observation space, <see langword="null"/> while unset.</summary>
+        private Space? _observationSpace;
 
-        public virtual Task<Step> StepAsync(object action) {
-            return DistributedScheduler.Default.Run(() => Step(action));
-        }
+        /// <summary>Python's <c>_np_random</c>: <see langword="null"/> until first used or seeded.</summary>
+        private Generator? _npRandom;
 
-        public abstract Image Render(string mode = "human");
-        public abstract void CloseEnvironment();
+        /// <summary>Python's <c>_np_random_seed</c>: <see langword="null"/> until first used or seeded, -1 once a generator was assigned.</summary>
+        private BigInteger? _npRandomSeed;
+
+        /// <summary>The attributes created at run time, allocated on first use.</summary>
+        private Info? _dynamicAttributes;
 
         /// <summary>
-        ///     Reseeds the env's generator, so the episodes that follow are reproducible; see <see cref="IEnv.Seed"/>.
+        ///     The metadata (<c>metadata</c>), with Python key spelling: <c>{"render_modes": ["human", "rgb_array"],
+        ///     "render_fps": 50}</c>. Defaults to <c>{"render_modes": []}</c>, as <c>Env.metadata</c> does.
         /// </summary>
-        /// <param name="seed">Any non-negative seed.</param>
-        /// <exception cref="Gym.Exceptions.Error">Thrown when <paramref name="seed"/> is negative, with Gymnasium's message.</exception>
-        /// <remarks>This took an <see cref="int"/> before the migration to NumSharp master; overrides must now take <see langword="long"/>.</remarks>
-        public abstract void Seed(long seed);
-
-        /// <summary>
-        ///     Returns unwrapped version of current environment.
-        /// </summary>
-        protected virtual Env Unwrapped() {
-            return this;
+        /// <exception cref="ArgumentNullException">Thrown when assigning <see langword="null"/>.</exception>
+        public virtual Metadata Metadata {
+            get => _metadata;
+            set => _metadata = value ?? throw new ArgumentNullException(nameof(value));
         }
 
+        /// <summary>
+        ///     The render mode given to the constructor (<c>render_mode</c>), <see langword="null"/> (the default) when the env
+        ///     should not render. Fixed for the env's life: rendering another way means building another env.
+        /// </summary>
+        public virtual string? RenderMode { get; protected set; }
+
+        /// <summary>The spec <c>make</c> attached (<c>spec</c>), or <see langword="null"/> (the default) for an env built with its constructor.</summary>
+        public virtual EnvSpec? Spec { get; set; }
+
+        /// <summary>The space every action must belong to (<c>action_space</c>); the env sets it in its constructor.</summary>
+        /// <exception cref="AttributeError">
+        ///     Thrown by the getter while unset, as reading Python's annotated-only attribute does
+        ///     (<c>'GenericTestEnv' object has no attribute 'action_space'</c>).
+        /// </exception>
+        public virtual Space ActionSpace {
+            get => _actionSpace ?? throw MissingAttribute("action_space");
+            set => _actionSpace = value;
+        }
+
+        /// <summary>The space every observation belongs to (<c>observation_space</c>); the env sets it in its constructor.</summary>
+        /// <exception cref="AttributeError">Thrown by the getter while unset.</exception>
+        public virtual Space ObservationSpace {
+            get => _observationSpace ?? throw MissingAttribute("observation_space");
+            set => _observationSpace = value;
+        }
+
+        /// <summary>
+        ///     The env's generator (<c>np_random</c>). The first read creates one from OS entropy, as Gymnasium does, which is
+        ///     why an unseeded env still draws reproducibly within itself; a seeded <see cref="Reset"/> replaces it. Assigning a
+        ///     generator shares it deliberately and makes <see cref="NpRandomSeed"/> -1, because a generator's seed cannot be
+        ///     recovered.
+        /// </summary>
+        public virtual Generator NpRandom {
+            get {
+                if (_npRandom is null)
+                    (_npRandom, _npRandomSeed) = Seeding.NpRandom();
+                return _npRandom;
+            }
+            set {
+                _npRandom = value;
+                // Setting a numpy rng with -1 would cause a ValueError, which marks the seed as unknown.
+                _npRandomSeed = -1;
+            }
+        }
+
+        /// <summary>
+        ///     The seed of <see cref="NpRandom"/> (<c>np_random_seed</c>): the seed of the last seeded reset, the 128-bit
+        ///     entropy of an entropy-seeded generator (created by this read if none exists yet), or -1 after a generator was
+        ///     assigned. Read-only: Python raises <see cref="AttributeError"/> on assignment, and
+        ///     <see cref="PyAttributes.SetAttr"/> does too.
+        /// </summary>
+        public virtual BigInteger NpRandomSeed {
+            get {
+                if (_npRandomSeed is null)
+                    (_npRandom, _npRandomSeed) = Seeding.NpRandom();
+                return _npRandomSeed.Value;
+            }
+        }
+
+        /// <summary>The innermost env (<c>unwrapped</c>): the env itself; wrappers override it to walk down their stack.</summary>
+        public virtual IEnv Unwrapped => this;
+
+        /// <summary>
+        ///     Python's <c>_np_random</c>: the generator as it is, <see langword="null"/> before first use, without creating one.
+        ///     Gymnasium's tests read it to check laziness; a wrapper raises <see cref="AttributeError"/> instead.
+        /// </summary>
+        [PyName("_np_random")]
+        protected virtual Generator? RawNpRandom {
+            get => _npRandom;
+            set => _npRandom = value;
+        }
+
+        /// <summary>Python's <c>_np_random_seed</c>: the recorded seed as it is, <see langword="null"/> before first use.</summary>
+        [PyName("_np_random_seed")]
+        protected virtual BigInteger? RawNpRandomSeed {
+            get => _npRandomSeed;
+            set => _npRandomSeed = value;
+        }
+
+        /// <summary>The run-time attributes, Python's instance <c>__dict__</c> entries the class does not declare.</summary>
+        IDictionary<string, object?> IDynamicAttributes.DynamicAttributes => _dynamicAttributes ??= new Info();
+
+        /// <summary>
+        ///     Runs one timestep of the dynamics with <paramref name="action"/> (<c>step(action)</c>). Once the result is
+        ///     terminated or truncated, call <see cref="Reset"/> before stepping again.
+        /// </summary>
+        /// <param name="action">An element of <see cref="ActionSpace"/>.</param>
+        /// <returns>The observation, reward, <c>terminated</c>, <c>truncated</c> and info.</returns>
+        /// <exception cref="AssertionError">Thrown by ported envs for an invalid action or a step before the first reset, as their asserts are.</exception>
+        public abstract StepResult<TObs> Step(TAct action);
+
+        /// <summary>
+        ///     Starts an episode (<c>reset(seed=seed, options=options)</c>). Implementations call <see cref="SeedNpRandom"/>
+        ///     first, then draw the initial state from <see cref="NpRandom"/>.
+        /// </summary>
+        /// <param name="seed">
+        ///     Reseeds <see cref="NpRandom"/> with Gymnasium's <c>Generator(PCG64(SeedSequence(seed)))</c> when given (any
+        ///     non-negative integer); <see langword="null"/> keeps the current generator. Seed once, right after
+        ///     construction, then reset without a seed.
+        /// </param>
+        /// <param name="options">Env-specific reset options, or <see langword="null"/>.</param>
+        /// <returns>The first observation and the info.</returns>
+        /// <exception cref="Error">Thrown for a negative seed, with Gymnasium's message.</exception>
+        public abstract ResetResult<TObs> Reset(BigInteger? seed = null, IReadOnlyDictionary<string, object?>? options = null);
+
+        /// <summary>
+        ///     Renders as <see cref="RenderMode"/> says (<c>render()</c>): <c>rgb_array</c> returns a frame, <c>ansi</c> text,
+        ///     <c>human</c> draws to a window during <see cref="Step"/> and returns <see cref="RenderResult.None"/>. The base
+        ///     raises <see cref="NotImplementedError"/>, as <c>Env.render</c> does.
+        /// </summary>
+        /// <returns>The rendering.</returns>
+        /// <exception cref="NotImplementedError">Thrown unless the env overrides it.</exception>
+        public virtual RenderResult Render() => throw new NotImplementedError();
+
+        /// <summary>
+        ///     Releases what the env holds (<c>close()</c>): windows, native handles, connections. Calling it on a closed env
+        ///     does nothing more. The base holds nothing.
+        /// </summary>
+        public virtual void Close() { }
+
+        /// <summary>Calls <see cref="Close"/>, so <c>using</c> plays the role of Python's <c>with</c> statement (<c>__exit__</c>).</summary>
         public void Dispose() {
-            CloseEnvironment();
-        }
-    }
-
-    public abstract class Env<TAction> : Env where TAction : Enum {
-        /// <summary>
-        ///     Converts <paramref name="action"/> to <typeparamref name="TAction"/> and steps with it. Any integer width, a
-        ///     <typeparamref name="TAction"/> member, and the 0-d int64 array that <see cref="Discrete.Sample"/> returns are
-        ///     accepted.
-        /// </summary>
-        /// <param name="action">A boxed integer, a <typeparamref name="TAction"/> member, or a 0-d integer <see cref="NDArray"/>.</param>
-        /// <returns>The result of <see cref="Step(TAction)"/>.</returns>
-        /// <exception cref="ArgumentException">Thrown when <paramref name="action"/> does not denote an integer.</exception>
-        /// <exception cref="OverflowException">Thrown when an unsigned 64-bit action exceeds <see cref="long.MaxValue"/>.</exception>
-        public override Step Step(object action) {
-            return Step(ToAction(action));
+            Close();
+            GC.SuppressFinalize(this);
         }
 
         /// <summary>
-        ///     Steps on <see cref="DistributedScheduler.Default"/>. The conversion runs inside the scheduled work, so a bad
-        ///     action faults the returned task instead of throwing here.
+        ///     Port of <c>has_wrapper_attr</c>: whether this env has the Python attribute <paramref name="name"/> (Python's
+        ///     <c>hasattr</c>: declared members by Python name, then run-time attributes).
         /// </summary>
-        /// <param name="action">A boxed integer, a <typeparamref name="TAction"/> member, or a 0-d integer <see cref="NDArray"/>.</param>
-        /// <returns>A task that completes with the result of <see cref="Step(TAction)"/>.</returns>
-        public override Task<Step> StepAsync(object action) {
-            return DistributedScheduler.Default.Run(() => Step(ToAction(action)));
+        /// <param name="name">The attribute, in Python spelling.</param>
+        /// <returns><see langword="true"/> when reading it would succeed.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="name"/> is <see langword="null"/>.</exception>
+        public virtual bool HasWrapperAttr(string name) => PyAttributes.HasAttr(this, name);
+
+        /// <summary>Port of <c>get_wrapper_attr</c>: Python's <c>getattr(self, name)</c>.</summary>
+        /// <param name="name">The attribute, in Python spelling.</param>
+        /// <returns>The value, boxed.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="name"/> is <see langword="null"/>.</exception>
+        /// <exception cref="AttributeError">Thrown when the env has no such attribute (<c>'CartPoleEnv' object has no attribute 'x'</c>).</exception>
+        public virtual object? GetWrapperAttr(string name) => PyAttributes.GetAttr(this, name);
+
+        /// <summary>
+        ///     Port of <c>set_wrapper_attr</c> on an env: assigns the attribute when <paramref name="force"/> is set or the env
+        ///     has it, creating a run-time attribute for a new name.
+        /// </summary>
+        /// <param name="name">The attribute, in Python spelling.</param>
+        /// <param name="value">The value; numbers convert to a numeric attribute's type.</param>
+        /// <param name="force">Assign even when the env does not have the attribute yet.</param>
+        /// <returns><see langword="true"/> when the attribute was assigned.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="name"/> is <see langword="null"/>.</exception>
+        /// <exception cref="AttributeError">Thrown for a read-only attribute (<c>property 'np_random_seed' of 'CartPoleEnv' object has no setter</c>).</exception>
+        /// <exception cref="TypeError">Thrown when the value does not fit the attribute's type.</exception>
+        public virtual bool SetWrapperAttr(string name, object? value, bool force = true) {
+            if (force || PyAttributes.HasAttr(this, name)) {
+                PyAttributes.SetAttr(this, name, value);
+                return true;
+            }
+
+            return false;
         }
 
         /// <summary>
-        ///     Maps an untyped action to the enum member of the same underlying value, whatever the enum's underlying type.
+        ///     Port of <c>Env.__str__</c>: <c>&lt;CartPoleEnv instance&gt;</c> without a spec, <c>&lt;CartPoleEnv&lt;CartPole-v1&gt;&gt;</c>
+        ///     with one.
         /// </summary>
-        /// <param name="action">A boxed integer, a <typeparamref name="TAction"/> member, or a 0-d integer <see cref="NDArray"/>.</param>
-        /// <returns>The member of <typeparamref name="TAction"/> with that value; it need not be a named member.</returns>
-        /// <exception cref="ArgumentException">Thrown when <paramref name="action"/> does not denote an integer.</exception>
-        /// <exception cref="OverflowException">Thrown when an unsigned 64-bit action exceeds <see cref="long.MaxValue"/>.</exception>
+        /// <returns>The text Gymnasium prints, which wrapper descriptions embed.</returns>
+        public override string ToString() {
+            EnvSpec? spec = Spec;
+            string name = PyAttributes.PyTypeName(GetType());
+            return spec is null ? $"<{name} instance>" : $"<{name}<{spec.Id}>>";
+        }
+
+        /// <summary>
+        ///     The first line of every <see cref="Reset"/>, the port of <c>super().reset(seed=seed)</c>: reseeds
+        ///     <see cref="NpRandom"/> and records <see cref="NpRandomSeed"/> when a seed is given; without one, the generator,
+        ///     and with it the random stream, carries on.
+        /// </summary>
+        /// <param name="seed">The seed passed to <see cref="Reset"/>, or <see langword="null"/>.</param>
+        /// <exception cref="Error">Thrown for a negative seed: <c>Seed must be greater or equal to zero, actual value: -1</c>.</exception>
+        protected void SeedNpRandom(BigInteger? seed) {
+            // Initialize the RNG if the seed is manually passed.
+            if (seed is not null)
+                (_npRandom, _npRandomSeed) = Seeding.NpRandom(seed);
+        }
+
+        /// <summary>
+        ///     Converts an action given to the untyped <see cref="IEnv.Step"/> to <typeparamref name="TAct"/>: an instance of it
+        ///     as is; for an integer or enum action type, any .NET integer, <see langword="bool"/>, enum member or 0-d integer
+        ///     array (what <c>Discrete.Sample()</c> returns); for a floating-point action type, any number or 0-d array.
+        /// </summary>
+        /// <param name="action">The action as given.</param>
+        /// <returns>The typed action.</returns>
+        /// <exception cref="TypeError">Thrown when the action cannot denote a <typeparamref name="TAct"/>.</exception>
+        /// <exception cref="OverflowException">Thrown when an integer does not fit an integer action type.</exception>
         /// <remarks>
-        ///     Replaces <c>(TAction)(object)action</c>, which unboxes exactly (trap 1 of docs/plans/NUMSHARP_MIGRATION_PLAN.md
-        ///     §7): it threw <see cref="InvalidCastException"/> for a <see langword="long"/>, for a sampled action, and for any
-        ///     integer whose width differs from the enum's underlying type.
+        ///     Python has no such step: an env receives whatever it is given and validates it itself. Envs whose Python source
+        ///     asserts on the action override this to assert first, so an unconvertible action fails with the source's message
+        ///     (CartPole: <c>'x' (&lt;class 'str'&gt;) invalid</c>) rather than this one.
         /// </remarks>
-        private static TAction ToAction(object action) {
-            return (TAction) Enum.ToObject(typeof(TAction), Discrete.ToInt64(action));
+        protected virtual TAct ConvertAction(object? action) {
+            if (action is TAct typed)
+                return typed;
+            Type target = Nullable.GetUnderlyingType(typeof(TAct)) ?? typeof(TAct);
+            if (action is null) {
+                // null is None: fine for a reference or nullable action type, which the check above cannot match.
+                if (default(TAct) is null)
+                    return default!;
+            } else if (target.IsEnum) {
+                if (Discrete.TryToInt64(action, out long value))
+                    return (TAct)Enum.ToObject(target, value);
+            } else if (IsIntegerType(target)) {
+                if (Discrete.TryToInt64(action, out long value))
+                    return (TAct)Convert.ChangeType(value, target, CultureInfo.InvariantCulture);
+            } else if (target == typeof(double) || target == typeof(float)) {
+                if (action is not string && (action is IConvertible || action is NDArray { ndim: 0 })) {
+                    double real = PyBuiltins.Float(action);
+                    return (TAct)(target == typeof(float) ? (object)(float)real : real);
+                }
+            }
+
+            throw new TypeError($"{PyAttributes.PyTypeName(GetType())} takes actions of type {target.Name}, not {PyBuiltins.Repr(action)} ({PyBuiltins.TypeRepr(action)})");
         }
 
-        public abstract Step Step(TAction action);
-    }
-
-    public abstract class GoalEnv : Env {
-        public override NDArray Reset() {
-            //todo var result = base.Reset();
-            return null;
+        /// <summary>The untyped step: converts the action (<see cref="ConvertAction"/>), steps, and boxes the observation.</summary>
+        /// <param name="action">The action.</param>
+        /// <returns>The transition with its observation boxed.</returns>
+        StepResult<object?> IEnv.Step(object? action) {
+            StepResult<TObs> result = Step(ConvertAction(action));
+            return new StepResult<object?>(result.Observation, result.Reward, result.Terminated, result.Truncated, result.Info);
         }
 
-        public abstract object ComputeReward(object achievedGoal, object DesiredGoal, Dict info);
+        /// <summary>The untyped reset: resets and boxes the observation.</summary>
+        /// <param name="seed">The seed, or <see langword="null"/>.</param>
+        /// <param name="options">The options, or <see langword="null"/>.</param>
+        /// <returns>The first observation, boxed, and the info.</returns>
+        ResetResult<object?> IEnv.Reset(BigInteger? seed, IReadOnlyDictionary<string, object?>? options) {
+            ResetResult<TObs> result = Reset(seed, options);
+            return new ResetResult<object?>(result.Observation, result.Info);
+        }
+
+        /// <summary>The error Python raises for an attribute that was declared but never assigned.</summary>
+        /// <param name="name">The attribute.</param>
+        /// <returns>The error to throw: <c>'X' object has no attribute 'name'</c>.</returns>
+        private AttributeError MissingAttribute(string name) => new($"'{PyAttributes.PyTypeName(GetType())}' object has no attribute '{name}'");
+
+        /// <summary>Whether a type is one of .NET's integer primitives.</summary>
+        /// <param name="type">The type.</param>
+        /// <returns><see langword="true"/> for the signed and unsigned integers of every width.</returns>
+        private static bool IsIntegerType(Type type) {
+            return type == typeof(long) || type == typeof(int) || type == typeof(short) || type == typeof(sbyte) || type == typeof(ulong) || type == typeof(uint)
+                   || type == typeof(ushort) || type == typeof(byte);
+        }
     }
 }

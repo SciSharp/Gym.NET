@@ -217,7 +217,7 @@ namespace Gym.Spaces {
         /// <param name="seed">Any non-negative seed.</param>
         /// <exception cref="Error">Thrown when <paramref name="seed"/> is negative, with Gymnasium's message.</exception>
         /// <remarks>Gymnasium's <c>seed</c> also accepts no seed and returns the one it used; that shape of the API arrives with P2.</remarks>
-        public override void Seed(long seed) {
+        public override void Seed(System.Numerics.BigInteger seed) {
             NpRandom = Seeding.NpRandom(seed).Rng;
         }
 

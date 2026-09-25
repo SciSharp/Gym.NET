@@ -71,7 +71,7 @@ where `gymnasium` and `numpy` were imported from, and whether `refs/Gymnasium` h
 | `Outcome.CapturePython`, `PyRef`, `PyConvert` | `Oracle/Outcome.cs`, `Interop/PyRef.cs`, `Oracle/PyConvert.cs` | Run a tree call under the GIL and describe its result or its exception; hold a Python object across calls (released under the GIL); convert CLR arguments (`None`, ints of any width, floats, strings, `NDArray` as `ToNumpyCopy`, dicts, lists, tuples). |
 | `PyGymEnv` | `Oracle/PyGymEnv.cs` | A live Gymnasium env (`gymnasium.make(...)`, optionally `.unwrapped`), driven through the tree; the `cartpole_balance` policy (Python's float64 arithmetic) and Gymnasium's own `lunar_lander.heuristic`. |
 | `GymPair` | `Pair/GymPair.cs` | The lockstep runner (plan §5): same seed, same actions (`Pair/ParityAction.cs`), every call verified in a fixed field order, first divergence thrown as `ParityException` (`Pair/Divergence.cs`). |
-| `IDotNetEnv`, `GymNetEnv` | `Pair/IDotNetEnv.cs`, `Pair/GymNetEnv.cs` | The .NET half. `GymNetEnv` bridges Gym.NET's legacy API to Gymnasium's contract without touching a value (the bridge is printed in every report). |
+| `IDotNetEnv`, `GymNetEnv` | `Pair/IDotNetEnv.cs`, `Pair/GymNetEnv.cs` | The .NET half. `GymNetEnv` drives any Gym.NET env, bare or wrapped, through `IEnv`, Gymnasium's own contract (5-tuple, float64 reward, `(obs, info)` resets), so nothing is adapted; attributes go through the unwrapped env by Python name (`PyAttributes`). |
 | Action sources | `Pair/ActionSources.cs` | Open-loop, a Python policy on Gymnasium's own observations, or seeded sampling on both sides (samples compared before each step). |
 | `RngFacts`, `GeneratorProbe` | `Oracle/RngFacts.cs`, `Oracle/GeneratorProbe.cs` | A NumSharp `Generator`'s PCG64 state in NumPy's `bit_generator.state` shape; finds the generator of a Gym.NET env or space. |
 | `FrameDiff` | `Frames/FrameDiff.cs` | Pixel parity (plan §6): differing pixels, bounding box, max channel delta, delta histogram, and PNG artifacts. |
@@ -108,18 +108,21 @@ the returned `PyObject`), not a string: only a multi-statement program goes thro
 
 ```csharp
 using var pair = new GymPair(PyGymEnv.Make("CartPole-v1"),               // gymnasium.make(...).unwrapped
-                             new GymNetEnv(new CartPoleEnv(NullEnvViewer.Factory)),
+                             new GymNetEnv(new CartPoleEnv()),               // any IEnv, bare or wrapped
                              stateAttribute: "state");                     // also compare the float64 state
 PairRun run = pair.Run(seed, ActionSources.Policy("cartpole_balance"), maxSteps: 500, frameEvery: 0);
 ```
 
 State injection (one step of dynamics, isolated from reset and the generator): `pair.InjectState("state", 0.01, -0.02,
-0.03, 0.04)` then `pair.Step(ParityAction.Discrete(1))`. Frames: `PyGymEnv.Make(..., renderMode: "rgb_array")` and
-`pair.CompareFrame("label")`.
+0.03, 0.04)` then `pair.Step(ParityAction.Discrete(1))`. Frames: `PyGymEnv.Make(..., renderMode: "rgb_array")`, a Gym.NET env
+built with `renderMode: "rgb_array"` (the render mode is fixed at construction, as in Gymnasium), and
+`pair.CompareFrame("label")`. A wrapper stack: `PyGymEnv.Make(id, viaMake: true)` keeps `make`'s stack, compared with
+Gym.NET's `TimeLimit(OrderEnforcing(env))` until Gym.NET's own `make` (P3).
 
 ### Errors
 
-`Outcome` carries exceptions as data, so an error is a compared outcome, not a test failure:
+`Outcome` carries exceptions as data, so an error is a compared outcome, not a test failure (`ZeroDivisionError` maps to
+`System.DivideByZeroException`, as `OverflowError` maps to `System.OverflowException`):
 `Outcome.CapturePython(() => Python.gymnasium.utils.seeding.np_random(seed))` (with `seed` a `PyInt` of -1) against
 `Outcome.Capture(() => Seeding.NpRandom(-1))` passes when Gym.NET throws `Gym.Exceptions.Error` with Gymnasium's message. `ExceptionMap` holds the port plan's §3.4 mapping
 (`ValueError` → `NumSharp.ValueError`, `gymnasium.error.X` → `Gym.Exceptions.X`, `AssertionError` →
@@ -169,10 +172,12 @@ State injection (one step of dynamics, isolated from reset and the generator): `
 | CartPole-v1 | reference transcription: 4 seeds × 500 steps, and through termination. **The port, byte for byte:** reset; 4 × 500-step episodes of the balancing policy and 5 random-action episodes, each past termination; `sutton_barto_reward`; semi-implicit Euler; `tau = 0.05`; 51 steps from an injected state; 17 reset-option cases (seeded and unseeded, `ValueError`/`OverflowError` messages, state and generator after a failed reset); 13 invalid actions and 3 pre-reset steps (`AssertionError` messages); the post-termination warning (text, category, count); frames at A.9's states, along 4 episodes, at 20 extreme states (clipped, Sint16-wrapped, quarter-turn snapped, and pygame's NaN/overflow errors) and before reset (`None`); observation and action spaces; metadata | |
 | Rendering (`Gym.Rendering` vs pygame-ce 2.5.8) | `aapolygon`, `filled_polygon`, `aacircle`, `filled_circle` (150 random shapes each, clipping and translucency), `hline`/`vline`, compositions, Sint16 wrap-around polygons, CartPole's shapes, `transform.flip`, `Vector2.rotate_rad` bit for bit (NaN payloads included), pygame's argument errors | |
 | LunarLander-v3 | Gym.NET discrete action space | continuous action space (B-20); observation space (B-19); heuristic episodes, both variants (F6, P8, B-17, B-19) |
+| Core API (P1) | `make("CartPole-v1")`'s stack against `TimeLimit(OrderEnforcing(CartPoleEnv))` through truncation at step 500 (2 seeds); `OrderEnforcing` and `TimeLimit` call by call (`ResetNeeded`/`TypeError`/`ValueError` messages, `has_reset`, `_elapsed_steps`, truncation past the limit, `str`); the attribute protocol through a stack (plain `getattr`/`setattr`, `has/get/set_wrapper_attr`, run-time attributes, read-only properties, a wrapper's `_np_random`); `np_random`/`np_random_seed` (lazy, seeded, -1 once assigned, through a wrapper); `render()` without a render mode; `EnvSpec` repr and `pprint`; `parse_env_id`/`get_env_id`; the single-env step-API conversions; dict repr | |
+| `PyMath` (F3) | `//`, `%`, `divmod` on ints and floats, `min`/`max`, `round` with and without digits, `np.clip` (512 triples), `np.sign`, bit for bit against CPython 3.12 and NumPy 2.4.2 | |
 
 Not built yet (plan §8–§10): the reverse bridge (`check_env` on a Gym.NET env through a Python shim), the golden
-record/replay modes sharing these cases, differential fuzzing, and the wrapper, vector and registry areas, which wait for
-their ports (P1–P6).
+record/replay modes sharing these cases, differential fuzzing, and the remaining wrapper, vector and registry areas, which
+wait for their ports (P3–P6).
 
 ---
 

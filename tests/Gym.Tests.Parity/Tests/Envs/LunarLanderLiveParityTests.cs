@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using Gym.Environments;
 using Gym.Environments.Envs.Aether;
 using Gym.Spaces;
 using Gym.Tests.Parity.Interop;
@@ -27,7 +26,7 @@ namespace Gym.Tests.Parity.Tests.Envs {
         [TestMethod]
         public void GymNet_DiscreteActionSpace_MatchesGymnasium() {
             using PyRef python = PyRef.Of(() => CartPoleLiveParityTests.MadeSpace("LunarLander-v3", Python.gymnasium.Env.action_space));
-            var space = (Discrete)new LunarLanderEnv(NullEnvViewer.Factory).ActionSpace;
+            var space = (Discrete)new LunarLanderEnv().ActionSpace;
             ByteContract.AssertSame("LunarLander action_space.n", Outcome.CapturePython(() => Python.gymnasium.spaces.discrete.Discrete.n(python.Object)), Outcome.Returned(ValueFacts.Of(space.N)));
             ByteContract.AssertSame("LunarLander action_space.start", Outcome.CapturePython(() => Python.gymnasium.spaces.discrete.Discrete.start(python.Object)), Outcome.Returned(ValueFacts.Of(space.Start)));
             ByteContract.AssertSame("LunarLander action_space.dtype", Outcome.CapturePython(() => Python.gymnasium.spaces.space.Space.dtype(python.Object)), Outcome.Returned(ValueFacts.Of(space.DType)));
@@ -47,7 +46,7 @@ namespace Gym.Tests.Parity.Tests.Envs {
         public void GymNet_ContinuousActionSpace_MatchesGymnasium() {
             var kwargs = new Dictionary<string, object?> { ["continuous"] = true };
             using PyRef python = PyRef.Of(() => CartPoleLiveParityTests.MadeSpace("LunarLander-v3", Python.gymnasium.Env.action_space, kwargs));
-            var space = (Box)new LunarLanderEnv(NullEnvViewer.Factory, continuous: true).ActionSpace;
+            var space = (Box)new LunarLanderEnv(continuous: true).ActionSpace;
             ByteContract.AssertSame("LunarLanderContinuous action_space.shape", Outcome.CapturePython(() => Python.gymnasium.spaces.space.Space.shape(python.Object)), Outcome.Returned(Spaces.DiscreteLiveParityTests.ShapeFacts(space.Shape)));
             ByteContract.AssertSame("LunarLanderContinuous action_space.low", Outcome.CapturePython(() => Python.gymnasium.spaces.box.Box.low(python.Object)), Outcome.Returned(ValueFacts.Of(space.Low)));
             ByteContract.AssertSame("LunarLanderContinuous action_space.high", Outcome.CapturePython(() => Python.gymnasium.spaces.box.Box.high(python.Object)), Outcome.Returned(ValueFacts.Of(space.High)));
@@ -65,7 +64,7 @@ namespace Gym.Tests.Parity.Tests.Envs {
         public void GymNet_ObservationSpace_MatchesGymnasium(bool continuous) {
             var kwargs = new Dictionary<string, object?> { ["continuous"] = continuous };
             using PyRef python = PyRef.Of(() => CartPoleLiveParityTests.MadeSpace("LunarLander-v3", Python.gymnasium.Env.observation_space, kwargs));
-            var space = (Box)new LunarLanderEnv(NullEnvViewer.Factory, continuous: continuous).ObservationSpace;
+            var space = (Box)new LunarLanderEnv(continuous: continuous).ObservationSpace;
             ByteContract.AssertSame("LunarLander observation_space.low", Outcome.CapturePython(() => Python.gymnasium.spaces.box.Box.low(python.Object)), Outcome.Returned(ValueFacts.Of(space.Low)));
             ByteContract.AssertSame("LunarLander observation_space.high", Outcome.CapturePython(() => Python.gymnasium.spaces.box.Box.high(python.Object)), Outcome.Returned(ValueFacts.Of(space.High)));
         }
@@ -85,7 +84,7 @@ namespace Gym.Tests.Parity.Tests.Envs {
         [DataRow(true, 42L)]
         public void GymNet_HeuristicEpisode_MatchesGymnasium(bool continuous, long seed) {
             var kwargs = new Dictionary<string, object?> { ["continuous"] = continuous };
-            using var pair = new GymPair(PyGymEnv.Make("LunarLander-v3", kwargs), new GymNetEnv(new LunarLanderEnv(NullEnvViewer.Factory, continuous: continuous)));
+            using var pair = new GymPair(PyGymEnv.Make("LunarLander-v3", kwargs), new GymNetEnv(new LunarLanderEnv(continuous: continuous)));
             PairRun run = pair.Run(seed, ActionSources.Policy("lunar_lander_heuristic"), maxSteps: 1000);
             TestContext.WriteLine(run.ToString());
         }

@@ -887,6 +887,35 @@ Sizes are relative (S < M < L < XL). The phases in the second group can run in p
 
 A reasonable first release (2.0) is P0–P7: core, spaces, registry, wrappers, vector, classic_control and toy_text, all byte-perfect with pixel-perfect frames. Box2D and MuJoCo families follow in minor releases.
 
+**Progress.** **P1 is done** (2026-09-25). `tests/test_core.py` is ported (`tests/Gym.Tests/Ported/TestCore.cs`, with
+`testing_env.py`, `test_seeding.py`, `test_step_api_compatibility.py`'s single-env cases, `test_order_enforcing.py` and
+`test_time_limit.py`) and green on net8.0 and net10.0, and the live parity suite compares the core API with Gymnasium call
+by call (`Tests/Core/CoreLiveParityTests.cs`, `Tests/Utils/PyMathLiveParityTests.cs`). What landed:
+
+- `IEnv` and `Env<TObs, TAct>` (§6.3): lazy `NpRandom`/`NpRandomSeed` (-1 once assigned), `SeedNpRandom` as the port of
+  `super().reset(seed=seed)`, `Unwrapped`, `Spec`, `RenderMode`, `Metadata` (default `{"render_modes": []}`), `Close`/
+  `Dispose`, `__str__`, and the attribute protocol (`HasWrapperAttr`/`GetWrapperAttr`/`SetWrapperAttr`) on Python names
+  through `Gym.Utils.PyAttributes` (`[PyName]`, snake_case, run-time attributes, Python's `AttributeError` messages).
+- `Wrapper<TWObs, TWAct, TObs, TAct>` (and `Wrapper<TObs, TAct>`, `IWrapper`), `ObservationWrapper`, `RewardWrapper`,
+  `ActionWrapper`; spec propagation with `WrapperSpec` and `IRecordConstructorArgs`; `EnvSpec`/`WrapperSpec` with the id
+  grammar (`EnvRegistry.ParseEnvId`/`GetEnvId`), dataclass repr and `pprint`.
+- `StepResult<TObs>`, `ResetResult<TObs>`, `DoneStepResult<TObs>`; `Info` (a Python dict: insertion order, `KeyError`,
+  Python `==` through `PyEquality`, `repr`); `Metadata`; `RenderResult` (`None`, `Rgb`, `Depth`, `RgbDepth`, `Ansi`,
+  `Frames`, so `ansi_list` has a home too).
+- Every class of `error.py` (§3.4); `NotImplementedError` and `ImportError` in `Gym.Exceptions`; `Logger` (done earlier);
+  seeding (F2, done earlier); `PyMath` (F3: `FloorDiv`, `Mod`, `DivMod`, `Min`, `Max`, `Clip`, `Round`, `Sign`,
+  `Float32`, bit-exact with CPython and NumPy); `PyCopy` (`deepcopy`); `StepApiCompatibility` (single env).
+- Pulled forward from P3 because `test_core.py` needs them: `TimeLimit` and `OrderEnforcing` (`Gym.Wrappers`). `make`,
+  `PassiveEnvChecker` and the registry stay in P3; tests build `make`'s stack by hand until then.
+- CartPole and LunarLander run on `Env<TObs, TAct>`: `render_mode` at construction, human mode rendered during `reset`/
+  `step` and paced by `Gym.Rendering.Clock` (pygame's `Clock.tick`), `rgb_array` frames as `RenderResult.Rgb`.
+- The pre-0.26 API moved to `Gym.Legacy` (§16): `Step`, `ILegacyEnv`, `LegacyEnvAdapter` (built on
+  `StepApiCompatibility`), and the baselines-style `VecEnv` family, all `[Obsolete]`. `GoalEnv` and the
+  `DistributedScheduler` threading are deleted; `StepAsync` is a `Task.Run` extension.
+
+Open ends P1 leaves on purpose: spaces stay the non-generic `Space` until P2 (`Space<T>`), and `Metadata.AutoresetMode`
+arrives with the vector API's `AutoresetMode` (P6).
+
 ---
 
 ## 18. External contributions
@@ -1146,7 +1175,7 @@ gated cell of the live parity suite (`tests/Gym.Tests.Parity`, `CartPoleLivePari
 | B-12 | `CartPoleEnv.cs:46` | `float.MaxValue` bounds instead of `inf` (changes `Box` boundedness) | Source read | P4; **fixed** 2026-09-25 (`GymNet_ObservationSpace_MatchesGymnasium`) |
 | B-13 | `CartPoleEnv.cs:185` | Returns the internal float64 state (aliased) instead of a float32 copy | A.7 | P4; **fixed** 2026-09-25: `State` float64, observations fresh float32 copies (`GymNet_Reset_MatchesGymnasium`) |
 | B-14 | `CartPoleEnv.cs:139` | Action validation is `Debug.Assert` only; Release treats any non-1 action as "push left" | Source read | P4; **fixed** 2026-09-25: `AssertionError` with Python's message (`GymNet_InvalidActions_RaiseGymnasiumsAssertion`) |
-| B-15 | `CartPoleEnv.cs:49` | Unseeded `RandomState()` fallback | A.3 | P4; **fixed** 2026-09-25 (`c141717`): a per-instance entropy-seeded PCG64 generator; Gymnasium's lazy creation arrives with P1's `Env<TObs, TAct>.NpRandom` |
+| B-15 | `CartPoleEnv.cs:49` | Unseeded `RandomState()` fallback | A.3 | P4; **fixed** 2026-09-25 (`c141717`): a per-instance entropy-seeded PCG64 generator, created lazily since P1 as Gymnasium's (`NpRandomSeed_MatchesGymnasium`) |
 | B-16 | `CartPoleEnv.cs:115`–`121` | Wrong colours; 1.07–1.14% of pixels differ | A.9 | P7; **fixed** 2026-09-25: rendered with `Gym.Rendering`'s SDL_gfx port, pixel-identical at every tested state (`GymNet_Frame*`) |
 | B-17 | `src/Gym.Environments/Envs/Aether/LunarLanderEnv.cs:496` vs `:505`–`508` | Reset draws force before terrain (Gymnasium: terrain first) | Source read | P8 |
 | B-18 | `LunarLanderEnv.cs:409`–`410` | Wind indices drawn in the constructor, even without wind | Source read | P8 |
@@ -1162,10 +1191,10 @@ gated cell of the live parity suite (`tests/Gym.Tests.Parity`, `CartPoleLivePari
 | B-28 | `LunarLanderEnv.cs:155`–`164` | FPS, viewport and engine geometry are public mutable fields | A.3 | P8 |
 | B-29 | `LunarLanderEnv.cs:384`–`387` | Falls back to the global `np.random`; a second env perturbs the first | A.8 | P8 |
 | B-30 | `LunarLanderEnv.cs:806` | `p.RenderColor != null` on a struct is always true (`CS8073`) | A.12 | P8 |
-| B-31 | `src/Gym/Envs/Env.cs:34` | `Unwrapped` is protected; no wrapper attribute access | Source read | P1 |
-| B-32 | `Env.cs:56`–`59` | `GoalEnv.Reset()` returns `null` | Source read | P1 (deleted) |
-| B-33 | `src/Gym/Envs/VecEnvWrapper.cs:22`–`24` | `Step(int)` sends the same action to every sub-env | Source read | P6 (deleted) |
-| B-34 | `src/Gym/Internal/Threading/DistributedThread.cs:114`–`137`, `DistributedQueuedTaskScheduler.cs:194` | `Thread.Abort`/`ResetAbort`/compressed stack throw on .NET 5+ | A.12 | P1 (deleted) |
+| B-31 | `src/Gym/Envs/Env.cs:34` | `Unwrapped` is protected; no wrapper attribute access | Source read | P1; **fixed** 2026-09-25: public `Unwrapped` and the attribute protocol on Python names (`TestGetSetWrapperAttr`, `WrapperAttributes_MatchGymnasium`) |
+| B-32 | `Env.cs:56`–`59` | `GoalEnv.Reset()` returns `null` | Source read | P1 (deleted); **fixed** 2026-09-25: `GoalEnv` deleted |
+| B-33 | `src/Gym/Envs/VecEnvWrapper.cs:22`–`24` | `Step(int)` sends the same action to every sub-env | Source read | P6 (deleted); moved to `Gym.Legacy` (`[Obsolete]`) by P1 |
+| B-34 | `src/Gym/Internal/Threading/DistributedThread.cs:114`–`137`, `DistributedQueuedTaskScheduler.cs:194` | `Thread.Abort`/`ResetAbort`/compressed stack throw on .NET 5+ | A.12 | P1 (deleted); **fixed** 2026-09-25: `Internal/Threading` deleted, `StepAsync` runs on `Task.Run` (`StepAsync_StepsOnTheThreadPool`) |
 | B-35 | `CartPoleEnv.cs:83`–`88`, `LunarLanderEnv.cs:779`–`784` | Viewer creation blocks on async inside `lock (this)` | A.3 | P7 |
 | B-36 | `examples/ReinforcementLearning/*` | Doesn't build (`NU1201`) | A.12 | P10 |
 | B-37 | `tests/Gym.Tests/Envs/Aether/LunarLanderEnvironment.cs:65` | The only determinism assertion runs in Debug builds only | Source read | P0 |
@@ -1179,21 +1208,23 @@ Status legend: **M** matches, **D** diverges, **B** broken, **—** missing, **n
 
 ### C.1 Core (`gymnasium/core.py`)
 
-| Gymnasium | Gym.NET today | Status | Fork |
+Updated 2026-09-25 for P1 (the audit's "today" column was `pr/24`).
+
+| Gymnasium | Gym.NET (P1) | Status | Fork |
 |---|---|---|---|
-| `Env.step` → 5-tuple | `Step Step(object)` → 4-tuple, float reward | D | changed |
-| `Env.reset(*, seed, options)` → `(obs, info)` | `NDArray Reset()` | D | changed |
-| `Env.render()` + `render_mode` | `Image Render(string mode)` | D | |
-| `Env.close()` | `CloseEnvironment()`, `Dispose()` | D | |
+| `Env.step` → 5-tuple | `StepResult<TObs> Step(TAct)`, float64 reward; `IEnv.Step(object)` | M | changed |
+| `Env.reset(*, seed, options)` → `(obs, info)` | `ResetResult<TObs> Reset(BigInteger? seed, options)` | M | changed |
+| `Env.render()` + `render_mode` | `RenderResult Render()`, `RenderMode` fixed at construction | M | |
+| `Env.close()` | `Close()`, `Dispose()` | M | |
 | `__enter__`/`__exit__` | `IDisposable` | M | |
-| `np_random`, `np_random_seed` | private fields | — | |
-| `action_space`, `observation_space` | `ActionSpace`, `ObservationSpace` | M | |
-| `metadata` | `Dict Metadata` with legacy keys | D | |
-| `spec` | — | — | |
-| `unwrapped` | `protected Unwrapped()` | D | |
-| `get_wrapper_attr`, `set_wrapper_attr`, `has_wrapper_attr` | — | — | |
-| `__str__` | default | — | |
-| `Wrapper`, `ObservationWrapper`, `ActionWrapper`, `RewardWrapper` | — | — | new |
+| `np_random`, `np_random_seed` | `NpRandom` (lazy), `NpRandomSeed` (-1 once assigned) | M | |
+| `action_space`, `observation_space` | `ActionSpace`, `ObservationSpace` (non-generic `Space` until P2) | M | |
+| `metadata` | `Metadata Metadata` (Python keys, per instance) | M | |
+| `spec` | `EnvSpec? Spec` (a wrapper's extends its env's) | M | |
+| `unwrapped` | `IEnv Unwrapped` | M | |
+| `get_wrapper_attr`, `set_wrapper_attr`, `has_wrapper_attr` | `GetWrapperAttr`, `SetWrapperAttr`, `HasWrapperAttr` on Python names | M | |
+| `__str__` | `ToString()`: `<CartPoleEnv instance>`, `<TimeLimit<...>>` | M | |
+| `Wrapper`, `ObservationWrapper`, `ActionWrapper`, `RewardWrapper` | `Wrapper<TWObs, TWAct, TObs, TAct>`, `ObservationWrapper`, `ActionWrapper`, `RewardWrapper` | M | new |
 
 ### C.2 Spaces (`gymnasium/spaces`)
 
@@ -1248,13 +1279,15 @@ All missing on `pr/24`. The fork adds `TimeLimit`, `OrderEnforcing`, `Autoreset`
 
 ### C.9 Errors and logger
 
+Updated 2026-09-25 for P1.
+
 | Gymnasium | Gym.NET | Status |
 |---|---|---|
-| `InvalidAction` | `InvalidActionError` | D |
-| `AlreadyPendingCallError` | `AlreadySteppingError` | D |
-| `NoAsyncCallError` | `NotSteppingError` | D |
-| `Error`, `UnregisteredEnv`, `NamespaceNotFound`, `NameNotFound`, `VersionNotFound`, `DeprecatedEnv`, `RegistrationError`, `DependencyNotInstalled`, `UnsupportedMode`, `InvalidMetadata`, `ResetNeeded`, `MissingArgument`, `InvalidProbability`, `InvalidBound`, `DeprecatedWrapper`, `ClosedEnvironmentError`, `CustomSpaceError` | — | — |
-| `logger.warn`, `logger.deprecation`, `logger.error` | `Console`/`Debug.WriteLine` | — |
+| `InvalidAction` | `InvalidAction` (the legacy `InvalidActionError` remains for LunarLander until P8) | M |
+| `AlreadyPendingCallError` | `AlreadyPendingCallError` (with `Name`) | M |
+| `NoAsyncCallError` | `NoAsyncCallError` (with `Name`) | M |
+| `Error`, `UnregisteredEnv`, `NamespaceNotFound`, `NameNotFound`, `VersionNotFound`, `DeprecatedEnv`, `RegistrationError`, `DependencyNotInstalled`, `UnsupportedMode`, `InvalidMetadata`, `ResetNeeded`, `MissingArgument`, `InvalidProbability`, `InvalidBound`, `DeprecatedWrapper`, `ClosedEnvironmentError`, `CustomSpaceError` | Same names in `Gym.Exceptions`, same hierarchy (`DeprecatedWrapper` is an `ImportError`; the last two are not `Error`s) | M |
+| `logger.warn`, `logger.deprecation`, `logger.error` | `Gym.Logger` | M |
 
 ### C.10 Functional
 

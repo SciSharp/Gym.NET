@@ -103,11 +103,11 @@ namespace Gym.Tests.Utils {
         [TestMethod]
         public void UnseededEnvs_CreatedBackToBack_ResetDifferently()
         {
-            var first = new CartPoleEnv(NullEnvViewer.Factory);
-            var second = new CartPoleEnv(NullEnvViewer.Factory);
+            var first = new CartPoleEnv();
+            var second = new CartPoleEnv();
 
-            using NDArray firstState = first.Reset();
-            using NDArray secondState = second.Reset();
+            using NDArray firstState = first.Reset().Observation;
+            using NDArray secondState = second.Reset().Observation;
 
             Assert.IsFalse(np.array_equal(firstState, secondState), "Unseeded envs must not share an initial state.");
         }

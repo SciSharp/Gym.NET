@@ -7,13 +7,18 @@ namespace Gym.Exceptions {
     ///     NumSharp, decision D17). Catch it to handle any Gymnasium-defined failure, for example an invalid seed.
     /// </summary>
     /// <remarks>
-    ///     Only the superclass is ported so far; the subclasses of <c>error.py</c> arrive with P1. Gym.NET's older
-    ///     exceptions in this namespace (<see cref="InvalidActionError"/>, <see cref="AlreadySteppingError"/>,
-    ///     <see cref="NotSteppingError"/>) do not derive from it yet.
+    ///     Every class of <c>error.py</c> is ported with its hierarchy (<see cref="UnregisteredEnv"/> and its three
+    ///     subclasses, <see cref="ResetNeeded"/>, <see cref="InvalidAction"/>, ...); the ones Gymnasium does not derive from
+    ///     <c>Error</c> (<see cref="AlreadyPendingCallError"/>, <see cref="DeprecatedWrapper"/>, ...) do not here either.
+    ///     Gym.NET's pre-port exceptions (<see cref="InvalidActionError"/>, <see cref="AlreadySteppingError"/>,
+    ///     <see cref="NotSteppingError"/>) remain for the legacy API.
     /// </remarks>
     public class Error : Exception {
-        /// <summary>An error without a message.</summary>
-        public Error() { }
+        /// <summary>
+        ///     An error without a message. Its <see cref="Exception.Message"/> is empty, as Python's <c>str(Error())</c> is,
+        ///     rather than .NET's generic "Exception of type ... was thrown.", so messages compare verbatim with Gymnasium's.
+        /// </summary>
+        public Error() : base("") { }
 
         /// <summary>An error with Gymnasium's message, which callers and ported tests may match verbatim.</summary>
         /// <param name="message">The message, ported verbatim from the Python source that raises it.</param>

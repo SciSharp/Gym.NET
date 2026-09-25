@@ -50,7 +50,7 @@ namespace Gym.Tests.Envs.Aether {
         /// <summary>
         ///     Runs one PID-controlled episode and, when <paramref name="seed"/> is given, asserts its recorded baseline.
         /// </summary>
-        /// <param name="factory">The viewer the env renders every step to.</param>
+        /// <param name="factory">The viewer the env renders to: it runs in <c>human</c> mode, which renders during every reset and step.</param>
         /// <param name="seed">
         ///     The seed of the env's generator, asserted against <see cref="_Baselines"/>; <see langword="null"/> still seeds
         ///     with 0, so the run stays deterministic, but asserts only that the episode ends within <see cref="MAX_STEPS"/>.
@@ -58,28 +58,28 @@ namespace Gym.Tests.Envs.Aether {
         /// <param name="continuous">Selects the continuous action space.</param>
         public void Run(IEnvironmentViewerFactoryDelegate factory, int? seed, bool continuous = false) {
             _seed = seed ?? 0;
-            LunarLanderEnv env = new LunarLanderEnv(factory, random_state: Seeding.NpRandom(_seed).Rng, continuous: continuous);
+            LunarLanderEnv env = new LunarLanderEnv(factory, random_state: Seeding.NpRandom(_seed).Rng, continuous: continuous, render_mode: "human");
             env.Verbose = VERBOSE;
             try {
                 // Run a PID test
                 float total_reward = 0f;
                 int steps = 0;
-                NDArray state = env.Reset();
+                NDArray state = env.Reset().Observation;
                 while (true) {
                     object a = PID(env, (float[]) state);
-                    var (observation, reward, done, information) = env.Step(a);
-                    total_reward += reward;
+                    var (observation, reward, terminated, truncated, information) = env.Step(a);
+                    // The reward is float32 arithmetic widened to float64 (P8 ports Gymnasium's float64), so narrowing is exact.
+                    total_reward += (float)reward;
                     steps++;
                     if (VERBOSE && (steps % 1000 == 0)) {
                         System.Diagnostics.Debug.WriteLine("{0}: a={1}, reward={2}, total={3}", steps, a, reward, total_reward);
                     }
 
-                    if (done || steps > MAX_STEPS) {
+                    if (terminated || truncated || steps > MAX_STEPS) {
                         break;
                     }
 
                     state = observation;
-                    env.Render();
                 }
                 if (seed.HasValue)
                 {
@@ -91,7 +91,7 @@ namespace Gym.Tests.Envs.Aether {
                 Assert.IsTrue(steps < MAX_STEPS, "Too many steps.");
                 System.Diagnostics.Debug.WriteLine("Total reward: {0} in {1} steps.", total_reward, steps);
             } finally {
-                env.CloseEnvironment();
+                env.Close();
             }
         }
 
@@ -263,7 +263,7 @@ namespace Gym.Tests.Envs.Aether {
         public void Step_ContinuousActionWithFewerThanTwoThrottles_ThrowsIndexError()
         {
             var env = new LunarLanderEnv(NullEnvViewer.Factory, continuous: true, random_state: Seeding.NpRandom(0).Rng);
-            env.Reset().Dispose();
+            env.Reset().Observation.Dispose();
 
             using NDArray sampled = env.ActionSpace.Sample();
             var zeroD = Assert.ThrowsExactly<IndexError>(() => env.Step(sampled));

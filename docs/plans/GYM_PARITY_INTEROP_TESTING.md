@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Draft 2, 2026-09-25: the live harness is built and running as `tests/Gym.Tests.Parity` (see §14 for what's verified and what's next) |
+| **Status** | Draft 3, 2026-09-25: the live harness is built and running as `tests/Gym.Tests.Parity`, and drives Gym.NET through Gymnasium's own contract since the core-API port (see §14 for what's verified and what's next) |
 | **Companion to** | `docs/plans/GYMNASIUM_PORT_PLAN.md` (§14 verification strategy); this document designs its live half |
 | **Modelled on** | `refs/NumSharp`: `src/NumSharp.Interop.pythonnet` + `test/NumSharp.Tests.Interop` (and its `CLAUDE.md`) |
 | **Oracle** | `refs/Gymnasium` @ `9e04324`, imported **in-process** through pythonnet |
@@ -161,7 +161,7 @@ public sealed class GymPair : IDisposable
 }
 ```
 
-**As built (2026-09-25).** Constructing both sides from one id needs Gym.NET's registry (`Gymnasium.Make`, P1), so the pair takes the two envs instead: `new GymPair(PyGymEnv.Make("CartPole-v1"), new GymNetEnv(new CartPoleEnv(...)), stateAttribute: "state")`, with `Reset(seed)`, `Step(ParityAction)`, `Run(seed, actionSource, maxSteps, frameEvery)`, `InjectState(attribute, values)` and `CompareFrame(label)`. `PyGymEnv.Make` goes through `gymnasium.make` and steps its `unwrapped` env by default, the right counterpart while Gym.NET has no wrappers (`viaMake: true` keeps the stack). `GymNetEnv` bridges Gym.NET's legacy API without touching a value: `Seed(s)` + `Reset()` stands for `reset(seed=s)`, the missing reset info and a null step information are reported as `{}`, `done` as `terminated`, and `truncated` as `False`, which is what Gymnasium's unwrapped env returns. Every report prints those adaptations. Test-local envs implement `IDotNetEnv` directly; `Reference/CartPoleReference.cs` is the harness's positive control.
+**As built (2026-09-25).** Constructing both sides from one id needs Gym.NET's registry (`Gymnasium.Make`, P1), so the pair takes the two envs instead: `new GymPair(PyGymEnv.Make("CartPole-v1"), new GymNetEnv(new CartPoleEnv(...)), stateAttribute: "state")`, with `Reset(seed)`, `Step(ParityAction)`, `Run(seed, actionSource, maxSteps, frameEvery)`, `InjectState(attribute, values)` and `CompareFrame(label)`. `PyGymEnv.Make` goes through `gymnasium.make` and steps its `unwrapped` env by default, the right counterpart while Gym.NET has no wrappers (`viaMake: true` keeps the stack). `GymNetEnv` drives any Gym.NET env, bare or wrapped, through `IEnv`, Gymnasium's own contract since the core-API port (P1): `Reset(seed)` returns `(obs, info)` and `Step` the 5-tuple with a float64 reward, so there is nothing left to adapt and its `Adaptations` are empty. (Until P1 it bridged the legacy API: `Seed(s)` + `Reset()` for `reset(seed=s)`, `{}` for the missing infos, `done` as `terminated`, `False` as `truncated`, all printed with every report.) Attributes are read and written on the unwrapped env by Python name, through the port's own `PyAttributes`. Test-local envs implement `IDotNetEnv` directly; `Reference/CartPoleReference.cs` is the harness's positive control.
 
 **What is compared, per call:**
 
@@ -344,11 +344,32 @@ B-10) and LunarLander (F6, B-17, B-19, B-20). Found on the way: .NET 8's `double
 infinite dividend where the C runtime's `fmod` keeps the infinity's sign, so `rotate_rad(inf)` differed in one bit on
 net8.0 only; `Vector2.RotateRad` now reproduces `fmod`'s NaNs itself.
 
+**The core API (P1) on 2026-09-25.** Gym.NET's `Env<TObs, TAct>`, the wrapper family, `TimeLimit`, `OrderEnforcing`,
+`EnvSpec`, `Info`, the result types, every `error.py` class and `PyMath` (F3) landed, and the harness moved onto them:
+`GymNetEnv` compares the port's own 5-tuple with no adaptation left, and 17 new cells compare the core API itself.
+**177 cells, 163 gated, all passing on net8.0 and net10.0; the same 14 `[OpenBugs]`.** The new cells: Gymnasium's
+`make("CartPole-v1")` stack against Gym.NET's `TimeLimit(OrderEnforcing(CartPoleEnv))` for whole episodes, both truncating at
+step 500; `OrderEnforcing` and `TimeLimit` call by call (`ResetNeeded` and argument-error messages, `has_reset`,
+`_elapsed_steps`, truncation at and past the limit, `str(env)`); the attribute protocol through a stack (plain
+`getattr`/`setattr` that a wrapper does not forward, `has/get/set_wrapper_attr` and where each lands, run-time attributes,
+the read-only `np_random_seed`/`spec`/`render_mode`, a wrapper's `_np_random`); lazy `np_random` and `np_random_seed`
+semantics, through a wrapper too; `render()` without a render mode (the bare `AssertionError`, then the warning with a
+spec); `EnvSpec`'s repr and `pprint` in all four flag combinations and a wrapped stack's spec; `parse_env_id` over 17 ids
+(Unicode digits and malformed ids included) and `get_env_id`; the single-env step-API conversions; dict repr; and
+`PyMath` against CPython and NumPy over edge corpora (`//`, `%`, `divmod` on ints and floats, `min`/`max`, `round` with
+17 digit counts, all 512 `np.clip` triples of an 8-value corpus, `np.sign`), NaN payloads and signed zeros included.
+Five planted defects (`TimeLimit` truncating one step late, the textbook `clip`, an unquoted attribute name in
+`get_wrapper_attr`'s error, half-up decimal rounding, a one-element tuple without its comma in a spec's repr) were each
+caught by the cell meant for it. Found on the way: `np.clip` keeps the value it holds on ties (`clip(-0.0, 0.0, 1)` is
+`-0.0`), which the textbook `min(max(x, lo), hi)` gets wrong; and Python's `dones and truncated` returns an operand, so a
+non-boolean `"TimeLimit.truncated"` stays an int in Python where `StepResult`'s flags are `bool` (a documented deviation,
+kept out of the gated corpus).
+
 **Next steps:**
 1. Wire the suite into CI (port plan §14.8): a Windows reference job that runs `tools/parity/setup_venv.ps1`, then `dotnet test tests/Gym.Tests.Parity --filter "TestCategory!=OpenBugs"` with `GYMNET_PYTHONNET_REQUIRE_ENGINE=1`.
 2. The reverse bridge (§8): `PyEnvShim.py` over `IDotNetEnv`, then `check_env` and `check_environments_match` on Gym.NET's envs.
 3. One case catalog for live, record and replay (§9), with the port plan's golden harness (F4).
-4. As each port lands (P1 core API, P2 spaces, P4 CartPole, P7 rasterizer, P8 LunarLander), remove its `[OpenBugs]` and add the cells its new surface needs (`Gymnasium.Make`, wrappers, vector envs, the registry, §7).
+4. As each port lands (P2 spaces, P3 registry and checkers, P7 rasterizer, P8 LunarLander; P1 core API and the CartPole slice of P4/P7 are in), remove its `[OpenBugs]` and add the cells its new surface needs (`Gymnasium.Make`, `PassiveEnvChecker`, the remaining wrappers, vector envs, the registry, §7).
 
 **Open questions for the maintainer:**
 - Whether the live suite should be required on PRs, or only on the reference job and nightly.

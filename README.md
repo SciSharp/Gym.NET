@@ -21,36 +21,35 @@ PM> Install-Package Gym.NET.Rendering.WinForm
 ```
 
 ## Example
-The following example runs and renders cartpole-v1 environment.
+The following example runs and renders the CartPole-v1 environment with Gymnasium's API: `Reset(seed)` returns
+`(observation, info)`, `Step` returns `(observation, reward, terminated, truncated, info)`, and the render mode is chosen
+at construction.
 ```C#
 using NumSharp;
-using SixLabors.ImageSharp;
-using Gym.Environments;
 using Gym.Environments.Envs.Classic;
+using Gym.Envs;
 using Gym.Rendering.WinForm;
+using Gym.Wrappers;
 
-CartPoleEnv cp = new CartPoleEnv(WinFormEnvViewer.Factory); //or AvaloniaEnvViewer.Factory
-bool done = true;
+// "human" renders every reset and step into the window, paced at metadata["render_fps"] (50 fps);
+// "rgb_array" would instead make Render() return each frame as a RenderResult.Rgb.
+using var cp = new TimeLimit<NDArray, long>(
+    new CartPoleEnv(renderMode: "human", viewerFactory: WinFormEnvViewer.Factory), //or AvaloniaEnvViewer.Factory
+    maxEpisodeSteps: 500);
+
+var (observation, info) = cp.Reset(seed: 42);
 for (int i = 0; i < 100_000; i++)
 {
-    if (done)
-    {
-        NDArray observation = cp.Reset();
-        done = false;
-    }
+    var (next, reward, terminated, truncated, stepInfo) = cp.Step(i % 2); //we switch between moving left and right
+    //do something with the reward and observation.
+    if (terminated || truncated)
+        (observation, info) = cp.Reset();
     else
-    {
-        var (observation, reward, _done, information) = cp.Step((i % 2)); //we switch between moving left and right
-        done = _done;
-        //do something with the reward and observation.
-    }
-
-    SixLabors.ImageSharp.Image img = cp.Render(); //returns the image that was rendered.
-    Thread.Sleep(15); //this is to prevent it from finishing instantly !
+        observation = next;
 }
-
-cp.Close();
 ```
+Code written for the pre-0.26 API (`Reset()` returning the observation, the 4-tuple `Step`, `Seed(s)`) keeps working for
+now through `Gym.Legacy.LegacyEnvAdapter`.
 
 ## Roadmap
 - Implement [Spaces](https://github.com/openai/gym/tree/master/gym/spaces)

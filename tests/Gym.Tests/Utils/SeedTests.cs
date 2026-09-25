@@ -74,8 +74,9 @@ namespace Gym.Tests.Utils {
         }
 
         /// <summary>
-        ///     Seeds beyond the former 2^32 - 1 ceiling are accepted by every space and env, and the same seed replays the
-        ///     same stream (the Gymnasium golden pins the values themselves for seeds up to 2^40).
+        ///     Seeds beyond the former 2^32 - 1 ceiling are accepted by every space and env (an env through
+        ///     <c>Reset(seed)</c>, even beyond <see cref="long"/>), and the same seed replays the same stream (the Gymnasium
+        ///     golden pins the values themselves for seeds up to 2^40).
         /// </summary>
         [TestMethod]
         public void Seed_LargeSeeds_AreAcceptedAndReproducible()
@@ -90,9 +91,11 @@ namespace Gym.Tests.Utils {
                     Assert.AreEqual((long) a, (long) b, $"Seed {seed}: construction and Seed must give the same stream.");
 
                 new Box(-1f, 1f, new Shape(2), np.float32, seed: seed).Seed(seed);
-                new CartPoleEnv(NullEnvViewer.Factory).Seed(seed);
-                new LunarLanderEnv(NullEnvViewer.Factory, random_state: Seeding.NpRandom(0).Rng).Seed(seed);
+                AssertSameReset(seed);
+                new LunarLanderEnv(NullEnvViewer.Factory, random_state: Seeding.NpRandom(0).Rng).Reset(seed: seed).Observation.Dispose();
             }
+
+            AssertSameReset(BigInteger.Pow(2, 100) + 7);
         }
 
         /// <summary>Every space and env rejects a negative seed with Gymnasium's error and message.</summary>
@@ -103,8 +106,8 @@ namespace Gym.Tests.Utils {
             {
                 AssertSeedRejected(() => new Discrete(4).Seed(seed), seed);
                 AssertSeedRejected(() => new Box(-1f, 1f, new Shape(2), np.float32).Seed(seed), seed);
-                AssertSeedRejected(() => new CartPoleEnv(NullEnvViewer.Factory).Seed(seed), seed);
-                AssertSeedRejected(() => new LunarLanderEnv(NullEnvViewer.Factory, random_state: Seeding.NpRandom(0).Rng).Seed(seed), seed);
+                AssertSeedRejected(() => new CartPoleEnv().Reset(seed: seed), seed);
+                AssertSeedRejected(() => new LunarLanderEnv(NullEnvViewer.Factory, random_state: Seeding.NpRandom(0).Rng).Reset(seed: seed), seed);
             }
         }
 
@@ -119,20 +122,38 @@ namespace Gym.Tests.Utils {
         }
 
         /// <summary>
-        ///     LunarLander reseeds its generator in place, so an action space created with the same generator follows: after
-        ///     <c>Seed(7)</c> its next sample is what a <c>Discrete(4)</c> seeded with 7 draws first.
+        ///     A seeded reset gives LunarLander a new generator, as Gymnasium's <c>super().reset(seed=seed)</c> does: an action
+        ///     space created with the constructor's <c>random_state</c> keeps drawing from that generator, whose next sample is
+        ///     what it would have been without the reset. (Before the core-API port, <c>Seed(s)</c> reseeded the shared
+        ///     generator in place, which Gymnasium never does.)
         /// </summary>
         [TestMethod]
-        public void LunarLanderSeed_ReseedsTheSharedGeneratorInPlace()
+        public void LunarLanderSeededReset_ReplacesOnlyTheEnvsGenerator()
         {
-            var env = new LunarLanderEnv(NullEnvViewer.Factory, random_state: Seeding.NpRandom(1).Rng);
-            var expected = new Discrete(4, seed: 7);
+            var shared = Seeding.NpRandom(1).Rng;
+            var env = new LunarLanderEnv(NullEnvViewer.Factory, random_state: shared);
+            // The constructor draws the wind and turbulence phases from the shared generator (B-18); the twin makes the same draws.
+            var twinGenerator = Seeding.NpRandom(1).Rng;
+            twinGenerator.integers(-9999, 9999).Dispose();
+            twinGenerator.integers(-9999, 9999).Dispose();
+            var twin = new Discrete(4, random_state: twinGenerator);
 
-            env.Seed(7);
+            env.Reset(seed: 7).Observation.Dispose();
 
-            using NDArray shared = env.ActionSpace.Sample();
-            using NDArray fresh = expected.Sample();
-            Assert.AreEqual((long) fresh, (long) shared);
+            Assert.AreEqual(new BigInteger(7), env.NpRandomSeed);
+            Assert.AreNotSame(shared, env.NpRandom);
+            using NDArray fromShared = env.ActionSpace.Sample();
+            using NDArray fromTwin = twin.Sample();
+            Assert.AreEqual((long) fromTwin, (long) fromShared);
+        }
+
+        /// <summary>Two CartPoles reset with <paramref name="seed"/> start from the same state.</summary>
+        /// <param name="seed">A non-negative seed of any size.</param>
+        private static void AssertSameReset(BigInteger seed)
+        {
+            using NDArray first = new CartPoleEnv().Reset(seed: seed).Observation;
+            using NDArray second = new CartPoleEnv().Reset(seed: seed).Observation;
+            Assert.IsTrue(np.array_equal(first, second), $"Seed {seed}: the same seed must give the same initial state.");
         }
 
         /// <summary>Asserts that <paramref name="seeding"/> throws Gymnasium's <see cref="Error"/> with its negative-seed message.</summary>
