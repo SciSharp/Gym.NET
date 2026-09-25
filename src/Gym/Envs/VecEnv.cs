@@ -37,15 +37,28 @@ namespace Gym.Envs {
         //         :return: ([int] or [float]) observation
         //      
         public abstract NDArray[] Reset();
-        public abstract Step[] Step(int action);
+
+        /// <summary>Steps every sub-env with the same <paramref name="action"/>; see <see cref="IVecEnv.Step"/> (B-33).</summary>
+        /// <param name="action">The discrete action, <see langword="long"/> like Gymnasium's <c>np.int64</c>.</param>
+        /// <returns>One step result per sub-env, in <see cref="Environments"/> order.</returns>
+        public abstract Step[] Step(long action);
 
         public abstract void Close();
 
-        public void Seed(int seed) {
+        /// <summary>Seeds every sub-env with the same <paramref name="seed"/>, so they all replay the same stream.</summary>
+        /// <param name="seed">A NumPy seed in <c>[0, 2**32 - 1]</c>.</param>
+        /// <exception cref="ValueError">Thrown when <paramref name="seed"/> is outside <c>[0, 2**32 - 1]</c>.</exception>
+        public void Seed(long seed) {
             Seed(Enumerable.Repeat(seed, Environments.Count).ToArray());
         }
 
-        public void Seed(int[] seed) {
+        /// <summary>Seeds each sub-env with its own seed, in <see cref="Environments"/> order.</summary>
+        /// <param name="seed">One NumPy seed in <c>[0, 2**32 - 1]</c> per sub-env.</param>
+        /// <exception cref="ArgumentException">Thrown when the number of seeds differs from the number of sub-envs.</exception>
+        /// <exception cref="ValueError">
+        ///     Thrown when a seed is outside <c>[0, 2**32 - 1]</c>. The sub-envs before it have already been reseeded.
+        /// </exception>
+        public void Seed(long[] seed) {
             if (seed.Length != Environments.Count) throw new ArgumentException("Number of seeds passed should be equals to number of environments", nameof(seed));
             for (int i = 0; i < Environments.Count; i++) {
                 Environments[i].Seed(seed[i]);
@@ -60,7 +73,10 @@ namespace Gym.Envs {
         //         You should not call this if a step_async run is
         //         already pending.
         //         
-        public Task<Step[]> StepAsync(int action) {
+        /// <summary>Runs <see cref="Step(long)"/> on <see cref="DistributedScheduler.Default"/>.</summary>
+        /// <param name="action">The discrete action sent to every sub-env.</param>
+        /// <returns>A task that completes with one step result per sub-env.</returns>
+        public Task<Step[]> StepAsync(long action) {
             return DistributedScheduler.Default.Run(() => Step(action));
         }
 

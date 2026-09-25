@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Reflection.Metadata;
 using System.Text.Json;
+using Gym.Utils;
 using NumSharp;
 
 namespace Gym.Spaces {
@@ -20,19 +21,23 @@ namespace Gym.Spaces {
         public NDArray BoundedHigh { get; private set; }
         /// <summary>
         ///     A box of <paramref name="shape"/> whose every element lies in [<paramref name="low"/>, <paramref name="high"/>],
-        ///     with integer bounds; forwards to <see cref="Box(float, float, Shape, DType, int, NumPyRandom)"/>.
+        ///     with integer bounds; forwards to <see cref="Box(float, float, Shape, DType, long, NumPyRandom)"/>.
         /// </summary>
         /// <param name="low">The lower bound of every element.</param>
         /// <param name="high">The upper bound of every element.</param>
         /// <param name="shape">The shape of every sample.</param>
         /// <param name="dType">The element type; <see langword="null"/> means float32.</param>
-        /// <param name="seed">A seed for this box's own generator, or -1 to fall back to the process-wide <c>np.random</c>.</param>
+        /// <param name="seed">
+        ///     A NumPy seed in <c>[0, 2**32 - 1]</c> for this box's own generator, or -1 to fall back to the process-wide
+        ///     <c>np.random</c>.
+        /// </param>
+        /// <exception cref="ValueError">Thrown when <paramref name="seed"/> is neither -1 nor in <c>[0, 2**32 - 1]</c>.</exception>
         /// <remarks>
         ///     Footgun: with <see langword="int"/> literals and no fifth argument (<c>new Box(0, 5, shape, np.int32)</c>) the
         ///     call is ambiguous with the <paramref name="seed"/>-less <see cref="Box(int, int, Shape, DType, NumPyRandom)"/>
         ///     overload (CS0121). Name the fifth argument (<c>seed: 3</c>), or pass <see langword="float"/> literals.
         /// </remarks>
-        public Box(int low, int high, Shape shape, DType dType = null, int seed = -1) : this((float) low, (float) high, shape, dType, seed, null) { }
+        public Box(int low, int high, Shape shape, DType dType = null, long seed = -1) : this((float) low, (float) high, shape, dType, seed, null) { }
 
         /// <summary>
         ///     A box of <paramref name="shape"/> whose every element lies in [<paramref name="low"/>, <paramref name="high"/>],
@@ -44,7 +49,7 @@ namespace Gym.Spaces {
         /// <param name="dType">The element type; <see langword="null"/> means float32.</param>
         /// <param name="random_state">The generator to draw from, or <see langword="null"/> for the process-wide <c>np.random</c>.</param>
         /// <remarks>
-        ///     Footgun: see <see cref="Box(int, int, Shape, DType, int)"/>; the two integer overloads are ambiguous unless the
+        ///     Footgun: see <see cref="Box(int, int, Shape, DType, long)"/>; the two integer overloads are ambiguous unless the
         ///     fifth argument is given by name.
         /// </remarks>
         public Box(int low, int high, Shape shape, DType dType = null, NumPyRandom random_state = null) : this((float)low, (float)high, shape, dType, -1, random_state) { }
@@ -57,21 +62,25 @@ namespace Gym.Spaces {
         /// <param name="high">The upper bound of every element, cast to <paramref name="dType"/>.</param>
         /// <param name="shape">The shape of every sample.</param>
         /// <param name="dType">The element type; <see langword="null"/> means float32.</param>
-        /// <param name="seed">A seed for this box's own generator, or -1 to use <paramref name="random_state"/> instead.</param>
+        /// <param name="seed">
+        ///     A NumPy seed in <c>[0, 2**32 - 1]</c> for this box's own generator, or -1 to use <paramref name="random_state"/>
+        ///     instead.
+        /// </param>
         /// <param name="random_state">
         ///     The generator to draw from when <paramref name="seed"/> is -1, or <see langword="null"/> for the process-wide
         ///     <c>np.random</c>.
         /// </param>
+        /// <exception cref="ValueError">Thrown when <paramref name="seed"/> is neither -1 nor in <c>[0, 2**32 - 1]</c>.</exception>
         /// <remarks>
         ///     The bounds are built with <c>np.full(shape, value, dtype)</c>, which casts the scalar to the dtype exactly the
         ///     way NumPy does. It replaces <c>(low + np.zeros(shape, dType)).astype(dType)</c>, which relied on NumSharp.Lite's
         ///     promotion. There is no null check on <paramref name="shape"/>: <see cref="Shape"/> is a struct in NumSharp, so
         ///     the former <c>Equals(shape, null)</c> guard could never fire.
         /// </remarks>
-        public Box(float low, float high, Shape shape, DType dType = null, int seed = -1, NumPyRandom random_state = null) : base(shape, (dType = dType ?? np.float32)) {
+        public Box(float low, float high, Shape shape, DType dType = null, long seed = -1, NumPyRandom random_state = null) : base(shape, (dType = dType ?? np.float32)) {
             Low = np.full(shape, low, dType);
             High = np.full(shape, high, dType);
-            RandomState = seed != -1 ? np.random.RandomState(seed) : random_state ?? np.random;
+            RandomState = seed != -1 ? LegacySeeding.RandomState(seed) : random_state ?? np.random;
             CheckBounded();
         }
 
@@ -82,22 +91,28 @@ namespace Gym.Spaces {
         /// <param name="low">The lower bounds; its shape becomes the box's shape. A C# scalar converts to a 0-d box.</param>
         /// <param name="high">The upper bounds, with the shape of <paramref name="low"/>.</param>
         /// <param name="dType">The element type; <see langword="null"/> means float32.</param>
-        /// <param name="seed">A seed for this box's own generator, or -1 to use <paramref name="random_state"/> instead.</param>
+        /// <param name="seed">
+        ///     A NumPy seed in <c>[0, 2**32 - 1]</c> for this box's own generator, or -1 to use <paramref name="random_state"/>
+        ///     instead.
+        /// </param>
         /// <param name="random_state">
         ///     The generator to draw from when <paramref name="seed"/> is -1, or <see langword="null"/> for the process-wide
         ///     <c>np.random</c>.
         /// </param>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="low"/> or <paramref name="high"/> is <see langword="null"/>.</exception>
-        /// <exception cref="ValueError">Thrown when the two shapes differ, with Gymnasium's message.</exception>
-        public Box(NDArray low, NDArray high, DType dType = null, int seed = -1, NumPyRandom random_state = null) : base(RequireSameShape(low, high), (dType = dType ?? np.float32)) {
+        /// <exception cref="ValueError">
+        ///     Thrown when the two shapes differ, with Gymnasium's message, or when <paramref name="seed"/> is neither -1 nor in
+        ///     <c>[0, 2**32 - 1]</c>.
+        /// </exception>
+        public Box(NDArray low, NDArray high, DType dType = null, long seed = -1, NumPyRandom random_state = null) : base(RequireSameShape(low, high), (dType = dType ?? np.float32)) {
             Low = low.astype(dType);
             High = high.astype(dType);
-            RandomState = seed != -1 ? np.random.RandomState(seed) : random_state ?? np.random;
+            RandomState = seed != -1 ? LegacySeeding.RandomState(seed) : random_state ?? np.random;
             CheckBounded();
         }
 
         /// <summary>
-        ///     Validates the bounds of <see cref="Box(NDArray, NDArray, DType, int, NumPyRandom)"/> before the base constructor
+        ///     Validates the bounds of <see cref="Box(NDArray, NDArray, DType, long, NumPyRandom)"/> before the base constructor
         ///     runs, and returns the box's shape. It replaces a <c>Debug.Assert</c> that vanished in Release builds, where
         ///     mismatched bounds used to construct a box whose <see cref="Low"/> and <see cref="High"/> disagreed.
         /// </summary>
@@ -295,8 +310,14 @@ namespace Gym.Spaces {
             throw new NotSupportedException(ndArray?.ToString() ?? nameof(ndArray));
         }
 
-        public override void Seed(int seed) {
-            RandomState = np.random.RandomState(seed);
+        /// <summary>
+        ///     Gives this box a fresh generator seeded with <paramref name="seed"/>, bit-identical to
+        ///     <c>numpy.random.RandomState(seed)</c>. A generator the box shared with other spaces is left untouched.
+        /// </summary>
+        /// <param name="seed">A NumPy seed in <c>[0, 2**32 - 1]</c>.</param>
+        /// <exception cref="ValueError">Thrown when <paramref name="seed"/> is outside <c>[0, 2**32 - 1]</c>, with NumPy's message.</exception>
+        public override void Seed(long seed) {
+            RandomState = LegacySeeding.RandomState(seed);
         }
 
         #region Object Overrides

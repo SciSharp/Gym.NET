@@ -26,7 +26,14 @@ namespace Gym.Envs {
 
         public abstract Image Render(string mode = "human");
         public abstract void CloseEnvironment();
-        public abstract void Seed(int seed);
+
+        /// <summary>
+        ///     Reseeds the env's generator, so the episodes that follow are reproducible; see <see cref="IEnv.Seed"/>.
+        /// </summary>
+        /// <param name="seed">A NumPy seed in <c>[0, 2**32 - 1]</c>.</param>
+        /// <exception cref="ValueError">Thrown when <paramref name="seed"/> is outside <c>[0, 2**32 - 1]</c>, with NumPy's message.</exception>
+        /// <remarks>This took an <see cref="int"/> before the migration to NumSharp master; overrides must now take <see langword="long"/>.</remarks>
+        public abstract void Seed(long seed);
 
         /// <summary>
         ///     Returns unwrapped version of current environment.
@@ -41,12 +48,43 @@ namespace Gym.Envs {
     }
 
     public abstract class Env<TAction> : Env where TAction : Enum {
+        /// <summary>
+        ///     Converts <paramref name="action"/> to <typeparamref name="TAction"/> and steps with it. Any integer width, a
+        ///     <typeparamref name="TAction"/> member, and the 0-d int64 array that <see cref="Discrete.Sample"/> returns are
+        ///     accepted.
+        /// </summary>
+        /// <param name="action">A boxed integer, a <typeparamref name="TAction"/> member, or a 0-d integer <see cref="NDArray"/>.</param>
+        /// <returns>The result of <see cref="Step(TAction)"/>.</returns>
+        /// <exception cref="ArgumentException">Thrown when <paramref name="action"/> does not denote an integer.</exception>
+        /// <exception cref="OverflowException">Thrown when an unsigned 64-bit action exceeds <see cref="long.MaxValue"/>.</exception>
         public override Step Step(object action) {
-            return Step((TAction) (object) action);
+            return Step(ToAction(action));
         }
 
+        /// <summary>
+        ///     Steps on <see cref="DistributedScheduler.Default"/>. The conversion runs inside the scheduled work, so a bad
+        ///     action faults the returned task instead of throwing here.
+        /// </summary>
+        /// <param name="action">A boxed integer, a <typeparamref name="TAction"/> member, or a 0-d integer <see cref="NDArray"/>.</param>
+        /// <returns>A task that completes with the result of <see cref="Step(TAction)"/>.</returns>
         public override Task<Step> StepAsync(object action) {
-            return DistributedScheduler.Default.Run(() => Step((TAction) (object) action));
+            return DistributedScheduler.Default.Run(() => Step(ToAction(action)));
+        }
+
+        /// <summary>
+        ///     Maps an untyped action to the enum member of the same underlying value, whatever the enum's underlying type.
+        /// </summary>
+        /// <param name="action">A boxed integer, a <typeparamref name="TAction"/> member, or a 0-d integer <see cref="NDArray"/>.</param>
+        /// <returns>The member of <typeparamref name="TAction"/> with that value; it need not be a named member.</returns>
+        /// <exception cref="ArgumentException">Thrown when <paramref name="action"/> does not denote an integer.</exception>
+        /// <exception cref="OverflowException">Thrown when an unsigned 64-bit action exceeds <see cref="long.MaxValue"/>.</exception>
+        /// <remarks>
+        ///     Replaces <c>(TAction)(object)action</c>, which unboxes exactly (trap 1 of docs/plans/NUMSHARP_MIGRATION_PLAN.md
+        ///     §7): it threw <see cref="InvalidCastException"/> for a <see langword="long"/>, for a sampled action, and for any
+        ///     integer whose width differs from the enum's underlying type.
+        /// </remarks>
+        private static TAction ToAction(object action) {
+            return (TAction) Enum.ToObject(typeof(TAction), Discrete.ToInt64(action));
         }
 
         public abstract Step Step(TAction action);

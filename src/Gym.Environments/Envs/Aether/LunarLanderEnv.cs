@@ -360,8 +360,10 @@ namespace Gym.Environments.Envs.Aether
         public bool RenderEngineParticles { get; set; } = true;
         public bool Verbose { get; set; } = false;
 
-        private int _wind_idx;
-        private int _torque_idx;
+        /// <summary>The wind phase: drawn with <c>randint(-9999, 9999)</c> and advanced once per windy step. <see langword="long"/> because NumPy produces it as int64.</summary>
+        private long _wind_idx;
+        /// <summary>The turbulence phase, drawn and advanced like <see cref="_wind_idx"/>.</summary>
+        private long _torque_idx;
         private float _InitialY;
         private World _World;
         private Body _Moon;
@@ -426,8 +428,8 @@ namespace Gym.Environments.Envs.Aether
                 throw (new WarningException("turbulence_power value is recommended to be between 0.0 and 2.0"));
             }
 
-            _wind_idx = TakeInt32(RandomState.randint(-9999, 9999));
-            _torque_idx = TakeInt32(RandomState.randint(-9999, 9999));
+            _wind_idx = TakeInt64(RandomState.randint(-9999, 9999));
+            _torque_idx = TakeInt64(RandomState.randint(-9999, 9999));
 
             NDArray low = np.array(new float[] { -1.5f, -1.5f, -5f, -5f, (float)-Math.PI, -5f, 0f, 0f });
             NDArray high = np.array(new float[] { 1.5f, 1.5f, 5f, 5f, (float)Math.PI, 5f, 1f, 1f });
@@ -464,13 +466,13 @@ namespace Gym.Environments.Envs.Aether
         ///     counterpart of <see cref="TakeDouble"/>.
         /// </summary>
         /// <param name="draw">A 0-d integer array that the caller hands over; it is disposed before this method returns.</param>
-        /// <returns>The drawn value.</returns>
+        /// <returns>The drawn value as <see langword="long"/>, the .NET spelling of NumPy's default integer, int64.</returns>
         /// <exception cref="IncorrectShapeException">Thrown when <paramref name="draw"/> is not 0-d.</exception>
-        private static int TakeInt32(NDArray draw)
+        private static long TakeInt64(NDArray draw)
         {
             using (draw)
             {
-                return (int)draw;
+                return (long)draw;
             }
         }
 
@@ -634,18 +636,20 @@ namespace Gym.Environments.Envs.Aether
         ///     step draws two dispersion values, whether or not an engine fires.
         /// </summary>
         /// <param name="action">
-        ///     Discrete mode: a boxed <see cref="int"/> in [0, 3] (see <see cref="LunarLanderDiscreteActions"/>). Continuous
-        ///     mode: an <see cref="NDArray"/> of shape (2,) holding the main and lateral throttles, clipped to [-1, 1].
+        ///     Discrete mode: an integer in [0, 3] (see <see cref="LunarLanderDiscreteActions"/>) of any width, an enum member,
+        ///     or the 0-d array <c>ActionSpace.Sample()</c> returns. Continuous mode: an <see cref="NDArray"/> of shape (2,)
+        ///     holding the main and lateral throttles, clipped to [-1, 1].
         /// </param>
         /// <returns>The new observation (a fresh float32 array of shape (8,)), the reward, the done flag and diagnostics.</returns>
         /// <exception cref="InvalidActionError">Thrown when a discrete action is outside the action space.</exception>
-        /// <exception cref="InvalidCastException">Thrown when a discrete action is not a boxed <see cref="int"/>.</exception>
+        /// <exception cref="ArgumentException">Thrown when a discrete action does not denote an integer.</exception>
+        /// <exception cref="OverflowException">Thrown when an unsigned 64-bit discrete action exceeds <see cref="long.MaxValue"/>.</exception>
         /// <exception cref="IndexError">
         ///     Thrown when a continuous action is 0-d, which is what the continuous action space samples today (B-20).
         /// </exception>
         public override Step Step(object action)
         {
-            int i_action = -1;
+            long i_action = -1;
             NDArray c_action = null;
             // The two throttles of a continuous action, read once as float32 scalars after clipping.
             float mainThrottle = 0f;
@@ -657,7 +661,9 @@ namespace Gym.Environments.Envs.Aether
             }
             else
             {
-                i_action = (int)action;
+                // (int)action unboxed exactly: it threw InvalidCastException for a long, and for the 0-d int64 NDArray that
+                // ActionSpace.Sample() returns (trap 1 of docs/plans/NUMSHARP_MIGRATION_PLAN.md §7).
+                i_action = Discrete.ToInt64(action);
                 l_action = (LunarLanderDiscreteActions)i_action;
             }
             if (UseWind && !_Lander.TouchedGround)
@@ -982,8 +988,20 @@ namespace Gym.Environments.Envs.Aether
             }
         }
 
-        public override void Seed(int seed)
+        /// <summary>
+        ///     Reseeds the env's generator in place, bit-identical to <c>numpy.random.RandomState(seed)</c>. In place, unlike
+        ///     the spaces' <c>Seed</c>: when the env was created with a <c>random_state</c>, its action space draws from that
+        ///     same instance and is reseeded too; without one, this reseeds the process-wide <c>np.random</c> (B-29).
+        /// </summary>
+        /// <param name="seed">A NumPy seed in <c>[0, 2**32 - 1]</c>.</param>
+        /// <exception cref="ValueError">Thrown when <paramref name="seed"/> is outside <c>[0, 2**32 - 1]</c>, with NumPy's message.</exception>
+        /// <remarks>
+        ///     The wind and turbulence phases were drawn in the constructor (B-18), so reseeding does not redraw them; only the
+        ///     draws of later <see cref="Reset"/> and <see cref="Step"/> calls follow the new seed.
+        /// </remarks>
+        public override void Seed(long seed)
         {
+            // Binds to seed(long), which accepts the whole [0, 2^32 - 1] and rejects the rest with NumPy's ValueError.
             RandomState.seed(seed);
         }
     }

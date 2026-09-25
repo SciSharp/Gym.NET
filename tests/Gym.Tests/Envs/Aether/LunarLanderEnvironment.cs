@@ -10,6 +10,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Gym.Environments.Envs.Aether;
 using Gym.Rendering.WinForm;
+using Gym.Utils;
 using NumSharp;
 using static System.Net.Mime.MediaTypeNames;
 using System.Security.Policy;
@@ -56,7 +57,7 @@ namespace Gym.Tests.Envs.Aether {
         /// <param name="continuous">Selects the continuous action space.</param>
         public void Run(IEnvironmentViewerFactoryDelegate factory, int? seed, bool continuous = false) {
             _seed = seed ?? 0;
-            LunarLanderEnv env = new LunarLanderEnv(factory, random_state: np.random.RandomState(_seed), continuous: continuous);
+            LunarLanderEnv env = new LunarLanderEnv(factory, random_state: LegacySeeding.RandomState(_seed), continuous: continuous);
             env.Verbose = VERBOSE;
             try {
                 // Run a PID test

@@ -1,31 +1,42 @@
 ﻿using System;
+using Gym.Utils;
 using NumSharp;
 
 namespace Gym.Spaces {
     public class Discrete : Space {
-        public int N { get; }
-        public int Start { get; private set; }
+        /// <summary>The number of elements, <see cref="long"/> like Gymnasium's <c>np.int64</c> <c>n</c>.</summary>
+        public long N { get; }
+
+        /// <summary>The smallest element, <see cref="long"/> like Gymnasium's <c>np.int64</c> <c>start</c>.</summary>
+        public long Start { get; private set; }
         protected NumPyRandom RandomState;
 
         /// <summary>
         ///     The space of the <paramref name="n"/> integers <c>{start, ..., start + n - 1}</c>.
         /// </summary>
         /// <param name="n">The number of elements.</param>
-        /// <param name="dType">The declared element type; <see langword="null"/> means float32. <see cref="Sample"/> returns int64 regardless.</param>
-        /// <param name="seed">A seed for this space's own generator, or -1 to use <paramref name="random_state"/> instead.</param>
+        /// <param name="dType">
+        ///     The declared element type; <see langword="null"/> means int64, Gymnasium's default. <see cref="Sample"/> returns
+        ///     int64 regardless.
+        /// </param>
+        /// <param name="seed">
+        ///     A NumPy seed in <c>[0, 2**32 - 1]</c> for this space's own generator, or -1 to use
+        ///     <paramref name="random_state"/> instead.
+        /// </param>
         /// <param name="start">The smallest element.</param>
         /// <param name="random_state">
         ///     The generator to draw from when <paramref name="seed"/> is -1, or <see langword="null"/> for the process-wide
         ///     <c>np.random</c>.
         /// </param>
+        /// <exception cref="ValueError">Thrown when <paramref name="seed"/> is neither -1 nor in <c>[0, 2**32 - 1]</c>.</exception>
         /// <remarks>
         ///     The shape stays <c>(n)</c> instead of Gymnasium's <c>()</c> (B-03, P2): the examples read
-        ///     <c>ActionSpace.Shape.Size</c> as the number of actions.
+        ///     <c>ActionSpace.Shape.Size</c> as the number of actions. The default dtype was float32 under NumSharp.Lite.
         /// </remarks>
-        public Discrete(int n, DType dType = null, int seed = -1, int start=0, NumPyRandom random_state = null) : base(new Shape(n), (dType = dType ?? np.float32)) {
+        public Discrete(long n, DType dType = null, long seed = -1, long start=0, NumPyRandom random_state = null) : base(new Shape(n), (dType = dType ?? np.int64)) {
             N = n;
             Start = start;
-            RandomState = seed != -1 ? np.random.RandomState(seed) : random_state ?? np.random;
+            RandomState = seed != -1 ? LegacySeeding.RandomState(seed) : random_state ?? np.random;
         }
 
         /// <summary>
@@ -62,30 +73,130 @@ namespace Gym.Spaces {
                 }
                 return NDArray.Scalar<long>(Start);
             }
-            // NumSharp's randint defaults to int32 where NumPy 2 defaults to int64. The values and the stream are the same
-            // for either dtype at this range; int64 makes the result NumPy's dtype.
+            // NumSharp's randint defaults to int32 where NumPy 2 defaults to int64; int64 makes the result NumPy's dtype.
+            // Below n = 2^31 the stream is NumPy's for either dtype. For n in [2^31, 2^32] NumSharp switches to its 64-bit
+            // path while NumPy keeps its 32-bit one, so those draws differ from NumPy (not covered by the parity golden).
             using NDArray drawn = RandomState.randint(0, N, dtype: np.int64);
             return NDArray.Scalar<long>(Start + (long)drawn);
         }
 
+        /// <summary>
+        ///     Whether <paramref name="ndArray"/> denotes an element of this space: any integer (<see cref="TryToInt64"/>'s
+        ///     inputs) in <c>[Start, Start + N)</c>. Anything that is not an integer returns <see langword="false"/>, as in
+        ///     Gymnasium; under NumSharp.Lite it threw <see cref="NotSupportedException"/> for everything but a boxed
+        ///     <see cref="int"/>.
+        /// </summary>
+        /// <param name="ndArray">The candidate: a boxed integer of any width, a <see cref="bool"/>, an enum member, or a 0-d integer array.</param>
+        /// <returns><see langword="true"/> when the candidate converts to an integer inside the space.</returns>
+        /// <remarks>
+        ///     Mirrors <c>gymnasium/spaces/discrete.py:198</c> @ 9e04324, except that Gymnasium also requires
+        ///     <c>np.can_cast(x.dtype, self.dtype)</c>, which rejects, for example, a uint64 value in an int64 space (P2).
+        /// </remarks>
         public override bool Contains(object ndArray) {
-            if (ndArray is int i) {
-                return Contains(i);
+            try {
+                return TryToInt64(ndArray, out long x) && Contains(x);
+            } catch (OverflowException) {
+                // Only an unsigned 64-bit value above long.MaxValue gets here. It cannot be an element of an int64 space;
+                // Gymnasium returns False for an integer outside the dtype's range as well.
+                return false;
             }
-
-            throw new NotSupportedException(ndArray?.ToString() ?? nameof(ndArray));
         }
 
-        public bool Contains(int x) {
-            return x >= 0 && x < N;
+        /// <summary>Whether <paramref name="x"/> lies in <c>[Start, Start + N)</c>.</summary>
+        /// <param name="x">The candidate element.</param>
+        /// <returns><see langword="true"/> when <paramref name="x"/> is an element of this space.</returns>
+        /// <remarks>
+        ///     Honours <see cref="Start"/> (B-02: <c>Discrete(3, start: 5)</c> accepted 0 and rejected 5 and 7). The upper bound
+        ///     is computed in <see cref="Int128"/>, because Gymnasium compares unbounded Python ints and
+        ///     <c>Start + N</c> can exceed <see cref="long.MaxValue"/>.
+        /// </remarks>
+        public bool Contains(long x) {
+            return x >= Start && (Int128) x < (Int128) Start + N;
         }
 
+        /// <summary>Whether the value of the enum member <paramref name="x"/> is an element of this space.</summary>
+        /// <param name="x">The candidate, for example a <c>LunarLanderDiscreteActions</c> member.</param>
+        /// <returns><see langword="true"/> when the member's underlying value lies in <c>[Start, Start + N)</c>.</returns>
+        /// <remarks>
+        ///     Works for every underlying type. The former <c>(int)(object)x</c> unboxed exactly and threw
+        ///     <see cref="InvalidCastException"/> for enums not backed by <see cref="int"/>.
+        /// </remarks>
         public bool Contains(Enum x) {
-            return Contains((int) (object) x);
+            return Contains((object) x);
         }
 
-        public override void Seed(int seed) {
-            RandomState = np.random.RandomState(seed);
+        /// <summary>
+        ///     Converts an action handed to <c>Env.Step(object)</c> into the discrete value it denotes. Envs must call this
+        ///     instead of casting: <c>(int)action</c> unboxes exactly and throws <see cref="InvalidCastException"/> as soon as
+        ///     the action is a <see langword="long"/>, or the 0-d int64 <see cref="NDArray"/> that <see cref="Sample"/> returns.
+        /// </summary>
+        /// <param name="action">A boxed integer of any width, a <see cref="bool"/>, an enum member, or a 0-d integer <see cref="NDArray"/>.</param>
+        /// <returns>The action as <see langword="long"/>, the .NET spelling of Gymnasium's <c>np.int64</c>.</returns>
+        /// <exception cref="ArgumentException">
+        ///     Thrown when <paramref name="action"/> is <see langword="null"/>, not an integer, or an array that is not 0-d.
+        /// </exception>
+        /// <exception cref="OverflowException">
+        ///     Thrown when an unsigned 64-bit action exceeds <see cref="long.MaxValue"/> (see <see cref="TryToInt64"/>).
+        /// </exception>
+        public static long ToInt64(object action)
+        {
+            if (TryToInt64(action, out long value))
+                return value;
+            throw new ArgumentException(
+                $"{action ?? "null"} ({action?.GetType().Name ?? "null"}) is not a discrete action: expected an integer, an enum or a 0-d integer NDArray.",
+                nameof(action));
+        }
+
+        /// <summary>
+        ///     Non-throwing form of <see cref="ToInt64"/> for membership tests, so that <see cref="Contains(object)"/> decides
+        ///     what an input that is not an integer means instead of surfacing a conversion error.
+        /// </summary>
+        /// <param name="action">The candidate action.</param>
+        /// <param name="value">The converted value when the method returns <see langword="true"/>; otherwise 0.</param>
+        /// <returns><see langword="true"/> when <paramref name="action"/> denotes an integer.</returns>
+        /// <exception cref="OverflowException">
+        ///     Thrown when an unsigned 64-bit action (a <see langword="ulong"/>, a 0-d uint64 array or an enum backed by
+        ///     <see langword="ulong"/>) exceeds <see cref="long.MaxValue"/>.
+        /// </exception>
+        /// <remarks>
+        ///     Accepts what Gymnasium's <c>Discrete.contains</c> accepts: Python ints, which include <c>bool</c> (a subclass
+        ///     of <c>int</c>, so <c>True</c> is 1), and 0-d arrays of an integer dtype (NumPy scalars). A 0-d <em>boolean</em>
+        ///     array is rejected, because <c>np.bool_</c> is not an <c>np.integer</c>.
+        /// </remarks>
+        public static bool TryToInt64(object action, out long value)
+        {
+            switch (action)
+            {
+                case long l: value = l; return true;
+                case int i: value = i; return true;
+                case short s: value = s; return true;
+                case sbyte sb: value = sb; return true;
+                case byte b: value = b; return true;
+                case ushort us: value = us; return true;
+                case uint ui: value = ui; return true;
+                case ulong ul: value = checked((long)ul); return true;
+                case bool flag: value = flag ? 1 : 0; return true;
+                case Enum e: value = Convert.ToInt64(e); return true;
+                // Gymnasium's Discrete.contains accepts 0-d integer arrays (np.int64 scalars) as well as Python ints.
+                case NDArray nd when nd.ndim == 0 && nd.dtype.kind is 'i' or 'u':
+                    // NumSharp's (long) is a C-style cast: a uint64 above long.MaxValue wraps silently (ulong.MaxValue
+                    // becomes -1, measured), so that dtype takes a checked conversion.
+                    value = nd.typecode == NPTypeCode.UInt64 ? checked((long)(ulong)nd) : (long)nd;
+                    return true;
+                default:
+                    value = 0;
+                    return false;
+            }
+        }
+
+        /// <summary>
+        ///     Gives this space a fresh generator seeded with <paramref name="seed"/>, bit-identical to
+        ///     <c>numpy.random.RandomState(seed)</c>. A generator the space shared (for example with its env) is left untouched.
+        /// </summary>
+        /// <param name="seed">A NumPy seed in <c>[0, 2**32 - 1]</c>.</param>
+        /// <exception cref="ValueError">Thrown when <paramref name="seed"/> is outside <c>[0, 2**32 - 1]</c>, with NumPy's message.</exception>
+        public override void Seed(long seed) {
+            RandomState = LegacySeeding.RandomState(seed);
         }
 
         #region Object Overrides

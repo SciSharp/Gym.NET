@@ -33,6 +33,16 @@ namespace Gym.Spaces {
 
         public abstract NDArray Sample(NDArray mask = null);
         public abstract bool Contains(object ndArray);
-        public abstract void Seed(int seed);
+
+        /// <summary>
+        ///     Gives this space a fresh generator seeded with <paramref name="seed"/>, so the samples that follow are
+        ///     reproducible and independent of every other space and env, including any that shared its previous generator.
+        /// </summary>
+        /// <param name="seed">
+        ///     A NumPy seed in <c>[0, 2**32 - 1]</c>; <see langword="long"/> because seeds above <see cref="int.MaxValue"/>
+        ///     are valid.
+        /// </param>
+        /// <exception cref="ValueError">Thrown when <paramref name="seed"/> is outside <c>[0, 2**32 - 1]</c>, with NumPy's message.</exception>
+        public abstract void Seed(long seed);
     }
 }

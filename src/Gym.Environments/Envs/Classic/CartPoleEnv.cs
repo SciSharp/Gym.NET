@@ -6,6 +6,7 @@ using Gym.Collections;
 using Gym.Envs;
 using Gym.Observations;
 using Gym.Spaces;
+using Gym.Utils;
 using JetBrains.Annotations;
 using NumSharp;
 using SixLabors.ImageSharp;
@@ -134,8 +135,27 @@ namespace Gym.Environments.Envs.Classic {
             return img;
         }
 
+        /// <summary>
+        ///     Pushes the cart left (action 0) or right (action 1) and integrates one Euler step of <c>tau</c> seconds.
+        /// </summary>
+        /// <param name="action">
+        ///     0 or 1 as any integer width, a <see cref="bool"/>, an enum member, or the 0-d array <c>ActionSpace.Sample()</c>
+        ///     returns.
+        /// </param>
+        /// <returns>
+        ///     The new state (a float64 array of shape (4,)), the reward, and the done flag. The observation is the env's own
+        ///     state array, so writing to it changes the next step (B-13's aliasing, removed with the ownership step).
+        /// </returns>
+        /// <exception cref="ArgumentException">Thrown when <paramref name="action"/> does not denote an integer.</exception>
+        /// <exception cref="OverflowException">Thrown when an unsigned 64-bit action exceeds <see cref="long.MaxValue"/>.</exception>
+        /// <remarks>
+        ///     An integer other than 0 or 1 is caught only by the <c>Debug.Assert</c> below, so Release builds treat it as
+        ///     "push left" (B-14, P4).
+        /// </remarks>
         public override Step Step(object action) {
-            int iaction = (int)action;
+            // (int)action unboxed exactly: it threw InvalidCastException for a long, and for the 0-d int64 NDArray that
+            // ActionSpace.Sample() returns (trap 1 of docs/plans/NUMSHARP_MIGRATION_PLAN.md §7).
+            long iaction = Discrete.ToInt64(action);
             Debug.Assert(ActionSpace.Contains(iaction), $"{action} ({action.GetType().Name}) invalid action for {GetType().Name} environment");
             //get the last step data
             var x = state.GetDouble(0);
@@ -193,8 +213,15 @@ namespace Gym.Environments.Envs.Classic {
             }
         }
 
-        public override void Seed(int seed) {
-            random = np.random.RandomState(seed);
+        /// <summary>
+        ///     Gives the env a fresh generator seeded with <paramref name="seed"/>, which the next <see cref="Reset"/> draws its
+        ///     initial state from. The action space keeps its own generator; seed it separately.
+        /// </summary>
+        /// <param name="seed">A NumPy seed in <c>[0, 2**32 - 1]</c>.</param>
+        /// <exception cref="ValueError">Thrown when <paramref name="seed"/> is outside <c>[0, 2**32 - 1]</c>, with NumPy's message.</exception>
+        public override void Seed(long seed) {
+            // NumSharp's RandomState(int) cannot take seeds above int.MaxValue and does not validate; LegacySeeding does both.
+            random = LegacySeeding.RandomState(seed);
         }
     }
 }

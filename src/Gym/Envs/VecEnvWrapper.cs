@@ -19,7 +19,14 @@ namespace Gym.Envs {
             return Environments.Select(e => e.Reset()).ToArray();
         }
 
-        public override Step[] Step(int action) {
+        /// <summary>
+        ///     Steps every sub-env, one after another, with the same <paramref name="action"/> (B-33). The action reaches each
+        ///     env boxed as a <see langword="long"/>, so an env that still casts <c>(int)action</c> throws
+        ///     <see cref="System.InvalidCastException"/>; envs convert with <see cref="Discrete.ToInt64"/>.
+        /// </summary>
+        /// <param name="action">The discrete action.</param>
+        /// <returns>One step result per sub-env, in <see cref="VecEnv.Environments"/> order.</returns>
+        public override Step[] Step(long action) {
             return Environments.Select(e => e.Step(action)).ToArray();
         }
 
