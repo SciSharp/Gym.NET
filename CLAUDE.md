@@ -33,7 +33,10 @@ refs/Gym.NET/
 │   └── Gym.Rendering.WinForm/     # Windows Forms GUI rendering (WinFormEnvViewer)
 │
 ├── tests/
-│   └── Gym.Tests/                 # MSTest test suite for environments, spaces, and multi-instance concurrency
+│   ├── Gym.Tests/                 # MSTest test suite for environments, spaces, and multi-instance concurrency
+│   └── Gym.Tests.Parity/          # Live parity gate: embedded CPython runs refs/Gymnasium, compared byte/pixel-exact (see its CLAUDE.md)
+│
+├── tools/parity/                  # Parity stack: manifest.json (pins), requirements.txt, setup_venv.{ps1,sh}; audit probes
 │
 ├── examples/                      # Standalone reinforcement learning sample runners
 │   └── ReinforcementLearning/     # CartPole neural network training via parameters vs image observations
@@ -95,7 +98,25 @@ dotnet test tests/Gym.Tests/Gym.Tests.csproj --filter "FullyQualifiedName~LunarL
 dotnet test tests/Gym.Tests/Gym.Tests.csproj --filter "FullyQualifiedName~LunarLanderEnvironment.Run_TwoInstances_Continuous_AvaloniaEnv"
 ```
 
-### 3.3 Submodule Management
+### 3.3 Gymnasium Parity Tests (live)
+
+`tests/Gym.Tests.Parity` embeds CPython (pythonnet) and compares Gym.NET with `refs/Gymnasium` byte for byte and pixel for
+pixel, on the reference stack pinned in `tools/parity/manifest.json` (Python 3.12, NumPy 2.4.2, pygame-ce 2.5.8, Box2D
+2.3.10). Cells Gym.NET does not pass yet are `[OpenBugs("B-xx")]` (NumSharp's convention): gated runs exclude them. Full
+guide: `tests/Gym.Tests.Parity/CLAUDE.md`; design: `docs/plans/GYM_PARITY_INTEROP_TESTING.md`.
+
+```powershell
+# Once per machine without the stack: creates tools/parity/.venv, which the suite finds on its own
+pwsh tools/parity/setup_venv.ps1
+
+# The gate (what must pass)
+dotnet test tests/Gym.Tests.Parity/Gym.Tests.Parity.csproj --filter "TestCategory!=OpenBugs"
+
+# The open gaps, each printing its first divergence from Gymnasium
+dotnet test tests/Gym.Tests.Parity/Gym.Tests.Parity.csproj --filter "TestCategory=OpenBugs" --logger "console;verbosity=detailed"
+```
+
+### 3.4 Submodule Management
 
 ```powershell
 # Initialize the Gymnasium and NumSharp SOT submodules. The build compiles NumSharp from refs/NumSharp (eng/NumSharp.props).

@@ -1,0 +1,55 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The live half of Gym.NET's Gymnasium parity gate (docs/plans/GYM_PARITY_INTEROP_TESTING.md): the test process
+       embeds CPython through pythonnet, imports Gymnasium from refs/Gymnasium, and compares Gym.NET with it byte for byte
+       and pixel for pixel. How to run it and how to add a cell: CLAUDE.md in this directory. -->
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>Gym.Tests.Parity</RootNamespace>
+    <!-- New projects follow the port plan's section 3.7. Warnings as errors also turns NumSharp's ownership analyzer
+         (NDW012/NDW016/NDW017) into errors here, so every NDArray the harness creates is disposed or handed on. -->
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <Deterministic>true</Deterministic>
+    <!-- Enforces the XML documentation the repository requires on every member (CS1591 and friends become errors). -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.10.1" />
+    <PackageReference Include="MSTest.TestAdapter" Version="4.4.1" />
+    <PackageReference Include="MSTest.TestFramework" Version="4.4.1" />
+    <!-- The embedded engine. This is NumSharp.Interop.pythonnet's floor ([3.0.5, 4.0.0)), declared here so the version
+         the suite runs is visible: 3.0.5 drives Python 3.7 to 3.13, and a Python 3.14 reference would need 3.1.0 here and
+         in NumSharp's interop (plan section 13). -->
+    <PackageReference Include="pythonnet" Version="3.0.5" />
+    <!-- FrameDiff reads Gym.NET's rendered Image and writes the PNG artifacts of a failed frame comparison. Same version as
+         src/Gym.Environments: the last Apache-2.0 release line. -->
+    <PackageReference Include="SixLabors.ImageSharp" Version="2.1.13" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Gym\Gym.csproj" />
+    <ProjectReference Include="..\..\src\Gym.Environments\Gym.Environments.csproj" />
+  </ItemGroup>
+
+  <!-- The Python half of the oracle, loaded into the embedded interpreter as module gym_oracle. Embedded, so the suite
+       depends neither on the working directory nor on copy-to-output. -->
+  <ItemGroup>
+    <EmbeddedResource Include="Oracle\gym_oracle.py" LogicalName="Gym.Tests.Parity.Oracle.gym_oracle.py" />
+  </ItemGroup>
+
+  <!-- NumSharp and its pythonnet bridge: the regular NuGet references, co-versioned. While NumSharpSource=Submodule (the
+       default until a NumSharp release contains the DType API), eng/NumSharp.props replaces both with refs/NumSharp's
+       source builds; -p:NumSharpSource=Package builds against them as they stand. The import stays last: an item Remove
+       only sees the items declared before it. -->
+  <ItemGroup>
+    <PackageReference Include="NumSharp" Version="0.70.0" />
+    <PackageReference Include="NumSharp.Interop.pythonnet" Version="0.70.0" />
+  </ItemGroup>
+  <Import Project="..\..\eng\NumSharp.props" />
+
+</Project>

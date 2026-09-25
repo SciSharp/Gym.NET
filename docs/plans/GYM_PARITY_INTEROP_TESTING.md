@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Draft 1, 2026-09-23 (see §14 for what's verified and what's next) |
+| **Status** | Draft 2, 2026-09-25: the live harness is built and running as `tests/Gym.Tests.Parity` (see §14 for what's verified and what's next) |
 | **Companion to** | `docs/plans/GYMNASIUM_PORT_PLAN.md` (§14 verification strategy); this document designs its live half |
 | **Modelled on** | `refs/NumSharp`: `src/NumSharp.Interop.pythonnet` + `test/NumSharp.Tests.Interop` (and its `CLAUDE.md`) |
 | **Oracle** | `refs/Gymnasium` @ `9e04324`, imported **in-process** through pythonnet |
@@ -59,25 +59,46 @@ A pinned venv, created by `tools/parity/setup_venv.{ps1,sh}` from `tools/parity/
 
 Verified on 2026-09-23: this venv installs cleanly on Windows 11 x64 from Python 3.12.12 (numpy 2.4.2, pygame-ce 2.5.8, Box2D 2.3.10), and `refs/Gymnasium` imports from `sys.path` and runs CartPole, Pendulum and `rgb_array` rendering.
 
+Verified on 2026-09-25: `tools/parity/setup_venv.ps1` and `setup_venv.sh` (Git Bash) each create `tools/parity/.venv` from `tools/parity/requirements.txt` (the pins above, plus `cloudpickle` 3.1.2, `typing-extensions` 4.15.0 and `farama-notifications` 0.0.6), and the suite runs on it unconfigured: 103 of 103 gated cells passed with `python.source` reporting the venv. The reference interpreter itself (`~/.claude/python`, not a venv) carries the same stack, and the suite runs on it when no venv exists.
+
 **Session manifest check.** At `[AssemblyInitialize]` the session reads `gymnasium.__file__`, the `refs/Gymnasium` HEAD SHA, `numpy.__version__`, `pygame.version.ver`, `Box2D.__version__`, `sys.version`, and the OS and CPU. A mismatch with `tools/parity/manifest.json` fails the run: a live oracle on the wrong stack proves nothing. `GYMNET_PARITY_ALLOW_STACK_DRIFT=1` downgrades the mismatch to Inconclusive for local exploration.
+
+As built, the check also fails the run when `gymnasium` is imported from anywhere but `refs/Gymnasium`, when `git status` reports modified tracked files in the submodule (an edited oracle changes what "Gymnasium's answer" means; cleanliness is reported as unverified, not failed, when git is unavailable), and when `sys.flags.hash_randomization` is not 0. The report also records where Python and NumPy were loaded from and the platform.
 
 ## 4. Project layout
 
+As built (2026-09-25); the project's own guide is `tests/Gym.Tests.Parity/CLAUDE.md`:
+
 ```
-tests/Gym.Tests.Parity/                 live-interop test project (net8.0;net10.0)
+tests/Gym.Tests.Parity/                 live-interop test project (net8.0;net10.0; nullable, warnings as errors)
   AssemblyInfo.cs                       [assembly: DoNotParallelize]
+  OpenBugsAttribute.cs                  NumSharp's [OpenBugs] category, with the port plan's defect ids (§12)
   Session/GymPythonSession.cs           engine start, venv + refs/Gymnasium on sys.path, manifest check
-  Session/ParityTestBase.cs             InteropTestBase port: Scope, Gil(), leak gate, SkipUnless
-  Oracle/ByteContract.cs                NDArray/scalar/Info vs PyObject, bitwise
-  Oracle/PyGym.cs                       live builders: make, reset, step, render, space ops
+  Session/PythonDiscovery.cs            NumSharp's interpreter discovery, plus the parity venv
+  Session/NativeEnvironment.cs          determinism variables through the C runtime (see below)
+  Session/StackManifest.cs              tools/parity/manifest.json and the stack report
+  Session/RepositoryLayout.cs           the checkout, the submodule's HEAD and its cleanliness
+  Session/ParityTestBase.cs             InteropTestBase port: Scope, Gil(), SkipUnless, SkipOffReferencePlatform
+  Session/LeakGate.cs                   NumSharp's LiveExports/LiveImports gate, run after every test
+  Oracle/gym_oracle.py                  the Python half: describe(), invoke(), OracleEnv, policies (embedded resource)
+  Oracle/ValueFacts.cs                  the side-neutral description of a value both halves reduce to
+  Oracle/ByteContract.cs                the comparer: dtype, shape, bytes, float bits, ulps, key order, exceptions
+  Oracle/Outcome.cs                     a call's value or exception; the Python -> .NET exception map (port plan §3.4)
+  Oracle/PyGym.cs, PyGymEnv.cs          live builders: objects from expressions, handles, gymnasium.make envs
+  Oracle/RngFacts.cs, GeneratorProbe.cs PCG64 state in NumPy's bit_generator.state shape
   Pair/GymPair.cs                       lockstep differential runner (§5)
-  Pair/Divergence.cs                    first-divergence report and shrinking
-  Frames/FrameDiff.cs                   pixel diff and PNG artifacts (§6)
-  Bridge/PyEnvShim.py, DotNetEnv.cs     reverse bridge: a .NET env seen by Python (§8)
-  Cases/*.cs                            ParityCase catalog shared with golden record/replay (§9)
-  Tests/Core|Spaces|Registry|Wrappers|Vector|Envs/*LiveParityTests.cs
+  Pair/Divergence.cs                    first-divergence report (ParityException)
+  Pair/ParityAction.cs, ActionSources.cs  one action with identical bits on both sides; open-loop, policy, sampled
+  Pair/IDotNetEnv.cs, GymNetEnv.cs      the .NET half; the adapter over Gym.NET's legacy env API
+  Pair/Transition.cs                    a described reset/step result
+  Frames/Frame.cs, FrameDiff.cs         pixel diff and PNG artifacts (§6)
+  Frames/ParityArtifacts.cs             where artifacts go, attached to the test result
+  Reference/CartPoleReference.cs        float64 transcription of cartpole.py: positive and negative controls (§11)
+  Tests/Harness|Rng|Spaces|Envs/*.cs    the cells (§14)
 tools/parity/requirements.txt, setup_venv.ps1, setup_venv.sh, manifest.json
 ```
+
+Not built yet: `Bridge/` (§8) and `Cases/` (§9).
 
 Environment variables, mirroring NumSharp's:
 
@@ -94,6 +115,8 @@ The session also sets deterministic process state before importing anything:
 - `PYTHONHASHSEED=0` (Python `set` ordering)
 - `SDL_VIDEODRIVER=dummy` and `PYGAME_HIDE_SUPPORT_PROMPT=1` (headless pygame)
 - `OMP_NUM_THREADS=1`, `OPENBLAS_NUM_THREADS=1`, `MKL_NUM_THREADS=1`
+
+As built it adds `PYTHONDONTWRITEBYTECODE=1` (and sets `sys.dont_write_bytecode`), so the suite never writes `__pycache__` into the submodule, and `SDL_AUDIODRIVER=dummy`. These must be set in the **C runtime's** environment: `Environment.SetEnvironmentVariable` only changes the Win32 block, which CPython's `Py_Initialize` does not read (measured 2026-09-25: `PYTHONHASHSEED=0` stayed invisible and `sys.flags.hash_randomization` stayed 1). The session therefore also calls `_wputenv_s` (UCRT) on Windows and `setenv` (libc) elsewhere, and the stack check verifies the effect. No `.runsettings` is needed, so the suite behaves the same from `dotnet test`, an IDE or the test executable.
 
 ## 5. Lockstep differential: `GymPair`
 
@@ -135,15 +158,18 @@ public sealed class GymPair : IDisposable
 }
 ```
 
+**As built (2026-09-25).** Constructing both sides from one id needs Gym.NET's registry (`Gymnasium.Make`, P1), so the pair takes the two envs instead: `new GymPair(PyGymEnv.Make("CartPole-v1"), new GymNetEnv(new CartPoleEnv(...)), stateAttribute: "state")`, with `Reset(seed)`, `Step(ParityAction)`, `Run(seed, actionSource, maxSteps, frameEvery)`, `InjectState(attribute, values)` and `CompareFrame(label)`. `PyGymEnv.Make` goes through `gymnasium.make` and steps its `unwrapped` env by default, the right counterpart while Gym.NET has no wrappers (`viaMake: true` keeps the stack). `GymNetEnv` bridges Gym.NET's legacy API without touching a value: `Seed(s)` + `Reset()` stands for `reset(seed=s)`, the missing reset info and a null step information are reported as `{}`, `done` as `terminated`, and `truncated` as `False`, which is what Gymnasium's unwrapped env returns. Every report prints those adaptations. Test-local envs implement `IDotNetEnv` directly; `Reference/CartPoleReference.cs` is the harness's positive control.
+
 **What is compared, per call:**
 
 | Field | Comparison |
 |---|---|
-| Observation | dtype + shape + C-order bytes (`ByteContract`); for `Discrete`: int value and Python type (`int` vs `np.int64`) |
+| Observation | dtype + shape + C-order bytes (`ByteContract`). A NumPy scalar (`np.int64(3)`) equals a 0-d NumSharp array of the same dtype and bytes, because NumSharp has no scalar types; Python type names are reported, never compared |
 | Reward | float64 bit pattern (a Python `float` or `np.float64`; `np.float32` rewards are widened exactly) |
 | `terminated`, `truncated` | equality |
-| `info` | same keys **in the same order**; values compared recursively (arrays by bytes, scalars by bits); a per-wrapper allowlist excludes wall-clock entries (`RecordEpisodeStatistics` `"t"`) |
-| RNG state | `env.unwrapped.np_random.bit_generator.state` (PCG64 `state`/`inc`) vs NumSharp's PCG64 state. This catches a missing or extra draw at the step it happens, even before any value differs |
+| `info` | same keys **in the same order**; values compared recursively (arrays by bytes, scalars by bits); a per-wrapper allowlist excludes wall-clock entries (`RecordEpisodeStatistics` `"t"`), to be added with the first wrapper that needs one |
+| State attribute (as built, optional) | a float64 attribute both envs expose (`state` for classic control), compared exactly after every call, so dynamics are checked at full precision even where the float32 observation would round a difference away |
+| RNG state | `env.unwrapped.np_random.bit_generator.state` (PCG64 `state`/`inc`) vs NumSharp's PCG64 state. This catches a missing or extra draw at the step it happens, even before any value differs. As built, only after the pair's own seeded reset: before one, both generators are entropy-seeded (and reading Gymnasium's `np_random` would create one), so the skip is noted in the report instead |
 | Exceptions | same type (mapped through port plan §3.4) and same message |
 
 **Action sources:**
@@ -154,6 +180,8 @@ public sealed class GymPair : IDisposable
 **State injection** is for unit-level dynamics checks. The pair writes the same state into both envs (Python `env.unwrapped.state = …`; .NET the equivalent public property), steps once, and compares. This isolates one step of dynamics from reset and RNG. In the 2026-09-23 scan this technique separated "wrong float32 constants" from "platform math" in CartPole (port plan Appendix A.7).
 
 **Divergence report and shrinking** (`Divergence`): the report gives the first step, field, element index, both values (hex bits and decimal), the ulp distance, the action history, and a dump of both envs' full state at steps *k−1* and *k*, written to `GYMNET_PARITY_ARTIFACTS`. The shrinker replays from reset to find the shortest action prefix that still diverges, then tries state injection at *k−1* to confirm whether the fault lies in `step` alone.
+
+As built, the report lists **every** differing field of the first diverging call (together they tell a missing cast from wrong values: CartPole's reset reports only `observation.dtype`, with "casting dotnet to <f4 would make them identical"), the action history, the pair's adaptations, and the state attribute before and after, in the exception message; frame artifacts go to `GYMNET_PARITY_ARTIFACTS`. The shrinker is not built: with open-loop and policy sources the first divergence already is the shortest prefix, so it waits for the fuzzer (§10).
 
 ## 6. Pixel parity
 
@@ -243,14 +271,16 @@ Each generated case runs in `Live` mode. On failure the shrinker (§5) minimizes
 
 Following NumSharp's `HarnessSelfTests`, a parity harness that can't fail is worthless. Negative controls:
 
-| Control | Must report |
-|---|---|
-| CartPole with `tau = 0.02f` (the current Gym.NET bug) | divergence at step 1, field `observation`, via `GymPair` |
-| A space that skips one RNG draw | divergence at the RNG-state check, one step before any value differs |
-| A frame with one pixel changed by 1 | `FrameDiff` failure, 1 pixel, delta 1 |
-| An `info` with keys in a different order | `info` key-order divergence |
-| A reward computed in float32 | reward-bits divergence with the ulp distance |
-| A leaked `PyObject` | leak-gate failure |
+| Control | Must report | As built (`Tests/Harness/HarnessSelfTests.cs`, all passing 2026-09-25) |
+|---|---|---|
+| CartPole with `tau = 0.02f` (the current Gym.NET bug) | divergence at step 1, field `observation`, via `GymPair` | `CartPoleReference.WithFloat32Tau()`: step 1, field `state`, 4 of 4 elements, no `rng`/`reward`/flag field. The float64 state, not the observation, is the field: a 1e-10 difference can round away in the float32 observation |
+| A space that skips one RNG draw | divergence at the RNG-state check, one step before any value differs | `CartPoleReference.WithExtraDraw()` (one extra `random()` after the reset): reported at the reset, field `rng` only, the observation still identical |
+| A frame with one pixel changed by 1 | `FrameDiff` failure, 1 pixel, delta 1 | on a real Gymnasium frame: 1 pixel, delta 1, bounds that pixel, histogram bucket 1 |
+| An `info` with keys in a different order | `info` key-order divergence | `info.keys`: "same keys in a different order" |
+| A reward computed in float32 | reward-bits divergence with the ulp distance | 0.1 against 0.1f: "107374182 ulp apart in float64" |
+| A leaked `PyObject` | leak-gate failure | an export Python still holds keeps `LiveExports` above the baseline (0 → 1); `del` settles it |
+
+The positive control is as important: the faithful `CartPoleReference` runs 500 steps in lockstep with nothing reported. Further self-tests pin the comparer's rules: a float32/float64 dtype difference with equal values is reported (with "casting would make them identical"); `np.int64(3)` equals a 0-d int64 NumSharp array but not an int32 one or a `(1,)` array; a Python `ValueError` matches `NumSharp.ValueError` with the same message and is reported against another type, another message, or a return; state injection without a reset compares no generators.
 
 ## 12. Tolerances and exclusions
 
@@ -259,12 +289,15 @@ Following NumSharp's `HarnessSelfTests`, a parity harness that can't fail is wor
 - cells known to be platform-dependent (libm transcendentals and the `float128` path in `rescale_box` off Windows) go **Inconclusive off the reference platform**, never red, and stay strict on it;
 - MuJoCo frames (GPU and driver dependent) are compared on dynamics only unless offscreen rendering is pinned.
 
+**Known gaps are not exclusions.** A cell Gym.NET fails because a port has not landed yet asserts Gymnasium's answer and carries `[OpenBugs("B-xx", ...)]`, NumSharp's category for known failing reproductions, with the defect ids of the port plan's register (Appendix B) or its workstreams. Gated runs filter the category out (`--filter "TestCategory!=OpenBugs"`), a run of the category alone prints every gap's first divergence, and when the port lands the cell passes unchanged and the attribute is removed. NumSharp's triage rule applies: never excuse a real gap as an exclusion. As built, platform-dependent cells call `SkipOffReferencePlatform` (the reference is `referencePlatform` in the manifest, `win-x64`); `ParityExclusions` itself is not built, because no compared value needs one yet: it arrives with the first wrapper that reports wall-clock time.
+
 ## 13. Costs and limits
 
 - One interpreter per test process and `[DoNotParallelize]`: the live suite is slower than unit tests. Keep cases short (hundreds of steps); long episodes belong to `Replay`.
 - Each paired step costs a few Python calls. Batch comparisons per step, not per field.
 - CPython can't be re-initialized: never call `PythonEngine.Shutdown()` between tests. Shut down once at assembly cleanup, with `NoopFormatter` set.
 - pythonnet 3.0.5 caps Python at 3.13. Moving the reference to 3.14 requires pythonnet 3.1.0 across the harness and NumSharp's interop.
+- Measured 2026-09-25 (Windows 11 x64): the 103 gated cells run in about 2 s; a 500-step CartPole lockstep with the state and generator compared after every call takes about 0.2 s; a 600 × 400 frame crosses in about 0.1 s (pythonnet's `As<byte[]>()`), fine for a few frames per test but not for a frame every step.
 
 ## 14. Status and continuation
 
@@ -274,11 +307,18 @@ Following NumSharp's `HarnessSelfTests`, a parity harness that can't fail is wor
 - NumSharp master's `default_rng` is bit-identical to NumPy 2.4.2 for 16/17 of Gymnasium's draw patterns (all but `geometric`).
 - The state-injection technique detects the CartPole float32-constant divergence at step 1, and a float64 transcription is bit-identical for 4 × 500 steps. These were run offline, through JSON, not yet through pythonnet.
 
-**Not yet done:** booting pythonnet inside a Gym.NET test project. First steps for the next session:
-1. Create `tests/Gym.Tests.Parity` with `pythonnet` `[3.0.5, 4.0.0)` and `NumSharp.Interop.pythonnet` (use a ProjectReference to `refs/NumSharp/src/NumSharp.Interop.pythonnet` until the Gym.NET NumSharp migration lands, port plan F1).
-2. Port `PythonSession` + `InteropTestBase`. Point `PYTHONNET_PYDLL` at the base `python312.dll`, then prepend the venv's `site-packages` and `refs/Gymnasium` to `sys.path`. Confirm `import gymnasium` and the manifest check.
-3. Implement `ByteContract` + `GymPair` for CartPole and reproduce, **live**, the offline result: the current `CartPoleEnv` diverges at step 1, and a float64 port matches for 500 steps.
-4. Add the §11 self-tests before any further coverage.
+**Verified live on 2026-09-25** (`tests/Gym.Tests.Parity`, Gym.NET branch `feat/numsharp-master-migration` after the PCG64 seeding commit b51689d; Windows 11 x64, .NET SDK 10.0.101; the four first steps of Draft 1 are done):
+- pythonnet 3.0.5 embeds CPython 3.12.12 in the test process; NumSharp.Interop.pythonnet is built from `refs/NumSharp` (`eng/NumSharp.props` swaps its declared package, as it does NumSharp's); `import gymnasium` resolves to `refs/Gymnasium` @ 9e04324, clean; the manifest check passes; hash randomization is off.
+- **130 cells: 103 gated, all passing; 27 `[OpenBugs]`, each failing at its documented defect and nothing else**, in Debug and Release on net8.0 and net10.0. The existing `Gym.Tests` suite is unaffected (62 of 62 headless).
+- **Byte-identical to Gymnasium today:** `Seeding.NpRandom` (reported seed and PCG64 state for 9 seeds up to `long.MaxValue` and for 2^100 + 7; the negative-seed `Error` and its message; an unseeded generator's 128-bit seed rebuilds it in NumPy); the 15 draw patterns of the port plan's A.6, value for value with the state after each; `Discrete` (samples, masked samples, membership, attributes); `Box` (bounds and their classification, `is_bounded`, samples in every bound category and dtype family, membership); CartPole's action space; LunarLander's discrete action space.
+- **The live form of the offline results:** the float64 CartPole transcription is bit-identical for 4 seeds × 500 steps and through termination; Gym.NET's CartPole now matches Gymnasium's reset state and generator (F2) and differs only by the missing float32 cast (B-13: "casting dotnet to <f4 would make them identical"); from the same state its float32 constants move the state at step 1 (B-11); its frames differ in 2,573, 2,747 and 2,659 pixels at A.9's three states, exactly A.9's counts (B-16).
+- **Found by the live suite:** Gym.NET's `Box(float low, float high, ...)` stores the bounds of a float64 box through `float`, so `Box(-0.1, 0.1, (2,), float64)` has `low` -0.10000000149011612 where Gymnasium has -0.1 (107374182 ulps; open, P2).
+
+**Next steps:**
+1. Wire the suite into CI (port plan §14.8): a Windows reference job that runs `tools/parity/setup_venv.ps1`, then `dotnet test tests/Gym.Tests.Parity --filter "TestCategory!=OpenBugs"` with `GYMNET_PYTHONNET_REQUIRE_ENGINE=1`.
+2. The reverse bridge (§8): `PyEnvShim.py` over `IDotNetEnv`, then `check_env` and `check_environments_match` on Gym.NET's envs.
+3. One case catalog for live, record and replay (§9), with the port plan's golden harness (F4).
+4. As each port lands (P1 core API, P2 spaces, P4 CartPole, P7 rasterizer, P8 LunarLander), remove its `[OpenBugs]` and add the cells its new surface needs (`Gymnasium.Make`, wrappers, vector envs, the registry, §7).
 
 **Open questions for the maintainer:**
 - Whether the live suite should be required on PRs, or only on the reference job and nightly.

@@ -298,6 +298,9 @@ paket-files/
 __pycache__/
 *.pyc
 
+# The parity suite's reference Python stack, created by tools/parity/setup_venv.{ps1,sh}
+tools/parity/.venv/
+
 # Cake - Uncomment if you are using it
 # tools/**
 # !tools/packages.config

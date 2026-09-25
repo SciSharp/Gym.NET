@@ -1,0 +1,24 @@
+# The reference Python stack of Gym.NET's live parity suite (tests/Gym.Tests.Parity), pinned per
+# docs/plans/GYM_PARITY_INTEROP_TESTING.md section 3 and checked at run time against tools/parity/manifest.json.
+#
+# Gymnasium itself is deliberately absent: the suite imports it from the refs/Gymnasium submodule through sys.path, so
+# the oracle is exactly the pinned commit. A pip-installed Gymnasium could drift from that commit, and an editable
+# install would write build artifacts into the submodule.
+#
+# Install with tools/parity/setup_venv.ps1 (Windows) or tools/parity/setup_venv.sh (Linux, macOS). Python must be 3.12:
+# pythonnet 3.0.5 drives 3.7 to 3.13, and 3.12 is the port plan's reference (section 1.3).
+
+# NumSharp is verified byte-exact against this NumPy (port plan, Appendix A.6).
+numpy==2.4.2
+# The rasterizer oracle. Gymnasium only sets a floor (pygame-ce>=2.1.3), and frames are compared pixel for pixel, so the
+# exact build matters; 2.5.8 bundles SDL 2.32.10.
+pygame-ce==2.5.8
+# Gymnasium's pin for Python < 3.14 (pyproject.toml, extra "box2d"); it ships wheels up to 3.13, so no swig is needed.
+box2d==2.3.10
+# Gymnasium's own runtime dependencies (pyproject.toml, "dependencies"). cloudpickle and typing-extensions are the
+# versions on the reference machine. farama-notifications is not installed there (gymnasium/__init__.py imports it
+# inside try/except, and it only prints release notices), so it is pinned to its latest release, 0.0.6; it never
+# affects a compared value.
+cloudpickle==3.1.2
+typing-extensions==4.15.0
+farama-notifications==0.0.6

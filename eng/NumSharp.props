@@ -2,13 +2,17 @@
   <!-- ==================================================================================================================
        How Gym.NET builds against NumSharp, and NumSharp's ownership analyzer (NDW012/NDW016/NDW017).
 
-       Every project that compiles against NumSharp (src/Gym, src/Gym.Environments, tests/Gym.Tests) declares the regular
-       NuGet reference itself, as its last lines, immediately followed by this import:
+       Every project that compiles against NumSharp (src/Gym, src/Gym.Environments, tests/Gym.Tests,
+       tests/Gym.Tests.Parity) declares the regular NuGet reference itself, as its last lines, immediately followed by
+       this import:
 
            <ItemGroup>
              <PackageReference Include="NumSharp" Version="..." />
            </ItemGroup>
            <Import Project="..\..\eng\NumSharp.props" />
+
+       A project that also uses NumSharp.Interop.pythonnet (the live parity suite) declares that package in the same
+       ItemGroup, at the same version; it follows the same switch (see the ItemGroup that captures it below).
 
        This file never adds a NumSharp PackageReference of its own. It only decides whether the declared one is used:
 
@@ -50,6 +54,22 @@
   <ItemGroup Condition="'$(NumSharpSource)' == 'Submodule'">
     <PackageReference Remove="NumSharp" />
     <ProjectReference Include="$(NumSharpRoot)src\NumSharp.Core\NumSharp.Core.csproj" />
+  </ItemGroup>
+
+  <!-- NumSharp.Interop.pythonnet, the NDArray <-> numpy bridge of the live parity suite (tests/Gym.Tests.Parity), is
+       co-versioned with NumSharp and follows the same switch. A project that declares its package gets refs/NumSharp's
+       source build of it in Submodule mode, compiled against the same NumSharp.Core. The package cannot be mixed with the
+       submodule build: it is compiled against NuGet NumSharp 0.70.0, and NumSharp.Core packs under that same id and
+       version, so NuGet would bind the package to the submodule's NumSharp.dll, whose DType API (Stage B) differs from
+       the release; the mismatch would surface at run time as MissingMethodException, not at build time. Projects that
+       don't declare the package are unaffected. -->
+  <ItemGroup>
+    <_GymNetDeclaredInteropPackage Include="@(PackageReference->WithMetadataValue('Identity', 'NumSharp.Interop.pythonnet'))" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(NumSharpSource)' == 'Submodule' and '@(_GymNetDeclaredInteropPackage)' != ''">
+    <PackageReference Remove="NumSharp.Interop.pythonnet" />
+    <ProjectReference Include="$(NumSharpRoot)src\NumSharp.Interop.pythonnet\NumSharp.Interop.pythonnet.csproj" />
   </ItemGroup>
 
   <!-- ReferenceNDArrayAnalyzer=false drops the analyzer, mirroring the switch NumSharp.Core itself honours: a file-based

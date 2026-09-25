@@ -1,0 +1,22 @@
+{
+  "$comment": [
+    "The reference stack of the live parity suite (tests/Gym.Tests.Parity), docs/plans/GYM_PARITY_INTEROP_TESTING.md section 3.",
+    "GymPythonSession reads every 'stack' entry from the embedded interpreter at [AssemblyInitialize] and fails the run on",
+    "a mismatch, because a live oracle on the wrong stack proves nothing; GYMNET_PARITY_ALLOW_STACK_DRIFT=1 downgrades the",
+    "mismatch to Inconclusive for local exploration. A value ending in '.*' matches by prefix: '3.12.*' accepts 3.12.12.",
+    "'gymnasium.commit' is the refs/Gymnasium checkout's HEAD; re-pinning the submodule means updating it here too",
+    "(port plan section 14.10). 'referencePlatform' is the runtime identifier whose results are authoritative (port plan",
+    "section 1.3): cells pinned to it report Inconclusive elsewhere instead of failing.",
+    "Keep the versions in step with tools/parity/requirements.txt."
+  ],
+  "stack": {
+    "gymnasium.commit": "9e04324f6b0adbe19112206dfe247edc4142e7ec",
+    "gymnasium.version": "1.4.0",
+    "python.version": "3.12.*",
+    "numpy.version": "2.4.2",
+    "pygame.version": "2.5.8",
+    "pygame.sdl": "2.32.10",
+    "box2d.version": "2.3.10"
+  },
+  "referencePlatform": "win-x64"
+}
