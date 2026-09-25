@@ -21,20 +21,39 @@ namespace Gym.Tests.Envs.Aether {
 
     [TestClass]
     public class LunarLanderEnvironment {
-        private Dictionary<int, float> _ExpectedScoreForRandomSeed = new Dictionary<int, float>();
-        private Dictionary<int, int> _ExpectedStepsForRandomSeed = new Dictionary<int, int>();
+        /// <summary>
+        ///     Gym.NET regression baselines of the PID episode below, keyed by seed and action mode: the step count and the
+        ///     float32 bit pattern of the total reward, both asserted exactly. Every value was identical in Debug and Release on
+        ///     .NET 8 and .NET 10 (docs/plans/NUMSHARP_MIGRATION_PLAN.md §9.2), so there is no tolerance and no
+        ///     configuration guard. They are not Gymnasium goldens: the physics engine is Aether, not Box2D.
+        /// </summary>
+        /// <remarks>
+        ///     Recorded against NumSharp master, whose <c>RandomState</c> is NumPy's MT19937. NumSharp.Lite's stream differed
+        ///     (seed 1000 discrete was 245 steps / 35.515747 and was asserted in Debug builds only, B-37).
+        /// </remarks>
+        private static readonly Dictionary<(int Seed, bool Continuous), (int Steps, uint RewardBits)> _Baselines = new Dictionary<(int Seed, bool Continuous), (int Steps, uint RewardBits)> {
+            [(0, false)] = (192, 0x4189de14u),    // 17.233437
+            [(1, false)] = (251, 0x42131674u),    // 36.771927
+            [(42, false)] = (182, 0xc23951deu),   // -46.32995
+            [(1000, false)] = (230, 0x4223bd98u), // 40.93515
+            [(0, true)] = (176, 0x41be6a44u),     // 23.801888
+            [(1, true)] = (157, 0x422776fcu),     // 41.866196
+            [(42, true)] = (221, 0x423c7858u),    // 47.117523
+            [(1000, true)] = (355, 0x420d93f0u),  // 35.39447
+        };
         private int _seed;
         private const int MAX_STEPS = 5000;
         private const bool VERBOSE = false;
 
-        public LunarLanderEnvironment()
-        {
-            // Total reward: 35.515747 in 245 steps (.NET 8/10 deterministic baseline).
-            _ExpectedScoreForRandomSeed[1000] = 35.515747f;
-            _ExpectedStepsForRandomSeed[1000] = 245;
-        }
-
-
+        /// <summary>
+        ///     Runs one PID-controlled episode and, when <paramref name="seed"/> is given, asserts its recorded baseline.
+        /// </summary>
+        /// <param name="factory">The viewer the env renders every step to.</param>
+        /// <param name="seed">
+        ///     The seed of the env's generator, asserted against <see cref="_Baselines"/>; <see langword="null"/> still seeds
+        ///     with 0, so the run stays deterministic, but asserts only that the episode ends within <see cref="MAX_STEPS"/>.
+        /// </param>
+        /// <param name="continuous">Selects the continuous action space.</param>
         public void Run(IEnvironmentViewerFactoryDelegate factory, int? seed, bool continuous = false) {
             _seed = seed ?? 0;
             LunarLanderEnv env = new LunarLanderEnv(factory, random_state: np.random.RandomState(_seed), continuous: continuous);
@@ -60,14 +79,12 @@ namespace Gym.Tests.Envs.Aether {
                     state = observation;
                     env.Render();
                 }
-                if (_seed != 0)
+                if (seed.HasValue)
                 {
-                    #if DEBUG
-                    float escore = _ExpectedScoreForRandomSeed[_seed];
-                    int esteps = _ExpectedStepsForRandomSeed[_seed];
+                    var (esteps, erewardBits) = _Baselines[(_seed, continuous)];
+                    uint rewardBits = unchecked((uint)BitConverter.SingleToInt32Bits(total_reward));
                     Assert.AreEqual(esteps, steps, string.Format("Expected number of steps for seed {0} did not match.", _seed));
-                    Assert.AreEqual(escore, total_reward, 1e-5f, string.Format("Expected score for seed {0} did not match.", _seed));
-                    #endif
+                    Assert.AreEqual(erewardBits, rewardBits, string.Format("Expected score for seed {0} did not match: expected {1:R} (0x{2:x8}), got {3:R} (0x{4:x8}).", _seed, BitConverter.Int32BitsToSingle(unchecked((int)erewardBits)), erewardBits, total_reward, rewardBits));
                 }
                 Assert.IsTrue(steps < MAX_STEPS, "Too many steps.");
                 System.Diagnostics.Debug.WriteLine("Total reward: {0} in {1} steps.", total_reward, steps);
@@ -211,6 +228,27 @@ namespace Gym.Tests.Envs.Aether {
         public void Run_Discrete_NullEnv_ConsistencyCheck()
         {
             Run(NullEnvViewer.Factory, 1000);
+        }
+
+        /// <summary>
+        ///     Pins all eight headless baselines (four seeds, both action modes), so any change to a draw, its order or the
+        ///     episode arithmetic fails here in every build configuration. Seeds 0, 1, 42 and 1000 are those of
+        ///     docs/plans/NUMSHARP_MIGRATION_PLAN.md §9.2.
+        /// </summary>
+        /// <param name="seed">The env generator's seed.</param>
+        /// <param name="continuous">Selects the continuous action space.</param>
+        [TestMethod]
+        [DataRow(0, false)]
+        [DataRow(1, false)]
+        [DataRow(42, false)]
+        [DataRow(1000, false)]
+        [DataRow(0, true)]
+        [DataRow(1, true)]
+        [DataRow(42, true)]
+        [DataRow(1000, true)]
+        public void Run_NullEnv_Baseline(int seed, bool continuous)
+        {
+            Run(NullEnvViewer.Factory, seed, continuous);
         }
     }
 }

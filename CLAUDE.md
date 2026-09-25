@@ -98,6 +98,7 @@ dotnet test tests/Gym.Tests/Gym.Tests.csproj --filter "FullyQualifiedName~LunarL
 ### 3.3 Submodule Management
 
 ```powershell
-# Initialize and synchronize Gymnasium SOT submodule
-git submodule update --init --recursive
+# Initialize the Gymnasium and NumSharp SOT submodules. The build compiles NumSharp from refs/NumSharp (eng/NumSharp.props).
+# Not --recursive: that would also clone NumSharp's own submodules (numpy, OpenBLAS, onnxruntime, ...), which the build does not need.
+git submodule update --init refs/Gymnasium refs/NumSharp
 ```

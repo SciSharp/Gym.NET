@@ -8,9 +8,9 @@
 
 - **.NET SDK**: .NET 8.0 SDK / .NET 10.0 SDK.
 - **Runtimes**: Windows Desktop Runtime (for WinForms / Avalonia test runners).
-- **Submodules**: Ensure `refs/Gymnasium` submodule is initialized:
+- **Submodules**: Ensure the `refs/Gymnasium` and `refs/NumSharp` submodules are initialized. The build compiles NumSharp from `refs/NumSharp` (see `eng/NumSharp.props`). Don't use `--recursive`: it would also clone NumSharp's own submodules (numpy, OpenBLAS, onnxruntime, ...), which the build doesn't need.
   ```powershell
-  git submodule update --init --recursive
+  git submodule update --init refs/Gymnasium refs/NumSharp
   ```
 
 ---

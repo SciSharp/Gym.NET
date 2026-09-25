@@ -378,6 +378,26 @@ namespace Gym.Environments.Envs.Aether
             _viewer = viewer ?? throw new ArgumentNullException(nameof(viewer));
         }
 
+        /// <summary>
+        ///     Creates a lander with the given physics and action mode. Construction already consumes two draws from the
+        ///     generator (the wind and turbulence phases), even when wind is disabled (B-18), so it changes the stream every
+        ///     later <see cref="Reset"/> and <see cref="Step"/> sees.
+        /// </summary>
+        /// <param name="viewerFactory">Creates the viewer on the first <see cref="Render"/>; <see langword="null"/> means <see cref="NullEnvViewer"/>.</param>
+        /// <param name="continuous">Selects the continuous action space (two throttles) instead of four discrete actions.</param>
+        /// <param name="gravity">The world's vertical gravity, within [-12, 0].</param>
+        /// <param name="enable_wind">Applies wind and turbulence while the lander is airborne.</param>
+        /// <param name="wind_power">The maximum linear wind force, within [0, 20].</param>
+        /// <param name="turbulence_power">The maximum rotational wind torque, within [0, 2].</param>
+        /// <param name="random_state">
+        ///     The generator this env draws from. The same instance is handed to the action space, so both share one stream.
+        ///     <see langword="null"/> falls back to the process-wide <c>np.random</c> (B-29).
+        /// </param>
+        /// <exception cref="ArgumentException">Thrown when <paramref name="gravity"/> is outside [-12, 0].</exception>
+        /// <exception cref="WarningException">
+        ///     Thrown when <paramref name="wind_power"/> or <paramref name="turbulence_power"/> is outside its recommended range,
+        ///     where Gymnasium only warns (B-27).
+        /// </exception>
         public LunarLanderEnv(IEnvironmentViewerFactoryDelegate viewerFactory, bool continuous = false, float gravity = -10f, bool enable_wind = false, float wind_power = 15f, float turbulence_power = 1.5f, NumPyRandom random_state=null)
         {
             RandomState = random_state;
@@ -406,8 +426,8 @@ namespace Gym.Environments.Envs.Aether
                 throw (new WarningException("turbulence_power value is recommended to be between 0.0 and 2.0"));
             }
 
-            _wind_idx = RandomState.randint(-9999, 9999);
-            _torque_idx = RandomState.randint(-9999, 9999);
+            _wind_idx = TakeInt32(RandomState.randint(-9999, 9999));
+            _torque_idx = TakeInt32(RandomState.randint(-9999, 9999));
 
             NDArray low = np.array(new float[] { -1.5f, -1.5f, -5f, -5f, (float)-Math.PI, -5f, 0f, 0f });
             NDArray high = np.array(new float[] { 1.5f, 1.5f, 5f, 5f, (float)Math.PI, 5f, 1f, 1f });
@@ -421,6 +441,37 @@ namespace Gym.Environments.Envs.Aether
                 ActionSpace = new Discrete(4, random_state: random_state);
             }
 
+        }
+
+        /// <summary>
+        ///     Reads a 0-d floating-point draw from <see cref="RandomState"/> and releases the array at once. NumSharp returns a
+        ///     scalar draw as a 0-d array whose conversion to a C# scalar is explicit; routing every draw through here keeps the
+        ///     draw sites one-liners and keeps the per-step draws off the finalizer.
+        /// </summary>
+        /// <param name="draw">A 0-d array that the caller hands over; it is disposed before this method returns.</param>
+        /// <returns>The drawn value in float64, the dtype of NumPy's <c>uniform</c>.</returns>
+        /// <exception cref="IncorrectShapeException">Thrown when <paramref name="draw"/> is not 0-d.</exception>
+        private static double TakeDouble(NDArray draw)
+        {
+            using (draw)
+            {
+                return (double)draw;
+            }
+        }
+
+        /// <summary>
+        ///     Reads a 0-d integer draw from <see cref="RandomState"/> and releases the array at once; the integer
+        ///     counterpart of <see cref="TakeDouble"/>.
+        /// </summary>
+        /// <param name="draw">A 0-d integer array that the caller hands over; it is disposed before this method returns.</param>
+        /// <returns>The drawn value.</returns>
+        /// <exception cref="IncorrectShapeException">Thrown when <paramref name="draw"/> is not 0-d.</exception>
+        private static int TakeInt32(NDArray draw)
+        {
+            using (draw)
+            {
+                return (int)draw;
+            }
         }
 
         #region Particles
@@ -486,6 +537,11 @@ namespace Gym.Environments.Envs.Aether
             _Lander = null;
         }
 
+        /// <summary>
+        ///     Rebuilds the world and the lander, then performs the zero step. It draws, in order: the initial force (x then y),
+        ///     the 12 terrain heights, and the zero step's two dispersion values. Gymnasium draws the terrain first (B-17).
+        /// </summary>
+        /// <returns>The zero step's observation: a fresh float32 array of shape (8,).</returns>
         public override NDArray Reset()
         {
             Destroy();
@@ -493,7 +549,9 @@ namespace Gym.Environments.Envs.Aether
             _World.ContactManager.BeginContact = new BeginContactDelegate(_Contacts.BeginContact);
             _World.ContactManager.EndContact = new EndContactDelegate(_Contacts.EndContact);
             _Lander = new LunarLanderBody(2,_World);
-            _Lander.Fuselage.Unit.ApplyForce(new Vector2(RandomState.uniform(-INITIAL_RANDOM, INITIAL_RANDOM), RandomState.uniform(-INITIAL_RANDOM, INITIAL_RANDOM)));
+            // C# evaluates arguments left to right, so x is still drawn before y. Each float64 draw is narrowed to float32
+            // once, as the implicit NDArray -> float conversion it replaces did.
+            _Lander.Fuselage.Unit.ApplyForce(new Vector2((float)TakeDouble(RandomState.uniform(-INITIAL_RANDOM, INITIAL_RANDOM)), (float)TakeDouble(RandomState.uniform(-INITIAL_RANDOM, INITIAL_RANDOM))));
             GameOver = false;
             _PrevShaping = float.MinValue;
             float w = VIEWPORT_W / SCALE;
@@ -504,7 +562,7 @@ namespace Gym.Environments.Envs.Aether
             float[] height = new float[CHUNKS + 1];
             for (int i = 0; i < height.Length; i++)
             {
-                height[i] = RandomState.uniform(0f, h / 2f);
+                height[i] = (float)TakeDouble(RandomState.uniform(0f, h / 2f));
             }
             float[] chunk_x = new float[CHUNKS];
             for (int i = 0; i < CHUNKS; i++)
@@ -571,10 +629,27 @@ namespace Gym.Environments.Envs.Aether
             return Step(0).Observation;
         }
 
+        /// <summary>
+        ///     Applies one action, advances the physics by one frame (1/<see cref="FPS"/> s) and scores the new state. Every
+        ///     step draws two dispersion values, whether or not an engine fires.
+        /// </summary>
+        /// <param name="action">
+        ///     Discrete mode: a boxed <see cref="int"/> in [0, 3] (see <see cref="LunarLanderDiscreteActions"/>). Continuous
+        ///     mode: an <see cref="NDArray"/> of shape (2,) holding the main and lateral throttles, clipped to [-1, 1].
+        /// </param>
+        /// <returns>The new observation (a fresh float32 array of shape (8,)), the reward, the done flag and diagnostics.</returns>
+        /// <exception cref="InvalidActionError">Thrown when a discrete action is outside the action space.</exception>
+        /// <exception cref="InvalidCastException">Thrown when a discrete action is not a boxed <see cref="int"/>.</exception>
+        /// <exception cref="IndexError">
+        ///     Thrown when a continuous action is 0-d, which is what the continuous action space samples today (B-20).
+        /// </exception>
         public override Step Step(object action)
         {
             int i_action = -1;
             NDArray c_action = null;
+            // The two throttles of a continuous action, read once as float32 scalars after clipping.
+            float mainThrottle = 0f;
+            float lateralThrottle = 0f;
             LunarLanderDiscreteActions l_action = LunarLanderDiscreteActions.Nothing;
             if (ContinuousMode)
             {
@@ -598,6 +673,12 @@ namespace Gym.Environments.Envs.Aether
             {
                 // Not implemented
                 c_action = np.clip(c_action, -1f, 1f).astype(NPTypeCode.Float);
+                // The NDArray expressions these reads replace (c_action[0] > 0f, np.clip(c_action[0], 0f, 1f),
+                // np.abs(c_action[1]), ...) allocated about five 0-d arrays per step and no longer compile: NumSharp's
+                // array-to-scalar conversions are explicit and its comparisons return NDArray<bool>. Scalar float32 math is
+                // bit-identical: the same IEEE operations, and a NaN throttle fires no engine either way.
+                mainThrottle = c_action.GetSingle(0);
+                lateralThrottle = c_action.GetSingle(1);
             }
             else
             {
@@ -608,16 +689,18 @@ namespace Gym.Environments.Envs.Aether
             }
             Vector2 tip = new Vector2((float)Math.Sin(_Lander.Fuselage.Unit.Rotation), (float)Math.Cos(_Lander.Fuselage.Unit.Rotation));
             Vector2 side = new Vector2(-tip.Y, tip.X);
-            float disp_x = RandomState.uniform(-1f, 1f) / SCALE;
-            float disp_y = RandomState.uniform(-1f, 1f) / SCALE;
+            // Divided in float64 and narrowed once, bit-identical to the float64 NumSharp expression (draw / SCALE) whose
+            // implicit conversion to float no longer compiles.
+            float disp_x = (float)(TakeDouble(RandomState.uniform(-1f, 1f)) / SCALE);
+            float disp_y = (float)(TakeDouble(RandomState.uniform(-1f, 1f)) / SCALE);
 
             bool fire_main = false;
             bool fire_thruster = false;
             if (ContinuousMode)
             {
-                if (c_action[0] > 0f)
+                if (mainThrottle > 0f)
                     fire_main = true;
-                if (np.abs(c_action[1]) > 0.5f)
+                if (Math.Abs(lateralThrottle) > 0.5f)
                     fire_thruster = true;
                 if (Verbose)
                 {
@@ -637,7 +720,7 @@ namespace Gym.Environments.Envs.Aether
                 //
                 if (ContinuousMode)
                 {
-                    m_power = (np.clip(c_action[0], 0f, 1f) + 1f) *0.5f;
+                    m_power = (Math.Clamp(mainThrottle, 0f, 1f) + 1f) *0.5f;
                     if (Verbose)
                     {
                         System.Diagnostics.Debug.WriteLine("MAIN: m_power {0}", m_power);
@@ -680,8 +763,8 @@ namespace Gym.Environments.Envs.Aether
                 float direction = 0f;
                 if (ContinuousMode)
                 {
-                    direction = c_action[1] < 0f ? -1f : 1f;
-                    s_power = np.clip(np.abs(c_action[1]), 0.5f, 1.0f);
+                    direction = lateralThrottle < 0f ? -1f : 1f;
+                    s_power = Math.Clamp(Math.Abs(lateralThrottle), 0.5f, 1.0f);
                     if (Verbose)
                     {
                         System.Diagnostics.Debug.WriteLine("SIDE {1}: s_power {0}", s_power, direction);
@@ -746,8 +829,10 @@ namespace Gym.Environments.Envs.Aether
             step.Information["RightContact"] = _Lander.Legs[1].Contact;
             step.Observation = new float[] { pos.X, pos.Y, vel.X, vel.Y, _Lander.Fuselage.Unit.Rotation, (float)step.Information["omega"], _Lander.Legs[0].Contact ? 1f : 0f, _Lander.Legs[1].Contact ? 1f : 0f };
             float reward = 0f;
-            float shaping = -100f * np.sqrt(pos.X * pos.X + pos.Y * pos.Y);
-            shaping += -100f * np.sqrt(vel.X * vel.X + vel.Y * vel.Y);
+            // (float)Math.Sqrt of the float32 argument equals NumSharp's float32 np.sqrt: a float64 square root narrowed to
+            // float32 is correctly rounded (float64 carries more than 2 * 24 + 2 bits), and it allocates no 0-d array.
+            float shaping = -100f * (float)Math.Sqrt(pos.X * pos.X + pos.Y * pos.Y);
+            shaping += -100f * (float)Math.Sqrt(vel.X * vel.X + vel.Y * vel.Y);
             shaping += -100f * Math.Abs((float)step.Information["angle"]);
             shaping += 10f * (_Lander.Legs[0].Contact ? 1f : 0f);
             shaping += 10f * (_Lander.Legs[1].Contact ? 1f : 0f);

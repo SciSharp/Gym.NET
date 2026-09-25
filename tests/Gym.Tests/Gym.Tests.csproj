@@ -27,4 +27,8 @@
     <ProjectReference Include="..\..\src\Gym\Gym.csproj" />
   </ItemGroup>
 
+  <!-- A direct NumSharp reference plus the ownership analyzer, so the NDW diagnostics also cover the tests; see
+       eng/NumSharp.props. -->
+  <Import Project="..\..\eng\NumSharp.props" />
+
 </Project>
