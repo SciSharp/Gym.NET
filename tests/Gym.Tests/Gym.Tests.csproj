@@ -27,6 +27,12 @@
     <ProjectReference Include="..\..\src\Gym\Gym.csproj" />
   </ItemGroup>
 
+  <!-- NumPy 2.4.2 golden of the legacy RandomState draw patterns, recorded by tools/parity/legacy_rng.py and replayed by
+       LegacyRngParityTests. Embedded, so the test does not depend on the working directory or on copy-to-output. -->
+  <ItemGroup>
+    <EmbeddedResource Include="Parity\legacy_rng.golden.txt" LogicalName="Gym.Tests.Parity.legacy_rng.golden.txt" />
+  </ItemGroup>
+
   <!-- A direct NumSharp reference plus the ownership analyzer, so the NDW diagnostics also cover the tests; see
        eng/NumSharp.props. -->
   <Import Project="..\..\eng\NumSharp.props" />

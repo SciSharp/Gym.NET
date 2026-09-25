@@ -41,13 +41,25 @@ namespace Gym.Environments.Envs.Classic {
         private NDArray state;
         private int steps_beyond_done = -1;
 
+        /// <summary>
+        ///     Creates the env with its action space (two pushes) and observation space. Every generator involved is the env's
+        ///     own: the env draws its initial states from <paramref name="randomState"/>, and each space has a separate,
+        ///     entropy-seeded generator that <c>ActionSpace.Seed</c> reseeds.
+        /// </summary>
+        /// <param name="viewerFactory">Creates the viewer on the first <see cref="Render"/>; <see langword="null"/> means <see cref="NullEnvViewer"/>.</param>
+        /// <param name="randomState">
+        ///     The generator <see cref="Reset"/> draws from, or <see langword="null"/> for one of the env's own, seeded from OS
+        ///     entropy (B-15: lazy seeding as in Gymnasium waits for P4).
+        /// </param>
         public CartPoleEnv(IEnvironmentViewerFactoryDelegate viewerFactory, NumPyRandom randomState) {
             _viewerFactory = viewerFactory;
             // Angle limit set to 2 * theta_threshold_radians so failing observation is still within bounds  
             var high = np.array(x_threshold * 2, float.MaxValue, theta_threshold_radians * 2, float.MaxValue);
             ActionSpace = new Discrete(2);
             ObservationSpace = new Box((-1 * high), high, np.float32);
-            random = randomState ?? np.random.RandomState();
+            // Not np.random.RandomState(): NumSharp seeds it from Environment.TickCount, so every env created within the same
+            // millisecond (a loop building a batch of envs) replayed the same initial states (trap 6).
+            random = randomState ?? LegacySeeding.FromEntropy();
 
             Metadata = new Dict("render.modes", new[] {"human", "rgb_array"}, "video.frames_per_second", 50);
         }

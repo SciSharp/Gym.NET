@@ -28,8 +28,8 @@ namespace Gym.Spaces {
         /// <param name="shape">The shape of every sample.</param>
         /// <param name="dType">The element type; <see langword="null"/> means float32.</param>
         /// <param name="seed">
-        ///     A NumPy seed in <c>[0, 2**32 - 1]</c> for this box's own generator, or -1 to fall back to the process-wide
-        ///     <c>np.random</c>.
+        ///     A NumPy seed in <c>[0, 2**32 - 1]</c> for this box's own generator, or -1 for a generator of its own seeded from
+        ///     OS entropy.
         /// </param>
         /// <exception cref="ValueError">Thrown when <paramref name="seed"/> is neither -1 nor in <c>[0, 2**32 - 1]</c>.</exception>
         /// <remarks>
@@ -47,7 +47,10 @@ namespace Gym.Spaces {
         /// <param name="high">The upper bound of every element.</param>
         /// <param name="shape">The shape of every sample.</param>
         /// <param name="dType">The element type; <see langword="null"/> means float32.</param>
-        /// <param name="random_state">The generator to draw from, or <see langword="null"/> for the process-wide <c>np.random</c>.</param>
+        /// <param name="random_state">
+        ///     The generator to draw from (it may be shared with other spaces), or <see langword="null"/> for a generator of the
+        ///     box's own, seeded from OS entropy.
+        /// </param>
         /// <remarks>
         ///     Footgun: see <see cref="Box(int, int, Shape, DType, long)"/>; the two integer overloads are ambiguous unless the
         ///     fifth argument is given by name.
@@ -67,8 +70,8 @@ namespace Gym.Spaces {
         ///     instead.
         /// </param>
         /// <param name="random_state">
-        ///     The generator to draw from when <paramref name="seed"/> is -1, or <see langword="null"/> for the process-wide
-        ///     <c>np.random</c>.
+        ///     The generator to draw from when <paramref name="seed"/> is -1 (it may be shared with other spaces), or
+        ///     <see langword="null"/> for a generator of the box's own, seeded from OS entropy.
         /// </param>
         /// <exception cref="ValueError">Thrown when <paramref name="seed"/> is neither -1 nor in <c>[0, 2**32 - 1]</c>.</exception>
         /// <remarks>
@@ -80,7 +83,9 @@ namespace Gym.Spaces {
         public Box(float low, float high, Shape shape, DType dType = null, long seed = -1, NumPyRandom random_state = null) : base(shape, (dType = dType ?? np.float32)) {
             Low = np.full(shape, low, dType);
             High = np.full(shape, high, dType);
-            RandomState = seed != -1 ? LegacySeeding.RandomState(seed) : random_state ?? np.random;
+            // Never the process-wide np.random: it is shared, so one space's draws would shift another's, and NumSharp's
+            // MT19937 takes no lock, so two threads drawing from it corrupt its state (trap 5).
+            RandomState = seed != -1 ? LegacySeeding.RandomState(seed) : random_state ?? LegacySeeding.FromEntropy();
             CheckBounded();
         }
 
@@ -96,8 +101,8 @@ namespace Gym.Spaces {
         ///     instead.
         /// </param>
         /// <param name="random_state">
-        ///     The generator to draw from when <paramref name="seed"/> is -1, or <see langword="null"/> for the process-wide
-        ///     <c>np.random</c>.
+        ///     The generator to draw from when <paramref name="seed"/> is -1 (it may be shared with other spaces), or
+        ///     <see langword="null"/> for a generator of the box's own, seeded from OS entropy.
         /// </param>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="low"/> or <paramref name="high"/> is <see langword="null"/>.</exception>
         /// <exception cref="ValueError">
@@ -107,7 +112,9 @@ namespace Gym.Spaces {
         public Box(NDArray low, NDArray high, DType dType = null, long seed = -1, NumPyRandom random_state = null) : base(RequireSameShape(low, high), (dType = dType ?? np.float32)) {
             Low = low.astype(dType);
             High = high.astype(dType);
-            RandomState = seed != -1 ? LegacySeeding.RandomState(seed) : random_state ?? np.random;
+            // Never the process-wide np.random: it is shared, so one space's draws would shift another's, and NumSharp's
+            // MT19937 takes no lock, so two threads drawing from it corrupt its state (trap 5).
+            RandomState = seed != -1 ? LegacySeeding.RandomState(seed) : random_state ?? LegacySeeding.FromEntropy();
             CheckBounded();
         }
 

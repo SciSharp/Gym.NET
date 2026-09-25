@@ -43,6 +43,10 @@ namespace Gym.Spaces {
         ///     are valid.
         /// </param>
         /// <exception cref="ValueError">Thrown when <paramref name="seed"/> is outside <c>[0, 2**32 - 1]</c>, with NumPy's message.</exception>
+        /// <remarks>
+        ///     This is the only way to make an unseeded space reproducible. Seeding the process-wide <c>np.random</c> has no
+        ///     effect on spaces: each draws from its own generator (entropy-seeded unless one was given), as in Gymnasium.
+        /// </remarks>
         public abstract void Seed(long seed);
     }
 }

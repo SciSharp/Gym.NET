@@ -2,6 +2,7 @@
 using Gym.Envs;
 using Gym.Observations;
 using Gym.Spaces;
+using Gym.Utils;
 using NumSharp;
 using SixLabors.ImageSharp;
 using System;
@@ -393,7 +394,7 @@ namespace Gym.Environments.Envs.Aether
         /// <param name="turbulence_power">The maximum rotational wind torque, within [0, 2].</param>
         /// <param name="random_state">
         ///     The generator this env draws from. The same instance is handed to the action space, so both share one stream.
-        ///     <see langword="null"/> falls back to the process-wide <c>np.random</c> (B-29).
+        ///     <see langword="null"/> gives the env a generator of its own, seeded from OS entropy, and the action space another.
         /// </param>
         /// <exception cref="ArgumentException">Thrown when <paramref name="gravity"/> is outside [-12, 0].</exception>
         /// <exception cref="WarningException">
@@ -405,7 +406,9 @@ namespace Gym.Environments.Envs.Aether
             RandomState = random_state;
             if (RandomState == null)
             {
-                RandomState = np.random;
+                // B-29: the former fallback, the process-wide np.random, let a second env perturb the first, and crashed
+                // when two threads stepped envs at once (NumSharp's MT19937 takes no lock, trap 5).
+                RandomState = LegacySeeding.FromEntropy();
             }
             _viewerFactory = viewerFactory;
             ContinuousMode = continuous;
@@ -991,7 +994,7 @@ namespace Gym.Environments.Envs.Aether
         /// <summary>
         ///     Reseeds the env's generator in place, bit-identical to <c>numpy.random.RandomState(seed)</c>. In place, unlike
         ///     the spaces' <c>Seed</c>: when the env was created with a <c>random_state</c>, its action space draws from that
-        ///     same instance and is reseeded too; without one, this reseeds the process-wide <c>np.random</c> (B-29).
+        ///     same instance and is reseeded too; without one, the action space has a generator of its own and is not.
         /// </summary>
         /// <param name="seed">A NumPy seed in <c>[0, 2**32 - 1]</c>.</param>
         /// <exception cref="ValueError">Thrown when <paramref name="seed"/> is outside <c>[0, 2**32 - 1]</c>, with NumPy's message.</exception>

@@ -25,8 +25,8 @@ namespace Gym.Spaces {
         /// </param>
         /// <param name="start">The smallest element.</param>
         /// <param name="random_state">
-        ///     The generator to draw from when <paramref name="seed"/> is -1, or <see langword="null"/> for the process-wide
-        ///     <c>np.random</c>.
+        ///     The generator to draw from when <paramref name="seed"/> is -1 (it may be shared, for example with the env), or
+        ///     <see langword="null"/> for a generator of the space's own, seeded from OS entropy.
         /// </param>
         /// <exception cref="ValueError">Thrown when <paramref name="seed"/> is neither -1 nor in <c>[0, 2**32 - 1]</c>.</exception>
         /// <remarks>
@@ -36,7 +36,9 @@ namespace Gym.Spaces {
         public Discrete(long n, DType dType = null, long seed = -1, long start=0, NumPyRandom random_state = null) : base(new Shape(n), (dType = dType ?? np.int64)) {
             N = n;
             Start = start;
-            RandomState = seed != -1 ? LegacySeeding.RandomState(seed) : random_state ?? np.random;
+            // Never the process-wide np.random: it is shared, so one space's draws would shift another's, and NumSharp's
+            // MT19937 takes no lock, so two threads drawing from it corrupt its state (trap 5).
+            RandomState = seed != -1 ? LegacySeeding.RandomState(seed) : random_state ?? LegacySeeding.FromEntropy();
         }
 
         /// <summary>
