@@ -9,12 +9,11 @@ using NumSharp;
 
 namespace Gym.Tests.Utils {
     /// <summary>
-    ///     Pins the unseeded fallback (<see cref="LegacySeeding.FromEntropy"/>): every env and space created without a seed
-    ///     or generator draws from a generator of its own, whose stream differs from every other instance's even when they are
-    ///     created back to back. The two defects it replaces: the process-wide <c>np.random</c>, which every unseeded space
-    ///     shared (trap 5, B-29), and <c>np.random.RandomState()</c>, which NumSharp seeds from
-    ///     <see cref="System.Environment.TickCount"/>, so instances created in the same millisecond repeated one stream
-    ///     (trap 6).
+    ///     Pins the unseeded fallback (<c>Seeding.NpRandom()</c>, NumPy's <c>SeedSequence()</c> OS entropy): every env and
+    ///     space created without a seed or generator draws from a generator of its own, whose stream differs from every other
+    ///     instance's even when they are created back to back. The two defects it guards against: a shared process-wide
+    ///     generator (<c>np.random</c>, trap 5, B-29), and TickCount seeding, which made instances created in the same
+    ///     millisecond repeat one stream (NumSharp's legacy <c>np.random.RandomState()</c>, trap 6).
     /// </summary>
     [TestClass]
     public class EntropySeedingTests {
@@ -25,7 +24,7 @@ namespace Gym.Tests.Utils {
             public ProbeDiscrete(long n) : base(n) { }
 
             /// <summary>The space's generator.</summary>
-            public NumPyRandom Generator => RandomState;
+            public Generator Rng => NpRandom;
         }
 
         /// <summary>A <see cref="Box"/> that exposes the generator it draws from.</summary>
@@ -34,7 +33,7 @@ namespace Gym.Tests.Utils {
             public ProbeBox() : base(-1f, 1f, new Shape(3)) { }
 
             /// <summary>The box's generator.</summary>
-            public NumPyRandom Generator => RandomState;
+            public Generator Rng => NpRandom;
         }
 
         /// <summary>
@@ -42,9 +41,9 @@ namespace Gym.Tests.Utils {
         ///     seeding all 64 would be identical.
         /// </summary>
         [TestMethod]
-        public void FromEntropy_BackToBack_ProducesIndependentStreams()
+        public void UnseededGenerators_BackToBack_ProduceIndependentStreams()
         {
-            var generators = Enumerable.Range(0, 64).Select(_ => LegacySeeding.FromEntropy()).ToList();
+            var generators = Enumerable.Range(0, 64).Select(_ => Seeding.NpRandom().Rng).ToList();
 
             var streams = generators.Select(FirstDraws).ToList();
 
@@ -52,8 +51,8 @@ namespace Gym.Tests.Utils {
         }
 
         /// <summary>
-        ///     Unseeded spaces never share a generator, with each other or with the process-wide <c>np.random</c>, so drawing
-        ///     from one cannot shift another and two threads never draw from one unsynchronized MT19937.
+        ///     Unseeded spaces never share a generator, so drawing from one cannot shift another, and two threads never draw
+        ///     from one unsynchronized generator.
         /// </summary>
         [TestMethod]
         public void UnseededSpaces_EachOwnTheirGenerator()
@@ -62,10 +61,9 @@ namespace Gym.Tests.Utils {
             var second = new ProbeDiscrete(4);
             var box = new ProbeBox();
 
-            Assert.AreNotSame(first.Generator, second.Generator);
-            Assert.AreNotSame(first.Generator, box.Generator);
-            foreach (var generator in new[] { first.Generator, second.Generator, box.Generator })
-                Assert.AreNotSame(np.random, generator, "No space may fall back to the process-wide np.random.");
+            Assert.AreNotSame(first.Rng, second.Rng);
+            Assert.AreNotSame(first.Rng, box.Rng);
+            Assert.AreNotSame(second.Rng, box.Rng);
         }
 
         /// <summary>Two unseeded spaces created back to back draw different streams.</summary>
@@ -117,9 +115,9 @@ namespace Gym.Tests.Utils {
         /// <summary>Draws 8 values in [0, 2^31 - 1) from <paramref name="generator"/>, joined into one comparable string.</summary>
         /// <param name="generator">The generator to draw from.</param>
         /// <returns>The draws, comma-separated.</returns>
-        private static string FirstDraws(NumPyRandom generator)
+        private static string FirstDraws(Generator generator)
         {
-            using NDArray draws = generator.randint(0, int.MaxValue, new Shape(8), np.int64);
+            using NDArray draws = generator.integers(0, int.MaxValue, new Shape(8), np.int64);
             return string.Join(",", draws.ToArray<long>());
         }
 

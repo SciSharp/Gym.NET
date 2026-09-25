@@ -1,7 +1,7 @@
 """Record Gymnasium's behavior for the Gym.NET parity audit (docs/plans/GYMNASIUM_PARITY_AUDIT.md).
 
 Runs Gymnasium from the pinned source checkout (refs/Gymnasium @ 9e04324) and writes one "<case> <index> <value>" line
-per observation, in the format of tools/parity/legacy_rng.py: float64 as 16 hex digits of the IEEE bit pattern, float32
+per observation, in the format of tools/parity/gymnasium_rng.py: float64 as 16 hex digits of the IEEE bit pattern, float32
 as 8, integers and booleans in decimal. gymnet_side.cs prints the same cases through Gym.NET, and compare.py scores them.
 
 Also writes, into the output directory:

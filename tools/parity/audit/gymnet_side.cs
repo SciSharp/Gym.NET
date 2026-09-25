@@ -3,7 +3,7 @@
 // Gym.NET side of the Gymnasium parity audit (docs/plans/GYMNASIUM_PARITY_AUDIT.md).
 //
 // Prints the cases of gymnasium_side.py through Gym.NET, in the same "<case> <index> <value>" format, into two files:
-//   gymnet.txt      what Gym.NET does today (its spaces, envs and legacy MT19937 generators);
+//   gymnet.txt      what Gym.NET does today (its spaces and envs, on Gym.Utils.Seeding's generators);
 //   projection.txt  what the same cases give when they are computed the way Gymnasium computes them, on NumSharp's
 //                   Generator(PCG64(SeedSequence(seed))) and with a float64 transcription of Gymnasium's CartPole step.
 //                   It is a measurement of how far F2 (seeding) and the P2/P4 re-ports would carry, not shipped code.
@@ -37,7 +37,7 @@ var stateField = typeof(CartPoleEnv).GetField("state", BindingFlags.NonPublic | 
 foreach (long seed in seeds)
 {
     // ---- Seeding ----
-    Emit(current, $"rng.random.s{seed}", LegacySeeding.RandomState(seed).random_sample(8).ToArray<double>().Select(F64));
+    Emit(current, $"rng.random.s{seed}", Seeding.NpRandom(seed).Rng.random(8).ToArray<double>().Select(F64));
     Emit(projection, $"rng.random.s{seed}", np.random.default_rng(seed).random(8).ToArray<double>().Select(F64));
 
     // ---- Discrete ----
@@ -84,7 +84,7 @@ foreach (long seed in seeds)
         .Select(v => ((int)Math.Clamp(Math.Floor(v), int.MinValue, int.MaxValue)).ToString(CultureInfo.InvariantCulture)));
 
     // ---- CartPole ----
-    var cartPole = new CartPoleEnv(NullEnvViewer.Factory, LegacySeeding.RandomState(seed));
+    var cartPole = new CartPoleEnv(NullEnvViewer.Factory, Seeding.NpRandom(seed).Rng);
     using (var reset = cartPole.Reset())
     {
         Emit(current, $"cartpole.reset.dtype.s{seed}", new[] { reset.dtype.name });
@@ -119,7 +119,7 @@ foreach (long seed in seeds)
     foreach (bool continuous in new[] { false, true })
     {
         string mode = continuous ? "continuous" : "discrete";
-        var lander = new LunarLanderEnv(NullEnvViewer.Factory, continuous: continuous, random_state: LegacySeeding.RandomState(seed));
+        var lander = new LunarLanderEnv(NullEnvViewer.Factory, continuous: continuous, random_state: Seeding.NpRandom(seed).Rng);
         NDArray obs = lander.Reset();
         Emit(current, $"lunar.{mode}.reset.s{seed}", obs.ToArray<float>().Select(F32));
         // Gym.NET has no TimeLimit; cap at LunarLander-v3's max_episode_steps (1000) to compare like with like.
@@ -137,7 +137,7 @@ foreach (long seed in seeds)
         current.Add($"lunar.{mode}.heuristic.s{seed} 0 steps={steps} total={F64(total)} ({total.ToString("F6", CultureInfo.InvariantCulture)}) terminated={(done ? 1 : 0)}");
     }
     {
-        var lander = new LunarLanderEnv(NullEnvViewer.Factory, random_state: LegacySeeding.RandomState(seed));
+        var lander = new LunarLanderEnv(NullEnvViewer.Factory, random_state: Seeding.NpRandom(seed).Rng);
         lander.ActionSpace.Seed(seed);
         lander.Reset().Dispose();
         int outside = 0;
@@ -162,7 +162,7 @@ var ll = new LunarLanderEnv(NullEnvViewer.Factory);
 current.Add("lunar.obs_space 0 " + string.Join(" ", ((Box)ll.ObservationSpace).Low.ToArray<float>().Select(F32)));
 current.Add("lunar.obs_space 1 " + string.Join(" ", ((Box)ll.ObservationSpace).High.ToArray<float>().Select(F32)));
 {
-    var lander = new LunarLanderEnv(NullEnvViewer.Factory, continuous: true, random_state: LegacySeeding.RandomState(0));
+    var lander = new LunarLanderEnv(NullEnvViewer.Factory, continuous: true, random_state: Seeding.NpRandom(0).Rng);
     lander.Reset().Dispose();
     string outcome;
     try

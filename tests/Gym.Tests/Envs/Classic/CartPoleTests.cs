@@ -25,7 +25,7 @@ namespace Gym.Tests.Envs.Classic {
         [TestMethod]
         public void Step_WithSampledActions_RunsEpisodes()
         {
-            var env = new CartPoleEnv(NullEnvViewer.Factory, LegacySeeding.RandomState(0));
+            var env = new CartPoleEnv(NullEnvViewer.Factory, Seeding.NpRandom(0).Rng);
             env.ActionSpace.Seed(0);
             env.Reset().Dispose();
 
@@ -53,7 +53,7 @@ namespace Gym.Tests.Envs.Classic {
         [TestMethod]
         public void Step_NonIntegerAction_ThrowsArgumentException()
         {
-            var env = new CartPoleEnv(NullEnvViewer.Factory, LegacySeeding.RandomState(0));
+            var env = new CartPoleEnv(NullEnvViewer.Factory, Seeding.NpRandom(0).Rng);
             env.Reset().Dispose();
 
             Assert.ThrowsExactly<ArgumentException>(() => env.Step(0.5));
@@ -66,7 +66,7 @@ namespace Gym.Tests.Envs.Classic {
         [TestMethod]
         public void Step_ConsecutiveObservations_AreDistinctObjects()
         {
-            var env = new CartPoleEnv(NullEnvViewer.Factory, LegacySeeding.RandomState(0));
+            var env = new CartPoleEnv(NullEnvViewer.Factory, Seeding.NpRandom(0).Rng);
             env.Reset().Dispose();
 
             var first = env.Step(0).Observation;
@@ -82,7 +82,7 @@ namespace Gym.Tests.Envs.Classic {
         [TestMethod]
         public void ObservationSpace_ContainsTheResetObservation()
         {
-            var env = new CartPoleEnv(NullEnvViewer.Factory, LegacySeeding.RandomState(0));
+            var env = new CartPoleEnv(NullEnvViewer.Factory, Seeding.NpRandom(0).Rng);
 
             Assert.IsTrue(env.ObservationSpace.Contains(env.Reset()));
         }
@@ -92,7 +92,7 @@ namespace Gym.Tests.Envs.Classic {
         /// <returns>The observation of that step.</returns>
         private static NDArray StepOnce(object action)
         {
-            var env = new CartPoleEnv(NullEnvViewer.Factory, LegacySeeding.RandomState(0));
+            var env = new CartPoleEnv(NullEnvViewer.Factory, Seeding.NpRandom(0).Rng);
             env.Reset().Dispose();
             return env.Step(action).Observation;
         }

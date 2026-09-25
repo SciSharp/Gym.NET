@@ -114,6 +114,19 @@ namespace Gym.Tests.Spaces
         }
 
         /// <summary>
+        ///     Defect B-09 is gone: integer boxes sample their upper bound as well, because Gymnasium draws from
+        ///     <c>[low, high + 1)</c> and floors. The pre-Gymnasium port drew from <c>[low, high)</c> and never produced high.
+        /// </summary>
+        [TestMethod]
+        public void IntegerBox_SamplesReachTheUpperBound()
+        {
+            var box = new Box(0f, 5f, new Shape(2000), np.int32, seed: 3);
+            using var sample = box.Sample();
+
+            Assert.AreEqual(5L, (long)np.amax(sample), "Some of 2,000 draws from [0, 6) must floor to 5.");
+        }
+
+        /// <summary>
         ///     Every integer dtype is floored before the cast, as Gymnasium's <c>dtype.kind in ["i", "u", "b"]</c> requires.
         ///     A plain cast truncates toward zero and could never produce the lower bound -5 from a draw in (-5, -4); flooring
         ///     does, so the minimum of many samples reaches -5 only when the dtype was recognized as an integer.

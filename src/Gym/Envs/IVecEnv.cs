@@ -23,14 +23,14 @@ namespace Gym.Envs {
         void Close();
 
         /// <summary>Seeds each sub-env with its own seed, in <see cref="Environments"/> order.</summary>
-        /// <param name="seed">One NumPy seed in <c>[0, 2**32 - 1]</c> per sub-env.</param>
-        /// <exception cref="ArgumentException">Thrown when the number of seeds differs from the number of sub-envs.</exception>
-        /// <exception cref="NumSharp.ValueError">Thrown when a seed is outside <c>[0, 2**32 - 1]</c>.</exception>
+        /// <param name="seed">One non-negative seed per sub-env.</param>
+        /// <exception cref="System.ArgumentException">Thrown when the number of seeds differs from the number of sub-envs.</exception>
+        /// <exception cref="Gym.Exceptions.Error">Thrown when a seed is negative, with Gymnasium's message.</exception>
         void Seed(long[] seed);
 
         /// <summary>Seeds every sub-env with the same <paramref name="seed"/>, so they all replay the same stream.</summary>
-        /// <param name="seed">A NumPy seed in <c>[0, 2**32 - 1]</c>.</param>
-        /// <exception cref="NumSharp.ValueError">Thrown when <paramref name="seed"/> is outside <c>[0, 2**32 - 1]</c>.</exception>
+        /// <param name="seed">A non-negative seed.</param>
+        /// <exception cref="Gym.Exceptions.Error">Thrown when <paramref name="seed"/> is negative, with Gymnasium's message.</exception>
         void Seed(long seed);
     }
 }

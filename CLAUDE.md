@@ -48,7 +48,7 @@ refs/Gym.NET/
   - `NDArray Reset()`: Resets the state and returns the initial observation.
   - `Step Step(object action)`: Steps environment dynamics; returns `(Observation, Reward, Done, Information)`.
   - `Image Render(string mode = "human")`: Generates/renders frame via `SixLabors.ImageSharp`.
-  - `void Seed(int seed)`: Seeds pseudorandom number generators via `NumPyRandom`.
+  - `void Seed(long seed)`: Seeds the env's generator with Gymnasium's seeding, `Generator(PCG64(SeedSequence(seed)))` (`Gym.Utils.Seeding.NpRandom`); any non-negative seed, as in Gymnasium.
   - `void CloseEnvironment()` / `Dispose()`: Releases rendering and physics resources.
 - **Pluggable Viewer Architecture:** Environments accept an `IEnvironmentViewerFactoryDelegate` allowing execution in headless mode (`NullEnvViewer.Factory`) or interactive GUI mode (`AvaloniaEnvViewer.Factory`, `WinFormEnvViewer.Factory`).
 - **Vectorized Environments (`IVecEnv` / `VecEnv` / `DummyVecEnv`):** Synchronous/asynchronous batch stepping across multiple parallel environment instances.

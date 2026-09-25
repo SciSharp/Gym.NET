@@ -37,7 +37,8 @@ namespace Gym.Environments.Envs.Classic {
         private const float x_threshold = 2.4f;
 
         //properties
-        private NumPyRandom random;
+        /// <summary>The env's generator, Gymnasium's <c>np_random</c>: <see cref="Reset"/> draws the initial state from it.</summary>
+        private Generator random;
         private NDArray state;
         private int steps_beyond_done = -1;
 
@@ -48,18 +49,19 @@ namespace Gym.Environments.Envs.Classic {
         /// </summary>
         /// <param name="viewerFactory">Creates the viewer on the first <see cref="Render"/>; <see langword="null"/> means <see cref="NullEnvViewer"/>.</param>
         /// <param name="randomState">
-        ///     The generator <see cref="Reset"/> draws from, or <see langword="null"/> for one of the env's own, seeded from OS
-        ///     entropy (B-15: lazy seeding as in Gymnasium waits for P4).
+        ///     The generator <see cref="Reset"/> draws from (<see cref="Gym.Utils.Seeding.NpRandom"/> makes one), or
+        ///     <see langword="null"/> for one of the env's own, seeded from OS entropy (B-15: lazy seeding as in Gymnasium waits
+        ///     for P4).
         /// </param>
-        public CartPoleEnv(IEnvironmentViewerFactoryDelegate viewerFactory, NumPyRandom randomState) {
+        public CartPoleEnv(IEnvironmentViewerFactoryDelegate viewerFactory, Generator randomState) {
             _viewerFactory = viewerFactory;
             // Angle limit set to 2 * theta_threshold_radians so failing observation is still within bounds  
             var high = np.array(x_threshold * 2, float.MaxValue, theta_threshold_radians * 2, float.MaxValue);
             ActionSpace = new Discrete(2);
             ObservationSpace = new Box((-1 * high), high, np.float32);
-            // Not np.random.RandomState(): NumSharp seeds it from Environment.TickCount, so every env created within the same
-            // millisecond (a loop building a batch of envs) replayed the same initial states (trap 6).
-            random = randomState ?? LegacySeeding.FromEntropy();
+            // An unseeded generator draws OS entropy (NumPy's SeedSequence()), so envs created back to back never share a
+            // stream; NumSharp's legacy np.random.RandomState() fallback seeded from Environment.TickCount (trap 6).
+            random = randomState ?? Seeding.NpRandom().Rng;
 
             Metadata = new Dict("render.modes", new[] {"human", "rgb_array"}, "video.frames_per_second", 50);
         }
@@ -226,14 +228,14 @@ namespace Gym.Environments.Envs.Classic {
         }
 
         /// <summary>
-        ///     Gives the env a fresh generator seeded with <paramref name="seed"/>, which the next <see cref="Reset"/> draws its
-        ///     initial state from. The action space keeps its own generator; seed it separately.
+        ///     Gives the env a fresh generator, Gymnasium's <c>seeding.np_random(seed)</c>, which the next <see cref="Reset"/>
+        ///     draws its initial state from: <c>Seed(s)</c> then <c>Reset()</c> starts where Gymnasium's
+        ///     <c>reset(seed=s)</c> starts. The action space keeps its own generator; seed it separately.
         /// </summary>
-        /// <param name="seed">A NumPy seed in <c>[0, 2**32 - 1]</c>.</param>
-        /// <exception cref="ValueError">Thrown when <paramref name="seed"/> is outside <c>[0, 2**32 - 1]</c>, with NumPy's message.</exception>
+        /// <param name="seed">Any non-negative seed.</param>
+        /// <exception cref="Gym.Exceptions.Error">Thrown when <paramref name="seed"/> is negative, with Gymnasium's message.</exception>
         public override void Seed(long seed) {
-            // NumSharp's RandomState(int) cannot take seeds above int.MaxValue and does not validate; LegacySeeding does both.
-            random = LegacySeeding.RandomState(seed);
+            random = Seeding.NpRandom(seed).Rng;
         }
     }
 }

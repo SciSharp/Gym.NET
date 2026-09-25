@@ -24,23 +24,24 @@ namespace Gym.Tests.Envs.Aether {
     public class LunarLanderEnvironment {
         /// <summary>
         ///     Gym.NET regression baselines of the PID episode below, keyed by seed and action mode: the step count and the
-        ///     float32 bit pattern of the total reward, both asserted exactly. Every value was identical in Debug and Release on
-        ///     .NET 8 and .NET 10 (docs/plans/NUMSHARP_MIGRATION_PLAN.md §9.2), so there is no tolerance and no
-        ///     configuration guard. They are not Gymnasium goldens: the physics engine is Aether, not Box2D.
+        ///     float32 bit pattern of the total reward, both asserted exactly. The values are identical in Debug and Release on
+        ///     .NET 8 and .NET 10, so there is no tolerance and no configuration guard. They are not Gymnasium goldens: the
+        ///     physics engine is Aether, not Box2D, and the draw order differs (B-17, B-18).
         /// </summary>
         /// <remarks>
-        ///     Recorded against NumSharp master, whose <c>RandomState</c> is NumPy's MT19937. NumSharp.Lite's stream differed
-        ///     (seed 1000 discrete was 245 steps / 35.515747 and was asserted in Debug builds only, B-37).
+        ///     Recorded 2026-09-25 with Gymnasium's seeding, <c>Generator(PCG64(SeedSequence(seed)))</c>. Earlier streams gave
+        ///     other values: NumPy's legacy MT19937 <c>RandomState</c> (seed 1000 discrete: 230 steps / 40.93515) and
+        ///     NumSharp.Lite (245 steps / 35.515747, asserted in Debug builds only, B-37).
         /// </remarks>
         private static readonly Dictionary<(int Seed, bool Continuous), (int Steps, uint RewardBits)> _Baselines = new Dictionary<(int Seed, bool Continuous), (int Steps, uint RewardBits)> {
-            [(0, false)] = (192, 0x4189de14u),    // 17.233437
-            [(1, false)] = (251, 0x42131674u),    // 36.771927
-            [(42, false)] = (182, 0xc23951deu),   // -46.32995
-            [(1000, false)] = (230, 0x4223bd98u), // 40.93515
-            [(0, true)] = (176, 0x41be6a44u),     // 23.801888
-            [(1, true)] = (157, 0x422776fcu),     // 41.866196
-            [(42, true)] = (221, 0x423c7858u),    // 47.117523
-            [(1000, true)] = (355, 0x420d93f0u),  // 35.39447
+            [(0, false)] = (192, 0x4250cd08u),    // 52.200226
+            [(1, false)] = (499, 0x4146ef58u),    // 12.433434
+            [(42, false)] = (200, 0x419a3a40u),   // 19.278442
+            [(1000, false)] = (209, 0xbf03fd80u), // -0.51558685
+            [(0, true)] = (156, 0x423b96fcu),     // 46.897446
+            [(1, true)] = (156, 0x421e3cdcu),     // 39.559433
+            [(42, true)] = (184, 0x4211c7fcu),    // 36.445297
+            [(1000, true)] = (167, 0x417ea038u),  // 15.914116
         };
         private int _seed;
         private const int MAX_STEPS = 5000;
@@ -57,7 +58,7 @@ namespace Gym.Tests.Envs.Aether {
         /// <param name="continuous">Selects the continuous action space.</param>
         public void Run(IEnvironmentViewerFactoryDelegate factory, int? seed, bool continuous = false) {
             _seed = seed ?? 0;
-            LunarLanderEnv env = new LunarLanderEnv(factory, random_state: LegacySeeding.RandomState(_seed), continuous: continuous);
+            LunarLanderEnv env = new LunarLanderEnv(factory, random_state: Seeding.NpRandom(_seed).Rng, continuous: continuous);
             env.Verbose = VERBOSE;
             try {
                 // Run a PID test
@@ -233,8 +234,8 @@ namespace Gym.Tests.Envs.Aether {
 
         /// <summary>
         ///     Pins all eight headless baselines (four seeds, both action modes), so any change to a draw, its order or the
-        ///     episode arithmetic fails here in every build configuration. Seeds 0, 1, 42 and 1000 are those of
-        ///     docs/plans/NUMSHARP_MIGRATION_PLAN.md §9.2.
+        ///     episode arithmetic fails here in every build configuration. Seeds 0, 1, 42 and 1000, as in the parity
+        ///     audit (docs/plans/GYMNASIUM_PARITY_AUDIT.md).
         /// </summary>
         /// <param name="seed">The env generator's seed.</param>
         /// <param name="continuous">Selects the continuous action space.</param>
@@ -261,7 +262,7 @@ namespace Gym.Tests.Envs.Aether {
         [TestMethod]
         public void Step_ContinuousActionWithFewerThanTwoThrottles_ThrowsIndexError()
         {
-            var env = new LunarLanderEnv(NullEnvViewer.Factory, continuous: true, random_state: LegacySeeding.RandomState(0));
+            var env = new LunarLanderEnv(NullEnvViewer.Factory, continuous: true, random_state: Seeding.NpRandom(0).Rng);
             env.Reset().Dispose();
 
             using NDArray sampled = env.ActionSpace.Sample();

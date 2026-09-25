@@ -24,10 +24,10 @@ namespace Gym.Envs {
         ///     reseeds (for example an action space created with the same generator) is up to the env.
         /// </summary>
         /// <param name="seed">
-        ///     A NumPy seed in <c>[0, 2**32 - 1]</c>; <see langword="long"/> because seeds above <see cref="int.MaxValue"/>
-        ///     are valid.
+        ///     Any non-negative seed, as in Gymnasium (a Python int with no upper bound); <see langword="long"/> covers every
+        ///     seed up to 2^63 - 1.
         /// </param>
-        /// <exception cref="NumSharp.ValueError">Thrown when <paramref name="seed"/> is outside <c>[0, 2**32 - 1]</c>, with NumPy's message.</exception>
+        /// <exception cref="Gym.Exceptions.Error">Thrown when <paramref name="seed"/> is negative, with Gymnasium's message.</exception>
         void Seed(long seed);
     }
 }

@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Reflection.Metadata;
 using System.Text.Json;
+using Gym.Exceptions;
 using Gym.Utils;
 using NumSharp;
 
@@ -14,27 +15,32 @@ namespace Gym.Spaces {
         Above
     }
     public class Box : Space, IEquatable<Box> {
-        protected NumPyRandom RandomState;
+        /// <summary>
+        ///     The generator this box samples from: NumPy's <c>Generator(PCG64)</c>, Gymnasium's <c>np_random</c>. The box owns
+        ///     it, unless one was passed in to be shared.
+        /// </summary>
+        /// <remarks>Named <c>RandomState</c> and typed as NumPy's legacy <c>RandomState</c> (MT19937) before Gym.NET adopted Gymnasium's seeding.</remarks>
+        protected Generator NpRandom;
         public NDArray Low { get; }
         public NDArray High { get; }
         public NDArray BoundedLow { get; private set;  }
         public NDArray BoundedHigh { get; private set; }
         /// <summary>
         ///     A box of <paramref name="shape"/> whose every element lies in [<paramref name="low"/>, <paramref name="high"/>],
-        ///     with integer bounds; forwards to <see cref="Box(float, float, Shape, DType, long, NumPyRandom)"/>.
+        ///     with integer bounds; forwards to <see cref="Box(float, float, Shape, DType, long, Generator)"/>.
         /// </summary>
         /// <param name="low">The lower bound of every element.</param>
         /// <param name="high">The upper bound of every element.</param>
         /// <param name="shape">The shape of every sample.</param>
         /// <param name="dType">The element type; <see langword="null"/> means float32.</param>
         /// <param name="seed">
-        ///     A NumPy seed in <c>[0, 2**32 - 1]</c> for this box's own generator, or -1 for a generator of its own seeded from
-        ///     OS entropy.
+        ///     A non-negative seed for this box's own generator, drawing what Gymnasium's <c>Box(..., seed=seed)</c> draws; or
+        ///     -1 for a generator of its own seeded from OS entropy.
         /// </param>
-        /// <exception cref="ValueError">Thrown when <paramref name="seed"/> is neither -1 nor in <c>[0, 2**32 - 1]</c>.</exception>
+        /// <exception cref="Error">Thrown when <paramref name="seed"/> is negative but not -1, with Gymnasium's message.</exception>
         /// <remarks>
         ///     Footgun: with <see langword="int"/> literals and no fifth argument (<c>new Box(0, 5, shape, np.int32)</c>) the
-        ///     call is ambiguous with the <paramref name="seed"/>-less <see cref="Box(int, int, Shape, DType, NumPyRandom)"/>
+        ///     call is ambiguous with the <paramref name="seed"/>-less <see cref="Box(int, int, Shape, DType, Generator)"/>
         ///     overload (CS0121). Name the fifth argument (<c>seed: 3</c>), or pass <see langword="float"/> literals.
         /// </remarks>
         public Box(int low, int high, Shape shape, DType dType = null, long seed = -1) : this((float) low, (float) high, shape, dType, seed, null) { }
@@ -55,7 +61,7 @@ namespace Gym.Spaces {
         ///     Footgun: see <see cref="Box(int, int, Shape, DType, long)"/>; the two integer overloads are ambiguous unless the
         ///     fifth argument is given by name.
         /// </remarks>
-        public Box(int low, int high, Shape shape, DType dType = null, NumPyRandom random_state = null) : this((float)low, (float)high, shape, dType, -1, random_state) { }
+        public Box(int low, int high, Shape shape, DType dType = null, Generator random_state = null) : this((float)low, (float)high, shape, dType, -1, random_state) { }
 
         /// <summary>
         ///     A box of <paramref name="shape"/> whose every element lies in [<paramref name="low"/>, <paramref name="high"/>].
@@ -66,26 +72,26 @@ namespace Gym.Spaces {
         /// <param name="shape">The shape of every sample.</param>
         /// <param name="dType">The element type; <see langword="null"/> means float32.</param>
         /// <param name="seed">
-        ///     A NumPy seed in <c>[0, 2**32 - 1]</c> for this box's own generator, or -1 to use <paramref name="random_state"/>
-        ///     instead.
+        ///     A non-negative seed for this box's own generator, drawing what Gymnasium's <c>Box(..., seed=seed)</c> draws; or
+        ///     -1 to use <paramref name="random_state"/> instead.
         /// </param>
         /// <param name="random_state">
         ///     The generator to draw from when <paramref name="seed"/> is -1 (it may be shared with other spaces), or
         ///     <see langword="null"/> for a generator of the box's own, seeded from OS entropy.
         /// </param>
-        /// <exception cref="ValueError">Thrown when <paramref name="seed"/> is neither -1 nor in <c>[0, 2**32 - 1]</c>.</exception>
+        /// <exception cref="Error">Thrown when <paramref name="seed"/> is negative but not -1, with Gymnasium's message.</exception>
         /// <remarks>
         ///     The bounds are built with <c>np.full(shape, value, dtype)</c>, which casts the scalar to the dtype exactly the
         ///     way NumPy does. It replaces <c>(low + np.zeros(shape, dType)).astype(dType)</c>, which relied on NumSharp.Lite's
         ///     promotion. There is no null check on <paramref name="shape"/>: <see cref="Shape"/> is a struct in NumSharp, so
         ///     the former <c>Equals(shape, null)</c> guard could never fire.
         /// </remarks>
-        public Box(float low, float high, Shape shape, DType dType = null, long seed = -1, NumPyRandom random_state = null) : base(shape, (dType = dType ?? np.float32)) {
+        public Box(float low, float high, Shape shape, DType dType = null, long seed = -1, Generator random_state = null) : base(shape, (dType = dType ?? np.float32)) {
             Low = np.full(shape, low, dType);
             High = np.full(shape, high, dType);
-            // Never the process-wide np.random: it is shared, so one space's draws would shift another's, and NumSharp's
-            // MT19937 takes no lock, so two threads drawing from it corrupt its state (trap 5).
-            RandomState = seed != -1 ? LegacySeeding.RandomState(seed) : random_state ?? LegacySeeding.FromEntropy();
+            // A generator of the box's own unless one is shared on purpose: a shared generator couples two spaces' streams,
+            // and generators are not synchronized, so two threads drawing from one corrupt its state.
+            NpRandom = seed != -1 ? Seeding.NpRandom(seed).Rng : random_state ?? Seeding.NpRandom().Rng;
             CheckBounded();
         }
 
@@ -97,29 +103,27 @@ namespace Gym.Spaces {
         /// <param name="high">The upper bounds, with the shape of <paramref name="low"/>.</param>
         /// <param name="dType">The element type; <see langword="null"/> means float32.</param>
         /// <param name="seed">
-        ///     A NumPy seed in <c>[0, 2**32 - 1]</c> for this box's own generator, or -1 to use <paramref name="random_state"/>
-        ///     instead.
+        ///     A non-negative seed for this box's own generator, drawing what Gymnasium's <c>Box(..., seed=seed)</c> draws; or
+        ///     -1 to use <paramref name="random_state"/> instead.
         /// </param>
         /// <param name="random_state">
         ///     The generator to draw from when <paramref name="seed"/> is -1 (it may be shared with other spaces), or
         ///     <see langword="null"/> for a generator of the box's own, seeded from OS entropy.
         /// </param>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="low"/> or <paramref name="high"/> is <see langword="null"/>.</exception>
-        /// <exception cref="ValueError">
-        ///     Thrown when the two shapes differ, with Gymnasium's message, or when <paramref name="seed"/> is neither -1 nor in
-        ///     <c>[0, 2**32 - 1]</c>.
-        /// </exception>
-        public Box(NDArray low, NDArray high, DType dType = null, long seed = -1, NumPyRandom random_state = null) : base(RequireSameShape(low, high), (dType = dType ?? np.float32)) {
+        /// <exception cref="ValueError">Thrown when the two shapes differ, with Gymnasium's message.</exception>
+        /// <exception cref="Error">Thrown when <paramref name="seed"/> is negative but not -1, with Gymnasium's message.</exception>
+        public Box(NDArray low, NDArray high, DType dType = null, long seed = -1, Generator random_state = null) : base(RequireSameShape(low, high), (dType = dType ?? np.float32)) {
             Low = low.astype(dType);
             High = high.astype(dType);
-            // Never the process-wide np.random: it is shared, so one space's draws would shift another's, and NumSharp's
-            // MT19937 takes no lock, so two threads drawing from it corrupt its state (trap 5).
-            RandomState = seed != -1 ? LegacySeeding.RandomState(seed) : random_state ?? LegacySeeding.FromEntropy();
+            // A generator of the box's own unless one is shared on purpose: a shared generator couples two spaces' streams,
+            // and generators are not synchronized, so two threads drawing from one corrupt its state.
+            NpRandom = seed != -1 ? Seeding.NpRandom(seed).Rng : random_state ?? Seeding.NpRandom().Rng;
             CheckBounded();
         }
 
         /// <summary>
-        ///     Validates the bounds of <see cref="Box(NDArray, NDArray, DType, long, NumPyRandom)"/> before the base constructor
+        ///     Validates the bounds of <see cref="Box(NDArray, NDArray, DType, long, Generator)"/> before the base constructor
         ///     runs, and returns the box's shape. It replaces a <c>Debug.Assert</c> that vanished in Release builds, where
         ///     mismatched bounds used to construct a box whose <see cref="Low"/> and <see cref="High"/> disagreed.
         /// </summary>
@@ -192,22 +196,25 @@ namespace Gym.Spaces {
 
         /// <summary>
         ///     Draws one point of the box, choosing each element's distribution from its bounds: uniform on [low, high],
-        ///     low + exponential when only bounded below, high − exponential when only bounded above, and a normal draw when
-        ///     unbounded. The result is a fresh array of <see cref="Space.DType"/> that the caller owns.
+        ///     low + exponential when only bounded below, high − exponential when only bounded above, and a standard normal
+        ///     when unbounded. Integer boxes draw up to <c>high</c> inclusive. The result is a fresh array of
+        ///     <see cref="Space.DType"/> that the caller owns.
         /// </summary>
         /// <param name="mask">Must be <see langword="null"/>: a box cannot be sampled under a mask.</param>
         /// <returns>A new array of <see cref="Space.Shape"/> and <see cref="Space.DType"/>, 0-d for a 0-d box.</returns>
         /// <exception cref="NotSupportedException">Thrown when <paramref name="mask"/> is not <see langword="null"/>.</exception>
         /// <remarks>
         ///     <para>
-        ///     Mirrors <c>gymnasium/spaces/box.py:404</c> @ 9e04324: the same categories drawn in the same order (unbounded,
-        ///     low-bounded, upper-bounded, bounded), so the generator advances exactly as NumPy's would. The bounded draw
-        ///     reproduces <c>numpy.random.RandomState.uniform(low_array, high_array)</c> bit for bit.
+        ///     Port of <c>gymnasium/spaces/box.py:404</c> @ 9e04324. It makes the same generator calls in the same order
+        ///     (standard normal, exponential, exponential, uniform) with the same arguments, so a box seeded like Gymnasium's
+        ///     samples the same bits. Boxes that are not floating-point shift <c>high</c> by one
+        ///     (<c>high.astype(int64) + 1</c>), floor, clip integer dtypes to their range (int64 with Gymnasium's margin of 2
+        ///     and its second clip to the bounds), then cast.
         ///     </para>
         ///     <para>
-        ///     Known deviations kept until P2 re-ports the space: unbounded elements draw <c>normal(0.5, 1)</c> where Gymnasium
-        ///     draws a standard normal (B-08), and integer boxes never draw <c>high</c> because Gymnasium's <c>high + 1</c> is
-        ///     missing (B-09).
+        ///     The pre-Gymnasium port drew <c>normal(0.5, 1)</c> for unbounded elements (B-08) and never reached <c>high</c> in
+        ///     integer boxes (B-09); both follow Gymnasium now. Not ported yet (P2): the probability-mask argument, and
+        ///     Gymnasium's <c>error.Error</c> for a mask instead of <see cref="NotSupportedException"/>.
         ///     </para>
         /// </remarks>
         public override NDArray Sample(NDArray mask = null) {
@@ -217,72 +224,123 @@ namespace Gym.Spaces {
                 throw new NotSupportedException("Box.sample cannot be provided a mask.");
             }
 
-            // Boolean selectors that classify the elements by interval type. One path serves every rank: NumSharp's masked
-            // indexing handles 0-d arrays, so NumSharp.Lite's separate 0-d branch is gone. Every intermediate is scoped with
-            // `using` because an undisposed NDArray is only reclaimed by the finalizer.
-            using NDArray notBoundedLow = ~BoundedLow;
-            using NDArray notBoundedHigh = ~BoundedHigh;
-            using NDArray unbounded = notBoundedLow & notBoundedHigh;
-            using NDArray upp_bounded = notBoundedLow & BoundedHigh;
-            using NDArray low_bounded = BoundedLow & notBoundedHigh;
-            using NDArray bounded = BoundedLow & BoundedHigh;
+            // Gymnasium: high = self.high if self.dtype.kind == "f" else self.high.astype("int64") + 1, so that integer (and
+            // boolean) samples reach high itself after the floor below. The shifted copy is owned here; High never is.
+            NDArray shiftedHigh = null;
+            try
+            {
+                NDArray high = High;
+                if (DType.kind != 'f')
+                {
+                    using NDArray highInt64 = High.astype(np.int64);
+                    shiftedHigh = highInt64 + 1;
+                    high = shiftedHigh;
+                }
 
-            // float64 like Gymnasium's np.empty(self.shape); the cast to DType happens once, at the end.
-            using NDArray sample = np.empty(Shape);
+                // Boolean selectors that classify the elements by interval type. One path serves every rank: NumSharp's masked
+                // indexing handles 0-d arrays. Every intermediate is scoped with `using` because an undisposed NDArray is only
+                // reclaimed by the finalizer.
+                using NDArray notBoundedLow = ~BoundedLow;
+                using NDArray notBoundedHigh = ~BoundedHigh;
+                using NDArray unbounded = notBoundedLow & notBoundedHigh;
+                using NDArray upp_bounded = notBoundedLow & BoundedHigh;
+                using NDArray low_bounded = BoundedLow & notBoundedHigh;
+                using NDArray bounded = BoundedLow & BoundedHigh;
 
-            // count_nonzero gives the size Gymnasium reads from mask[mask].shape without materializing the selection. A
-            // category with no elements draws nothing, which leaves the generator exactly where NumPy leaves it for size 0.
-            long unboundedCount = np.count_nonzero(unbounded);
-            if (unboundedCount > 0)
-            {
-                using NDArray drawn = RandomState.normal(0.5f, 1.0f, unboundedCount);
-                sample[unbounded] = drawn;
-            }
-            long lowBoundedCount = np.count_nonzero(low_bounded);
-            if (lowBoundedCount > 0)
-            {
-                using NDArray exponential = RandomState.exponential(1.0f, lowBoundedCount);
-                using NDArray lows = Low[low_bounded];
-                using NDArray drawn = exponential + lows;
-                sample[low_bounded] = drawn;
-            }
-            long uppBoundedCount = np.count_nonzero(upp_bounded);
-            if (uppBoundedCount > 0)
-            {
-                using NDArray exponential = RandomState.exponential(1.0f, uppBoundedCount);
-                using NDArray negated = -exponential;
-                using NDArray highs = High[upp_bounded];
-                using NDArray drawn = negated + highs;
-                sample[upp_bounded] = drawn;
-            }
-            long boundedCount = np.count_nonzero(bounded);
-            if (boundedCount > 0)
-            {
-                // numpy.random.RandomState.uniform(low_array, high_array) casts both bounds to float64 (numpy/random/mtrand.pyx,
-                // uniform) and computes lower + range * next_double() per element (random_uniform in
-                // numpy/random/src/distributions/distributions.c). NumSharp's uniform(NDArray, NDArray, DType) computes in the
-                // operand dtype and takes no size, so it is not used. random_sample(n) draws the same n next_double() values,
-                // so the stream and the bits match NumPy.
-                using NDArray lows = Low[bounded];
-                using NDArray highs = High[bounded];
-                using NDArray low64 = lows.astype(np.float64);
-                using NDArray high64 = highs.astype(np.float64);
-                using NDArray range = high64 - low64;
-                using NDArray u = RandomState.random_sample(boundedCount);
-                using NDArray scaled = range * u;
-                using NDArray drawn = low64 + scaled;
-                sample[bounded] = drawn;
-            }
+                // float64 like Gymnasium's np.empty(self.shape); the cast to DType happens once, at the end.
+                using NDArray sample = np.empty(Shape);
 
-            // Gymnasium floors every integer-like dtype: dtype.kind in ["i", "u", "b"]. Testing the kind, rather than a list
-            // of dtypes, also covers uint8: np.@byte is int8 in NumSharp, so the former `DType == np.@byte` test had silently
-            // stopped meaning uint8.
-            if (DType.kind is 'i' or 'u' or 'b')
+                // count_nonzero gives the size Gymnasium reads from mask[mask].shape without materializing the selection. A
+                // category with no elements draws nothing, which leaves the generator exactly where NumPy leaves it for a
+                // size-0 draw.
+                long unboundedCount = np.count_nonzero(unbounded);
+                if (unboundedCount > 0)
+                {
+                    // Gymnasium: np_random.normal(size=...), a STANDARD normal.
+                    using NDArray drawn = NpRandom.normal(0.0, 1.0, unboundedCount);
+                    sample[unbounded] = drawn;
+                }
+                long lowBoundedCount = np.count_nonzero(low_bounded);
+                if (lowBoundedCount > 0)
+                {
+                    using NDArray exponential = NpRandom.exponential(1.0, lowBoundedCount);
+                    using NDArray lows = Low[low_bounded];
+                    using NDArray drawn = exponential + lows;
+                    sample[low_bounded] = drawn;
+                }
+                long uppBoundedCount = np.count_nonzero(upp_bounded);
+                if (uppBoundedCount > 0)
+                {
+                    // Gymnasium offsets from the shifted high here as well.
+                    using NDArray exponential = NpRandom.exponential(1.0, uppBoundedCount);
+                    using NDArray negated = -exponential;
+                    using NDArray highs = high[upp_bounded];
+                    using NDArray drawn = negated + highs;
+                    sample[upp_bounded] = drawn;
+                }
+                long boundedCount = np.count_nonzero(bounded);
+                if (boundedCount > 0)
+                {
+                    // Generator.uniform(low_array, high_array) casts both bounds to float64 and computes
+                    // low + (high - low) * next_double() per element (numpy/random/_generator.pyx, uniform; random_uniform in
+                    // numpy/random/src/distributions/distributions.c). NumSharp's Generator.uniform takes scalar bounds only,
+                    // and random(n) draws the same n next_double() values, so the stream and the bits match NumPy.
+                    using NDArray lows = Low[bounded];
+                    using NDArray highs = high[bounded];
+                    using NDArray low64 = lows.astype(np.float64);
+                    using NDArray high64 = highs.astype(np.float64);
+                    using NDArray range = high64 - low64;
+                    using NDArray u = NpRandom.random(boundedCount);
+                    using NDArray scaled = range * u;
+                    using NDArray drawn = low64 + scaled;
+                    sample[bounded] = drawn;
+                }
+
+                return CastSample(sample);
+            }
+            finally
             {
-                using NDArray floored = np.floor(sample);
+                shiftedHigh?.Dispose();
+            }
+        }
+
+        /// <summary>
+        ///     The last steps of Gymnasium's <c>Box.sample</c> (<c>box.py:459</c>): floor every dtype of kind i, u or b, clip
+        ///     integer dtypes to their range so the cast cannot wrap, cast to <see cref="Space.DType"/>, and clip int64 once
+        ///     more to the bounds.
+        /// </summary>
+        /// <param name="sample">The float64 sample; it is not modified.</param>
+        /// <returns>A new array of <see cref="Space.DType"/>.</returns>
+        /// <remarks>
+        ///     Testing the kind, rather than a list of dtypes, also covers uint8: <c>np.@byte</c> is int8 in NumSharp. Boolean
+        ///     boxes are floored but not clipped, because <c>np.issubdtype(bool, np.integer)</c> is false.
+        /// </remarks>
+        private NDArray CastSample(NDArray sample) {
+            if (DType.kind is not ('i' or 'u' or 'b'))
+                return sample.astype(DType);
+
+            using NDArray floored = np.floor(sample);
+            if (DType.kind == 'b')
                 return floored.astype(DType);
+
+            // np.iinfo bounds, converted to float64 as NumPy converts the Python ints Gymnasium passes to clip. For int64,
+            // Gymnasium keeps a margin of 2, but even with it both limits round to ±2^63 in float64, which is why it clips
+            // again after the cast.
+            var info = np.iinfo(DType);
+            double dtypeMin = DType == np.int64 ? info.min + 2 : info.min;
+            double dtypeMax = DType == np.int64 ? info.max - 2 : DType.kind == 'u' ? info.maxUnsigned : info.max;
+            using NDArray lowerLimit = NDArray.Scalar<double>(dtypeMin);
+            using NDArray upperLimit = NDArray.Scalar<double>(dtypeMax);
+            using NDArray clipped = np.clip(floored, lowerLimit, upperLimit);
+            NDArray cast = clipped.astype(DType);
+            if (DType != np.int64)
+                return cast;
+
+            // float64 values near the int64 limits can cast to out-of-bounds integers; Gymnasium clips them to the bounds.
+            using (cast)
+            {
+                return np.clip(cast, Low, High);
             }
-            return sample.astype(DType);
         }
 
         /// <summary>
@@ -318,13 +376,15 @@ namespace Gym.Spaces {
         }
 
         /// <summary>
-        ///     Gives this box a fresh generator seeded with <paramref name="seed"/>, bit-identical to
-        ///     <c>numpy.random.RandomState(seed)</c>. A generator the box shared with other spaces is left untouched.
+        ///     Port of <c>Space.seed(seed)</c>: gives this box a fresh generator, <c>Generator(PCG64(SeedSequence(seed)))</c>,
+        ///     so it samples what Gymnasium's box samples after <c>box.seed(seed)</c>. A generator the box shared with other
+        ///     spaces is left untouched.
         /// </summary>
-        /// <param name="seed">A NumPy seed in <c>[0, 2**32 - 1]</c>.</param>
-        /// <exception cref="ValueError">Thrown when <paramref name="seed"/> is outside <c>[0, 2**32 - 1]</c>, with NumPy's message.</exception>
+        /// <param name="seed">Any non-negative seed.</param>
+        /// <exception cref="Error">Thrown when <paramref name="seed"/> is negative, with Gymnasium's message.</exception>
+        /// <remarks>Gymnasium's <c>seed</c> also accepts no seed and returns the one it used; that shape of the API arrives with P2.</remarks>
         public override void Seed(long seed) {
-            RandomState = LegacySeeding.RandomState(seed);
+            NpRandom = Seeding.NpRandom(seed).Rng;
         }
 
         #region Object Overrides

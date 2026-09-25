@@ -12,8 +12,8 @@ namespace Gym.Tests.Envs {
     /// <summary>
     ///     Envs and spaces created with default generators step and sample on parallel threads without exceptions. Before the
     ///     per-instance generators, every unseeded space and LunarLander shared the process-wide <c>np.random</c>, and two
-    ///     threads drawing from NumSharp's unsynchronized MT19937 threw <see cref="IndexOutOfRangeException"/> (trap 5,
-    ///     measured with 2 threads x 2,000,000 draws).
+    ///     threads drawing from one unsynchronized generator (NumSharp's MT19937 then) threw
+    ///     <see cref="IndexOutOfRangeException"/> (trap 5, measured with 2 threads x 2,000,000 draws).
     /// </summary>
     /// <remarks>
     ///     A race only fails when it happens to interleave badly, so these tests are smoke tests. The deterministic guarantee,

@@ -353,7 +353,11 @@ namespace Gym.Environments.Envs.Aether
         public bool UseWind { get; private set; } = false;
         public float WindPower { get; private set; } = 15f;
         public float TurbulencePower { get; private set; } = 1.5f;
-        private NumPyRandom RandomState { get; set; }
+        /// <summary>
+        ///     The env's generator, NumPy's <c>Generator(PCG64)</c> as in Gymnasium; shared with the action space when the caller
+        ///     passed one in.
+        /// </summary>
+        private Generator RandomState { get; set; }
 
         /// <summary>
         /// True when the filled circles are drawn for the side and main thrusters
@@ -361,7 +365,7 @@ namespace Gym.Environments.Envs.Aether
         public bool RenderEngineParticles { get; set; } = true;
         public bool Verbose { get; set; } = false;
 
-        /// <summary>The wind phase: drawn with <c>randint(-9999, 9999)</c> and advanced once per windy step. <see langword="long"/> because NumPy produces it as int64.</summary>
+        /// <summary>The wind phase: drawn with <c>integers(-9999, 9999)</c> and advanced once per windy step. <see langword="long"/> because NumPy produces it as int64.</summary>
         private long _wind_idx;
         /// <summary>The turbulence phase, drawn and advanced like <see cref="_wind_idx"/>.</summary>
         private long _torque_idx;
@@ -393,22 +397,23 @@ namespace Gym.Environments.Envs.Aether
         /// <param name="wind_power">The maximum linear wind force, within [0, 20].</param>
         /// <param name="turbulence_power">The maximum rotational wind torque, within [0, 2].</param>
         /// <param name="random_state">
-        ///     The generator this env draws from. The same instance is handed to the action space, so both share one stream.
-        ///     <see langword="null"/> gives the env a generator of its own, seeded from OS entropy, and the action space another.
+        ///     The generator this env draws from (<see cref="Gym.Utils.Seeding.NpRandom"/> makes one). The same instance
+        ///     is handed to the action space, so both share one stream. <see langword="null"/> gives the env a generator of its
+        ///     own, seeded from OS entropy, and the action space another.
         /// </param>
         /// <exception cref="ArgumentException">Thrown when <paramref name="gravity"/> is outside [-12, 0].</exception>
         /// <exception cref="WarningException">
         ///     Thrown when <paramref name="wind_power"/> or <paramref name="turbulence_power"/> is outside its recommended range,
         ///     where Gymnasium only warns (B-27).
         /// </exception>
-        public LunarLanderEnv(IEnvironmentViewerFactoryDelegate viewerFactory, bool continuous = false, float gravity = -10f, bool enable_wind = false, float wind_power = 15f, float turbulence_power = 1.5f, NumPyRandom random_state=null)
+        public LunarLanderEnv(IEnvironmentViewerFactoryDelegate viewerFactory, bool continuous = false, float gravity = -10f, bool enable_wind = false, float wind_power = 15f, float turbulence_power = 1.5f, Generator random_state=null)
         {
             RandomState = random_state;
             if (RandomState == null)
             {
-                // B-29: the former fallback, the process-wide np.random, let a second env perturb the first, and crashed
-                // when two threads stepped envs at once (NumSharp's MT19937 takes no lock, trap 5).
-                RandomState = LegacySeeding.FromEntropy();
+                // B-29: the process-wide np.random, the fallback before per-instance generators, let a second env perturb the
+                // first and was not safe to draw from on two threads.
+                RandomState = Seeding.NpRandom().Rng;
             }
             _viewerFactory = viewerFactory;
             ContinuousMode = continuous;
@@ -431,8 +436,9 @@ namespace Gym.Environments.Envs.Aether
                 throw (new WarningException("turbulence_power value is recommended to be between 0.0 and 2.0"));
             }
 
-            _wind_idx = TakeInt64(RandomState.randint(-9999, 9999));
-            _torque_idx = TakeInt64(RandomState.randint(-9999, 9999));
+            // Gymnasium: self.np_random.integers(-9999, 9999), drawn in reset rather than here (B-18).
+            _wind_idx = TakeInt64(RandomState.integers(-9999, 9999));
+            _torque_idx = TakeInt64(RandomState.integers(-9999, 9999));
 
             NDArray low = np.array(new float[] { -1.5f, -1.5f, -5f, -5f, (float)-Math.PI, -5f, 0f, 0f });
             NDArray high = np.array(new float[] { 1.5f, 1.5f, 5f, 5f, (float)Math.PI, 5f, 1f, 1f });
@@ -1002,20 +1008,26 @@ namespace Gym.Environments.Envs.Aether
         }
 
         /// <summary>
-        ///     Reseeds the env's generator in place, bit-identical to <c>numpy.random.RandomState(seed)</c>. In place, unlike
+        ///     Reseeds the env's generator in place to the state of Gymnasium's <c>seeding.np_random(seed)</c>. In place, unlike
         ///     the spaces' <c>Seed</c>: when the env was created with a <c>random_state</c>, its action space draws from that
         ///     same instance and is reseeded too; without one, the action space has a generator of its own and is not.
         /// </summary>
-        /// <param name="seed">A NumPy seed in <c>[0, 2**32 - 1]</c>.</param>
-        /// <exception cref="ValueError">Thrown when <paramref name="seed"/> is outside <c>[0, 2**32 - 1]</c>, with NumPy's message.</exception>
+        /// <param name="seed">Any non-negative seed.</param>
+        /// <exception cref="Gym.Exceptions.Error">Thrown when <paramref name="seed"/> is negative, with Gymnasium's message.</exception>
         /// <remarks>
         ///     The wind and turbulence phases were drawn in the constructor (B-18), so reseeding does not redraw them; only the
         ///     draws of later <see cref="Reset"/> and <see cref="Step"/> calls follow the new seed.
         /// </remarks>
         public override void Seed(long seed)
         {
-            // Binds to seed(long), which accepts the whole [0, 2^32 - 1] and rejects the rest with NumPy's ValueError.
-            RandomState.seed(seed);
+            var reseeded = Seeding.NpRandom(seed).Rng;
+            // NumPy's Generator has no reseed method. Copying a freshly seeded PCG64's complete state (NumPy's
+            // bit_generator.state: state, increment and the buffered 32-bit half) reseeds the shared instance for everyone
+            // holding it. A caller-supplied generator on another bit generator is replaced instead.
+            if (RandomState.bit_generator is PCG64 shared && reseeded.bit_generator is PCG64 fresh)
+                shared.state = fresh.state;
+            else
+                RandomState = reseeded;
         }
     }
 }

@@ -30,8 +30,8 @@ namespace Gym.Envs {
         /// <summary>
         ///     Reseeds the env's generator, so the episodes that follow are reproducible; see <see cref="IEnv.Seed"/>.
         /// </summary>
-        /// <param name="seed">A NumPy seed in <c>[0, 2**32 - 1]</c>.</param>
-        /// <exception cref="ValueError">Thrown when <paramref name="seed"/> is outside <c>[0, 2**32 - 1]</c>, with NumPy's message.</exception>
+        /// <param name="seed">Any non-negative seed.</param>
+        /// <exception cref="Gym.Exceptions.Error">Thrown when <paramref name="seed"/> is negative, with Gymnasium's message.</exception>
         /// <remarks>This took an <see cref="int"/> before the migration to NumSharp master; overrides must now take <see langword="long"/>.</remarks>
         public abstract void Seed(long seed);
 

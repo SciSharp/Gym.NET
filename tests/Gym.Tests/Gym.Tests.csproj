@@ -27,10 +27,11 @@
     <ProjectReference Include="..\..\src\Gym\Gym.csproj" />
   </ItemGroup>
 
-  <!-- NumPy 2.4.2 golden of the legacy RandomState draw patterns, recorded by tools/parity/legacy_rng.py and replayed by
-       LegacyRngParityTests. Embedded, so the test does not depend on the working directory or on copy-to-output. -->
+  <!-- Gymnasium (9e04324, NumPy 2.4.2) golden of seeded space samples and CartPole resets, recorded by
+       tools/parity/gymnasium_rng.py and replayed by GymnasiumRngParityTests. Embedded, so the test does not depend on the
+       working directory or on copy-to-output. -->
   <ItemGroup>
-    <EmbeddedResource Include="Parity\legacy_rng.golden.txt" LogicalName="Gym.Tests.Parity.legacy_rng.golden.txt" />
+    <EmbeddedResource Include="Parity\gymnasium_rng.golden.txt" LogicalName="Gym.Tests.Parity.gymnasium_rng.golden.txt" />
   </ItemGroup>
 
   <!-- NumSharp: the regular NuGet reference, declared here as well so the ownership analyzer also covers the tests (a

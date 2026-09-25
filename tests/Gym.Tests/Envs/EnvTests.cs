@@ -53,7 +53,7 @@ namespace Gym.Tests.Envs {
             public override void CloseEnvironment() { }
 
             /// <summary>Seeds the action space; the env itself draws nothing.</summary>
-            /// <param name="seed">A NumPy seed in <c>[0, 2**32 - 1]</c>.</param>
+            /// <param name="seed">Any non-negative seed.</param>
             public override void Seed(long seed) => ActionSpace.Seed(seed);
         }
 
@@ -90,7 +90,7 @@ namespace Gym.Tests.Envs {
         [TestMethod]
         public void DummyVecEnv_StepsWithLongActionAndSeedsAboveInt32()
         {
-            var vec = new DummyVecEnv(new CartPoleEnv(NullEnvViewer.Factory, LegacySeeding.RandomState(0)));
+            var vec = new DummyVecEnv(new CartPoleEnv(NullEnvViewer.Factory, Seeding.NpRandom(0).Rng));
 
             vec.Seed((1L << 31) + 5);
             vec.Seed(new[] { (long) uint.MaxValue });

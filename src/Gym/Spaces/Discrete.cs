@@ -1,4 +1,5 @@
 ﻿using System;
+using Gym.Exceptions;
 using Gym.Utils;
 using NumSharp;
 
@@ -9,7 +10,13 @@ namespace Gym.Spaces {
 
         /// <summary>The smallest element, <see cref="long"/> like Gymnasium's <c>np.int64</c> <c>start</c>.</summary>
         public long Start { get; private set; }
-        protected NumPyRandom RandomState;
+
+        /// <summary>
+        ///     The generator this space samples from: NumPy's <c>Generator(PCG64)</c>, Gymnasium's <c>np_random</c>. The space
+        ///     owns it, unless one was passed in to be shared (LunarLander shares its own with its action space).
+        /// </summary>
+        /// <remarks>Named <c>RandomState</c> and typed as NumPy's legacy <c>RandomState</c> (MT19937) before Gym.NET adopted Gymnasium's seeding.</remarks>
+        protected Generator NpRandom;
 
         /// <summary>
         ///     The space of the <paramref name="n"/> integers <c>{start, ..., start + n - 1}</c>.
@@ -20,25 +27,25 @@ namespace Gym.Spaces {
         ///     int64 regardless.
         /// </param>
         /// <param name="seed">
-        ///     A NumPy seed in <c>[0, 2**32 - 1]</c> for this space's own generator, or -1 to use
-        ///     <paramref name="random_state"/> instead.
+        ///     A non-negative seed for this space's own generator, drawing what Gymnasium's <c>Discrete(n, seed=seed)</c> draws;
+        ///     or -1 to use <paramref name="random_state"/> instead.
         /// </param>
         /// <param name="start">The smallest element.</param>
         /// <param name="random_state">
         ///     The generator to draw from when <paramref name="seed"/> is -1 (it may be shared, for example with the env), or
         ///     <see langword="null"/> for a generator of the space's own, seeded from OS entropy.
         /// </param>
-        /// <exception cref="ValueError">Thrown when <paramref name="seed"/> is neither -1 nor in <c>[0, 2**32 - 1]</c>.</exception>
+        /// <exception cref="Error">Thrown when <paramref name="seed"/> is negative but not -1, with Gymnasium's message.</exception>
         /// <remarks>
         ///     The shape stays <c>(n)</c> instead of Gymnasium's <c>()</c> (B-03, P2): the examples read
         ///     <c>ActionSpace.Shape.Size</c> as the number of actions. The default dtype was float32 under NumSharp.Lite.
         /// </remarks>
-        public Discrete(long n, DType dType = null, long seed = -1, long start=0, NumPyRandom random_state = null) : base(new Shape(n), (dType = dType ?? np.int64)) {
+        public Discrete(long n, DType dType = null, long seed = -1, long start=0, Generator random_state = null) : base(new Shape(n), (dType = dType ?? np.int64)) {
             N = n;
             Start = start;
-            // Never the process-wide np.random: it is shared, so one space's draws would shift another's, and NumSharp's
-            // MT19937 takes no lock, so two threads drawing from it corrupt its state (trap 5).
-            RandomState = seed != -1 ? LegacySeeding.RandomState(seed) : random_state ?? LegacySeeding.FromEntropy();
+            // A generator of the space's own unless one is shared on purpose: a shared generator couples two streams, and
+            // generators are not synchronized, so two threads drawing from one corrupt its state.
+            NpRandom = seed != -1 ? Seeding.NpRandom(seed).Rng : random_state ?? Seeding.NpRandom().Rng;
         }
 
         /// <summary>
@@ -54,10 +61,10 @@ namespace Gym.Spaces {
         ///     nothing, as in Gymnasium.
         /// </returns>
         /// <remarks>
-        ///     Mirrors the mask and uniform branches of <c>gymnasium/spaces/discrete.py:127</c> @ 9e04324, drawing with the
-        ///     legacy generator (<c>randint</c>/<c>choice</c> instead of Gymnasium's <c>Generator.integers</c>/<c>choice</c>)
-        ///     until F2; both draws are bit-identical to NumPy's <c>RandomState</c>. Not ported yet (P2): the probability mask,
-        ///     the mask assertions, and sampling in the space's own dtype (Gymnasium's default is int64 as well).
+        ///     Port of the mask and uniform branches of <c>gymnasium/spaces/discrete.py:127</c> @ 9e04324, with the same
+        ///     generator calls (<c>choice(np.where(mask == 1)[0])</c> and <c>integers(n, dtype=int64)</c>), so a space seeded
+        ///     like Gymnasium's samples the same values. Not ported yet (P2): the probability mask, the mask assertions, and
+        ///     sampling in a dtype other than int64 (Gymnasium draws in the space's dtype, int64 by default).
         /// </remarks>
         public override NDArray Sample(NDArray mask = null) {
             // `mask != null` is element-wise in NumSharp (an NDArray<bool>, not a bool), which made every call throw (B-01).
@@ -66,20 +73,31 @@ namespace Gym.Spaces {
                 using NDArray bmask = (mask == 1); // Valid action mask with boolean selector
                 if (np.any(bmask))
                 {
-                    // Gymnasium draws uniformly among the valid actions: np_random.choice(np.where(mask == 1)[0]). The former
-                    // (int) cast collapsed the whole index array into one int and sampled [0, firstValidIndex) (B-04). A
-                    // Discrete mask is 1-D, so nonzero returns exactly one index array.
+                    // Gymnasium draws uniformly among the valid actions: np_random.choice(np.where(mask == 1)[0]). A Discrete
+                    // mask is 1-D, so nonzero returns exactly one index array.
                     using NDArray validActions = np.nonzero(bmask)[0];
-                    using NDArray chosen = RandomState.choice(validActions);
-                    return NDArray.Scalar<long>(Start + (long)chosen);
+                    using NDArray chosen = NpRandom.choice(validActions);
+                    return NDArray.Scalar<long>(Start + SingleValue(chosen));
                 }
                 return NDArray.Scalar<long>(Start);
             }
-            // NumSharp's randint defaults to int32 where NumPy 2 defaults to int64; int64 makes the result NumPy's dtype.
-            // Below n = 2^31 the stream is NumPy's for either dtype. For n in [2^31, 2^32] NumSharp switches to its 64-bit
-            // path while NumPy keeps its 32-bit one, so those draws differ from NumPy (not covered by the parity golden).
-            using NDArray drawn = RandomState.randint(0, N, dtype: np.int64);
-            return NDArray.Scalar<long>(Start + (long)drawn);
+            // Gymnasium: self.start + self.np_random.integers(self.n, dtype=self.dtype.type), i.e. [0, n).
+            using NDArray drawn = NpRandom.integers(N, dtype: np.int64);
+            return NDArray.Scalar<long>(Start + SingleValue(drawn));
+        }
+
+        /// <summary>
+        ///     The one integer a size-less draw returns. NumSharp's <c>Generator.choice(array)</c> returns it as a one-element
+        ///     1-D array where NumPy returns a scalar, while <c>Generator.integers</c> returns a 0-d array; both hold the same
+        ///     value NumPy draws.
+        /// </summary>
+        /// <param name="draw">A 0-d or one-element array; the caller keeps ownership.</param>
+        /// <returns>The drawn value.</returns>
+        /// <exception cref="InvalidOperationException">Thrown when <paramref name="draw"/> does not hold exactly one element.</exception>
+        private static long SingleValue(NDArray draw) {
+            if (draw.size != 1)
+                throw new InvalidOperationException($"Expected a single drawn value, got {draw.size}.");
+            return Convert.ToInt64(draw.GetAtIndex(0));
         }
 
         /// <summary>
@@ -192,13 +210,15 @@ namespace Gym.Spaces {
         }
 
         /// <summary>
-        ///     Gives this space a fresh generator seeded with <paramref name="seed"/>, bit-identical to
-        ///     <c>numpy.random.RandomState(seed)</c>. A generator the space shared (for example with its env) is left untouched.
+        ///     Port of <c>Space.seed(seed)</c>: gives this space a fresh generator, <c>Generator(PCG64(SeedSequence(seed)))</c>,
+        ///     so it samples what Gymnasium's space samples after <c>space.seed(seed)</c>. A generator the space shared (for
+        ///     example with its env) is left untouched.
         /// </summary>
-        /// <param name="seed">A NumPy seed in <c>[0, 2**32 - 1]</c>.</param>
-        /// <exception cref="ValueError">Thrown when <paramref name="seed"/> is outside <c>[0, 2**32 - 1]</c>, with NumPy's message.</exception>
+        /// <param name="seed">Any non-negative seed.</param>
+        /// <exception cref="Error">Thrown when <paramref name="seed"/> is negative, with Gymnasium's message.</exception>
+        /// <remarks>Gymnasium's <c>seed</c> also accepts no seed and returns the one it used; that shape of the API arrives with P2.</remarks>
         public override void Seed(long seed) {
-            RandomState = LegacySeeding.RandomState(seed);
+            NpRandom = Seeding.NpRandom(seed).Rng;
         }
 
         #region Object Overrides
