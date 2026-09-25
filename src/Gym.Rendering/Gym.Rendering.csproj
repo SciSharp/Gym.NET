@@ -1,0 +1,47 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The pygame-compatible rasterizer of the Gymnasium port (port plan section 5.5, workstream F5): a Surface with pygame's
+       semantics and the drawing primitives Gymnasium's envs render with, reproduced pixel for pixel. The gfxdraw
+       primitives are a C# port of SDL_gfx 2.0.26 (zlib, see SdlGfx/SdlGfxPrimitives.cs and THIRD-PARTY-NOTICES.md). -->
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>Gym.Rendering</RootNamespace>
+    <!-- New projects follow the port plan's section 3.7. -->
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <Deterministic>true</Deterministic>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
+    <PackageId>Gym.NET.Rendering</PackageId>
+    <Version>0.2.0</Version>
+    <Authors>Eli Belash</Authors>
+    <Company>SciSharp STACK</Company>
+    <Product>Gym.NET.Rendering</Product>
+    <Description>pygame-compatible software rasterizer for Gym.NET: the Surface, gfxdraw primitives (a C# port of SDL_gfx 2.0.26), transform.flip, surfarray and Vector2.rotate_rad that Gymnasium's environments render with, reproduced pixel for pixel.</Description>
+    <Copyright>2023 © SciSharp STACK Team</Copyright>
+    <PackageLicenseUrl>https://github.com/SciSharp/Gym.NET/blob/master/README.md</PackageLicenseUrl>
+    <PackageProjectUrl>https://github.com/SciSharp/Gym.NET</PackageProjectUrl>
+    <PackageIconUrl>https://avatars3.githubusercontent.com/u/44989469?s=200&amp;v=4</PackageIconUrl>
+    <RepositoryUrl>https://github.com/SciSharp/Gym.NET</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageTags>gym, gymnasium, reinforcement learning, rendering, pygame, SDL_gfx, NumSharp</PackageTags>
+    <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+    <AllowedOutputExtensionsInPackageBuildOutputFolder>$(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb</AllowedOutputExtensionsInPackageBuildOutputFolder>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Gym for the Python built-in semantics the primitives' argument conversion needs (Gym.Utils.PyBuiltins). -->
+    <ProjectReference Include="..\Gym\Gym.csproj" />
+  </ItemGroup>
+
+  <!-- NumSharp: the regular NuGet reference (surfarray returns NDArrays). While NumSharpSource=Submodule (the default until
+       a NumSharp release contains the DType API), eng/NumSharp.props removes it and builds refs/NumSharp from source, with
+       its ownership analyzer; -p:NumSharpSource=Package builds against this reference as it stands. The import stays last:
+       it removes the reference declared before it and overrides GeneratePackageOnBuild above. -->
+  <ItemGroup>
+    <PackageReference Include="NumSharp" Version="0.70.0" />
+  </ItemGroup>
+  <Import Project="..\..\eng\NumSharp.props" />
+
+</Project>

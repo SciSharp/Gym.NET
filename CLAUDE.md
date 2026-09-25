@@ -22,10 +22,13 @@ refs/Gym.NET/
 │   │   ├── Spaces/                # Space (base), Box (bounded/continuous), Discrete
 │   │   ├── Observations/          # Step (Observation, Reward, Done, Information)
 │   │   ├── Internal/              # Dict, CircularQueue, DistributedScheduler, Threading
-│   │   └── Exceptions/            # InvalidActionError, AlreadySteppingError, NotSteppingError
+│   │   ├── Utils/                 # Seeding (PCG64), PyBuiltins (Python float/int/repr semantics), Warnings
+│   │   ├── Logger.cs              # Port of gymnasium.logger (colourised warnings, Python's default filters)
+│   │   └── Exceptions/            # Error, AssertionError, InvalidActionError, AlreadySteppingError, NotSteppingError
 │   │
+│   ├── Gym.Rendering/             # pygame-compatible rasterizer: Surface, GfxDraw (SDL_gfx 2.0.26 port), Transform, SurfArray, Vector2
 │   ├── Gym.Environments/          # Concrete environment implementations
-│   │   ├── Envs/Classic/          # CartPoleEnv (CartPole-v1)
+│   │   ├── Envs/Classic/          # CartPoleEnv (CartPole-v1, byte-for-byte port), ClassicControlUtils
 │   │   ├── Envs/Aether/           # LunarLanderEnv (Aether.Physics2D 2D physics simulation)
 │   │   └── Rendering/             # IEnvViewer, IEnvironmentViewerFactoryDelegate, NullEnvViewer
 │   │

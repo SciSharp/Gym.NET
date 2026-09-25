@@ -41,6 +41,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Gym\Gym.csproj" />
+    <!-- The pygame-compatible rasterizer the classic-control envs render rgb_array frames with, pixel for pixel. -->
+    <ProjectReference Include="..\Gym.Rendering\Gym.Rendering.csproj" />
   </ItemGroup>
 
   <!-- NumSharp: the regular NuGet reference. While NumSharpSource=Submodule (the default until a NumSharp release contains

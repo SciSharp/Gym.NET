@@ -148,6 +148,36 @@ namespace Gym.Tests.Parity.Oracle {
         }
 
         /// <summary>
+        ///     Renders and captures what <c>env.render()</c> did: a frame, <c>None</c> (before the first reset), or the
+        ///     exception pygame raised for a state it cannot draw.
+        /// </summary>
+        /// <returns>The outcome.</returns>
+        public RenderOutcome TryRender() {
+            return PythonRuntime.Run(() => {
+                PyObject result;
+                try {
+                    result = Python.gymnasium.Env.render(Env);
+                } catch (PythonException exception) {
+                    // The exception's Type is its own field, not a new reference: read, never disposed.
+                    return new RenderOutcome(null, new RaisedError(ValueFacts.QualifiedName(exception.Type), exception.Message));
+                }
+
+                using (result) {
+                    ValueFacts facts = ValueFacts.FromPython(result);
+                    return new RenderOutcome(facts.Kind == FactKind.None ? null : Frame.FromFacts(facts), null);
+                }
+            });
+        }
+
+        /// <summary>
+        ///     Runs a <see cref="Python"/> row on the unwrapped env under the GIL: setting Gymnasium's attributes before a pair
+        ///     runs, for example <c>Python.gymnasium.envs.classic_control.cartpole.CartPoleEnv.tau(env, 0.05)</c>.
+        /// </summary>
+        /// <param name="configure">The call; the env it receives is borrowed.</param>
+        /// <exception cref="PythonException">Thrown when the call raises.</exception>
+        public void WithUnwrapped(Action<PyObject> configure) => PythonRuntime.Run(() => configure(Unwrapped));
+
+        /// <summary>
         ///     Injects state: <c>env.unwrapped.&lt;name&gt; = np.array(values)</c>, a float64 NumPy copy made by NumSharp's interop.
         ///     The attribute is chosen at run time, so it is set by name rather than through a facade row.
         /// </summary>

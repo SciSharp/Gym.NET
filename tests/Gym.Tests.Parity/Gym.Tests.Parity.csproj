@@ -34,6 +34,8 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Gym\Gym.csproj" />
     <ProjectReference Include="..\..\src\Gym.Environments\Gym.Environments.csproj" />
+    <!-- The rasterizer, compared primitive by primitive with pygame.gfxdraw (Tests/Rendering). -->
+    <ProjectReference Include="..\..\src\Gym.Rendering\Gym.Rendering.csproj" />
   </ItemGroup>
 
   <!-- NumSharp and its pythonnet bridge: the regular NuGet references, co-versioned. While NumSharpSource=Submodule (the

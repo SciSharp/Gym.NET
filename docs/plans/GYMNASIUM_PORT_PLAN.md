@@ -1126,6 +1126,9 @@ The same rules applied to `cb9dcb6` (A.3 fork column). A source read confirmed f
 ## Appendix B: Defect register
 
 Verified on `pr/24`. The last column names the phase that removes the defect (all are fixed by re-porting, not patching).
+Rows marked **fixed** name the date and the gate that proves it; the CartPole rows were fixed on 2026-09-25 by the
+CartPole port ahead of P4 (with the `Gym.Rendering` rasterizer, F5's first slice), and every one of them is now a
+gated cell of the live parity suite (`tests/Gym.Tests.Parity`, `CartPoleLiveParityTests`).
 
 | ID | Location | Defect | Evidence | Removed in |
 |---|---|---|---|---|
@@ -1139,12 +1142,12 @@ Verified on `pr/24`. The last column names the phase that removes the defect (al
 | B-08 | `Box.cs:88`, `Box.cs:105` | Unbounded dims draw `normal(0.5, 1)`; Gymnasium uses a standard normal | Source read | P2 |
 | B-09 | `Box.cs:117` | Integer boxes never sample `high` (no `+ 1`) | Source read | P2 |
 | B-10 | `Box.cs:25`–`44` | No validation of dtype, NaN bounds or `low <= high` (Gymnasium raises `ValueError`/`TypeError`) | Source read | P2 |
-| B-11 | `src/Gym.Environments/Envs/Classic/CartPoleEnv.cs:24`–`36` | float32 physics constants: diverges at step 1 | A.7 | P4 |
-| B-12 | `CartPoleEnv.cs:46` | `float.MaxValue` bounds instead of `inf` (changes `Box` boundedness) | Source read | P4 |
-| B-13 | `CartPoleEnv.cs:185` | Returns the internal float64 state (aliased) instead of a float32 copy | A.7 | P4 |
-| B-14 | `CartPoleEnv.cs:139` | Action validation is `Debug.Assert` only; Release treats any non-1 action as "push left" | Source read | P4 |
-| B-15 | `CartPoleEnv.cs:49` | Unseeded `RandomState()` fallback | A.3 | P4 |
-| B-16 | `CartPoleEnv.cs:115`–`121` | Wrong colours; 1.07–1.14% of pixels differ | A.9 | P7 |
+| B-11 | `src/Gym.Environments/Envs/Classic/CartPoleEnv.cs:24`–`36` | float32 physics constants: diverges at step 1 | A.7 | P4; **fixed** 2026-09-25: float64 attributes, source operation order (`GymNet_Episode_MatchesGymnasium`) |
+| B-12 | `CartPoleEnv.cs:46` | `float.MaxValue` bounds instead of `inf` (changes `Box` boundedness) | Source read | P4; **fixed** 2026-09-25 (`GymNet_ObservationSpace_MatchesGymnasium`) |
+| B-13 | `CartPoleEnv.cs:185` | Returns the internal float64 state (aliased) instead of a float32 copy | A.7 | P4; **fixed** 2026-09-25: `State` float64, observations fresh float32 copies (`GymNet_Reset_MatchesGymnasium`) |
+| B-14 | `CartPoleEnv.cs:139` | Action validation is `Debug.Assert` only; Release treats any non-1 action as "push left" | Source read | P4; **fixed** 2026-09-25: `AssertionError` with Python's message (`GymNet_InvalidActions_RaiseGymnasiumsAssertion`) |
+| B-15 | `CartPoleEnv.cs:49` | Unseeded `RandomState()` fallback | A.3 | P4; **fixed** 2026-09-25 (`c141717`): a per-instance entropy-seeded PCG64 generator; Gymnasium's lazy creation arrives with P1's `Env<TObs, TAct>.NpRandom` |
+| B-16 | `CartPoleEnv.cs:115`–`121` | Wrong colours; 1.07–1.14% of pixels differ | A.9 | P7; **fixed** 2026-09-25: rendered with `Gym.Rendering`'s SDL_gfx port, pixel-identical at every tested state (`GymNet_Frame*`) |
 | B-17 | `src/Gym.Environments/Envs/Aether/LunarLanderEnv.cs:496` vs `:505`–`508` | Reset draws force before terrain (Gymnasium: terrain first) | Source read | P8 |
 | B-18 | `LunarLanderEnv.cs:409`–`410` | Wind indices drawn in the constructor, even without wind | Source read | P8 |
 | B-19 | `LunarLanderEnv.cs:412`–`413` | v2 observation bounds; 9.5% of random-play observations fall outside | A.8 | P8 |

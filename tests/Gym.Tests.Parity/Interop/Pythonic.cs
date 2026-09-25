@@ -215,6 +215,12 @@ namespace Gym.Tests.Parity {
             /// <exception cref="PythonException">Thrown when the call fails.</exception>
             internal static PyObject uint64(ulong value) => Scalar("uint64", new PyInt(value));
 
+            /// <summary><c>np.float32(value)</c>, from the float32 value itself (no rounding on the way).</summary>
+            /// <param name="value">The value.</param>
+            /// <returns>A new owned reference to the NumPy scalar.</returns>
+            /// <exception cref="PythonException">Thrown when the call fails.</exception>
+            internal static PyObject float32(float value) => Scalar("float32", new PyFloat(value));
+
             /// <summary><c>np.float64(value)</c>.</summary>
             /// <param name="value">The value.</param>
             /// <returns>A new owned reference to the NumPy scalar.</returns>
@@ -508,6 +514,12 @@ namespace Gym.Tests.Parity {
                 /// <returns>A new owned reference.</returns>
                 /// <exception cref="PythonException">Thrown when the attribute lookup fails.</exception>
                 internal static PyObject observation_space(PyObject env) => env.GetAttr("observation_space");
+
+                /// <summary><c>env.metadata</c>: <c>render_modes</c>, <c>render_fps</c>, ... in Python spelling.</summary>
+                /// <param name="env">The env.</param>
+                /// <returns>A new owned reference to the dict.</returns>
+                /// <exception cref="PythonException">Thrown when the attribute lookup fails.</exception>
+                internal static PyObject metadata(PyObject env) => env.GetAttr("metadata");
 
                 /// <summary><c>env.np_random</c>. Reading it creates an entropy-seeded generator when the env has none yet.</summary>
                 /// <param name="env">The env.</param>
@@ -889,7 +901,7 @@ namespace Gym.Tests.Parity {
                 /// <param name="r">The radius.</param>
                 /// <param name="color">The colour as <c>(r, g, b, a)</c>.</param>
                 /// <exception cref="PythonException">Thrown when drawing raises.</exception>
-                internal static void aacircle(PyObject surface, int x, int y, int r, (int R, int G, int B, int A) color) => Ints("aacircle", surface, new long[] { x, y, r }, color);
+                internal static void aacircle(PyObject surface, long x, long y, long r, (int R, int G, int B, int A) color) => Ints("aacircle", surface, new long[] { x, y, r }, color);
 
                 /// <summary><c>gfxdraw.filled_circle(surface, x, y, r, color)</c>.</summary>
                 /// <param name="surface">The surface.</param>
@@ -898,7 +910,7 @@ namespace Gym.Tests.Parity {
                 /// <param name="r">The radius.</param>
                 /// <param name="color">The colour as <c>(r, g, b, a)</c>.</param>
                 /// <exception cref="PythonException">Thrown when drawing raises.</exception>
-                internal static void filled_circle(PyObject surface, int x, int y, int r, (int R, int G, int B, int A) color) => Ints("filled_circle", surface, new long[] { x, y, r }, color);
+                internal static void filled_circle(PyObject surface, long x, long y, long r, (int R, int G, int B, int A) color) => Ints("filled_circle", surface, new long[] { x, y, r }, color);
 
                 /// <summary><c>gfxdraw.hline(surface, x1, x2, y, color)</c>.</summary>
                 /// <param name="surface">The surface.</param>
@@ -907,7 +919,7 @@ namespace Gym.Tests.Parity {
                 /// <param name="y">The row.</param>
                 /// <param name="color">The colour as <c>(r, g, b, a)</c>.</param>
                 /// <exception cref="PythonException">Thrown when drawing raises.</exception>
-                internal static void hline(PyObject surface, int x1, int x2, int y, (int R, int G, int B, int A) color) => Ints("hline", surface, new long[] { x1, x2, y }, color);
+                internal static void hline(PyObject surface, long x1, long x2, long y, (int R, int G, int B, int A) color) => Ints("hline", surface, new long[] { x1, x2, y }, color);
 
                 /// <summary><c>gfxdraw.vline(surface, x, y1, y2, color)</c>.</summary>
                 /// <param name="surface">The surface.</param>
@@ -916,7 +928,7 @@ namespace Gym.Tests.Parity {
                 /// <param name="y2">The other end's row.</param>
                 /// <param name="color">The colour as <c>(r, g, b, a)</c>.</param>
                 /// <exception cref="PythonException">Thrown when drawing raises.</exception>
-                internal static void vline(PyObject surface, int x, int y1, int y2, (int R, int G, int B, int A) color) => Ints("vline", surface, new long[] { x, y1, y2 }, color);
+                internal static void vline(PyObject surface, long x, long y1, long y2, (int R, int G, int B, int A) color) => Ints("vline", surface, new long[] { x, y1, y2 }, color);
 
                 /// <summary>Calls a polygon primitive with the vertices crossed through NumSharp's interop.</summary>
                 /// <param name="name">The primitive.</param>

@@ -328,6 +328,22 @@ new session cell `ByteReaders_AgreeOnAnImportedView` pins that import against Nu
 dtype families on a strided, negative-step view. Same verdicts afterwards: 131 cells, 104 gated passing, the same 27
 `[OpenBugs]` failing at the same divergences, net8.0 and net10.0.
 
+**CartPole byte-for-byte on 2026-09-25.** Gym.NET's `CartPoleEnv` was re-ported from `cartpole.py` (float64 attributes as
+settable properties, the source's operation order, float32 observation copies, `±inf` observation bounds,
+`AssertionError`s with Python's messages, `sutton_barto_reward`, both integrators, `Reset(seed, options)` with
+`maybe_parse_reset_bounds`, the post-termination warning through a new `Gym.Logger`), and renders with a new
+`Gym.Rendering` project: a pygame-compatible `Surface` and a C# port of SDL_gfx 2.0.26's `gfxdraw` primitives (zlib),
+plus `transform.flip`, `surfarray` and `Vector2.rotate_rad`. The live suite proves it: **160 cells, 146 gated, all
+passing on net8.0 and net10.0**, among them 37 CartPole cells (whole episodes of the balancing policy and of random
+actions, termination and past it, both reward schemes, the semi-implicit integrator, a changed `tau`, 17 reset-option
+cases seeded and unseeded, 13 invalid actions and 3 pre-reset steps with their exact messages, the warning's text and
+count, frames along episodes and at 20 extreme states, NaN/overflow errors included, metadata and spaces) and 11
+rasterizer cells against pygame itself (150 random shapes per primitive with clipping, translucency and Sint16
+wrap-around; `rotate_rad` bit for bit over 300 angles, NaN payloads included). The 14 open cells are spaces (P2, B-03,
+B-10) and LunarLander (F6, B-17, B-19, B-20). Found on the way: .NET 8's `double %` returns its own sign-set NaN for an
+infinite dividend where the C runtime's `fmod` keeps the infinity's sign, so `rotate_rad(inf)` differed in one bit on
+net8.0 only; `Vector2.RotateRad` now reproduces `fmod`'s NaNs itself.
+
 **Next steps:**
 1. Wire the suite into CI (port plan §14.8): a Windows reference job that runs `tools/parity/setup_venv.ps1`, then `dotnet test tests/Gym.Tests.Parity --filter "TestCategory!=OpenBugs"` with `GYMNET_PYTHONNET_REQUIRE_ENGINE=1`.
 2. The reverse bridge (§8): `PyEnvShim.py` over `IDotNetEnv`, then `check_env` and `check_environments_match` on Gym.NET's envs.

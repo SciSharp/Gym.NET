@@ -123,7 +123,7 @@ State injection (one step of dynamics, isolated from reset and the generator): `
 `Outcome.CapturePython(() => Python.gymnasium.utils.seeding.np_random(seed))` (with `seed` a `PyInt` of -1) against
 `Outcome.Capture(() => Seeding.NpRandom(-1))` passes when Gym.NET throws `Gym.Exceptions.Error` with Gymnasium's message. `ExceptionMap` holds the port plan's §3.4 mapping
 (`ValueError` → `NumSharp.ValueError`, `gymnasium.error.X` → `Gym.Exceptions.X`, `AssertionError` →
-`Gym.Exceptions.AssertionError`).
+`Gym.Exceptions.AssertionError`, `OverflowError` → `System.OverflowException`, the type NumSharp throws for NumPy's).
 
 ---
 
@@ -166,7 +166,8 @@ State injection (one step of dynamics, isolated from reset and the generator): `
 | Seeding | `Seeding.NpRandom` = `seeding.np_random` for 9 seeds (0 … `long.MaxValue`) and 2^100 + 7: reported seed and PCG64 state; 15 A.6 draw patterns value for value with the state after each; negative seeds raise `Error` with Gymnasium's message; the unseeded 128-bit seed rebuilds the generator in NumPy | |
 | `Discrete` | samples (7 cases, `n` up to 2^40, negative and positive `start`) and generator state; masked samples; all-masked returns `start` without a draw; membership (15 candidates); `n`/`start`/dtype; `repr` of a plain space | `can_cast` in `contains` (P2); shape `()` (B-03); `repr` with `start` (P2); `n <= 0` validation (B-10) |
 | `Box` | bounds, their classification, dtype, shape, `is_bounded` (8 boxes: every bound category, float/int/uint dtypes); 5 samples and generator state for each × 4 seeds; membership | `can_cast` in `contains`, a list as a point, double-precision bounds of a float64 box (P2) |
-| CartPole-v1 | reference transcription: 4 seeds × 500 steps, and through termination; Gym.NET action space | reset (B-13); episodes (B-11, B-13); dynamics from an injected state (B-11, B-13); frames at A.9's states (B-16: 2,573 / 2,747 / 2,659 pixels, A.9's counts); observation-space bounds (B-12) |
+| CartPole-v1 | reference transcription: 4 seeds × 500 steps, and through termination. **The port, byte for byte:** reset; 4 × 500-step episodes of the balancing policy and 5 random-action episodes, each past termination; `sutton_barto_reward`; semi-implicit Euler; `tau = 0.05`; 51 steps from an injected state; 17 reset-option cases (seeded and unseeded, `ValueError`/`OverflowError` messages, state and generator after a failed reset); 13 invalid actions and 3 pre-reset steps (`AssertionError` messages); the post-termination warning (text, category, count); frames at A.9's states, along 4 episodes, at 20 extreme states (clipped, Sint16-wrapped, quarter-turn snapped, and pygame's NaN/overflow errors) and before reset (`None`); observation and action spaces; metadata | |
+| Rendering (`Gym.Rendering` vs pygame-ce 2.5.8) | `aapolygon`, `filled_polygon`, `aacircle`, `filled_circle` (150 random shapes each, clipping and translucency), `hline`/`vline`, compositions, Sint16 wrap-around polygons, CartPole's shapes, `transform.flip`, `Vector2.rotate_rad` bit for bit (NaN payloads included), pygame's argument errors | |
 | LunarLander-v3 | Gym.NET discrete action space | continuous action space (B-20); observation space (B-19); heuristic episodes, both variants (F6, P8, B-17, B-19) |
 
 Not built yet (plan §8–§10): the reverse bridge (`check_env` on a Gym.NET env through a Python shim), the golden
@@ -188,6 +189,9 @@ their ports (P1–P6).
   `ParityTestBase.CurrentContext` replaces it (tests run one at a time, `[DoNotParallelize]`).
 - **`dotnet sln add` (SDK 10) adds referenced projects and x64/x86 platforms** to the solution; add a project to
   `Gym.NET.sln` by hand.
+- **.NET 8's `double %` is not C's `fmod` for non-finite dividends**: it returns its own sign-set NaN for `±inf` and NaN,
+  where the C runtime keeps the infinity's sign or the NaN operand. Measured through `Vector2.rotate_rad(inf)` differing
+  in one bit on net8.0 only; code that must match C (`Gym.Rendering.Vector2`) handles non-finite values itself.
 - **`Python.numpy.ndarray.tobytes_t` (pythonnet's `As<byte[]>()`) is slow for large buffers**: about 84 ms for a 600 × 400 × 3 frame (measured once, JIT
   warm-up included). Fine for a handful of frames per test; for a frame every step of long trajectories, read the bytes
   through NumSharp's buffer import instead.

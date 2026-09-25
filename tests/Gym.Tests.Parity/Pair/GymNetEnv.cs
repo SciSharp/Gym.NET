@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Reflection;
 using Gym.Envs;
 using Gym.Observations;
@@ -23,9 +24,9 @@ namespace Gym.Tests.Parity.Pair {
     ///     go away.
     ///     </para>
     ///     <para>
-    ///     Observations returned by <c>Step</c> are not disposed: Gym.NET's legacy envs return their own state array as the
-    ///     observation (B-13), which the next step still reads. <c>Reset</c> returns a copy, which is disposed after it is
-    ///     described.
+    ///     Observations returned by <c>Step</c> are not disposed: envs not ported yet may return their own state array as the
+    ///     observation (B-13's aliasing, which CartPole no longer has), which the next step still reads. <c>Reset</c> returns
+    ///     a copy, which is disposed after it is described.
     ///     </para>
     /// </remarks>
     public sealed class GymNetEnv : IDotNetEnv {
@@ -66,7 +67,7 @@ namespace Gym.Tests.Parity.Pair {
         public CallResult Step(object action) {
             try {
                 Step step = _env.Step(action);
-                // Not disposed: the observation is the env's own state array (B-13), read again by the next step.
+                // Not disposed: an env not ported yet may hand out its own state array (B-13), read again by the next step.
                 return CallResult.Of(new Transition(
                     ValueFacts.Of(step.Observation),
                     ValueFacts.Of(step.Reward),
@@ -91,17 +92,40 @@ namespace Gym.Tests.Parity.Pair {
 
         /// <inheritdoc />
         /// <remarks>
-        ///     Writes the env's private <see cref="NDArray"/> field of that name (CartPole's <c>state</c>), the Gym.NET
-        ///     counterpart of <c>env.unwrapped.state</c>. The replaced array is left to the collector, since an earlier
-        ///     observation may still alias it.
+        ///     Ported envs expose Gymnasium's attribute as a public property named in PascalCase (CartPole's <c>state</c> is
+        ///     <c>State</c>, a float64 <see cref="T:double[]"/>), which receives a copy of the values. Envs not ported yet keep
+        ///     an <see cref="NDArray"/> field of the Python name, which receives a new array; the replaced one is left to the
+        ///     collector, since an earlier observation may still alias it.
         /// </remarks>
+        /// <exception cref="NotSupportedException">Thrown when the env has neither.</exception>
         public void SetAttribute(string name, double[] values) {
-            FieldInfo field = StateField(name) ?? throw new NotSupportedException($"{Name} has no NDArray field '{name}'.");
+            PropertyInfo? property = AttributeProperty(name);
+            if (property != null && property.PropertyType == typeof(double[]) && property.CanWrite) {
+                property.SetValue(_env, (double[])values.Clone());
+                return;
+            }
+
+            FieldInfo field = StateField(name) ?? throw new NotSupportedException($"{Name} has neither a double[] property '{PascalCase(name)}' nor an NDArray field '{name}'.");
             field.SetValue(_env, np.array(values));
         }
 
         /// <inheritdoc />
+        /// <remarks>
+        ///     A <see cref="T:double[]"/> property is described as the float64 array Gymnasium holds (through NumSharp, so it
+        ///     compares with NumPy's <c>(4,) &lt;f8</c>); other property values and legacy fields are described as they are.
+        /// </remarks>
         public ValueFacts? GetAttribute(string name) {
+            PropertyInfo? property = AttributeProperty(name);
+            if (property != null) {
+                object? value = property.GetValue(_env);
+                if (value is double[] doubles) {
+                    using NDArray array = np.array(doubles);
+                    return ValueFacts.Of(array);
+                }
+
+                return ValueFacts.Of(value);
+            }
+
             FieldInfo? field = StateField(name);
             return field is null ? null : ValueFacts.Of(field.GetValue(_env));
         }
@@ -120,6 +144,20 @@ namespace Gym.Tests.Parity.Pair {
 
         /// <summary>Closes the env.</summary>
         public void Dispose() => _env.Dispose();
+
+        /// <summary>The public instance property that ports Gymnasium's attribute <paramref name="name"/>, if the env has one.</summary>
+        /// <param name="name">The attribute in Python spelling, for example <c>state</c> or <c>steps_beyond_terminated</c>.</param>
+        /// <returns>The property named <see cref="PascalCase"/>(<paramref name="name"/>), or <see langword="null"/>.</returns>
+        private PropertyInfo? AttributeProperty(string name) {
+            return _env.GetType().GetProperty(PascalCase(name), BindingFlags.Instance | BindingFlags.Public);
+        }
+
+        /// <summary>The port plan's 1:1 naming rule (§3.8): <c>steps_beyond_terminated</c> becomes <c>StepsBeyondTerminated</c>.</summary>
+        /// <param name="name">A Python attribute name.</param>
+        /// <returns>Its PascalCase spelling.</returns>
+        private static string PascalCase(string name) {
+            return string.Concat(name.Split('_', StringSplitOptions.RemoveEmptyEntries).Select(part => char.ToUpperInvariant(part[0]) + part.Substring(1)));
+        }
 
         /// <summary>Finds an instance field of type <see cref="NDArray"/> named <paramref name="name"/> in the env's class hierarchy.</summary>
         /// <param name="name">The field's name.</param>

@@ -2,7 +2,7 @@
   <!-- ==================================================================================================================
        How Gym.NET builds against NumSharp, and NumSharp's ownership analyzer (NDW012/NDW016/NDW017).
 
-       Every project that compiles against NumSharp (src/Gym, src/Gym.Environments, tests/Gym.Tests,
+       Every project that compiles against NumSharp (src/Gym, src/Gym.Rendering, src/Gym.Environments, tests/Gym.Tests,
        tests/Gym.Tests.Parity) declares the regular NuGet reference itself, as its last lines, immediately followed by
        this import:
 
@@ -29,7 +29,7 @@
          with PrivateAssets="all", so without the reference below a submodule build would silently skip the NDW
          diagnostics that package consumers get.
        NumSharpSource=Package: the declared package reference is used as it stands; the package ships the analyzer and the
-         NDW013 guard itself. Make it the default only after raising the declared Version, in all three projects, to the
+         NDW013 guard itself. Make it the default only after raising the declared Version, in every project listed above, to the
          first release that contains Stage B (plan §4.4).
 
        The import must come after the declared reference: an item Remove only sees items declared before it, and the

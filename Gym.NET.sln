@@ -19,6 +19,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Gym.Rendering.Avalonia", "s
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Gym.Tests.Parity", "tests\Gym.Tests.Parity\Gym.Tests.Parity.csproj", "{59D42C12-C99E-4D92-B10B-608EA0C3B6A7}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Gym.Rendering", "src\Gym.Rendering\Gym.Rendering.csproj", "{C1682014-33C5-567B-9500-5E521E45D0FA}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -49,6 +51,10 @@ Global
 		{59D42C12-C99E-4D92-B10B-608EA0C3B6A7}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{59D42C12-C99E-4D92-B10B-608EA0C3B6A7}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{59D42C12-C99E-4D92-B10B-608EA0C3B6A7}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C1682014-33C5-567B-9500-5E521E45D0FA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C1682014-33C5-567B-9500-5E521E45D0FA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C1682014-33C5-567B-9500-5E521E45D0FA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C1682014-33C5-567B-9500-5E521E45D0FA}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

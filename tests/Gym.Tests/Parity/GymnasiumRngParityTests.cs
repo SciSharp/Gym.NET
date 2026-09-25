@@ -136,13 +136,13 @@ namespace Gym.Tests.Parity {
                 using (NDArray s = new Box(0f, 255f, new Shape(8), np.uint8, seed: seed).Sample())
                     Emit(lines, $"box.uint8.s{seed}", s.ToArray<byte>().Select(v => v.ToString(CultureInfo.InvariantCulture)));
 
-                // Gym.NET's CartPole hands out its float64 state (B-13, P4); Gymnasium's observation is that state in float32.
+                // The golden records Gymnasium's float64 state (env.unwrapped.state) and its float32 observation; the port keeps
+                // the state in CartPoleEnv.State and hands out the float32 copy, as Gymnasium does (B-13 fixed).
                 var cartPole = new CartPoleEnv(NullEnvViewer.Factory, Seeding.NpRandom(seed).Rng);
                 using (NDArray reset = cartPole.Reset())
                 {
-                    double[] state = reset.ToArray<double>();
-                    Emit(lines, $"cartpole.reset.state.s{seed}", state.Select(F64));
-                    Emit(lines, $"cartpole.reset.obs.s{seed}", state.Select(v => F32((float) v)));
+                    Emit(lines, $"cartpole.reset.state.s{seed}", cartPole.State!.Select(F64));
+                    Emit(lines, $"cartpole.reset.obs.s{seed}", reset.ToArray<float>().Select(F32));
                 }
             }
             return lines;
