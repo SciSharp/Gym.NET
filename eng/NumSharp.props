@@ -1,24 +1,36 @@
 <Project>
   <!-- ==================================================================================================================
-       Where Gym.NET gets NumSharp from, and NumSharp's ownership analyzer (NDW012/NDW016/NDW017).
+       How Gym.NET builds against NumSharp, and NumSharp's ownership analyzer (NDW012/NDW016/NDW017).
 
-       Imported at the END of every project that compiles against NumSharp or must be analyzed by NumSharp's ownership
-       analyzer (src/Gym, src/Gym.Environments, tests/Gym.Tests). The end matters: the packing guard below overrides
-       those projects' own GeneratePackageOnBuild=true, and a property only wins when it is evaluated after them.
+       Every project that compiles against NumSharp (src/Gym, src/Gym.Environments, tests/Gym.Tests) declares the regular
+       NuGet reference itself, as its last lines, immediately followed by this import:
 
-       NumSharpSource=Submodule (default): builds refs/NumSharp/src/NumSharp.Core from source. Required while Gym.NET
-         depends on NumSharp master, because the DType API ("Stage B", NumSharp c916c579 and 68a02258) is not in NuGet
-         0.70.0; against that package the migrated code fails with three CS0121 and one CS1061
-         (docs/plans/NUMSHARP_MIGRATION_PLAN.md §3.2). Initialize the submodule NON-recursively; the exact command is in
-         the GymNetRequireNumSharpSubmodule error below (an XML comment cannot spell its double-dash option). NumSharp's
-         own submodules (numpy, pocketfft, OpenBLAS, onnxruntime, ...) are not needed to build NumSharp.Core, and a
-         recursive init would clone all of them.
+           <ItemGroup>
+             <PackageReference Include="NumSharp" Version="..." />
+           </ItemGroup>
+           <Import Project="..\..\eng\NumSharp.props" />
+
+       This file never adds a NumSharp PackageReference of its own. It only decides whether the declared one is used:
+
+       NumSharpSource=Submodule (default): the declared package reference is removed and refs/NumSharp/src/NumSharp.Core is
+         built from source instead. Required while Gym.NET depends on NumSharp master, because the DType API ("Stage B",
+         NumSharp c916c579 and 68a02258) is in no published release. Against 0.70.0, the newest, the migrated code fails
+         with four CS0121 (astype(Type, bool) vs astype(NPTypeCode, bool) for a DType argument, in Box) and one CS1061
+         (Type has no kind, in Discrete.TryToInt64); measured, cf. docs/plans/NUMSHARP_MIGRATION_PLAN.md §3.2, whose
+         trial code had one astype call fewer. Initialize the submodule
+         NON-recursively; the exact command is in the GymNetRequireNumSharpSubmodule error below (an XML comment cannot
+         spell its double-dash option). NumSharp's own submodules (numpy, pocketfft, OpenBLAS, onnxruntime, ...) are not
+         needed to build NumSharp.Core, and a recursive init would clone all of them.
          The analyzer is referenced explicitly because a ProjectReference does not carry it: NumSharp.Core references it
          with PrivateAssets="all", so without the reference below a submodule build would silently skip the NDW
          diagnostics that package consumers get.
-       NumSharpSource=Package: consumes the published package, which ships the analyzer and the NDW013 guard itself.
-         Flip only after setting NumSharpPackageVersion to the first release that contains Stage B (plan §4.4). The
-         analyzer reference below needs no edit then: it is limited to Submodule mode, and the package ships its own.
+       NumSharpSource=Package: the declared package reference is used as it stands; the package ships the analyzer and the
+         NDW013 guard itself. Make it the default only after raising the declared Version, in all three projects, to the
+         first release that contains Stage B (plan §4.4).
+
+       The import must come after the declared reference: an item Remove only sees items declared before it, and the
+       packing guard must override the projects' own GeneratePackageOnBuild=true, which a property only does when it is
+       evaluated later.
 
        Building NumSharp.Core from source also builds its IL weaver (tools/NumSharp.Build) and prints about 1,260
        NumSharp-internal warnings (mostly CS8632). They are NumSharp's, not Gym.NET's. Never pass -warnaserror on the
@@ -27,11 +39,16 @@
   <PropertyGroup>
     <NumSharpSource Condition="'$(NumSharpSource)' == ''">Submodule</NumSharpSource>
     <NumSharpRoot>$(MSBuildThisFileDirectory)..\refs\NumSharp\</NumSharpRoot>
-    <!-- Deliberately empty until a NumSharp release contains Stage B; the Package branch is unusable before that. -->
-    <NumSharpPackageVersion></NumSharpPackageVersion>
   </PropertyGroup>
 
+  <!-- The importing project's own NumSharp reference, captured before Submodule mode removes it, so that
+       GymNetRequireDeclaredNumSharpPackage can report a project that forgot to declare it in either mode. -->
+  <ItemGroup>
+    <_GymNetDeclaredNumSharpPackage Include="@(PackageReference->WithMetadataValue('Identity', 'NumSharp'))" />
+  </ItemGroup>
+
   <ItemGroup Condition="'$(NumSharpSource)' == 'Submodule'">
+    <PackageReference Remove="NumSharp" />
     <ProjectReference Include="$(NumSharpRoot)src\NumSharp.Core\NumSharp.Core.csproj" />
   </ItemGroup>
 
@@ -42,10 +59,6 @@
   <ItemGroup Condition="'$(NumSharpSource)' == 'Submodule' and '$(ReferenceNDArrayAnalyzer)' != 'false'">
     <ProjectReference Include="$(NumSharpRoot)tools\NumSharp.Build.Analyzer\NumSharp.Build.Analyzer.csproj"
                       OutputItemType="Analyzer" ReferenceOutputAssembly="false" PrivateAssets="all" />
-  </ItemGroup>
-
-  <ItemGroup Condition="'$(NumSharpSource)' == 'Package'">
-    <PackageReference Include="NumSharp" Version="$(NumSharpPackageVersion)" />
   </ItemGroup>
 
   <!-- Packing guard. In Submodule mode the ProjectReference to NumSharp.Core packs as a dependency on the NuGet package
@@ -59,19 +72,18 @@
 
   <Target Name="GymNetBlockSubmodulePack" BeforeTargets="GenerateNuspec"
           Condition="'$(NumSharpSource)' == 'Submodule' and '$(NumSharpAllowSubmodulePack)' != 'true'">
-    <Error Text="Gym.NET cannot be packed while NumSharpSource=Submodule: the package would depend on NuGet NumSharp 0.70.0, which lacks the DType API this build was compiled against. Pack with -p:NumSharpSource=Package -p:NumSharpPackageVersion=&lt;first release with Stage B&gt;, or pass -p:NumSharpAllowSubmodulePack=true for a local experiment." />
+    <Error Text="Gym.NET cannot be packed while NumSharpSource=Submodule: the package would depend on NuGet NumSharp 0.70.0, which lacks the DType API this build was compiled against. Pack with -p:NumSharpSource=Package once the declared NumSharp PackageReference names a release that contains Stage B, or pass -p:NumSharpAllowSubmodulePack=true for a local experiment." />
   </Target>
 
-  <!-- Configuration guards. Each failure would otherwise surface as dozens of CS0246 errors (or a bare NuGet version
-       error) that never name the cause. -->
+  <!-- Configuration guards. Each failure would otherwise surface as dozens of CS0246 errors that never name the cause. -->
   <Target Name="GymNetValidateNumSharpSource" BeforeTargets="CollectPackageReferences;ResolveProjectReferences"
           Condition="'$(NumSharpSource)' != 'Submodule' and '$(NumSharpSource)' != 'Package'">
     <Error Text="NumSharpSource must be 'Submodule' or 'Package', not '$(NumSharpSource)'." />
   </Target>
 
-  <Target Name="GymNetRequireNumSharpPackageVersion" BeforeTargets="CollectPackageReferences;ResolveProjectReferences"
-          Condition="'$(NumSharpSource)' == 'Package' and '$(NumSharpPackageVersion)' == ''">
-    <Error Text="NumSharpSource=Package needs NumSharpPackageVersion set to the first NumSharp release that contains the DType API (Stage B); NuGet 0.70.0 does not." />
+  <Target Name="GymNetRequireDeclaredNumSharpPackage" BeforeTargets="CollectPackageReferences;ResolveProjectReferences"
+          Condition="'@(_GymNetDeclaredNumSharpPackage)' == ''">
+    <Error Text="$(MSBuildProjectFile) imports eng/NumSharp.props but declares no NumSharp package reference. Declare &lt;PackageReference Include=&quot;NumSharp&quot; Version=&quot;...&quot; /&gt; in an ItemGroup right before the import: NumSharpSource=Package builds against it, and Submodule mode swaps it for refs/NumSharp." />
   </Target>
 
   <Target Name="GymNetRequireNumSharpSubmodule" BeforeTargets="CollectPackageReferences;ResolveProjectReferences"

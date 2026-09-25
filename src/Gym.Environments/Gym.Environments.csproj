@@ -43,8 +43,13 @@
     <ProjectReference Include="..\Gym\Gym.csproj" />
   </ItemGroup>
 
-  <!-- NumSharp (master, from the refs/NumSharp submodule) and its ownership analyzer. Imported last so that its packing
-       guard overrides GeneratePackageOnBuild above; see eng/NumSharp.props. -->
+  <!-- NumSharp: the regular NuGet reference. While NumSharpSource=Submodule (the default until a NumSharp release contains
+       the DType API), eng/NumSharp.props removes it and builds refs/NumSharp from source, with its ownership analyzer;
+       -p:NumSharpSource=Package builds against this reference as it stands. The import stays last: it removes the
+       reference declared before it and overrides GeneratePackageOnBuild above. -->
+  <ItemGroup>
+    <PackageReference Include="NumSharp" Version="0.70.0" />
+  </ItemGroup>
   <Import Project="..\..\eng\NumSharp.props" />
 
 </Project>

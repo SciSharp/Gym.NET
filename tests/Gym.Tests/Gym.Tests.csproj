@@ -33,8 +33,13 @@
     <EmbeddedResource Include="Parity\legacy_rng.golden.txt" LogicalName="Gym.Tests.Parity.legacy_rng.golden.txt" />
   </ItemGroup>
 
-  <!-- A direct NumSharp reference plus the ownership analyzer, so the NDW diagnostics also cover the tests; see
-       eng/NumSharp.props. -->
+  <!-- NumSharp: the regular NuGet reference, declared here as well so the ownership analyzer also covers the tests (a
+       package's analyzer does not flow to projects that reference it only through another project). While
+       NumSharpSource=Submodule (the default until a NumSharp release contains the DType API), eng/NumSharp.props removes
+       it and builds refs/NumSharp from source; -p:NumSharpSource=Package builds against it as it stands. -->
+  <ItemGroup>
+    <PackageReference Include="NumSharp" Version="0.70.0" />
+  </ItemGroup>
   <Import Project="..\..\eng\NumSharp.props" />
 
 </Project>
