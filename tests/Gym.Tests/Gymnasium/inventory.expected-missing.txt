@@ -1,0 +1,266 @@
+# Gymnasium's public names Gym.NET does not have yet, each with the phase that ports it or why it never will.
+# Read by tests/Gym.Tests/Gymnasium/InventoryTests.cs (embedded): one `module.name  phase-or-reason` per line, `#` comments.
+# The names come from tools/parity/gymnasium_inventory.json (python tools/parity/inventory.py --write).
+#
+# A ratchet: a name Gym.NET gains must be removed from this list (the test fails until it is), and a name Gymnasium
+# gains must be listed or ported. 2.0 needs every line here to be out of scope (n/a, by design, out of scope, P9).
+# Phases are docs/plans/COMPLETION_PLAN.md's; the DR ids are docs/plans/DESIGN_REVIEW.md's.
+
+gymnasium.envs.box2d.bipedal_walker.BipedalWalker                                        P8 box2d
+gymnasium.envs.box2d.bipedal_walker.BipedalWalkerHardcore                                P8 box2d
+gymnasium.envs.box2d.bipedal_walker.BipedalWalkerHeuristics                              P8 box2d
+gymnasium.envs.box2d.bipedal_walker.ContactDetector                                      by design: a private nested class of BipedalWalkerEnv (DR-28)
+gymnasium.envs.box2d.car_dynamics.Car                                                    P8 box2d
+gymnasium.envs.box2d.car_dynamics.Particle                                               P8 box2d
+gymnasium.envs.box2d.car_racing.CarRacing                                                P8 box2d
+gymnasium.envs.box2d.car_racing.FrictionDetector                                         P8 box2d
+gymnasium.envs.box2d.car_racing.register_input                                           P8 box2d
+gymnasium.envs.box2d.lunar_lander.ContactDetector                                        by design: a private nested class of LunarLanderEnv (DR-28)
+gymnasium.envs.box2d.lunar_lander.LunarLander                                            P8 box2d
+gymnasium.envs.box2d.lunar_lander.LunarLanderContinuous                                  P8 box2d
+gymnasium.envs.box2d.lunar_lander.demo_heuristic_lander                                  P8 box2d
+gymnasium.envs.box2d.lunar_lander.heuristic                                              P8 box2d
+gymnasium.envs.classic_control.acrobot.AcrobotEnv                                        P4 classic_control
+gymnasium.envs.classic_control.acrobot.bound                                             P4 classic_control
+gymnasium.envs.classic_control.acrobot.rk4                                               P4 classic_control
+gymnasium.envs.classic_control.acrobot.wrap                                              P4 classic_control
+gymnasium.envs.classic_control.cartpole.CartPoleVectorEnv                                P4 classic_control
+gymnasium.envs.classic_control.continuous_mountain_car.Continuous_MountainCarEnv         by design: merged into MountainCarEnv(continuous) (DR-32)
+gymnasium.envs.classic_control.mountain_car.MountainCarEnv                               P4 classic_control
+gymnasium.envs.classic_control.pendulum.PendulumEnv                                      P4 classic_control
+gymnasium.envs.classic_control.pendulum.angle_normalize                                  P4 classic_control
+gymnasium.envs.functional_jax_env.FunctionalJaxEnv                                       n/a: JAX functional envs
+gymnasium.envs.functional_jax_env.FunctionalJaxVectorEnv                                 n/a: JAX functional envs
+gymnasium.envs.mujoco.ant_v4.AntEnv                                                      P9 mujoco (postponed, DR-35)
+gymnasium.envs.mujoco.ant_v5.AntEnv                                                      P9 mujoco (postponed, DR-35)
+gymnasium.envs.mujoco.half_cheetah_v4.HalfCheetahEnv                                     P9 mujoco (postponed, DR-35)
+gymnasium.envs.mujoco.half_cheetah_v5.HalfCheetahEnv                                     P9 mujoco (postponed, DR-35)
+gymnasium.envs.mujoco.hopper_v4.HopperEnv                                                P9 mujoco (postponed, DR-35)
+gymnasium.envs.mujoco.hopper_v5.HopperEnv                                                P9 mujoco (postponed, DR-35)
+gymnasium.envs.mujoco.humanoid_v4.HumanoidEnv                                            P9 mujoco (postponed, DR-35)
+gymnasium.envs.mujoco.humanoid_v4.mass_center                                            P9 mujoco (postponed, DR-35)
+gymnasium.envs.mujoco.humanoid_v5.HumanoidEnv                                            P9 mujoco (postponed, DR-35)
+gymnasium.envs.mujoco.humanoid_v5.mass_center                                            P9 mujoco (postponed, DR-35)
+gymnasium.envs.mujoco.humanoidstandup_v4.HumanoidStandupEnv                              P9 mujoco (postponed, DR-35)
+gymnasium.envs.mujoco.humanoidstandup_v5.HumanoidStandupEnv                              P9 mujoco (postponed, DR-35)
+gymnasium.envs.mujoco.inverted_double_pendulum_v4.InvertedDoublePendulumEnv              P9 mujoco (postponed, DR-35)
+gymnasium.envs.mujoco.inverted_double_pendulum_v5.InvertedDoublePendulumEnv              P9 mujoco (postponed, DR-35)
+gymnasium.envs.mujoco.inverted_pendulum_v4.InvertedPendulumEnv                           P9 mujoco (postponed, DR-35)
+gymnasium.envs.mujoco.inverted_pendulum_v5.InvertedPendulumEnv                           P9 mujoco (postponed, DR-35)
+gymnasium.envs.mujoco.mujoco_env.MujocoEnv                                               P9 mujoco (postponed, DR-35)
+gymnasium.envs.mujoco.mujoco_env.expand_model_path                                       P9 mujoco (postponed, DR-35)
+gymnasium.envs.mujoco.mujoco_rendering.BaseRender                                        P9 mujoco (postponed, DR-35)
+gymnasium.envs.mujoco.mujoco_rendering.MujocoRenderer                                    P9 mujoco (postponed, DR-35)
+gymnasium.envs.mujoco.mujoco_rendering.OffScreenViewer                                   P9 mujoco (postponed, DR-35)
+gymnasium.envs.mujoco.mujoco_rendering.WindowViewer                                      P9 mujoco (postponed, DR-35)
+gymnasium.envs.mujoco.pusher_v4.PusherEnv                                                P9 mujoco (postponed, DR-35)
+gymnasium.envs.mujoco.pusher_v5.PusherEnv                                                P9 mujoco (postponed, DR-35)
+gymnasium.envs.mujoco.reacher_v4.ReacherEnv                                              P9 mujoco (postponed, DR-35)
+gymnasium.envs.mujoco.reacher_v5.ReacherEnv                                              P9 mujoco (postponed, DR-35)
+gymnasium.envs.mujoco.swimmer_v4.SwimmerEnv                                              P9 mujoco (postponed, DR-35)
+gymnasium.envs.mujoco.swimmer_v5.SwimmerEnv                                              P9 mujoco (postponed, DR-35)
+gymnasium.envs.mujoco.utils.check_mujoco_reset_state                                     P9 mujoco (postponed, DR-35)
+gymnasium.envs.mujoco.utils.get_state                                                    P9 mujoco (postponed, DR-35)
+gymnasium.envs.mujoco.utils.set_state                                                    P9 mujoco (postponed, DR-35)
+gymnasium.envs.mujoco.walker2d_v4.Walker2dEnv                                            P9 mujoco (postponed, DR-35)
+gymnasium.envs.mujoco.walker2d_v5.Walker2dEnv                                            P9 mujoco (postponed, DR-35)
+gymnasium.envs.phys2d.cartpole.CartPoleFunctional                                        n/a: JAX functional envs
+gymnasium.envs.phys2d.cartpole.CartPoleJaxEnv                                            n/a: JAX functional envs
+gymnasium.envs.phys2d.cartpole.CartPoleJaxVectorEnv                                      n/a: JAX functional envs
+gymnasium.envs.phys2d.cartpole.CartPoleParams                                            n/a: JAX functional envs
+gymnasium.envs.phys2d.pendulum.PendulumFunctional                                        n/a: JAX functional envs
+gymnasium.envs.phys2d.pendulum.PendulumJaxEnv                                            n/a: JAX functional envs
+gymnasium.envs.phys2d.pendulum.PendulumJaxVectorEnv                                      n/a: JAX functional envs
+gymnasium.envs.phys2d.pendulum.PendulumParams                                            n/a: JAX functional envs
+gymnasium.envs.registration.VectorizeMode                                                P3 registry
+gymnasium.envs.registration.current_namespace                                            P3 registry
+gymnasium.envs.registration.make                                                         P3 registry
+gymnasium.envs.registration.make_vec                                                     P3 registry
+gymnasium.envs.registration.pprint_registry                                              P3 registry
+gymnasium.envs.registration.register                                                     P3 registry
+gymnasium.envs.registration.register_envs                                                P3 registry
+gymnasium.envs.registration.registry                                                     P3 registry
+gymnasium.envs.registration.spec                                                         P3 registry
+gymnasium.envs.tabular.blackjack.BlackJackJaxEnv                                         n/a: JAX functional envs
+gymnasium.envs.tabular.blackjack.BlackJackParams                                         n/a: JAX functional envs
+gymnasium.envs.tabular.blackjack.BlackjackFunctional                                     n/a: JAX functional envs
+gymnasium.envs.tabular.blackjack.EnvState                                                n/a: JAX functional envs
+gymnasium.envs.tabular.blackjack.cmp                                                     n/a: JAX functional envs
+gymnasium.envs.tabular.blackjack.dealer_stop                                             n/a: JAX functional envs
+gymnasium.envs.tabular.blackjack.draw_card                                               n/a: JAX functional envs
+gymnasium.envs.tabular.blackjack.draw_card_wrapper                                       n/a: JAX functional envs
+gymnasium.envs.tabular.blackjack.draw_hand                                               n/a: JAX functional envs
+gymnasium.envs.tabular.blackjack.is_bust                                                 n/a: JAX functional envs
+gymnasium.envs.tabular.blackjack.is_natural                                              n/a: JAX functional envs
+gymnasium.envs.tabular.blackjack.notake                                                  n/a: JAX functional envs
+gymnasium.envs.tabular.blackjack.random_card                                             n/a: JAX functional envs
+gymnasium.envs.tabular.blackjack.score                                                   n/a: JAX functional envs
+gymnasium.envs.tabular.blackjack.sum_hand                                                n/a: JAX functional envs
+gymnasium.envs.tabular.blackjack.take                                                    n/a: JAX functional envs
+gymnasium.envs.tabular.blackjack.usable_ace                                              n/a: JAX functional envs
+gymnasium.envs.tabular.cliffwalking.CliffWalkingFunctional                               n/a: JAX functional envs
+gymnasium.envs.tabular.cliffwalking.CliffWalkingJaxEnv                                   n/a: JAX functional envs
+gymnasium.envs.tabular.cliffwalking.EnvState                                             n/a: JAX functional envs
+gymnasium.envs.tabular.cliffwalking.RenderStateType                                      n/a: JAX functional envs
+gymnasium.envs.tabular.cliffwalking.fell_off                                             n/a: JAX functional envs
+gymnasium.envs.toy_text.blackjack.BlackjackEnv                                           P5 toy_text
+gymnasium.envs.toy_text.blackjack.cmp                                                    P5 toy_text
+gymnasium.envs.toy_text.blackjack.draw_card                                              P5 toy_text
+gymnasium.envs.toy_text.blackjack.draw_hand                                              P5 toy_text
+gymnasium.envs.toy_text.blackjack.draw_table                                             P5 toy_text
+gymnasium.envs.toy_text.blackjack.is_bust                                                P5 toy_text
+gymnasium.envs.toy_text.blackjack.is_natural                                             P5 toy_text
+gymnasium.envs.toy_text.blackjack.score                                                  P5 toy_text
+gymnasium.envs.toy_text.blackjack.sum_hand                                               P5 toy_text
+gymnasium.envs.toy_text.blackjack.usable_ace                                             P5 toy_text
+gymnasium.envs.toy_text.cliffwalking.CliffWalkingEnv                                     P5 toy_text
+gymnasium.envs.toy_text.frozen_lake.FrozenLakeEnv                                        P5 toy_text
+gymnasium.envs.toy_text.frozen_lake.generate_random_map                                  P5 toy_text
+gymnasium.envs.toy_text.frozen_lake.is_valid                                             P5 toy_text
+gymnasium.envs.toy_text.taxi.TaxiEnv                                                     P5 toy_text
+gymnasium.envs.toy_text.utils.categorical_sample                                         P5 toy_text
+gymnasium.experimental.functional.FuncEnv                                                P6 FuncEnv (DR-36)
+gymnasium.spaces.box.array_short_repr                                                    P2 spaces
+gymnasium.spaces.box.is_float_integer                                                    P2 spaces
+gymnasium.spaces.dict.Dict                                                               P2 spaces
+gymnasium.spaces.graph.Graph                                                             P2 spaces
+gymnasium.spaces.graph.GraphInstance                                                     P2 spaces
+gymnasium.spaces.multi_binary.MultiBinary                                                P2 spaces
+gymnasium.spaces.multi_discrete.MultiDiscrete                                            P2 spaces
+gymnasium.spaces.oneof.OneOf                                                             P2 spaces
+gymnasium.spaces.sequence.Sequence                                                       P2 spaces
+gymnasium.spaces.text.Text                                                               P2 spaces
+gymnasium.spaces.tuple.Tuple                                                             P2 spaces
+gymnasium.spaces.utils.flatdim                                                           P2 spaces
+gymnasium.spaces.utils.flatten                                                           P2 spaces
+gymnasium.spaces.utils.flatten_space                                                     P2 spaces
+gymnasium.spaces.utils.is_space_dtype_shape_equiv                                        P2 spaces
+gymnasium.spaces.utils.unflatten                                                         P2 spaces
+gymnasium.utils.env_checker.check_env                                                    P3 checkers
+gymnasium.utils.env_checker.check_reset_options                                          P3 checkers
+gymnasium.utils.env_checker.check_reset_return_info_deprecation                          P3 checkers
+gymnasium.utils.env_checker.check_reset_return_type                                      P3 checkers
+gymnasium.utils.env_checker.check_reset_seed_determinism                                 P3 checkers
+gymnasium.utils.env_checker.check_returned_data_not_reused                               P3 checkers
+gymnasium.utils.env_checker.check_seed_deprecation                                       P3 checkers
+gymnasium.utils.env_checker.check_space_limit                                            P3 checkers
+gymnasium.utils.env_checker.check_step_determinism                                       P3 checkers
+gymnasium.utils.env_checker.data_equivalence                                             P3 checkers
+gymnasium.utils.env_match.check_environments_match                                       P3 checkers
+gymnasium.utils.ezpickle.EzPickle                                                        n/a: Python pickling
+gymnasium.utils.passive_env_checker.check_action_space                                   P3 checkers
+gymnasium.utils.passive_env_checker.check_observation_space                              P3 checkers
+gymnasium.utils.passive_env_checker.env_render_passive_checker                           P3 checkers
+gymnasium.utils.passive_env_checker.env_reset_passive_checker                            P3 checkers
+gymnasium.utils.passive_env_checker.env_step_passive_checker                             P3 checkers
+gymnasium.utils.performance.benchmark_init                                               P6 performance (DR-36)
+gymnasium.utils.performance.benchmark_render                                             P6 performance (DR-36)
+gymnasium.utils.performance.benchmark_step                                               P6 performance (DR-36)
+gymnasium.utils.performance.benchmark_vector_step                                        P6 performance (DR-36)
+gymnasium.utils.play.MissingKeysToAction                                                 P6 play (DR-36)
+gymnasium.utils.play.PlayPlot                                                            P6 play (DR-36)
+gymnasium.utils.play.PlayableGame                                                        P6 play (DR-36)
+gymnasium.utils.play.display_arr                                                         P6 play (DR-36)
+gymnasium.utils.play.play                                                                P6 play (DR-36)
+gymnasium.utils.save_video.capped_cubic_video_schedule                                   P6 video (DR-25)
+gymnasium.utils.save_video.save_video                                                    P6 video (DR-25)
+gymnasium.utils.step_api_compatibility.step_api_compatibility                            P6 utils
+gymnasium.vector.async_vector_env.AsyncState                                             P6 vector
+gymnasium.vector.async_vector_env.AsyncVectorEnv                                         P6 vector
+gymnasium.vector.sync_vector_env.SyncVectorEnv                                           P6 vector
+gymnasium.vector.utils.misc.CloudpickleWrapper                                           P6 vector
+gymnasium.vector.utils.misc.clear_mpi_env_vars                                           P6 vector
+gymnasium.vector.utils.shared_memory.create_shared_memory                                P6 vector
+gymnasium.vector.utils.shared_memory.read_from_shared_memory                             P6 vector
+gymnasium.vector.utils.shared_memory.write_to_shared_memory                              P6 vector
+gymnasium.vector.utils.space_utils.batch_differing_spaces                                P6 vector
+gymnasium.vector.utils.space_utils.batch_space                                           P6 vector
+gymnasium.vector.utils.space_utils.concatenate                                           P6 vector
+gymnasium.vector.utils.space_utils.create_empty_array                                    P6 vector
+gymnasium.vector.utils.space_utils.iterate                                               P6 vector
+gymnasium.vector.vector_env.ArrayType                                                    P6 vector
+gymnasium.vector.vector_env.AutoresetMode                                                P6 vector
+gymnasium.vector.vector_env.VectorActionWrapper                                          P6 vector
+gymnasium.vector.vector_env.VectorEnv                                                    P6 vector
+gymnasium.vector.vector_env.VectorObservationWrapper                                     P6 vector
+gymnasium.vector.vector_env.VectorRewardWrapper                                          P6 vector
+gymnasium.vector.vector_env.VectorWrapper                                                P6 vector
+gymnasium.wrappers.ArrayConversion                                                       n/a: JAX/PyTorch
+gymnasium.wrappers.JaxToNumpy                                                            n/a: JAX/PyTorch
+gymnasium.wrappers.JaxToTorch                                                            n/a: JAX/PyTorch
+gymnasium.wrappers.NumpyToTorch                                                          n/a: JAX/PyTorch
+gymnasium.wrappers.array_conversion.ArrayConversion                                      n/a: JAX/PyTorch
+gymnasium.wrappers.array_conversion.array_conversion                                     n/a: JAX/PyTorch
+gymnasium.wrappers.atari_preprocessing.AtariPreprocessing                                out of scope: Atari (DR-36)
+gymnasium.wrappers.common.Autoreset                                                      P3 wrappers.common
+gymnasium.wrappers.common.PassiveEnvChecker                                              P3 wrappers.common
+gymnasium.wrappers.common.RecordEpisodeStatistics                                        P3 wrappers.common
+gymnasium.wrappers.jax_to_numpy.JaxToNumpy                                               n/a: JAX/PyTorch
+gymnasium.wrappers.jax_to_numpy.jax_to_numpy                                             n/a: JAX/PyTorch
+gymnasium.wrappers.jax_to_numpy.numpy_to_jax                                             n/a: JAX/PyTorch
+gymnasium.wrappers.jax_to_torch.Device                                                   n/a: JAX/PyTorch
+gymnasium.wrappers.jax_to_torch.JaxToTorch                                               n/a: JAX/PyTorch
+gymnasium.wrappers.jax_to_torch.jax_to_torch                                             n/a: JAX/PyTorch
+gymnasium.wrappers.jax_to_torch.torch_to_jax                                             n/a: JAX/PyTorch
+gymnasium.wrappers.numpy_to_torch.Device                                                 n/a: JAX/PyTorch
+gymnasium.wrappers.numpy_to_torch.NumpyToTorch                                           n/a: JAX/PyTorch
+gymnasium.wrappers.numpy_to_torch.numpy_to_torch                                         n/a: JAX/PyTorch
+gymnasium.wrappers.numpy_to_torch.torch_to_numpy                                         n/a: JAX/PyTorch
+gymnasium.wrappers.rendering.AddWhiteNoise                                               P6 wrappers
+gymnasium.wrappers.rendering.HumanRendering                                              P6 wrappers
+gymnasium.wrappers.rendering.ObstructView                                                P6 wrappers
+gymnasium.wrappers.rendering.RecordVideo                                                 P6 wrappers
+gymnasium.wrappers.rendering.RenderCollection                                            P6 wrappers
+gymnasium.wrappers.stateful_action.RepeatAction                                          P6 wrappers
+gymnasium.wrappers.stateful_action.StickyAction                                          P6 wrappers
+gymnasium.wrappers.stateful_observation.DelayObservation                                 P6 wrappers
+gymnasium.wrappers.stateful_observation.FrameStackObservation                            P6 wrappers
+gymnasium.wrappers.stateful_observation.MaxAndSkipObservation                            P6 wrappers
+gymnasium.wrappers.stateful_observation.NormalizeObservation                             P6 wrappers
+gymnasium.wrappers.stateful_observation.TimeAwareObservation                             P6 wrappers
+gymnasium.wrappers.stateful_reward.NormalizeReward                                       P6 wrappers
+gymnasium.wrappers.transform_action.ClipAction                                           P6 wrappers
+gymnasium.wrappers.transform_action.DiscretizeAction                                     P6 wrappers
+gymnasium.wrappers.transform_action.RescaleAction                                        P6 wrappers
+gymnasium.wrappers.transform_action.TransformAction                                      P6 wrappers
+gymnasium.wrappers.transform_observation.AddRenderObservation                            P6 wrappers
+gymnasium.wrappers.transform_observation.DiscretizeObservation                           P6 wrappers
+gymnasium.wrappers.transform_observation.DtypeObservation                                P6 wrappers
+gymnasium.wrappers.transform_observation.FilterObservation                               P6 wrappers
+gymnasium.wrappers.transform_observation.FlattenObservation                              P6 wrappers
+gymnasium.wrappers.transform_observation.GrayscaleObservation                            P6 wrappers
+gymnasium.wrappers.transform_observation.RescaleObservation                              P6 wrappers
+gymnasium.wrappers.transform_observation.ReshapeObservation                              P6 wrappers
+gymnasium.wrappers.transform_observation.ResizeObservation                               P6 wrappers
+gymnasium.wrappers.transform_observation.TransformObservation                            P6 wrappers
+gymnasium.wrappers.transform_reward.ClipReward                                           P6 wrappers
+gymnasium.wrappers.transform_reward.TransformReward                                      P6 wrappers
+gymnasium.wrappers.utils.RunningMeanStd                                                  P6 wrappers
+gymnasium.wrappers.utils.create_zero_array                                               P6 wrappers
+gymnasium.wrappers.utils.update_mean_var_count_from_moments                              P6 wrappers
+gymnasium.wrappers.vector.array_conversion.ArrayConversion                               n/a: JAX/PyTorch
+gymnasium.wrappers.vector.common.RecordEpisodeStatistics                                 P6 vector wrappers
+gymnasium.wrappers.vector.dict_info_to_list.DictInfoToList                               P6 vector wrappers
+gymnasium.wrappers.vector.jax_to_numpy.JaxToNumpy                                        n/a: JAX/PyTorch
+gymnasium.wrappers.vector.jax_to_torch.JaxToTorch                                        n/a: JAX/PyTorch
+gymnasium.wrappers.vector.numpy_to_torch.NumpyToTorch                                    n/a: JAX/PyTorch
+gymnasium.wrappers.vector.rendering.HumanRendering                                       P6 vector wrappers
+gymnasium.wrappers.vector.rendering.RecordVideo                                          P6 vector wrappers
+gymnasium.wrappers.vector.stateful_observation.NormalizeObservation                      P6 vector wrappers
+gymnasium.wrappers.vector.stateful_reward.NormalizeReward                                P6 vector wrappers
+gymnasium.wrappers.vector.vectorize_action.ClipAction                                    P6 vector wrappers
+gymnasium.wrappers.vector.vectorize_action.RescaleAction                                 P6 vector wrappers
+gymnasium.wrappers.vector.vectorize_action.TransformAction                               P6 vector wrappers
+gymnasium.wrappers.vector.vectorize_action.VectorizeTransformAction                      P6 vector wrappers
+gymnasium.wrappers.vector.vectorize_observation.DtypeObservation                         P6 vector wrappers
+gymnasium.wrappers.vector.vectorize_observation.FilterObservation                        P6 vector wrappers
+gymnasium.wrappers.vector.vectorize_observation.FlattenObservation                       P6 vector wrappers
+gymnasium.wrappers.vector.vectorize_observation.GrayscaleObservation                     P6 vector wrappers
+gymnasium.wrappers.vector.vectorize_observation.RescaleObservation                       P6 vector wrappers
+gymnasium.wrappers.vector.vectorize_observation.ReshapeObservation                       P6 vector wrappers
+gymnasium.wrappers.vector.vectorize_observation.ResizeObservation                        P6 vector wrappers
+gymnasium.wrappers.vector.vectorize_observation.TransformObservation                     P6 vector wrappers
+gymnasium.wrappers.vector.vectorize_observation.VectorizeTransformObservation            P6 vector wrappers
+gymnasium.wrappers.vector.vectorize_reward.ClipReward                                    P6 vector wrappers
+gymnasium.wrappers.vector.vectorize_reward.TransformReward                               P6 vector wrappers
+gymnasium.wrappers.vector.vectorize_reward.VectorizeTransformReward                      P6 vector wrappers

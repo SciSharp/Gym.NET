@@ -35,6 +35,15 @@
     <EmbeddedResource Include="Parity\gymnasium_rng.golden.txt" LogicalName="Gym.Tests.Parity.gymnasium_rng.golden.txt" />
   </ItemGroup>
 
+  <!-- The API inventory (port plan section 14.6, completion plan P0r.4): Gymnasium's public names as
+       tools/parity/inventory.py scanned them, the pinned commit to check that scan against, and the ratchet list of names
+       Gym.NET does not have yet. InventoryTests reads all three from the assembly, like the golden above. -->
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\tools\parity\gymnasium_inventory.json" LogicalName="Gym.Tests.gymnasium_inventory.json" Link="Gymnasium\gymnasium_inventory.json" />
+    <EmbeddedResource Include="..\..\tools\parity\manifest.json" LogicalName="Gym.Tests.parity_manifest.json" Link="Gymnasium\parity_manifest.json" />
+    <EmbeddedResource Include="Gymnasium\inventory.expected-missing.txt" LogicalName="Gym.Tests.inventory.expected-missing.txt" />
+  </ItemGroup>
+
   <!-- NumSharp: the regular NuGet reference, declared here as well so the ownership analyzer also covers the tests (a
        package's analyzer does not flow to projects that reference it only through another project). Used as it stands by
        default (NumSharpSource=Package); -p:NumSharpSource=Submodule makes eng/NumSharp.props swap it for refs/NumSharp's

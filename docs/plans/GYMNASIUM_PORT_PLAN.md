@@ -802,6 +802,8 @@ Record NumPy draws for every pattern in Appendix A.6 (plus new ones as ports add
 
 `tools/parity/inventory.py` (an AST scan of `refs/Gymnasium`) produces the list of public names. A reflection test maps them through §3.8 and fails on unmapped in-scope names. Appendix C is its current output.
 
+**As built (2026-11-09, completion plan P0r.4).** `tools/parity/inventory.py` writes `tools/parity/gymnasium_inventory.json` (301 names at v1.4.0: each module's `__all__`, or its public classes and functions, resolved to the defining module). `tests/Gym.Tests/Gymnasium/InventoryTests.cs` maps them through §3.8 by reflection and compares the missing ones with `tests/Gym.Tests/Gymnasium/inventory.expected-missing.txt`, where each line carries its phase or reason (n/a, by design, out of scope). The list is a ratchet: a ported name must leave it and a new Gymnasium name must enter it, so it always states what is left. It supersedes Appendix C as the live record of presence; the parity suites judge fidelity.
+
 ### 14.7 Static rules
 
 **Dropped on 2026-11-08 (DR-03 in [`DESIGN_REVIEW.md`](DESIGN_REVIEW.md)): no analyzers and no rule scripts.** The
