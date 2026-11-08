@@ -19,7 +19,7 @@ namespace Gym.Spaces {
     ///     <see cref="Space.DType"/> whose elements lie within <see cref="Low"/> and <see cref="High"/>. It describes
     ///     continuous observations and actions, such as CartPole's observation or LunarLander's continuous engines.
     /// </summary>
-    /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/spaces/box.py#L64">gymnasium/spaces/box.py</see>.</remarks>
+    /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/spaces/box.py#L64">gymnasium/spaces/box.py</see>.</remarks>
     public class Box : Space, IEquatable<Box> {
         /// <summary>
         ///     The generator this box samples from: NumPy's <c>Generator(PCG64)</c>, Gymnasium's <c>np_random</c>. The box owns
@@ -144,7 +144,7 @@ namespace Gym.Spaces {
         ///     Thrown when the shapes differ, with Gymnasium's message (shapes are printed as Python tuples, so a 1-D shape
         ///     reads <c>(3,)</c>).
         /// </exception>
-        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/spaces/box.py#L177">gymnasium/spaces/box.py</see>.</remarks>
+        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/spaces/box.py#L177">gymnasium/spaces/box.py</see>.</remarks>
         private static Shape RequireSameShape(NDArray low, NDArray high) {
             if (low is null) throw new ArgumentNullException(nameof(low));
             if (high is null) throw new ArgumentNullException(nameof(high));
@@ -222,7 +222,7 @@ namespace Gym.Spaces {
         ///     in integer boxes (B-09); both match Gymnasium now. Not supported yet (P2): the probability-mask argument, and
         ///     Gymnasium's <c>error.Error</c> for a mask instead of <see cref="NotSupportedException"/>.
         ///     </para>
-        ///     <para>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/spaces/box.py#L404">gymnasium/spaces/box.py</see>.</para>
+        ///     <para>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/spaces/box.py#L404">gymnasium/spaces/box.py</see>.</para>
         /// </remarks>
         public override NDArray Sample(NDArray mask = null) {
             // `mask != null` would be an element-wise comparison in NumSharp (an NDArray<bool>, not a bool).
@@ -321,7 +321,7 @@ namespace Gym.Spaces {
         /// <remarks>
         ///     Testing the kind, rather than a list of dtypes, also covers uint8: <c>np.@byte</c> is int8 in NumSharp. Boolean
         ///     boxes are floored but not clipped, because <c>np.issubdtype(bool, np.integer)</c> is false.
-        ///     Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/spaces/box.py#L459">gymnasium/spaces/box.py</see>.
+        ///     Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/spaces/box.py#L459">gymnasium/spaces/box.py</see>.
         /// </remarks>
         private NDArray CastSample(NDArray sample) {
             if (DType.kind is not ('i' or 'u' or 'b'))
@@ -362,7 +362,7 @@ namespace Gym.Spaces {
         ///     Checks the shape, then the bounds reduced with <c>np.all</c>, as Gymnasium does (defect B-06: the former
         ///     <c>x &gt;= Low &amp;&amp; x &lt;= High</c> relied on NumSharp.Lite converting arrays to <see cref="bool"/> and threw
         ///     for every box that was not 0-d). Gymnasium's <c>np.can_cast(x.dtype, self.dtype)</c> check is not implemented
-        ///     yet (P2), so a float64 point can belong to a float32 box. Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/spaces/box.py#L483">gymnasium/spaces/box.py</see>.
+        ///     yet (P2), so a float64 point can belong to a float32 box. Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/spaces/box.py#L483">gymnasium/spaces/box.py</see>.
         /// </remarks>
         public override bool Contains(object ndArray) {
             if (ndArray is NDArray x)
@@ -391,7 +391,7 @@ namespace Gym.Spaces {
         /// <exception cref="Error">Thrown when <paramref name="seed"/> is negative, with Gymnasium's message.</exception>
         /// <remarks>
         ///     Gymnasium's <c>seed</c> also accepts no seed and returns the one it used; that shape of the API arrives with P2.
-        ///     Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/spaces/space.py#L112">gymnasium/spaces/space.py</see>.
+        ///     Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/spaces/space.py#L112">gymnasium/spaces/space.py</see>.
         /// </remarks>
         public override void Seed(System.Numerics.BigInteger seed) {
             NpRandom = Seeding.NpRandom(seed).Rng;
@@ -415,7 +415,7 @@ namespace Gym.Spaces {
         /// <remarks>
         ///     Gymnasium's <c>Box.__eq__</c> compares the bounds with <c>np.allclose</c>; the exact comparison stays until P2
         ///     adopts it. Because the comparison is exact, a box with a NaN bound equals only itself.
-        ///     Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/spaces/box.py#L524">gymnasium/spaces/box.py</see>.
+        ///     Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/spaces/box.py#L524">gymnasium/spaces/box.py</see>.
         /// </remarks>
         public bool Equals(Box other) {
             if (ReferenceEquals(null, other)) return false;

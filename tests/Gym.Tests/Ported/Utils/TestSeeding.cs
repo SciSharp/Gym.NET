@@ -9,12 +9,12 @@ namespace Gym.Tests.Ported.Utils {
     /// <remarks>
     ///     <c>test_invalid_seeds</c>' string seed (<c>"test"</c>) cannot reach a typed seed, and <c>test_rng_pickle</c> has
     ///     no .NET counterpart (there is no pickle); the generator's state round trip is compared with NumPy's by the live
-    ///     parity suite (<c>RngFacts</c>). <c>SeedTests</c> extends these with large seeds. Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/tests/utils/test_seeding.py">tests/utils/test_seeding.py</see>.
+    ///     parity suite (<c>RngFacts</c>). <c>SeedTests</c> extends these with large seeds. Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/tests/utils/test_seeding.py">tests/utils/test_seeding.py</see>.
     /// </remarks>
     [TestClass]
     public class TestSeeding {
         /// <summary>A negative seed (-1) raises <see cref="Error"/>.</summary>
-        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/tests/utils/test_seeding.py#L7">tests/utils/test_seeding.py (test_invalid_seeds)</see>.</remarks>
+        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/tests/utils/test_seeding.py#L7">tests/utils/test_seeding.py (test_invalid_seeds)</see>.</remarks>
         [TestMethod]
         public void TestInvalidSeeds() {
             foreach (int seed in new[] { -1 })
@@ -22,7 +22,7 @@ namespace Gym.Tests.Ported.Utils {
         }
 
         /// <summary>The reported seed is the one given.</summary>
-        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/tests/utils/test_seeding.py#L17">tests/utils/test_seeding.py (test_valid_seeds)</see>.</remarks>
+        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/tests/utils/test_seeding.py#L17">tests/utils/test_seeding.py (test_valid_seeds)</see>.</remarks>
         [TestMethod]
         public void TestValidSeeds() {
             foreach (int seed in new[] { 0, 1 }) {

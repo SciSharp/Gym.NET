@@ -30,7 +30,7 @@ namespace Gym.Tests.Parity.Tests.Envs {
     ///     Every lockstep here compares the float64 <c>state</c> after each call too (Gymnasium's <c>env.unwrapped.state</c>,
     ///     Gym.NET's <see cref="CartPoleEnv.State"/>), so dynamics are compared at full precision even where the float32
     ///     observation would round a difference away. Cells that step or draw a rotated pole are pinned to the reference
-    ///     platform: they rest on the platform's <c>cos</c>/<c>sin</c>. Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/envs/classic_control/cartpole.py#L20">gymnasium/envs/classic_control/cartpole.py</see>.
+    ///     platform: they rest on the platform's <c>cos</c>/<c>sin</c>. Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/envs/classic_control/cartpole.py#L21">gymnasium/envs/classic_control/cartpole.py</see>.
     /// </remarks>
     [TestClass]
     public sealed class CartPoleLiveParityTests : ParityTestBase {

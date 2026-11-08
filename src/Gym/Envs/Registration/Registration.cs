@@ -15,7 +15,7 @@ namespace Gym.Envs.Registration {
     /// </summary>
     /// <param name="kwargs">The keyword arguments, Python's <c>**kwargs</c>, by name.</param>
     /// <returns>The new env.</returns>
-    /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/envs/registration.py#L46">gymnasium/envs/registration.py</see>.</remarks>
+    /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/envs/registration.py#L45">gymnasium/envs/registration.py</see>.</remarks>
     public delegate IEnv EnvCreator(IReadOnlyDictionary<string, object?> kwargs);
 
     /// <summary>
@@ -31,7 +31,7 @@ namespace Gym.Envs.Registration {
     /// </param>
     /// <remarks>
     ///     Equality compares every field, the kwargs as Python dicts compare, as Gymnasium's dataclass does.
-    ///     Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/envs/registration.py#L59">gymnasium/envs/registration.py</see>.
+    ///     Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/envs/registration.py#L58">gymnasium/envs/registration.py</see>.
     /// </remarks>
     public sealed record WrapperSpec(string Name, string EntryPoint, Info? Kwargs) {
         /// <summary>
@@ -42,7 +42,7 @@ namespace Gym.Envs.Registration {
         /// <param name="kwargs">The constructor arguments to record.</param>
         /// <returns>The spec.</returns>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="wrapperType"/> is <see langword="null"/>.</exception>
-        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/core.py#L398">gymnasium/core.py</see>.</remarks>
+        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/core.py#L410">gymnasium/core.py</see>.</remarks>
         public static WrapperSpec For(Type wrapperType, Info? kwargs) {
             if (wrapperType is null)
                 throw new ArgumentNullException(nameof(wrapperType));
@@ -91,7 +91,7 @@ namespace Gym.Envs.Registration {
     ///     Equality is the dataclass's, over every field in declaration order, <see cref="Kwargs"/> compared as Python dicts.
     ///     <c>to_json</c>, <c>from_json</c> and <c>make</c> come with the registry (P3).
     ///     </para>
-    ///     <para>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/envs/registration.py#L73">gymnasium/envs/registration.py</see>.</para>
+    ///     <para>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/envs/registration.py#L72">gymnasium/envs/registration.py</see>.</para>
     /// </remarks>
     public sealed record EnvSpec {
         /// <summary>
@@ -189,7 +189,7 @@ namespace Gym.Envs.Registration {
         /// <param name="includeEntryPoints">Also print the entry points of the env and of each wrapper.</param>
         /// <param name="printAll">Print every field, including those at their default values.</param>
         /// <returns>The text when <paramref name="disablePrint"/> is set, otherwise <see langword="null"/> (it was printed).</returns>
-        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/envs/registration.py#L191">gymnasium/envs/registration.py</see>.</remarks>
+        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/envs/registration.py#L190">gymnasium/envs/registration.py</see>.</remarks>
         public string? Pprint(bool disablePrint = false, bool includeEntryPoints = false, bool printAll = false) {
             var output = new StringBuilder($"id={Id}");
             if (printAll || includeEntryPoints)
@@ -285,7 +285,7 @@ namespace Gym.Envs.Registration {
     ///     (<c>register</c>, <c>make</c>, <c>spec</c>, ...) joins it in P3 and is re-exported by the top-level
     ///     <c>Gymnasium</c> class.
     /// </summary>
-    /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/envs/registration.py">gymnasium/envs/registration.py</see>.</remarks>
+    /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/envs/registration.py">gymnasium/envs/registration.py</see>.</remarks>
     public static class EnvRegistry {
         /// <summary>
         ///     The id grammar, <c>[namespace/](env-name)[-v(version)]</c>, matched against the whole id (Python's
@@ -293,7 +293,7 @@ namespace Gym.Envs.Registration {
         /// </summary>
         /// <remarks>
         ///     .NET's <c>\w</c> and Python's agree on ASCII and on letters and digits; for rare non-ASCII marks the two Unicode
-        ///     definitions can differ. Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/envs/registration.py#L25">gymnasium/envs/registration.py</see>.
+        ///     definitions can differ. Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/envs/registration.py#L24">gymnasium/envs/registration.py</see>.
         /// </remarks>
         private static readonly Regex EnvIdRegex = new(@"\A(?:(?<namespace>[\w:-]+)/)?(?:(?<name>[\w:.-]+?))(?:-v(?<version>\d+))?\z", RegexOptions.CultureInvariant);
 
@@ -309,7 +309,7 @@ namespace Gym.Envs.Registration {
         ///     all IDs must be of the form [namespace/](env-name)-v(version). (namespace is optional))</c>.
         /// </exception>
         /// <exception cref="OverflowException">Thrown for a version beyond <see langword="long"/>, which Python's unbounded int would hold.</exception>
-        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/envs/registration.py#L259">gymnasium/envs/registration.py</see>.</remarks>
+        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/envs/registration.py#L258">gymnasium/envs/registration.py</see>.</remarks>
         public static (string? Namespace, string Name, long? Version) ParseEnvId(string envId) {
             if (envId is null)
                 throw new ArgumentNullException(nameof(envId));
@@ -328,7 +328,7 @@ namespace Gym.Envs.Registration {
         /// <param name="name">The name.</param>
         /// <param name="version">The version, or <see langword="null"/>.</param>
         /// <returns>The id.</returns>
-        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/envs/registration.py#L283">gymnasium/envs/registration.py</see>.</remarks>
+        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/envs/registration.py#L282">gymnasium/envs/registration.py</see>.</remarks>
         public static string GetEnvId(string? ns, string name, long? version) {
             string fullName = name;
             if (ns is not null)

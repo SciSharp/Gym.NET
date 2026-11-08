@@ -13,7 +13,7 @@ namespace Gym.Tests.Envs.Classic {
     ///     from <c>refs/Gymnasium</c>): which bounds are accepted, the messages of the rejected ones, and the order of seeding
     ///     and parsing.
     /// </summary>
-    /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/envs/classic_control/utils.py">gymnasium/envs/classic_control/utils.py</see>.</remarks>
+    /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/envs/classic_control/utils.py">gymnasium/envs/classic_control/utils.py</see>.</remarks>
     [TestClass]
     public class ClassicControlUtilsTests {
         /// <summary>Without options, or without the keys, the defaults are used; present keys win, numeric strings included.</summary>

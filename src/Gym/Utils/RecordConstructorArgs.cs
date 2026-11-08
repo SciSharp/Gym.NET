@@ -12,7 +12,7 @@ namespace Gym.Utils {
     /// <remarks>
     ///     Gymnasium's <c>RecordConstructorArgs</c> mix-in holds the arguments itself; a C# interface cannot, so implementers
     ///     keep them in a property set from their constructor with <see cref="RecordConstructorArgs.Record"/>, which does the
-    ///     deep copy. Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/utils/record_constructor.py#L9">gymnasium/utils/record_constructor.py</see>.
+    ///     deep copy. Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/utils/record_constructor.py#L9">gymnasium/utils/record_constructor.py</see>.
     /// </remarks>
     public interface IRecordConstructorArgs {
         /// <summary>
@@ -40,7 +40,7 @@ namespace Gym.Utils {
         ///     <c>Class.__init__</c>"), so a subclass that records before calling its base's <c>__init__</c> wins. C# runs the
         ///     base constructor first, so the equivalent rule is that every constructor assigns the record and the most derived
         ///     one, running last, overwrites the others: assign unconditionally.
-        ///     Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/utils/record_constructor.py#L23">gymnasium/utils/record_constructor.py</see>.
+        ///     Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/utils/record_constructor.py#L23">gymnasium/utils/record_constructor.py</see>.
         /// </remarks>
         public static Info Record(IEnumerable<KeyValuePair<string, object?>> kwargs, bool disableDeepcopy = false) {
             if (kwargs is null)

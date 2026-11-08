@@ -7,7 +7,7 @@ namespace Gym.Spaces {
     ///     tests membership (<see cref="Contains"/>) and draws random members (<see cref="Sample"/>) from a generator of its
     ///     own, so seeding a space never disturbs the env's stream.
     /// </summary>
-    /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/spaces/space.py#L18">gymnasium/spaces/space.py</see>.</remarks>
+    /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/spaces/space.py#L18">gymnasium/spaces/space.py</see>.</remarks>
     public abstract class Space {
         public Shape Shape { get; protected set; }
 
@@ -55,7 +55,7 @@ namespace Gym.Spaces {
         ///     This is the only way to make an unseeded space reproducible: seeding the process-wide <c>np.random</c> has no
         ///     effect on spaces, each of which draws from its own generator (entropy-seeded unless one was given), as in
         ///     Gymnasium. The parameter was a <see langword="long"/> until the core-API work (P1); overrides must take a
-        ///     <see cref="System.Numerics.BigInteger"/> now. Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/spaces/space.py#L112">gymnasium/spaces/space.py</see>.
+        ///     <see cref="System.Numerics.BigInteger"/> now. Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/spaces/space.py#L112">gymnasium/spaces/space.py</see>.
         /// </remarks>
         public abstract void Seed(System.Numerics.BigInteger seed);
     }

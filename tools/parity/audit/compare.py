@@ -3,7 +3,7 @@
 Usage:
     python tools/parity/audit/compare.py <output-dir>
 
-Reads gymnasium.txt (Gymnasium @ 9e04324), gymnet.txt (Gym.NET today) and projection.txt (the same cases computed the
+Reads gymnasium.txt (Gymnasium at the pinned commit; 9e04324 for the 2026-09 audit), gymnet.txt (Gym.NET today) and projection.txt (the same cases computed the
 way Gymnasium computes them, on NumSharp's Generator), plus the CartPole frames of both sides, and prints a Markdown
 scorecard. A value matches only when its text is identical: the same bits, dtype width and integer, so a float64
 observation never matches a float32 one.

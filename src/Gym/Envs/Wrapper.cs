@@ -46,7 +46,7 @@ namespace Gym.Envs {
     ///     forwarding passes values through unchanged and throws <see cref="InvalidCastException"/> when a value is not also of
     ///     the other type.
     ///     </para>
-    ///     <para>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/core.py#L290">gymnasium/core.py</see>.</para>
+    ///     <para>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/core.py#L302">gymnasium/core.py</see>.</para>
     /// </remarks>
     public class Wrapper<TWObs, TWAct, TObs, TAct> : Env<TWObs, TWAct>, IWrapper {
         /// <summary>Wraps <paramref name="env"/>.</summary>
@@ -221,7 +221,7 @@ namespace Gym.Envs {
         /// <param name="name">The attribute, in Python spelling.</param>
         /// <returns><see langword="true"/> when some layer has it.</returns>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="name"/> is <see langword="null"/>.</exception>
-        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/core.py#L408">gymnasium/core.py</see>.</remarks>
+        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/core.py#L420">gymnasium/core.py</see>.</remarks>
         public override bool HasWrapperAttr(string name) {
             if (PyAttributes.HasAttr(this, name))
                 return true;
@@ -240,7 +240,7 @@ namespace Gym.Envs {
         ///     as the cause (<c>raise ... from e</c>); NumSharp's <see cref="AttributeError"/> has no constructor taking an
         ///     inner exception, so the chain is not kept.
         /// </exception>
-        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/core.py#L415">gymnasium/core.py</see>.</remarks>
+        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/core.py#L427">gymnasium/core.py</see>.</remarks>
         public override object? GetWrapperAttr(string name) {
             if (PyAttributes.HasAttr(this, name))
                 return PyAttributes.GetAttr(this, name);
@@ -263,7 +263,7 @@ namespace Gym.Envs {
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="name"/> is <see langword="null"/>.</exception>
         /// <exception cref="AttributeError">Thrown when the attribute found is read-only.</exception>
         /// <exception cref="TypeError">Thrown when the value does not fit the attribute's type.</exception>
-        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/core.py#L434">gymnasium/core.py</see>.</remarks>
+        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/core.py#L446">gymnasium/core.py</see>.</remarks>
         public override bool SetWrapperAttr(string name, object? value, bool force = true) {
             if (PyAttributes.HasAttr(this, name)) {
                 PyAttributes.SetAttr(this, name, value);
@@ -283,7 +283,7 @@ namespace Gym.Envs {
 
         /// <summary>The stack's description: <c>&lt;TimeLimit&lt;OrderEnforcing&lt;CartPoleEnv&lt;CartPole-v1&gt;&gt;&gt;&gt;</c>.</summary>
         /// <returns>The wrapper's class name followed by the env's text.</returns>
-        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/core.py#L459">gymnasium/core.py</see>.</remarks>
+        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/core.py#L471">gymnasium/core.py</see>.</remarks>
         public override string ToString() => $"<{PyAttributes.PyTypeName(GetType())}{Env}>";
 
         /// <summary>
@@ -326,7 +326,7 @@ namespace Gym.Envs {
     /// <typeparam name="TWObs">The transformed observation type.</typeparam>
     /// <typeparam name="TObs">The env's observation type.</typeparam>
     /// <typeparam name="TAct">The action type, passed through.</typeparam>
-    /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/core.py#L534">gymnasium/core.py</see>.</remarks>
+    /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/core.py#L546">gymnasium/core.py</see>.</remarks>
     public abstract class ObservationWrapper<TWObs, TObs, TAct> : Wrapper<TWObs, TAct, TObs, TAct> {
         /// <summary>Wraps <paramref name="env"/>.</summary>
         /// <param name="env">The env whose observations are transformed.</param>
@@ -360,7 +360,7 @@ namespace Gym.Envs {
     /// <summary>Transforms every reward <see cref="Step"/> returns through <see cref="Reward"/>.</summary>
     /// <typeparam name="TObs">The observation type, passed through.</typeparam>
     /// <typeparam name="TAct">The action type, passed through.</typeparam>
-    /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/core.py#L578">gymnasium/core.py</see>.</remarks>
+    /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/core.py#L590">gymnasium/core.py</see>.</remarks>
     public abstract class RewardWrapper<TObs, TAct> : Wrapper<TObs, TAct, TObs, TAct> {
         /// <summary>Wraps <paramref name="env"/>.</summary>
         /// <param name="env">The env whose rewards are transformed.</param>
@@ -388,7 +388,7 @@ namespace Gym.Envs {
     /// <typeparam name="TObs">The observation type, passed through.</typeparam>
     /// <typeparam name="TWAct">The action type the wrapper takes.</typeparam>
     /// <typeparam name="TAct">The env's action type.</typeparam>
-    /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/core.py#L613">gymnasium/core.py</see>.</remarks>
+    /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/core.py#L625">gymnasium/core.py</see>.</remarks>
     public abstract class ActionWrapper<TObs, TWAct, TAct> : Wrapper<TObs, TWAct, TObs, TAct> {
         /// <summary>Wraps <paramref name="env"/>.</summary>
         /// <param name="env">The env whose actions are transformed.</param>

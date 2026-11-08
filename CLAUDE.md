@@ -67,7 +67,7 @@ refs/Gym.NET/
 - **Pluggable Viewer Architecture:** Environments accept an `IEnvironmentViewerFactoryDelegate` used for `render_mode="human"` (`NullEnvViewer.Factory` headless, `AvaloniaEnvViewer.Factory`, `WinFormEnvViewer.Factory`); human frames are paced by `Gym.Rendering.Clock` at `metadata["render_fps"]`.
 - **Legacy API (`Gym.Legacy`, `[Obsolete]`):** `LegacyEnvAdapter` exposes any env through the pre-0.26 4-tuple API (`Seed(s)` + `Reset()` is `Reset(seed: s)`; the reward stays float64, as everywhere in Gym.NET); the baselines-style `IVecEnv` / `VecEnv` / `DummyVecEnv` work over `ILegacyEnv` until `gymnasium.vector` (P6).
 - **Observation & Action Spaces:** Strongly-typed bounds checking and random sampling via `Box` (multi-dimensional continuous floats/bounds) and `Discrete` (categorical integer actions); `Seed(BigInteger)`.
-- **Documentation voice:** XML docs describe Gym.NET's own members (what they do, what they cost, their footguns) and never say "Port of ...". A member based on Gymnasium carries its source as a pinned GitHub permalink in `<remarks>`, e.g. `Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/core.py#L25">gymnasium/core.py</see>.`; pygame-ce, CPython and NumPy sources are referenced the same way at their pinned tags (port plan §3.1 rule 2).
+- **Documentation voice:** XML docs describe Gym.NET's own members (what they do, what they cost, their footguns) and never say "Port of ...". A member based on Gymnasium carries its source as a pinned GitHub permalink in `<remarks>`, e.g. `Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/core.py#L28">gymnasium/core.py</see>.`; pygame-ce, CPython and NumPy sources are referenced the same way at their pinned tags (port plan §3.1 rule 2).
 
 ---
 
@@ -144,4 +144,11 @@ git submodule update --init refs/Gymnasium refs/NumSharp
 # The build uses NuGet NumSharp 0.80.0 by default (eng/NumSharp.props, decision D3). To try a NumSharp fix before it is
 # released, check it out in refs/NumSharp and build from source:
 dotnet build Gym.NET.sln -p:NumSharpSource=Submodule
+
+# Re-pinning Gymnasium (refs/Gymnasium is at v1.4.0, 8ba8c3a6): check out the new commit, move every permalink with the
+# script (it reads the old commit from tools/parity/manifest.json, so run it before updating the manifest; it refuses
+# any link whose cited lines changed, for review by hand), then set "gymnasium.commit" in the manifest and rerun the gates.
+git -C refs/Gymnasium checkout <commit>
+python tools/parity/repin_references.py           # dry run: the report
+python tools/parity/repin_references.py --write   # rewrite the safe links
 ```

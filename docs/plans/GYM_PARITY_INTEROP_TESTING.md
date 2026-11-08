@@ -5,7 +5,7 @@
 | **Status** | Draft 3, 2026-09-25: the live harness is built and running as `tests/Gym.Tests.Parity`, and drives Gym.NET through Gymnasium's own contract since the core-API port (see §14 for what's verified and what's next) |
 | **Companion to** | `docs/plans/GYMNASIUM_PORT_PLAN.md` (§14 verification strategy); this document designs its live half |
 | **Modelled on** | `refs/NumSharp`: `src/NumSharp.Interop.pythonnet` + `test/NumSharp.Tests.Interop` (and its `CLAUDE.md`) |
-| **Oracle** | `refs/Gymnasium` @ `9e04324`, imported **in-process** through pythonnet |
+| **Oracle** | `refs/Gymnasium` @ `v1.4.0` (`8ba8c3a6`; `9e04324` until 2026-11-09), imported **in-process** through pythonnet |
 
 ## 1. Purpose
 

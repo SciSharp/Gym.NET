@@ -154,7 +154,7 @@ namespace Gym.Environments.Envs.Aether
     /// <remarks>
     ///     The comment above is Gymnasium's description of the environment. Where Gym.NET's lander still departs from it
     ///     (the physics engine, v2 geometry and observation bounds, the draw order), the live parity suite keeps the gaps as
-    ///     open bugs (F6, B-17, B-18). Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/envs/box2d/lunar_lander.py#L79">gymnasium/envs/box2d/lunar_lander.py</see>.
+    ///     open bugs (F6, B-17, B-18). Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/envs/box2d/lunar_lander.py#L79">gymnasium/envs/box2d/lunar_lander.py</see>.
     /// </remarks>
     public class LunarLanderEnv : Env<NDArray, object>
     {

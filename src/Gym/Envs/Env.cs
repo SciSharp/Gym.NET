@@ -38,7 +38,7 @@ namespace Gym.Envs {
     ///     instance of the class, so mutating one env's changed all of them); spaces are the non-generic <see cref="Space"/>
     ///     until the spaces work (P2) makes them <c>Space&lt;T&gt;</c>.
     ///     </para>
-    ///     <para>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/core.py#L25">gymnasium/core.py</see>.</para>
+    ///     <para>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/core.py#L28">gymnasium/core.py</see>.</para>
     /// </remarks>
     public abstract class Env<TObs, TAct> : IEnv, IDynamicAttributes {
         /// <summary>The metadata; a fresh <c>{"render_modes": []}</c> until the env assigns its own.</summary>
@@ -158,6 +158,12 @@ namespace Gym.Envs {
         /// <param name="action">An element of <see cref="ActionSpace"/>.</param>
         /// <returns>The observation, reward, <c>terminated</c>, <c>truncated</c> and info.</returns>
         /// <exception cref="AssertionError">Thrown by Gym's envs for an invalid action or a step before the first reset, where Gymnasium's envs fail an <c>assert</c>.</exception>
+        /// <remarks>
+        ///     Every call must return a new observation and a new info, never a buffer an earlier call returned and this one
+        ///     mutated: callers commonly keep every timestep (a replay or rollout buffer), and a reused buffer silently
+        ///     rewrites the history they kept. Gymnasium's <c>check_env</c> and <c>PassiveEnvChecker</c> enforce this
+        ///     since v1.4.0. Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/core.py#L79">gymnasium/core.py</see>.
+        /// </remarks>
         public abstract StepResult<TObs> Step(TAct action);
 
         /// <summary>
@@ -200,6 +206,10 @@ namespace Gym.Envs {
         /// <param name="options">Env-specific reset options, or <see langword="null"/>.</param>
         /// <returns>The first observation and the info.</returns>
         /// <exception cref="Error">Thrown for a negative seed, with Gymnasium's message.</exception>
+        /// <remarks>
+        ///     As with <see cref="Step"/>, the observation and info must be new objects, not a buffer a previous call
+        ///     returned and this one mutated in place. Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/core.py#L124">gymnasium/core.py</see>.
+        /// </remarks>
         public abstract ResetResult<TObs> Reset(BigInteger? seed = null, IReadOnlyDictionary<string, object?>? options = null);
 
         /// <summary>
@@ -230,7 +240,7 @@ namespace Gym.Envs {
         /// <param name="name">The attribute, in Python spelling.</param>
         /// <returns><see langword="true"/> when reading it would succeed.</returns>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="name"/> is <see langword="null"/>.</exception>
-        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/core.py#L270">gymnasium/core.py</see>.</remarks>
+        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/core.py#L282">gymnasium/core.py</see>.</remarks>
         public virtual bool HasWrapperAttr(string name) => PyAttributes.HasAttr(this, name);
 
         /// <summary>The Python attribute <paramref name="name"/> of this env, as Python's <c>getattr(self, name)</c> reads it.</summary>
@@ -238,7 +248,7 @@ namespace Gym.Envs {
         /// <returns>The value, boxed.</returns>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="name"/> is <see langword="null"/>.</exception>
         /// <exception cref="AttributeError">Thrown when the env has no such attribute (<c>'CartPoleEnv' object has no attribute 'x'</c>).</exception>
-        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/core.py#L274">gymnasium/core.py</see>.</remarks>
+        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/core.py#L286">gymnasium/core.py</see>.</remarks>
         public virtual object? GetWrapperAttr(string name) => PyAttributes.GetAttr(this, name);
 
         /// <summary>
@@ -252,7 +262,7 @@ namespace Gym.Envs {
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="name"/> is <see langword="null"/>.</exception>
         /// <exception cref="AttributeError">Thrown for a read-only attribute (<c>property 'np_random_seed' of 'CartPoleEnv' object has no setter</c>).</exception>
         /// <exception cref="TypeError">Thrown when the value does not fit the attribute's type.</exception>
-        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/core.py#L278">gymnasium/core.py</see>.</remarks>
+        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/core.py#L290">gymnasium/core.py</see>.</remarks>
         public virtual bool SetWrapperAttr(string name, object? value, bool force = true) {
             if (force || PyAttributes.HasAttr(this, name)) {
                 PyAttributes.SetAttr(this, name, value);
@@ -267,7 +277,7 @@ namespace Gym.Envs {
         ///     with one; wrapper descriptions embed it.
         /// </summary>
         /// <returns>The text, the same as Gymnasium prints for the env.</returns>
-        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/core.py#L249">gymnasium/core.py</see>.</remarks>
+        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/core.py#L261">gymnasium/core.py</see>.</remarks>
         public override string ToString() {
             EnvSpec? spec = Spec;
             string name = PyAttributes.PyTypeName(GetType());
@@ -281,7 +291,7 @@ namespace Gym.Envs {
         /// </summary>
         /// <param name="seed">The seed passed to <see cref="Reset"/>, or <see langword="null"/>.</param>
         /// <exception cref="Error">Thrown for a negative seed: <c>Seed must be greater or equal to zero, actual value: -1</c>.</exception>
-        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/core.py#L116">gymnasium/core.py</see>.</remarks>
+        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/core.py#L124">gymnasium/core.py</see>.</remarks>
         protected void SeedNpRandom(BigInteger? seed) {
             // Initialize the RNG if the seed is manually passed.
             if (seed is not null)

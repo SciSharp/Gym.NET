@@ -30,7 +30,7 @@ namespace Gym.Observations {
     ///     identical elements (a NaN element equals nothing, not even itself); any other observation compares as Python's
     ///     <c>==</c> does (<see cref="PyEquality"/>), and so does the info. The reward compares with
     ///     <see cref="double.Equals(double)"/>, which, unlike Python's <c>==</c>, treats NaN as equal to NaN so equality stays
-    ///     reflexive. Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/core.py#L76">gymnasium/core.py (Env.step)</see>.
+    ///     reflexive. Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/core.py#L79">gymnasium/core.py (Env.step)</see>.
     /// </remarks>
     public readonly record struct StepResult<TObs>(TObs Observation, double Reward, bool Terminated, bool Truncated, Info Info) {
         /// <summary>
@@ -61,7 +61,7 @@ namespace Gym.Observations {
     /// <param name="Info">Diagnostics with Python dict semantics, analogous to a step's; never <see langword="null"/> from Gym's own envs.</param>
     /// <remarks>
     ///     Equality follows <see cref="StepResult{TObs}"/>'s: exact for array observations, Python's <c>==</c> otherwise.
-    ///     Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/core.py#L116">gymnasium/core.py (Env.reset)</see>.
+    ///     Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/core.py#L124">gymnasium/core.py (Env.reset)</see>.
     /// </remarks>
     public readonly record struct ResetResult<TObs>(TObs Observation, Info Info) {
         /// <summary>Exact equality of the observations and Python equality of the infos (see the remarks).</summary>
@@ -85,7 +85,7 @@ namespace Gym.Observations {
     /// <param name="Done">Whether the episode ended, for either reason.</param>
     /// <param name="Info">Diagnostics; <c>"TimeLimit.truncated"</c> is <see langword="true"/> when a time limit, not the MDP, ended it.</param>
     /// <remarks>
-    ///     Equality follows <see cref="StepResult{TObs}"/>'s. Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/utils/step_api_compatibility.py#L11">gymnasium/utils/step_api_compatibility.py (DoneStepType)</see>.
+    ///     Equality follows <see cref="StepResult{TObs}"/>'s. Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/utils/step_api_compatibility.py#L11">gymnasium/utils/step_api_compatibility.py (DoneStepType)</see>.
     /// </remarks>
     public readonly record struct DoneStepResult<TObs>(TObs Observation, double Reward, bool Done, Info Info) {
         /// <summary>Exact equality (see <see cref="StepResult{TObs}"/>'s remarks).</summary>

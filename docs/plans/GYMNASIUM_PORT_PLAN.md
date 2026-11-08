@@ -4,7 +4,7 @@
 |---|---|
 | **Status** | Draft 1, 2026-09-23. The remaining work is ordered in [`COMPLETION_PLAN.md`](COMPLETION_PLAN.md) (2026-11-08), which also records decisions D18–D22 |
 | **Goal** | Gym.NET becomes a byte-perfect clone of `refs/Gymnasium`, plus its own additions |
-| **Source of truth** | `refs/Gymnasium` @ `9e04324` (v1.3.0 + 75 commits, `__version__ = "1.4.0"` dev, 2026-08-29) |
+| **Source of truth** | `refs/Gymnasium` @ `v1.4.0` (`8ba8c3a6`), re-pinned on 2026-11-09 by the completion plan's R0.4; this plan was written against `9e04324` (v1.3.0 + 75 commits, `__version__ = "1.4.0"` dev, 2026-08-29) |
 | **Array engine** | `refs/NumSharp` master @ `93967990` (v0.70.0 + 46) |
 | **Audited Gym.NET** | branch `pr/24` @ `2639785` (PR #24: .NET 8/10 upgrade) |
 | **Contributor fork** | `HalfTick/Gym.NET` master @ `cb9dcb6` (unmerged; assessed in §18) |
@@ -82,7 +82,7 @@ Golden data is recorded once, from one pinned stack, and every CI run compares a
 
 | Component | Pin |
 |---|---|
-| Gymnasium | `refs/Gymnasium` @ `9e04324` |
+| Gymnasium | `refs/Gymnasium` @ `v1.4.0` (`8ba8c3a6`; `9e04324` until 2026-11-09) |
 | Python | 3.12.x |
 | NumPy | 2.4.2 (NumSharp's `Generator` is verified byte-exact against it, Appendix A.6) |
 | pygame-ce | 2.5.8 (SDL 2.32.10) |
@@ -179,7 +179,7 @@ These rules apply to every ported file. They exist because each one was violated
 ### 3.1 Source fidelity
 
 1. **One C# file per Python module.** `gymnasium/spaces/box.py` → `src/Gym/Spaces/Box.cs`. Keep definition order, helper functions and branch structure. A reviewer should be able to read both files side by side.
-2. **Reference the source, in Gym.NET's own voice.** Gym.NET is its own codebase: a summary says what the member does and why it matters, never "Port of ...". A type or member based on Gymnasium carries its source as a pinned GitHub permalink in `<remarks>`: `Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/spaces/box.py#L64">gymnasium/spaces/box.py</see>.` The permalink carries the pinned commit, so when Gymnasium is re-pinned the references make a diff-driven update possible (§14.10). pygame-ce, CPython and NumPy sources are referenced the same way, at their pinned tags.
+2. **Reference the source, in Gym.NET's own voice.** Gym.NET is its own codebase: a summary says what the member does and why it matters, never "Port of ...". A type or member based on Gymnasium carries its source as a pinned GitHub permalink in `<remarks>`: `Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/spaces/box.py#L64">gymnasium/spaces/box.py</see>.` The permalink carries the pinned commit, so when Gymnasium is re-pinned the references make a diff-driven update possible (§14.10). pygame-ce, CPython and NumPy sources are referenced the same way, at their pinned tags.
 3. **Port behavior, including quirks.** Python's `height[-1]` wraps; `min`/`max` compare the way Python compares; asserts raise. Don't fix upstream behavior. If upstream is buggy, port the bug and file it upstream; record the fix as an explicit, flagged deviation only if the maintainer approves.
 4. **No restructuring for style.** PR #24's PRD mandates Object Calisthenics (no `else`, methods of at most 15 lines, one dot per line). That rule is rejected for ported code: it makes line-by-line verification against the source impossible. It may apply to Gym.NET-only additions.
 
@@ -457,7 +457,7 @@ namespace Gym.Observations;
 /// <summary>
 /// The first observation of an episode and its diagnostics, as returned by <c>reset</c>: <c>(obs, info)</c>.
 /// </summary>
-/// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/core.py#L116">gymnasium/core.py (Env.reset)</see>.</remarks>
+/// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/core.py#L124">gymnasium/core.py (Env.reset)</see>.</remarks>
 /// <typeparam name="TObs">Observation type; always an element of the env's observation space.</typeparam>
 /// <param name="Observation">The initial observation.</param>
 /// <param name="Info">Auxiliary diagnostics. Insertion order is observable (Python dict semantics).</param>
@@ -500,7 +500,7 @@ namespace Gym.Envs;
 /// <remarks>
 /// Implementations must call <see cref="SeedNpRandom"/> at the start of <see cref="Reset"/>, as Gymnasium's envs call
 /// <c>super().reset(seed=seed)</c>. Skipping it breaks seeding determinism, the property every golden test relies on.
-/// Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/core.py#L25">gymnasium/core.py</see>.
+/// Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/core.py#L28">gymnasium/core.py</see>.
 /// </remarks>
 public abstract class Env<TObs, TAct> : IEnv, IDisposable
 {

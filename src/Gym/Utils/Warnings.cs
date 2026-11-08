@@ -42,7 +42,7 @@ namespace Gym.Utils {
     ///     action, keyed on the text, the category and the location); a <see cref="WarningCategory.DeprecationWarning"/> is
     ///     shown the first time a given message is issued from anywhere (the <c>once</c> filter Gymnasium's logger installs
     ///     for its modules). So CartPole's "already returned terminated = True" warning appears once per process, not once
-    ///     per episode, exactly as in Python. Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/logger.py#L14">gymnasium/logger.py</see>.
+    ///     per episode, exactly as in Python. Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/logger.py#L14">gymnasium/logger.py</see>.
     ///     </para>
     ///     <para>
     ///     Python forgets which warnings it has shown whenever the filters change (<c>_filters_mutated</c>), which leaving a

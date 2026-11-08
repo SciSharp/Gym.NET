@@ -8,7 +8,7 @@ namespace Gym.Spaces {
     ///     The integers <c>{Start, ..., Start + N - 1}</c>: a categorical action or observation, such as CartPole's two
     ///     pushes or LunarLander's four engine choices.
     /// </summary>
-    /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/spaces/discrete.py#L27">gymnasium/spaces/discrete.py</see>.</remarks>
+    /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/spaces/discrete.py#L27">gymnasium/spaces/discrete.py</see>.</remarks>
     public class Discrete : Space {
         /// <summary>The number of elements, <see cref="long"/> like Gymnasium's <c>np.int64</c> <c>n</c>.</summary>
         public long N { get; }
@@ -69,7 +69,7 @@ namespace Gym.Spaces {
         ///     The mask and uniform branches make Gymnasium's generator calls (<c>choice(np.where(mask == 1)[0])</c> and
         ///     <c>integers(n, dtype=int64)</c>), so a space seeded like Gymnasium's samples the same values. Not supported yet
         ///     (P2): the probability mask, the mask assertions, and sampling in a dtype other than int64 (Gymnasium draws in
-        ///     the space's dtype, int64 by default). Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/spaces/discrete.py#L127">gymnasium/spaces/discrete.py</see>.
+        ///     the space's dtype, int64 by default). Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/spaces/discrete.py#L127">gymnasium/spaces/discrete.py</see>.
         /// </remarks>
         public override NDArray Sample(NDArray mask = null) {
             // `mask != null` is element-wise in NumSharp (an NDArray<bool>, not a bool), which made every call throw (B-01).
@@ -118,7 +118,7 @@ namespace Gym.Spaces {
         /// <returns><see langword="true"/> when the candidate converts to an integer inside the space.</returns>
         /// <remarks>
         ///     Accepts what Gymnasium accepts, except that Gymnasium also requires <c>np.can_cast(x.dtype, self.dtype)</c>,
-        ///     which rejects, for example, a uint64 value in an int64 space (P2). Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/spaces/discrete.py#L198">gymnasium/spaces/discrete.py</see>.
+        ///     which rejects, for example, a uint64 value in an int64 space (P2). Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/spaces/discrete.py#L198">gymnasium/spaces/discrete.py</see>.
         /// </remarks>
         public override bool Contains(object ndArray) {
             try {
@@ -226,7 +226,7 @@ namespace Gym.Spaces {
         /// <exception cref="Error">Thrown when <paramref name="seed"/> is negative, with Gymnasium's message.</exception>
         /// <remarks>
         ///     Gymnasium's <c>seed</c> also accepts no seed and returns the one it used; that shape of the API arrives with P2.
-        ///     Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/spaces/space.py#L112">gymnasium/spaces/space.py</see>.
+        ///     Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/spaces/space.py#L112">gymnasium/spaces/space.py</see>.
         /// </remarks>
         public override void Seed(System.Numerics.BigInteger seed) {
             NpRandom = Seeding.NpRandom(seed).Rng;

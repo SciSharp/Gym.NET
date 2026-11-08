@@ -24,7 +24,7 @@ namespace Gym.Envs {
     ///     <c>with</c> block does.
     ///     </para>
     ///     <para>Not thread-safe: step, reset and render an instance from one thread at a time.</para>
-    ///     <para>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/core.py#L25">gymnasium/core.py</see>.</para>
+    ///     <para>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/core.py#L28">gymnasium/core.py</see>.</para>
     /// </remarks>
     public interface IEnv : IDisposable {
         /// <summary>

@@ -3,8 +3,9 @@
 Each line is "<case> <index> <value>": float64 as 16 hex digits of the IEEE bit pattern, float32 as 8, integers in decimal.
 The C# test replays every case through Gym.NET's Seeding, Discrete, Box and CartPoleEnv and requires identical lines.
 
-Runs Gymnasium from the pinned source checkout (refs/Gymnasium @ 9e04324) on the reference stack (Python 3.12, NumPy
-2.4.2); no pygame or Box2D is needed. Regenerate the golden after changing this script, with LF line endings:
+Runs Gymnasium from the pinned source checkout (refs/Gymnasium, the commit tools/parity/manifest.json names) on the
+reference stack (Python 3.12, NumPy 2.4.2); no pygame or Box2D is needed. The golden was recorded at 9e04324 and came
+out byte-identical at v1.4.0 (2026-11-09). Regenerate it after changing this script or re-pinning, with LF line endings:
 
     PYTHONPATH=refs/Gymnasium python tools/parity/gymnasium_rng.py | tr -d '\\r' > tests/Gym.Tests/Parity/gymnasium_rng.golden.txt
 """

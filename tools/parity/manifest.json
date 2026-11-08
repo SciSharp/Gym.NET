@@ -4,13 +4,14 @@
     "GymPythonSession reads every 'stack' entry from the embedded interpreter at [AssemblyInitialize] and fails the run on",
     "a mismatch, because a live oracle on the wrong stack proves nothing; GYMNET_PARITY_ALLOW_STACK_DRIFT=1 downgrades the",
     "mismatch to Inconclusive for local exploration. A value ending in '.*' matches by prefix: '3.12.*' accepts 3.12.12.",
-    "'gymnasium.commit' is the refs/Gymnasium checkout's HEAD; re-pinning the submodule means updating it here too",
+    "'gymnasium.commit' is the refs/Gymnasium checkout's HEAD (v1.4.0 since 2026-11-09); re-pinning the submodule means",
+    "running tools/parity/repin_references.py first, which reads the old commit from here, and then updating it here too",
     "(port plan section 14.10). 'referencePlatform' is the runtime identifier whose results are authoritative (port plan",
     "section 1.3): cells pinned to it report Inconclusive elsewhere instead of failing.",
     "Keep the versions in step with tools/parity/requirements.txt."
   ],
   "stack": {
-    "gymnasium.commit": "9e04324f6b0adbe19112206dfe247edc4142e7ec",
+    "gymnasium.commit": "8ba8c3a63bb4e000b7f33923f43d292acac07be1",
     "gymnasium.version": "1.4.0",
     "python.version": "3.12.*",
     "numpy.version": "2.4.2",

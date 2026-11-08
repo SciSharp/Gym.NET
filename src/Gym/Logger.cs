@@ -22,7 +22,7 @@ namespace Gym {
     ///     which is what <c>stacklevel=2</c> selects for <c>warn</c> and <c>deprecation</c>; <c>error</c>'s
     ///     <c>stacklevel=3</c> would name the caller's caller, a difference that only changes which repeats are merged.
     ///     </para>
-    ///     <para>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/logger.py">gymnasium/logger.py</see> and <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/utils/colorize.py">gymnasium/utils/colorize.py</see>.</para>
+    ///     <para>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/logger.py">gymnasium/logger.py</see> and <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/utils/colorize.py">gymnasium/utils/colorize.py</see>.</para>
     /// </remarks>
     public static class Logger {
         /// <summary>The level of <see cref="Warn"/> and <see cref="Deprecation"/>, Python's <c>logger.WARN</c>.</summary>
@@ -63,7 +63,7 @@ namespace Gym {
         /// <param name="callerFilePath">Filled in by the compiler: the call site's file.</param>
         /// <param name="callerLineNumber">Filled in by the compiler: the call site's line.</param>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="msg"/> is <see langword="null"/>.</exception>
-        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/logger.py#L17">gymnasium/logger.py</see>.</remarks>
+        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/logger.py#L17">gymnasium/logger.py</see>.</remarks>
         public static void Warn(string msg, WarningCategory category = WarningCategory.UserWarning,
             [CallerFilePath] string callerFilePath = "", [CallerLineNumber] int callerLineNumber = 0) {
             if (msg is null)
@@ -80,7 +80,7 @@ namespace Gym {
         /// <param name="callerFilePath">Filled in by the compiler: the call site's file.</param>
         /// <param name="callerLineNumber">Filled in by the compiler: the call site's line.</param>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="msg"/> is <see langword="null"/>.</exception>
-        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/logger.py#L39">gymnasium/logger.py</see>.</remarks>
+        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/logger.py#L39">gymnasium/logger.py</see>.</remarks>
         public static void Deprecation(string msg, [CallerFilePath] string callerFilePath = "", [CallerLineNumber] int callerLineNumber = 0) {
             Warn(msg, WarningCategory.DeprecationWarning, callerFilePath, callerLineNumber);
         }
@@ -93,7 +93,7 @@ namespace Gym {
         /// <param name="callerFilePath">Filled in by the compiler: the call site's file.</param>
         /// <param name="callerLineNumber">Filled in by the compiler: the call site's line.</param>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="msg"/> is <see langword="null"/>.</exception>
-        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/logger.py#L44">gymnasium/logger.py</see>.</remarks>
+        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/logger.py#L44">gymnasium/logger.py</see>.</remarks>
         public static void Error(string msg, [CallerFilePath] string callerFilePath = "", [CallerLineNumber] int callerLineNumber = 0) {
             if (msg is null)
                 throw new ArgumentNullException(nameof(msg));
@@ -112,7 +112,7 @@ namespace Gym {
         /// <param name="highlight">Uses the background colour (the number plus 10).</param>
         /// <returns>The coloured text.</returns>
         /// <exception cref="System.Collections.Generic.KeyNotFoundException">Thrown for an unknown colour name, as Python's dict lookup raises <c>KeyError</c>.</exception>
-        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/utils/colorize.py#L23">gymnasium/utils/colorize.py</see>.</remarks>
+        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/utils/colorize.py#L23">gymnasium/utils/colorize.py</see>.</remarks>
         public static string Colorize(string text, string color, bool bold = false, bool highlight = false) {
             int number = ColorToNumber[color];
             if (highlight)

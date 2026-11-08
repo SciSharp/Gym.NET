@@ -15,7 +15,7 @@ namespace Gym.Tests.Parity.Tests.Envs {
     /// <remarks>
     ///     Gym.NET's lander is a different simulation today, not a divergent copy: Aether.Physics2D instead of Box2D 2.3.10
     ///     (F6), v2 geometry and observation bounds, its own draw order (B-17, B-18). Its episodes are open bugs until P8; the
-    ///     cells are here so P8 has its gate waiting. Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/envs/box2d/lunar_lander.py#L79">gymnasium/envs/box2d/lunar_lander.py</see>.
+    ///     cells are here so P8 has its gate waiting. Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/envs/box2d/lunar_lander.py#L79">gymnasium/envs/box2d/lunar_lander.py</see>.
     /// </remarks>
     [TestClass]
     public sealed class LunarLanderLiveParityTests : ParityTestBase {

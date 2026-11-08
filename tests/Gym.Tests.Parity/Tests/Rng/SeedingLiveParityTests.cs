@@ -18,7 +18,7 @@ namespace Gym.Tests.Parity.Tests.Rng {
     ///     full PCG64 state, the draw patterns Gymnasium's envs and spaces make (port plan Appendix A.6), and the error for a
     ///     negative seed.
     /// </summary>
-    /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/utils/seeding.py#L10">gymnasium/utils/seeding.py</see>.</remarks>
+    /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/utils/seeding.py#L10">gymnasium/utils/seeding.py</see>.</remarks>
     [TestClass]
     public sealed class SeedingLiveParityTests : ParityTestBase {
         /// <summary>Seeds of A.6 and of the F2 golden, from 0 to beyond 64 bits' worth of Python int.</summary>

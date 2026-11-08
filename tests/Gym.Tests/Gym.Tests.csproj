@@ -27,8 +27,9 @@
     <ProjectReference Include="..\..\src\Gym\Gym.csproj" />
   </ItemGroup>
 
-  <!-- Gymnasium (9e04324, NumPy 2.4.2) golden of seeded space samples and CartPole resets, recorded by
-       tools/parity/gymnasium_rng.py and replayed by GymnasiumRngParityTests. Embedded, so the test does not depend on the
+  <!-- Gymnasium (NumPy 2.4.2) golden of seeded space samples and CartPole resets, recorded by
+       tools/parity/gymnasium_rng.py and replayed by GymnasiumRngParityTests. Recorded at 9e04324; re-recorded at v1.4.0
+       on 2026-11-09, it came out byte-identical, so it stands for both. Embedded, so the test does not depend on the
        working directory or on copy-to-output. -->
   <ItemGroup>
     <EmbeddedResource Include="Parity\gymnasium_rng.golden.txt" LogicalName="Gym.Tests.Parity.gymnasium_rng.golden.txt" />

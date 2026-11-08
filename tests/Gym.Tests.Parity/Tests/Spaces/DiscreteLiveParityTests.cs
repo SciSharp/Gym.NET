@@ -16,7 +16,7 @@ namespace Gym.Tests.Parity.Tests.Spaces {
     ///     mask and the generator state behind them, membership over a matrix of candidates, the attributes, the shape, the
     ///     <c>repr</c> and the constructor's validation.
     /// </summary>
-    /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/spaces/discrete.py#L27">gymnasium/spaces/discrete.py</see>.</remarks>
+    /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/spaces/discrete.py#L27">gymnasium/spaces/discrete.py</see>.</remarks>
     [TestClass]
     public sealed class DiscreteLiveParityTests : ParityTestBase {
         /// <summary>Sampling cases: <c>(n, start, seed)</c>, including an <c>n</c> above 2^31 and one of 2^40.</summary>

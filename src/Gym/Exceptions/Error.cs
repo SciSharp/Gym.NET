@@ -11,7 +11,7 @@ namespace Gym.Exceptions {
     ///     <see cref="ResetNeeded"/>, <see cref="InvalidAction"/>, ...); the ones Gymnasium does not derive from <c>Error</c>
     ///     (<see cref="AlreadyPendingCallError"/>, <see cref="DeprecatedWrapper"/>, ...) do not here either. Gym.NET's older
     ///     exceptions (<see cref="InvalidActionError"/>, <see cref="AlreadySteppingError"/>, <see cref="NotSteppingError"/>)
-    ///     remain for the legacy API. Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/error.py#L4">gymnasium/error.py</see>.
+    ///     remain for the legacy API. Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/error.py#L4">gymnasium/error.py</see>.
     /// </remarks>
     public class Error : Exception {
         /// <summary>

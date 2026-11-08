@@ -18,7 +18,7 @@ namespace Gym.Tests.Utils {
     ///     unseeded generator. The legacy <c>RandomState</c> rules (a 2^32 - 1 ceiling, NumPy's <c>ValueError</c>) no longer
     ///     apply.
     /// </summary>
-    /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/utils/seeding.py">gymnasium/utils/seeding.py</see>.</remarks>
+    /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/utils/seeding.py">gymnasium/utils/seeding.py</see>.</remarks>
     [TestClass]
     public class SeedTests {
         /// <summary>Gymnasium's message for a negative seed, before the value.</summary>
@@ -31,7 +31,7 @@ namespace Gym.Tests.Utils {
         ///     Gymnasium's <c>test_valid_seeds</c>, extended with large seeds: <c>np_random(seed)</c> reports the seed it was
         ///     given, including one beyond <see cref="long"/>.
         /// </summary>
-        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/tests/utils/test_seeding.py#L17">tests/utils/test_seeding.py (test_valid_seeds)</see>.</remarks>
+        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/tests/utils/test_seeding.py#L17">tests/utils/test_seeding.py (test_valid_seeds)</see>.</remarks>
         [TestMethod]
         public void NpRandom_ValidSeeds_ReportTheSeed()
         {
@@ -46,7 +46,7 @@ namespace Gym.Tests.Utils {
         ///     Gymnasium's <c>test_invalid_seeds</c> for -1 (a string cannot reach a typed seed): a negative seed raises
         ///     <see cref="Error"/> with Gymnasium's message.
         /// </summary>
-        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/tests/utils/test_seeding.py#L7">tests/utils/test_seeding.py (test_invalid_seeds)</see>.</remarks>
+        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/tests/utils/test_seeding.py#L7">tests/utils/test_seeding.py (test_invalid_seeds)</see>.</remarks>
         [TestMethod]
         public void NpRandom_NegativeSeed_ThrowsGymnasiumError()
         {

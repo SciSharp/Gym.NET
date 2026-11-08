@@ -29,8 +29,8 @@ namespace Gym.Tests.Parity.Tests.Core {
     ///     validates, so every compared value is unaffected. Entry points name modules, which differ by design
     ///     (<c>gymnasium.core:Wrapper</c> against <c>Gym.Envs:Wrapper</c>), so spec cells use stacks whose wrappers edit the spec
     ///     rather than append a <c>WrapperSpec</c>, or build <c>WrapperSpec</c>s with the same strings on both sides.
-    ///     Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/core.py">gymnasium/core.py</see>, <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/wrappers/common.py">gymnasium/wrappers/common.py</see>,
-    ///     <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/envs/registration.py">gymnasium/envs/registration.py</see> and <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/utils/step_api_compatibility.py">gymnasium/utils/step_api_compatibility.py</see>.
+    ///     Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/core.py">gymnasium/core.py</see>, <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/wrappers/common.py">gymnasium/wrappers/common.py</see>,
+    ///     <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/envs/registration.py">gymnasium/envs/registration.py</see> and <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/utils/step_api_compatibility.py">gymnasium/utils/step_api_compatibility.py</see>.
     /// </remarks>
     [TestClass]
     public sealed class CoreLiveParityTests : ParityTestBase {

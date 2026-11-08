@@ -3,10 +3,10 @@
 | | |
 |---|---|
 | **Status** | Draft 2, 2026-11-08: the implementation designs are reviewed and approved in [`DESIGN_REVIEW.md`](DESIGN_REVIEW.md) (DR-01…DR-36). **A step starts only when every design it depends on is approved there** |
-| **Progress** | Approved to run on 2026-11-09: R0, P0r, P2, P3, P7, P4, P5, P6 (what is necessary; the rest deferred and listed), then P10 prepared without publishing or pushing. Done: R0.2 (`e4e5215`), R0.1 + R0.3 (2026-11-09) |
+| **Progress** | Approved to run on 2026-11-09: R0, P0r, P2, P3, P7, P4, P5, P6 (what is necessary; the rest deferred and listed), then P10 prepared without publishing or pushing. Done: R0.2 (`e4e5215`), R0.1 + R0.3 (`631e0cf`), R0.4 (2026-11-09) |
 | **Scope** | Everything [`GYMNASIUM_PORT_PLAN.md`](GYMNASIUM_PORT_PLAN.md) still has open, up to one 2.0 release that includes Box2D (D21); MuJoCo is postponed out of 2.0 (DR-35) |
 | **Starting point** | branch `journey1` @ `7b7c919`, cut from `feat/numsharp-master-migration` (13 commits ahead of `master`, pushed 2026-09-27, no PR); all work continues on `journey1` until 2.0 (D20) |
-| **Source of truth** | `refs/Gymnasium` @ `9e04324` today; `v1.4.0` (`8ba8c3a6`) after step R0.4 (D2) |
+| **Source of truth** | `refs/Gymnasium` @ `v1.4.0` (`8ba8c3a6`) since step R0.4 (D2, 2026-11-09); `9e04324` before |
 | **Array engine** | NuGet NumSharp 0.80.0 (released 2026-11-08); `refs/NumSharp` @ `v0.80.0` (`d523eb48`) after step R0.1 (D3) |
 | **Per-area specs** | [`GYMNASIUM_PORT_PLAN.md`](GYMNASIUM_PORT_PLAN.md) §6–§13 (what each area must do), [`NUMSHARP_MIGRATION_PLAN.md`](NUMSHARP_MIGRATION_PLAN.md) §8 (array ownership), [`GYM_PARITY_INTEROP_TESTING.md`](GYM_PARITY_INTEROP_TESTING.md) (the live suite) |
 
@@ -194,7 +194,16 @@ Each numbered step is one commit, unless it says otherwise.
   replace `PackageLicenseUrl`/`PackageIconUrl` in the five packable projects (NU5048/NU5125). `JetBrains.Annotations`
   gets `PrivateAssets="all"`, and `Gym.csproj` drops `SixLabors.ImageSharp.Drawing`, which nothing in `src/Gym` uses
   (both found by the 2026-09-23 NuGet review).
-- **R0.4 Gymnasium v1.4.0 (D2), by the port plan's §14.10.**
+- **R0.4 Gymnasium v1.4.0 (D2), by the port plan's §14.10.** *Done 2026-11-09. `repin_references.py` moved all 146
+  permalinks in 38 files and refused none: every line-anchored target kept its text, only line numbers moved (core.py
+  +3 to +12, cartpole.py +1, registration.py -1, wrappers/common.py +1 and +27); 4 whole-file links cite files that
+  changed, reviewed. `Env.Step`/`Env.Reset` document v1.4.0's new-objects contract (Gym.NET's envs already build a
+  fresh observation and `Info` per call); `_check_metadata` and `PassiveEnvChecker`'s data-reuse check are not ported
+  yet, so P3 ports v1.4.0's versions. The toy_text art (D14) is the Farama Foundation's own pixel art, shipped in
+  Gymnasium's MIT package (FrozenLake credits "Farama Foundation's shared environment art set"; Taxi, CliffWalking and
+  Blackjack carry an unfilled "Pixel art assets by ____"), so P5 needs only Gymnasium's MIT notice. The
+  `gymnasium_rng` golden re-recorded at v1.4.0 is byte-identical. Every gate's verdict is unchanged: unit 207/207,
+  parity 163/163, the same 8 + 15 `[OpenBugs]`, net8.0 and net10.0, Debug and Release.*
   - Check out `refs/Gymnasium` at `v1.4.0` and update `tools/parity/manifest.json`.
   - A script, `tools/parity/repin_references.py`, moves every permalink at `9e04324` to the new commit. It maps line
     numbers through `git diff 9e04324..v1.4.0` and refuses any link whose target line's text changed, so those get

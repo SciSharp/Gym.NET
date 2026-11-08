@@ -14,7 +14,7 @@ namespace Gym.Utils {
     ///     A generator is owned by whoever stores it and is not synchronized: give every env and space its own instance, as
     ///     Gymnasium gives each its own <c>np_random</c>. It replaces the former <c>LegacySeeding</c>, which built NumPy's
     ///     legacy <c>RandomState</c> (MT19937), a different generator family that Gymnasium no longer uses.
-    ///     Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/utils/seeding.py">gymnasium/utils/seeding.py</see>.
+    ///     Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/utils/seeding.py">gymnasium/utils/seeding.py</see>.
     /// </remarks>
     public static class Seeding {
         /// <summary>
@@ -39,7 +39,7 @@ namespace Gym.Utils {
         /// <remarks>
         ///     The steps are Gymnasium's <c>np_random</c>: validate, build <c>SeedSequence(seed)</c>, report
         ///     <c>seed_seq.entropy</c>, and wrap <c>PCG64(seed_seq)</c> in a <c>Generator</c>. Gymnasium's other check, "Seed
-        ///     must be a python integer", cannot fail for a typed integer. Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/utils/seeding.py#L10">gymnasium/utils/seeding.py</see>.
+        ///     must be a python integer", cannot fail for a typed integer. Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/utils/seeding.py#L10">gymnasium/utils/seeding.py</see>.
         /// </remarks>
         public static (Generator Rng, BigInteger Seed) NpRandom(BigInteger? seed = null) {
             if (seed is { Sign: < 0 })

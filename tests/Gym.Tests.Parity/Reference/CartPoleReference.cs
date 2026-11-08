@@ -23,7 +23,7 @@ namespace Gym.Tests.Parity.Reference {
     ///     <c>np.square</c>, the source's evaluation order, and <c>Generator(PCG64(SeedSequence(seed)))</c> with
     ///     <c>uniform(-0.05, 0.05, size=4)</c> for the reset, as <c>seeding.np_random</c> and <c>reset</c> do.
     ///     </para>
-    ///     <para>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/envs/classic_control/cartpole.py#L20">gymnasium/envs/classic_control/cartpole.py</see>.</para>
+    ///     <para>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/envs/classic_control/cartpole.py#L21">gymnasium/envs/classic_control/cartpole.py</see>.</para>
     /// </remarks>
     public sealed class CartPoleReference : IDotNetEnv {
         // CartPoleEnv.__init__ (cartpole.py, lines 124-136 at the pinned commit): instance attributes, all Python floats.
@@ -76,7 +76,7 @@ namespace Gym.Tests.Parity.Reference {
         private CartPoleReference(double tau, bool extraDrawAfterReset, string? variant) {
             _tau = tau;
             _extraDrawAfterReset = extraDrawAfterReset;
-            Name = "CartPoleReference (float64 transcription of cartpole.py @ 9e04324)" + (variant is null ? "" : $" broken: {variant}");
+            Name = "CartPoleReference (float64 transcription of cartpole.py @ v1.4.0)" + (variant is null ? "" : $" broken: {variant}");
         }
 
         /// <summary>The faithful transcription, which must match Gymnasium bit for bit.</summary>
@@ -107,7 +107,7 @@ namespace Gym.Tests.Parity.Reference {
         /// <remarks>
         ///     Gymnasium's <c>reset</c>: <c>super().reset(seed=seed)</c> sets <c>np_random</c> to
         ///     <c>seeding.np_random(seed)[0]</c>; then <c>self.state = self.np_random.uniform(low=-0.05, high=0.05, size=(4,))</c>,
-        ///     and the observation is its float32 copy with an empty info. Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/envs/classic_control/cartpole.py#L228">gymnasium/envs/classic_control/cartpole.py (CartPoleEnv.reset)</see>.
+        ///     and the observation is its float32 copy with an empty info. Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/envs/classic_control/cartpole.py#L229">gymnasium/envs/classic_control/cartpole.py (CartPoleEnv.reset)</see>.
         /// </remarks>
         public CallResult Reset(long seed) {
             _npRandom = new Generator(new PCG64(new SeedSequence(seed)));
@@ -124,7 +124,7 @@ namespace Gym.Tests.Parity.Reference {
         /// <inheritdoc />
         /// <remarks>
         ///     Gymnasium's <c>CartPoleEnv.step</c>, one statement per Python statement, in the source's order.
-        ///     Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/envs/classic_control/cartpole.py#L164">gymnasium/envs/classic_control/cartpole.py (CartPoleEnv.step)</see>.
+        ///     Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/envs/classic_control/cartpole.py#L165">gymnasium/envs/classic_control/cartpole.py (CartPoleEnv.step)</see>.
         /// </remarks>
         public CallResult Step(object action) {
             long a = Convert.ToInt64(action, CultureInfo.InvariantCulture);

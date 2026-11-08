@@ -9,7 +9,7 @@ namespace Gym.Environments.Envs.Classic {
     ///     The reset-option parsing every classic-control env shares, so <c>Reset(seed, options)</c> accepts and rejects
     ///     exactly what Gymnasium's <c>reset</c> does, with the same messages.
     /// </summary>
-    /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/envs/classic_control/utils.py">gymnasium/envs/classic_control/utils.py</see>.</remarks>
+    /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/envs/classic_control/utils.py">gymnasium/envs/classic_control/utils.py</see>.</remarks>
     public static class ClassicControlUtils {
         /// <summary>
         ///     Converts a reset option with Python's <c>float(x)</c>, turning its <c>ValueError</c> and <c>TypeError</c> into
@@ -25,7 +25,7 @@ namespace Gym.Environments.Envs.Classic {
         ///     Thrown, as Python's <c>OverflowError</c>, for an integer beyond the float range: Gymnasium catches only
         ///     <c>ValueError</c> and <c>TypeError</c>, so this one propagates unchanged.
         /// </exception>
-        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/envs/classic_control/utils.py#L8">gymnasium/envs/classic_control/utils.py</see>.</remarks>
+        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/envs/classic_control/utils.py#L8">gymnasium/envs/classic_control/utils.py</see>.</remarks>
         public static double VerifyNumberAndCast(object? x) {
             try {
                 return PyBuiltins.Float(x);
@@ -52,7 +52,7 @@ namespace Gym.Environments.Envs.Classic {
         /// <remarks>
         ///     Equal bounds are accepted, and NaN passes the comparison (<c>nan &gt; x</c> is false), exactly as in Python; a NaN or
         ///     infinite bound then fails in the generator's <c>uniform</c> instead (<c>high - low range exceeds valid bounds</c>).
-        ///     Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/envs/classic_control/utils.py#L17">gymnasium/envs/classic_control/utils.py</see>.
+        ///     Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/envs/classic_control/utils.py#L17">gymnasium/envs/classic_control/utils.py</see>.
         /// </remarks>
         public static (double Low, double High) MaybeParseResetBounds(IReadOnlyDictionary<string, object?>? options, double defaultLow, double defaultHigh) {
             if (options is null)

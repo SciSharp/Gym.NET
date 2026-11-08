@@ -21,7 +21,7 @@ namespace Gym.Utils {
     ///     vector API (P6). As in Gymnasium, both conversions edit the given info in place: the done conversion adds
     ///     <c>"TimeLimit.truncated"</c>, the terminated/truncated conversion removes it.
     ///     </para>
-    ///     <para>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/utils/step_api_compatibility.py">gymnasium/utils/step_api_compatibility.py</see>.</para>
+    ///     <para>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/utils/step_api_compatibility.py">gymnasium/utils/step_api_compatibility.py</see>.</para>
     /// </remarks>
     public static class StepApiCompatibility {
         /// <summary>The info key the done API uses to mark a truncation (<c>"TimeLimit.truncated"</c>).</summary>
@@ -39,7 +39,7 @@ namespace Gym.Utils {
         /// <remarks>
         ///     Python's <c>and</c> returns an operand (so <c>done</c> of <c>0</c> stays <c>0</c>); the flags here are
         ///     <see langword="bool"/>, the truth value of that operand. The popped value counts by Python truthiness.
-        ///     Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/utils/step_api_compatibility.py#L27">gymnasium/utils/step_api_compatibility.py</see>.
+        ///     Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/utils/step_api_compatibility.py#L27">gymnasium/utils/step_api_compatibility.py</see>.
         /// </remarks>
         public static StepResult<TObs> ConvertToTerminatedTruncatedStepApi<TObs>(DoneStepResult<TObs> stepReturns) {
             (TObs observations, double rewards, bool dones, Info infos) = stepReturns;
@@ -58,7 +58,7 @@ namespace Gym.Utils {
         /// <param name="stepReturns">The terminated/truncated transition; its info gains the key when the episode ended.</param>
         /// <returns>The same transition in the done API.</returns>
         /// <exception cref="ArgumentNullException">Thrown when the transition's info is <see langword="null"/>.</exception>
-        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/utils/step_api_compatibility.py#L82">gymnasium/utils/step_api_compatibility.py</see>.</remarks>
+        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/utils/step_api_compatibility.py#L82">gymnasium/utils/step_api_compatibility.py</see>.</remarks>
         public static DoneStepResult<TObs> ConvertToDoneStepApi<TObs>(StepResult<TObs> stepReturns) {
             (TObs observations, double rewards, bool terminated, bool truncated, Info infos) = stepReturns;
             if (infos is null)

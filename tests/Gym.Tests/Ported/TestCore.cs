@@ -30,17 +30,17 @@ namespace Gym.Tests.Ported {
     ///     CartPoleEnv))</c> with the spec <c>make</c> attaches: <c>make</c> and the <c>PassiveEnvChecker</c> it also adds
     ///     arrive with the registry (P3), and the checker takes no part in what the test asserts.
     ///     </para>
-    ///     <para>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/tests/test_core.py">tests/test_core.py</see>.</para>
+    ///     <para>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/tests/test_core.py">tests/test_core.py</see>.</para>
     /// </remarks>
     [TestClass]
     public class TestCore {
         /// <summary>The <c>example_env</c> fixture: a fresh <see cref="ExampleEnv"/> per test, so no test sees another's state.</summary>
         /// <returns>A new <see cref="ExampleEnv"/>.</returns>
-        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/tests/test_core.py#L46">tests/test_core.py (example_env)</see>.</remarks>
+        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/tests/test_core.py#L46">tests/test_core.py (example_env)</see>.</remarks>
         private static ExampleEnv CreateExampleEnv() => new();
 
         /// <summary>An env's defaults are Gymnasium's.</summary>
-        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/tests/test_core.py#L51">tests/test_core.py (test_example_env)</see>.</remarks>
+        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/tests/test_core.py#L51">tests/test_core.py (test_example_env)</see>.</remarks>
         [TestMethod]
         public void TestExampleEnv() {
             var exampleEnv = CreateExampleEnv();
@@ -52,7 +52,7 @@ namespace Gym.Tests.Ported {
         }
 
         /// <summary>What a wrapper forwards, what it can override, and its <c>_np_random</c> error.</summary>
-        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/tests/test_core.py#L87">tests/test_core.py (test_example_wrapper)</see>.</remarks>
+        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/tests/test_core.py#L87">tests/test_core.py (test_example_wrapper)</see>.</remarks>
         [TestMethod]
         public void TestExampleWrapper() {
             var env = CreateExampleEnv();
@@ -88,7 +88,7 @@ namespace Gym.Tests.Ported {
         }
 
         /// <summary>Each hook wrapper transforms what it is named after.</summary>
-        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/tests/test_core.py#L149">tests/test_core.py (test_reward_observation_action_wrapper)</see>.</remarks>
+        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/tests/test_core.py#L149">tests/test_core.py (test_reward_observation_action_wrapper)</see>.</remarks>
         [TestMethod]
         public void TestRewardObservationActionWrapper() {
             var env = new GenericTestEnv();
@@ -114,7 +114,7 @@ namespace Gym.Tests.Ported {
         ///     Attributes are reached through the stack only by <c>get_wrapper_attr</c>/<c>set_wrapper_attr</c>/
         ///     <c>has_wrapper_attr</c>, never forwarded by plain access.
         /// </summary>
-        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/tests/test_core.py#L170">tests/test_core.py (test_get_set_wrapper_attr)</see>.</remarks>
+        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/tests/test_core.py#L170">tests/test_core.py (test_get_set_wrapper_attr)</see>.</remarks>
         [TestMethod]
         public void TestGetSetWrapperAttr() {
             IEnv env = MakeCartPole();
@@ -169,7 +169,7 @@ namespace Gym.Tests.Ported {
         }
 
         /// <summary>Reading the seed creates the generator.</summary>
-        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/tests/test_core.py#L232">tests/test_core.py (TestRandomSeeding.test_nonempty_seed_retrieved_when_not_set)</see>.</remarks>
+        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/tests/test_core.py#L232">tests/test_core.py (TestRandomSeeding.test_nonempty_seed_retrieved_when_not_set)</see>.</remarks>
         [TestMethod]
         public void TestRandomSeeding_NonemptySeedRetrievedWhenNotSet() {
             var exampleEnv = CreateExampleEnv();
@@ -180,7 +180,7 @@ namespace Gym.Tests.Ported {
         }
 
         /// <summary>A seeded reset records its seed; an unseeded one keeps it.</summary>
-        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/tests/test_core.py#L237">tests/test_core.py (TestRandomSeeding.test_seed_set_at_reset_and_retrieved)</see>.</remarks>
+        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/tests/test_core.py#L237">tests/test_core.py (TestRandomSeeding.test_seed_set_at_reset_and_retrieved)</see>.</remarks>
         [TestMethod]
         public void TestRandomSeeding_SeedSetAtResetAndRetrieved() {
             var exampleEnv = CreateExampleEnv();
@@ -194,7 +194,7 @@ namespace Gym.Tests.Ported {
         }
 
         /// <summary><c>np_random_seed</c> is read-only.</summary>
-        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/tests/test_core.py#L246">tests/test_core.py (TestRandomSeeding.test_seed_cannot_be_set_directly)</see>.</remarks>
+        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/tests/test_core.py#L246">tests/test_core.py (TestRandomSeeding.test_seed_cannot_be_set_directly)</see>.</remarks>
         [TestMethod]
         public void TestRandomSeeding_SeedCannotBeSetDirectly() {
             var exampleEnv = CreateExampleEnv();
@@ -204,7 +204,7 @@ namespace Gym.Tests.Ported {
         }
 
         /// <summary>An assigned generator's seed is -1.</summary>
-        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/tests/test_core.py#L251">tests/test_core.py (TestRandomSeeding.test_negative_seed_retrieved_when_seed_unknown)</see>.</remarks>
+        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/tests/test_core.py#L251">tests/test_core.py (TestRandomSeeding.test_negative_seed_retrieved_when_seed_unknown)</see>.</remarks>
         [TestMethod]
         public void TestRandomSeeding_NegativeSeedRetrievedWhenSeedUnknown() {
             var exampleEnv = CreateExampleEnv();
@@ -216,7 +216,7 @@ namespace Gym.Tests.Ported {
         }
 
         /// <summary>Seeding through a wrapper seeds the env beneath.</summary>
-        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/tests/test_core.py#L258">tests/test_core.py (TestRandomSeeding.test_seeding_works_in_wrapped_envs)</see>.</remarks>
+        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/tests/test_core.py#L258">tests/test_core.py (TestRandomSeeding.test_seeding_works_in_wrapped_envs)</see>.</remarks>
         [TestMethod]
         public void TestRandomSeeding_SeedingWorksInWrappedEnvs() {
             const int seed = 42;
@@ -248,7 +248,7 @@ namespace Gym.Tests.Ported {
         }
 
         /// <summary>The minimal env of the core tests: <c>Box(0, 1)</c> spaces, every step returns <c>(0, 0, False, False, {})</c>, reset seeds and returns <c>(0, {})</c>.</summary>
-        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/tests/test_core.py#L21">tests/test_core.py (ExampleEnv)</see>.</remarks>
+        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/tests/test_core.py#L21">tests/test_core.py (ExampleEnv)</see>.</remarks>
         private sealed class ExampleEnv : Env<object?, object?> {
             /// <summary>Constructor for example environment.</summary>
             public ExampleEnv() {
@@ -272,7 +272,7 @@ namespace Gym.Tests.Ported {
         }
 
         /// <summary>A wrapper that rewards every step with <c>new_reward</c> (3).</summary>
-        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/tests/test_core.py#L60">tests/test_core.py (ExampleWrapper)</see>.</remarks>
+        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/tests/test_core.py#L60">tests/test_core.py (ExampleWrapper)</see>.</remarks>
         private sealed class ExampleWrapper : Wrapper<object?, object?> {
             /// <summary>Constructor that sets the reward.</summary>
             /// <param name="env">The env to wrap.</param>
@@ -304,7 +304,7 @@ namespace Gym.Tests.Ported {
         }
 
         /// <summary>A reward wrapper under which every reward becomes 1.</summary>
-        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/tests/test_core.py#L125">tests/test_core.py (ExampleRewardWrapper)</see>.</remarks>
+        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/tests/test_core.py#L125">tests/test_core.py (ExampleRewardWrapper)</see>.</remarks>
         private sealed class ExampleRewardWrapper : RewardWrapper<object?, object?> {
             /// <summary>Wraps <paramref name="env"/>.</summary>
             /// <param name="env">The env.</param>
@@ -317,7 +317,7 @@ namespace Gym.Tests.Ported {
         }
 
         /// <summary>An observation wrapper under which every observation becomes <c>np.array([1])</c>.</summary>
-        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/tests/test_core.py#L133">tests/test_core.py (ExampleObservationWrapper)</see>.</remarks>
+        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/tests/test_core.py#L133">tests/test_core.py (ExampleObservationWrapper)</see>.</remarks>
         private sealed class ExampleObservationWrapper : ObservationWrapper<object?, object?, object?> {
             /// <summary>Wraps <paramref name="env"/>.</summary>
             /// <param name="env">The env.</param>
@@ -330,7 +330,7 @@ namespace Gym.Tests.Ported {
         }
 
         /// <summary>An action wrapper under which every action becomes <c>np.array([1])</c>.</summary>
-        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/tests/test_core.py#L141">tests/test_core.py (ExampleActionWrapper)</see>.</remarks>
+        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/tests/test_core.py#L141">tests/test_core.py (ExampleActionWrapper)</see>.</remarks>
         private sealed class ExampleActionWrapper : ActionWrapper<object?, object?, object?> {
             /// <summary>Wraps <paramref name="env"/>.</summary>
             /// <param name="env">The env.</param>
