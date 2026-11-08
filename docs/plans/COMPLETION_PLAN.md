@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Status** | Draft 2, 2026-11-08: the implementation designs are reviewed and approved in [`DESIGN_REVIEW.md`](DESIGN_REVIEW.md) (DR-01…DR-36). **A step starts only when every design it depends on is approved there** |
-| **Progress** | Approved to run on 2026-11-09: R0, P0r, P2, P3, P7, P4, P5, P6 (what is necessary; the rest deferred and listed), then P10 prepared without publishing or pushing. Done: R0.2 (`e4e5215`), R0.1 + R0.3 (`631e0cf`), R0.4 (`0b3dee8`), R0.5 (2026-11-09) |
+| **Progress** | Approved to run on 2026-11-09: R0, P0r, P2, P3, P7, P4, P5, P6 (what is necessary; the rest deferred and listed), then P10 prepared without publishing or pushing. Done: R0.2 (`e4e5215`), R0.1 + R0.3 (`631e0cf`), R0.4 (`0b3dee8`), R0.5 (`c80bc2d`, `f9d4dc4`), P0r.3 (`339b3b3`), P0r.4 and P0r.1 (2026-11-09) |
 | **Scope** | Everything [`GYMNASIUM_PORT_PLAN.md`](GYMNASIUM_PORT_PLAN.md) still has open, up to one 2.0 release that includes Box2D (D21); MuJoCo is postponed out of 2.0 (DR-35) |
 | **Starting point** | branch `journey1` @ `7b7c919`, cut from `feat/numsharp-master-migration` (13 commits ahead of `master`, pushed 2026-09-27, no PR); all work continues on `journey1` until 2.0 (D20) |
 | **Source of truth** | `refs/Gymnasium` @ `v1.4.0` (`8ba8c3a6`) since step R0.4 (D2, 2026-11-09); `9e04324` before |
@@ -225,10 +225,13 @@ Each numbered step is one commit, unless it says otherwise.
 
 ### P0r P0's rest
 
-- **P0r.1 CI (D20, informational).** GitHub Actions on the branch:
+- **P0r.1 CI (D20, informational).** *Written 2026-11-09 (`.github/workflows/ci.yml`), not run: running it needs a push,
+  which this run does not do. The YAML parses and every command in it was run locally on Windows. One change from the
+  plan: the unit suite targets `net*-windows` (WinForms viewer tests), so the ubuntu job cannot run it, and replays the
+  goldens without Python instead.* GitHub Actions on the branch:
   - `windows-latest` (the reference) builds Debug and Release, runs the headless unit suite, sets up the pinned
     Python stack with `tools/parity/setup_venv.ps1`, and runs the parity gate with `GYMNET_PYTHONNET_REQUIRE_ENGINE=1`.
-  - `ubuntu-latest` builds and runs the unit suite.
+  - `ubuntu-latest` builds and runs the unit suite (as written: builds the parity suite and replays the goldens).
   - Both set `AVALONIA_TELEMETRY_OPTOUT=1` and exclude the viewer tests.
 - **P0r.2 Static rules: none (DR-03).** No analyzers and no rule scripts; the port plan's §14.7 bans are not enforced
   by tooling.
@@ -247,12 +250,16 @@ Each numbered step is one commit, unless it says otherwise.
     pinned stack (D15). The C# side gets `GoldenTrajectory`/`GoldenAssert`, with open-loop and sampled action modes.
   - Replay needs no Python: the ubuntu job and machines without the stack check L3/L4 from the files. The live suite
     stays the oracle on the reference job.
-- **P0r.4 Inventory (port plan §14.6).**
+- **P0r.4 Inventory (port plan §14.6).** *Done 2026-11-09: 301 public names at v1.4.0
+  (`tools/parity/gymnasium_inventory.json`); `InventoryTests` finds 43 in Gym.NET and checks the other 258 against
+  `tests/Gym.Tests/Gymnasium/inventory.expected-missing.txt`, each line with its phase (P2 16, P3 28, P4 8, P5 16,
+  P6 87, P8 12, P9 33) or reason (n/a 54: JAX, PyTorch, pickling; by design 3: DR-28, DR-32; Atari 1).*
   - `tools/parity/inventory.py` lists Gymnasium's public names by AST.
   - A reflection test maps them through §3.8 and reports the missing ones against a committed expected-missing list.
     Each phase shrinks the list, and 2.0 needs it empty.
 - **Exit:** both CI jobs green on the branch; the CartPole-v1 golden, recorded by the live suite, replays without
-  Python; the inventory test runs.
+  Python; the inventory test runs. *Met 2026-11-09 except "CI green", which waits for a push: the goldens replay with
+  Python disabled, and the inventory test runs and passes.*
 
 ### P2 Spaces
 

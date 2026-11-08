@@ -102,6 +102,11 @@ dotnet test tests/Gym.Tests/Gym.Tests.csproj --filter "FullyQualifiedName!~Avalo
 # The open gaps (NumSharp items N-1, N-3, ...), each failing until its fix lands
 dotnet test tests/Gym.Tests/Gym.Tests.csproj --filter "TestCategory=OpenBugs"
 
+# The API inventory: Gymnasium's public names (tools/parity/gymnasium_inventory.json) against Gym.NET, by reflection.
+# Porting a name means removing its line from tests/Gym.Tests/Gymnasium/inventory.expected-missing.txt (a ratchet);
+# after a re-pin, regenerate the inventory with: python tools/parity/inventory.py --write
+dotnet test tests/Gym.Tests/Gym.Tests.csproj --filter "FullyQualifiedName~InventoryTests" --logger "console;verbosity=detailed"
+
 # Run tests targeting a specific framework
 dotnet test tests/Gym.Tests/Gym.Tests.csproj -f net10.0-windows
 
@@ -133,7 +138,14 @@ dotnet test tests/Gym.Tests.Parity/Gym.Tests.Parity.csproj --filter "TestCategor
 
 # The open gaps, each printing its first divergence from Gymnasium
 dotnet test tests/Gym.Tests.Parity/Gym.Tests.Parity.csproj --filter "TestCategory=OpenBugs" --logger "console;verbosity=detailed"
+
+# The goldens (tests/Golden), replayed without Python; record them with GYMNET_PARITY_RECORD=1 (see its CLAUDE.md)
+dotnet test tests/Gym.Tests.Parity/Gym.Tests.Parity.csproj --filter "TestCategory=Golden"
 ```
+
+CI (`.github/workflows/ci.yml`, informational on `journey1` until 2.0, decision D20): a Windows job builds Debug and
+Release, runs the headless unit gate and the live parity gate on the pinned stack; an Ubuntu job replays the goldens
+without Python.
 
 ### 3.4 Submodule Management
 

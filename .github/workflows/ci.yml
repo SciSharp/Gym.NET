@@ -1,0 +1,112 @@
+# Gym.NET's continuous integration (completion plan P0r.1, decision D20: informational on the journey1 branch until 2.0).
+#
+# windows: the reference platform of tools/parity/manifest.json (win-x64). Builds Debug and Release, runs the headless
+#          unit gate, creates the pinned Python stack and runs the live parity gate with the engine required, so a
+#          missing or drifted stack fails instead of skipping. The golden replays run inside that gate as well.
+# ubuntu:  builds the cross-platform projects and replays the committed goldens without Python (DR-04). The unit suite
+#          targets net*-windows (WinForms viewer tests) and cannot run here. Golden cases that rest on the platform's
+#          libm (CartPole's cos/sin) report Inconclusive off win-x64 instead of failing (port plan section 14.9).
+#
+# Both jobs exclude the viewer tests (they open windows) and opt out of Avalonia's build telemetry.
+name: CI
+
+on:
+  push:
+    branches: [journey1, master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  AVALONIA_TELEMETRY_OPTOUT: "1"
+  DOTNET_NOLOGO: "1"
+  DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+  # The headless gate of CLAUDE.md section 3.2: no viewer windows, no known gaps.
+  UNIT_FILTER: "FullyQualifiedName!~AvaloniaEnv&FullyQualifiedName!~WinFormEnv&TestCategory!=OpenBugs"
+
+jobs:
+  windows:
+    name: windows (reference)
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      # Only Gymnasium: NumSharp comes from NuGet by default (eng/NumSharp.props, D3), and a recursive init would clone
+      # NumSharp's own submodules (numpy, OpenBLAS, onnxruntime) for nothing.
+      - name: Gymnasium submodule
+        run: git submodule update --init refs/Gymnasium
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - name: Build (Debug)
+        run: dotnet build Gym.NET.sln -c Debug
+
+      - name: Build (Release)
+        run: dotnet build Gym.NET.sln -c Release
+
+      - name: Unit tests, headless gate (Debug)
+        run: dotnet test tests/Gym.Tests/Gym.Tests.csproj -c Debug --no-build --filter "${{ env.UNIT_FILTER }}"
+
+      - name: Unit tests, headless gate (Release)
+        run: dotnet test tests/Gym.Tests/Gym.Tests.csproj -c Release --no-build --filter "${{ env.UNIT_FILTER }}"
+
+      # The reference interpreter: the manifest requires 3.12.* and checks numpy, pygame-ce (SDL), Box2D at run time.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Parity stack (tools/parity/.venv)
+        shell: pwsh
+        run: ./tools/parity/setup_venv.ps1 -Python python
+
+      - name: Parity gate (live Gymnasium, Release)
+        env:
+          GYMNET_PYTHONNET_REQUIRE_ENGINE: "1"
+          # Divergence dumps and frame PNGs (python.png, dotnet.png, diff.png) land here, for the upload below.
+          GYMNET_PARITY_ARTIFACTS: ${{ github.workspace }}/parity-artifacts
+        run: dotnet test tests/Gym.Tests.Parity/Gym.Tests.Parity.csproj -c Release --no-build --filter "TestCategory!=OpenBugs"
+
+      - name: Parity artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: parity-artifacts-windows
+          path: parity-artifacts/
+          if-no-files-found: ignore
+
+  ubuntu:
+    name: ubuntu (golden replay)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      # The parity project builds Gym, Gym.Rendering and Gym.Environments with it; the -windows projects are skipped.
+      - name: Build the parity suite (Release)
+        run: dotnet build tests/Gym.Tests.Parity/Gym.Tests.Parity.csproj -c Release
+
+      # No Python on purpose: the goldens replay from tests/Golden alone. The engine is not required, so the session's
+      # failure to start is recorded and no Golden test depends on it.
+      - name: Golden replay (no Python)
+        env:
+          GYMNET_PYTHONNET_REQUIRE_ENGINE: "0"
+          PYTHONNET_PYDLL: /nonexistent/libpython3.12.so
+          GYMNET_PARITY_VENV: /nonexistent/venv
+        run: dotnet test tests/Gym.Tests.Parity/Gym.Tests.Parity.csproj -c Release --no-build --filter "TestCategory=Golden"
