@@ -123,3 +123,16 @@ Three answers were recorded in the reading below; a correction from the maintain
 - **DR-02**: until NumSharp releases its changes, `NotImplementedError` and `ImportError` stay in `Gym.Exceptions` as DR-01's stuck-case workaround, each proven by an `[OpenBugs("N-3")]` test, and the bare-assert cells that need NumSharp's `""` message are `[OpenBugs("N-1")]`.
 - **DR-29**: "if it makes sense both by amount of code and by performance" is read as a measured gate per subsystem in P8.1, not a requirement to use NDArrays everywhere.
 - **DR-32**: the merged `MountainCarEnv` prints `Continuous_MountainCarEnv` in continuous mode, so `repr` stays exact; only `EnvSpec.kwargs` and the constructor's extra kwarg deviate.
+
+## Consequences found while implementing
+
+Effects of approved designs that only showed up in code. None changes a design; each records how the code lives with it.
+
+- **DR-06 with DR-10/DR-20** (found in R0.5, 2026-11-09): the namespace `Gym.Tests.Gymnasium` shadows the
+  `Gymnasium` facade class (`Gymnasium.Make`, `Gymnasium.HumanViewerFactory`) in every `Gym.Tests.*` namespace. C#
+  resolves a simple name by walking the enclosing namespaces outward, and finds the namespace `Gym.Tests.Gymnasium` (a
+  member of `Gym.Tests`) before it reaches the class, so `Gymnasium.Make(...)` does not compile in the unit tests
+  (CS0234), and no global alias can win (global usings are consulted last). Both approved names stay: when P3 adds the
+  facade, `Gym.Tests.csproj` imports it with a `global using static`, so tests call `Make("CartPole-v1")`, as Python's
+  `from gymnasium import make` reads; the facade's own tests may also spell `global::Gym.Gymnasium`. Consumers'
+  projects are unaffected unless they declare a `Gymnasium` namespace of their own.

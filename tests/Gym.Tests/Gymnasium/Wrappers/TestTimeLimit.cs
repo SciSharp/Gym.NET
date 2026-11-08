@@ -8,7 +8,7 @@ using Gym.Wrappers;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using NumSharp;
 
-namespace Gym.Tests.Ported.Wrappers {
+namespace Gym.Tests.Gymnasium.Wrappers {
     /// <summary>
     ///     Gymnasium's <c>TimeLimit</c> tests, run against <see cref="TimeLimit{TObs, TAct}"/>.
     /// </summary>

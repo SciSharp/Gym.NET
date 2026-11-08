@@ -7,7 +7,7 @@ using Gym.Wrappers;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using NumSharp;
 
-namespace Gym.Tests.Ported.Wrappers {
+namespace Gym.Tests.Gymnasium.Wrappers {
     /// <summary>Gymnasium's <c>OrderEnforcing</c> tests, run against <see cref="OrderEnforcing{TObs, TAct}"/>.</summary>
     /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/tests/wrappers/test_order_enforcing.py">tests/wrappers/test_order_enforcing.py</see>.</remarks>
     [TestClass]

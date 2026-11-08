@@ -6,7 +6,7 @@ using Gym.Environments.Envs.Classic;
 using Gym.Envs;
 using Gym.Envs.Registration;
 using Gym.Observations;
-using Gym.Tests.Ported;
+using Gym.Tests.Gymnasium;
 using Gym.Utils;
 using Gym.Wrappers;
 using Microsoft.VisualStudio.TestTools.UnitTesting;

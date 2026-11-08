@@ -1,7 +1,7 @@
 #nullable enable
 using System;
+using System.Linq;
 using System.Threading;
-using System.Threading.Tasks;
 using Gym.Environments;
 using Gym.Environments.Envs.Aether;
 using Gym.Environments.Envs.Classic;
@@ -19,10 +19,20 @@ namespace Gym.Tests.Envs {
     /// </summary>
     /// <remarks>
     ///     A race only fails when it happens to interleave badly, so these tests are smoke tests. The deterministic guarantee,
-    ///     that no two unseeded instances share a generator, is pinned by <c>EntropySeedingTests</c>.
+    ///     that no two unseeded instances share a generator, is pinned by <c>EntropySeedingTests</c>. Each worker runs on a
+    ///     dedicated <see cref="Thread"/>, never a thread-pool task: a <see cref="Barrier"/> of N releases only once N
+    ///     threads run at the same time, which <c>Task.Run</c> does not promise (a pool saturated by a parallel test run
+    ///     injects threads slowly, so the barrier would stall the test instead of making its threads overlap).
     /// </remarks>
     [TestClass]
     public class ConcurrencyTests {
+        /// <summary>
+        ///     How long <see cref="RunOnThreads"/> waits for each thread before failing the test. The runs take about a
+        ///     second; the margin is for slow CI machines, and the limit turns a stalled barrier into a failure instead of a
+        ///     test run that never ends.
+        /// </summary>
+        private static readonly TimeSpan ThreadTimeout = TimeSpan.FromMinutes(2);
+
         /// <summary>
         ///     Two unseeded LunarLanders and two unseeded CartPoles step on four threads that start together, sampling their
         ///     action and observation spaces every step.
@@ -31,14 +41,11 @@ namespace Gym.Tests.Envs {
         public void UnseededEnvs_SteppingInParallel_DoNotThrow()
         {
             using var start = new Barrier(4);
-            var runs = new[] {
-                Task.Run(() => RunLunarLander(start)),
-                Task.Run(() => RunLunarLander(start)),
-                Task.Run(() => RunCartPole(start)),
-                Task.Run(() => RunCartPole(start)),
-            };
-
-            Task.WaitAll(runs);
+            RunOnThreads(
+                () => RunLunarLander(start),
+                () => RunLunarLander(start),
+                () => RunCartPole(start),
+                () => RunCartPole(start));
         }
 
         /// <summary>Two unseeded spaces are sampled 250,000 times each on two threads that start together.</summary>
@@ -46,12 +53,59 @@ namespace Gym.Tests.Envs {
         public void UnseededSpaces_SampledInParallel_DoNotThrow()
         {
             using var start = new Barrier(2);
-            var runs = new[] {
-                Task.Run(() => SampleMany(new Discrete(1000), start)),
-                Task.Run(() => SampleMany(new Discrete(1000), start)),
-            };
+            RunOnThreads(
+                () => SampleMany(new Discrete(1000), start),
+                () => SampleMany(new Discrete(1000), start));
+        }
 
-            Task.WaitAll(runs);
+        /// <summary>
+        ///     Runs each body on a dedicated thread of its own, waits for all of them, and fails with whatever any body threw.
+        /// </summary>
+        /// <param name="bodies">
+        ///     The work of each thread. Every body gets its own thread, so a <see cref="Barrier"/> sized to the number of
+        ///     bodies is always reached.
+        /// </param>
+        /// <exception cref="AggregateException">
+        ///     Thrown when any body threw, holding every body's exception, or when a thread outlived
+        ///     <see cref="ThreadTimeout"/>, holding a <see cref="TimeoutException"/> and the failures recorded so far (a body
+        ///     that fails before its barrier leaves the other threads waiting there, so the timeout reports its exception).
+        /// </exception>
+        private static void RunOnThreads(params Action[] bodies)
+        {
+            var failures = new Exception?[bodies.Length];
+            var threads = new Thread[bodies.Length];
+            for (int i = 0; i < bodies.Length; i++)
+            {
+                int index = i;
+                threads[i] = new Thread(() => {
+                    // An exception escaping a raw thread would terminate the test host, so each thread records its own
+                    // failure in its own slot (no two threads share one, so no lock is needed) for the test thread to rethrow.
+                    try {
+                        bodies[index]();
+                    } catch (Exception exception) {
+                        failures[index] = exception;
+                    }
+                }) {
+                    // Background, so a thread stuck at its barrier after a timeout cannot keep the test host alive.
+                    IsBackground = true,
+                    Name = $"{nameof(ConcurrencyTests)} worker {index}",
+                };
+            }
+
+            foreach (var thread in threads)
+                thread.Start();
+            foreach (var thread in threads)
+            {
+                // Join is a full memory barrier, so the failures the thread recorded are visible once it returns true.
+                if (!thread.Join(ThreadTimeout))
+                    throw new AggregateException(
+                        new Exception?[] { new TimeoutException($"{thread.Name} was still running after {ThreadTimeout}.") }
+                            .Concat(failures).OfType<Exception>());
+            }
+
+            var thrown = failures.OfType<Exception>().ToArray();
+            if (thrown.Length > 0)
+                throw new AggregateException(thrown);
         }
 
         /// <summary>Runs 500 steps of an unseeded discrete LunarLander, resetting whenever an episode ends.</summary>

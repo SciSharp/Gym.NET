@@ -12,7 +12,7 @@ using Gym.Wrappers;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using NumSharp;
 
-namespace Gym.Tests.Ported {
+namespace Gym.Tests.Gymnasium {
     /// <summary>
     ///     Gymnasium's core tests, run against Gym.NET: the exit criterion of the core-API phase (P1), covering the
     ///     <c>Env</c> and <c>Wrapper</c> contract, the three single-hook wrappers, Python-name attribute access through a

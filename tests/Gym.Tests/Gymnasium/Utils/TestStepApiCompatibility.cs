@@ -5,7 +5,7 @@ using Gym.Observations;
 using Gym.Utils;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
-namespace Gym.Tests.Ported.Utils {
+namespace Gym.Tests.Gymnasium.Utils {
     /// <summary>
     ///     Gymnasium's step-API compatibility tests, run against <see cref="StepApiCompatibility"/>: the single-env cases
     ///     (<c>is_vector_env=False</c>); the vector cases come with the vector API (P6).

@@ -43,6 +43,7 @@ refs/Gym.NET/
 │
 ├── tests/
 │   ├── Gym.Tests/                 # MSTest test suite for environments, spaces, and multi-instance concurrency
+│   │   └── Gymnasium/             # refs/Gymnasium/tests mirrored one to one (test_core.py → TestCore.cs), namespace Gym.Tests.Gymnasium.* (DR-06)
 │   └── Gym.Tests.Parity/          # Live parity gate: embedded CPython runs refs/Gymnasium, compared byte/pixel-exact (see its CLAUDE.md)
 │
 ├── tools/parity/                  # Parity stack: manifest.json (pins), requirements.txt, setup_venv.{ps1,sh}; audit probes

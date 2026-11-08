@@ -4,7 +4,7 @@ using Gym.Exceptions;
 using Gym.Utils;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
-namespace Gym.Tests.Ported.Utils {
+namespace Gym.Tests.Gymnasium.Utils {
     /// <summary>Gymnasium's seeding tests, run against <see cref="Seeding"/>.</summary>
     /// <remarks>
     ///     <c>test_invalid_seeds</c>' string seed (<c>"test"</c>) cannot reach a typed seed, and <c>test_rng_pickle</c> has

@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Status** | Draft 2, 2026-11-08: the implementation designs are reviewed and approved in [`DESIGN_REVIEW.md`](DESIGN_REVIEW.md) (DR-01…DR-36). **A step starts only when every design it depends on is approved there** |
-| **Progress** | Approved to run on 2026-11-09: R0, P0r, P2, P3, P7, P4, P5, P6 (what is necessary; the rest deferred and listed), then P10 prepared without publishing or pushing. Done: R0.2 (`e4e5215`), R0.1 + R0.3 (`631e0cf`), R0.4 (2026-11-09) |
+| **Progress** | Approved to run on 2026-11-09: R0, P0r, P2, P3, P7, P4, P5, P6 (what is necessary; the rest deferred and listed), then P10 prepared without publishing or pushing. Done: R0.2 (`e4e5215`), R0.1 + R0.3 (`631e0cf`), R0.4 (`0b3dee8`), R0.5 (2026-11-09) |
 | **Scope** | Everything [`GYMNASIUM_PORT_PLAN.md`](GYMNASIUM_PORT_PLAN.md) still has open, up to one 2.0 release that includes Box2D (D21); MuJoCo is postponed out of 2.0 (DR-35) |
 | **Starting point** | branch `journey1` @ `7b7c919`, cut from `feat/numsharp-master-migration` (13 commits ahead of `master`, pushed 2026-09-27, no PR); all work continues on `journey1` until 2.0 (D20) |
 | **Source of truth** | `refs/Gymnasium` @ `v1.4.0` (`8ba8c3a6`) since step R0.4 (D2, 2026-11-09); `9e04324` before |
@@ -213,9 +213,15 @@ Each numbered step is one commit, unless it says otherwise.
   - Re-run every gate. A cell whose verdict moves is reviewed, never re-recorded blindly.
 - **R0.5 Housekeeping.** The two `Task.Run` concurrency tests move to explicit threads (§3.2); `tests/Gym.Tests/Ported`
   becomes `tests/Gym.Tests/Gymnasium`, namespace `Gym.Tests.Gymnasium.*`, mirroring `refs/Gymnasium/tests` (DR-06).
+  *Done 2026-11-09. `ConcurrencyTests` runs each worker on a dedicated background thread with a 2-minute join limit and
+  rethrows every worker's failure as one `AggregateException`. The rename surfaced that the namespace shadows the
+  `Gymnasium` facade class in `Gym.Tests.*`; P3 imports the facade with a `global using static` (DESIGN_REVIEW.md,
+  "Consequences found while implementing").*
 - **Exit:** Debug and Release build with 0 errors on net8.0 and net10.0; unit 212/212 (203 headless + 9 viewer), the
   N-1 tests aside; parity 163/163 gated, the N-1 cells aside; the 14 `[OpenBugs]` cells fail at their documented
-  divergences and nowhere else.
+  divergences and nowhere else. *Met 2026-11-09: 0 errors in both configurations; unit 207/207 headless (the 9 viewer
+  tests not run: they open windows), parity 163/163, `[OpenBugs]` 8 unit (N-1, N-3) and 15 parity (the 14 + the N-1
+  cell), on net8.0 and net10.0, Debug and Release.*
 
 ### P0r P0's rest
 

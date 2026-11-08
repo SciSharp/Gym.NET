@@ -9,7 +9,7 @@ using Gym.Observations;
 using Gym.Spaces;
 using NumSharp;
 
-namespace Gym.Tests.Ported {
+namespace Gym.Tests.Gymnasium {
     /// <summary>
     ///     The default functions of <see cref="GenericTestEnv"/>, the env Gymnasium's tests build with custom reset, step and
     ///     render functions.
