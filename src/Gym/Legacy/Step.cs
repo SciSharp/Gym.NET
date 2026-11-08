@@ -15,7 +15,7 @@ namespace Gym.Legacy {
     ///     the reward is float64, as in <see cref="Gym.Observations.StepResult{TObs}"/>.
     /// </remarks>
     [Obsolete("The 4-tuple step API is legacy: Env<TObs, TAct>.Step returns Gym.Observations.StepResult<TObs> (done is terminated || truncated). Gym.Legacy is removed in 3.0.")]
-    public class Step : IEquatable<Step>, ICloneable {
+    public class Step : IEquatable<Step>, ICloneable, IDisposable {
         /// <summary>The observation after the action.</summary>
         public NDArray Observation { get; set; }
 
@@ -27,6 +27,12 @@ namespace Gym.Legacy {
 
         /// <summary>The diagnostics; <c>"TimeLimit.truncated"</c> is set when the episode ended, true for a truncation.</summary>
         [CanBeNull] public Dict Information { get; set; }
+
+        /// <summary>Releases the observation, which the transition's receiver owns (D19).</summary>
+        public void Dispose() {
+            Observation?.Dispose();
+            GC.SuppressFinalize(this);
+        }
 
         /// <summary>An empty transition, filled through the setters.</summary>
         public Step() { }

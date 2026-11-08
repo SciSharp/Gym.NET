@@ -61,7 +61,7 @@ namespace Gym.Tests.Parity.Tests.Core {
                 using PyObject cartPole = Python.gymnasium.envs.classic_control.CartPoleEnv(render_mode: "rgb_array");
                 return Python.gymnasium.wrappers.OrderEnforcing(cartPole);
             });
-            var dotnet = new OrderEnforcing<NDArray, long>(new CartPoleEnv(renderMode: "rgb_array"));
+            var dotnet = new OrderEnforcing<NDArray, NDArray>(new CartPoleEnv(renderMode: "rgb_array"));
 
             ByteContract.AssertSame("str(env)", Outcome.CapturePython(() => Python.builtins.str(python.Object)), Outcome.Returned(ValueFacts.FromText(dotnet.ToString())));
             ByteContract.AssertSame("has_reset before reset", Outcome.CapturePython(() => Python.gymnasium.wrappers.common.OrderEnforcing.has_reset(python.Object)), Outcome.Returned(ValueFacts.Of(dotnet.HasReset)));
@@ -77,7 +77,7 @@ namespace Gym.Tests.Parity.Tests.Core {
                 using PyObject cartPole = Python.gymnasium.envs.classic_control.CartPoleEnv(render_mode: "rgb_array");
                 return Python.gymnasium.wrappers.OrderEnforcing(cartPole, disable_render_order_enforcing: true);
             });
-            var dotnetLenient = new OrderEnforcing<NDArray, long>(new CartPoleEnv(renderMode: "rgb_array"), disableRenderOrderEnforcing: true);
+            var dotnetLenient = new OrderEnforcing<NDArray, NDArray>(new CartPoleEnv(renderMode: "rgb_array"), disableRenderOrderEnforcing: true);
             ByteContract.AssertSame("render() before reset, render order enforcing disabled", Outcome.CapturePython(() => Python.gymnasium.Env.render(lenient.Object)),
                 Outcome.Capture(() => FrameOf(dotnetLenient.Render())));
         }
@@ -95,7 +95,7 @@ namespace Gym.Tests.Parity.Tests.Core {
                 using PyObject limit = PyConvert.ToPython(3L);
                 return Python.gymnasium.wrappers.TimeLimit(cartPole, limit);
             });
-            var dotnet = new TimeLimit<NDArray, long>(new CartPoleEnv(), 3);
+            var dotnet = new TimeLimit<NDArray, NDArray>(new CartPoleEnv(), 3);
 
             ByteContract.AssertSame("str(env)", Outcome.CapturePython(() => Python.builtins.str(python.Object)), Outcome.Returned(ValueFacts.FromText(dotnet.ToString())));
             ByteContract.AssertSame("step(0) before reset", CapturePythonStep(python.Object, 0), Outcome.Capture(() => TupleOf(dotnet.Step(0))));
@@ -118,7 +118,7 @@ namespace Gym.Tests.Parity.Tests.Core {
                     return Python.gymnasium.wrappers.TimeLimit(cartPole, value);
                 });
                 Assert.IsNotNull(pythonOutcome.Raised, $"Gymnasium must refuse {call}.");
-                ByteContract.AssertSame(call, pythonOutcome, Outcome.Capture(() => new TimeLimit<NDArray, long>(new CartPoleEnv(), limit)));
+                ByteContract.AssertSame(call, pythonOutcome, Outcome.Capture(() => new TimeLimit<NDArray, NDArray>(new CartPoleEnv(), limit)));
             }
         }
 
@@ -139,7 +139,7 @@ namespace Gym.Tests.Parity.Tests.Core {
             using PyRef pythonUnwrapped = PyRef.Of(() => Python.gymnasium.Env.unwrapped(python.Object));
             using PyRef pythonInner = PyRef.Of(() => Python.builtins.getattr(python.Object, "env"));
             var cartPole = new CartPoleEnv();
-            var dotnet = new TimeLimit<NDArray, long>(new OrderEnforcing<NDArray, long>(cartPole), 500);
+            var dotnet = new TimeLimit<NDArray, NDArray>(new OrderEnforcing<NDArray, NDArray>(cartPole), 500);
             IEnv dotnetInner = dotnet.Env;
 
             void GetAttr(string label, PyObject pythonTarget, object dotnetTarget, string name) =>
@@ -266,7 +266,7 @@ namespace Gym.Tests.Parity.Tests.Core {
                 using PyObject limit = PyConvert.ToPython(10L);
                 return Python.gymnasium.wrappers.TimeLimit(cartPole, limit);
             });
-            var dotnetWrapped = new TimeLimit<NDArray, long>(new CartPoleEnv(), 10);
+            var dotnetWrapped = new TimeLimit<NDArray, NDArray>(new CartPoleEnv(), 10);
             ByteContract.AssertSame("wrapped reset(seed=9)", Outcome.CapturePython(() => Python.gymnasium.Env.reset(pythonWrapped.Object, 9)), Outcome.Capture(() => TupleOf(dotnetWrapped.Reset(9))));
             ByteContract.AssertSame("wrapped np_random_seed", Outcome.CapturePython(() => Python.gymnasium.Env.np_random_seed(pythonWrapped.Object)), Outcome.Capture(() => dotnetWrapped.NpRandomSeed));
             PythonRuntime.Run(() => {
@@ -401,7 +401,7 @@ namespace Gym.Tests.Parity.Tests.Core {
                 using PyObject limit = PyConvert.ToPython(500L);
                 return Python.gymnasium.wrappers.TimeLimit(ordered, limit);
             });
-            var dotnetStack = new TimeLimit<NDArray, long>(new OrderEnforcing<NDArray, long>(new CartPoleEnv {
+            var dotnetStack = new TimeLimit<NDArray, NDArray>(new OrderEnforcing<NDArray, NDArray>(new CartPoleEnv {
                 Spec = new EnvSpec("CartPole-v1", "gymnasium.envs.classic_control.cartpole:CartPoleEnv", rewardThreshold: 475.0, orderEnforce: false, disableEnvChecker: true)
             }), 500);
             ByteContract.AssertSame("repr(TimeLimit(OrderEnforcing(env)).spec)", Outcome.CapturePython(() => {
@@ -501,12 +501,12 @@ namespace Gym.Tests.Parity.Tests.Core {
         ///     with the spec <c>make</c> gives the unwrapped env (the wrappers' settings cleared, so each puts its own back).
         /// </summary>
         /// <returns>The stack.</returns>
-        private static TimeLimit<NDArray, long> MadeCartPole() {
+        private static TimeLimit<NDArray, NDArray> MadeCartPole() {
             var cartPole = new CartPoleEnv {
                 Spec = new EnvSpec("CartPole-v1", "gymnasium.envs.classic_control.cartpole:CartPoleEnv", rewardThreshold: 475.0, orderEnforce: false, disableEnvChecker: true,
                     vectorEntryPoint: "gymnasium.envs.classic_control.cartpole:CartPoleVectorEnv")
             };
-            return new TimeLimit<NDArray, long>(new OrderEnforcing<NDArray, long>(cartPole), 500);
+            return new TimeLimit<NDArray, NDArray>(new OrderEnforcing<NDArray, NDArray>(cartPole), 500);
         }
 
         /// <summary>Gymnasium's <c>env.step(action)</c> with an int action, captured.</summary>

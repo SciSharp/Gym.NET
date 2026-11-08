@@ -143,7 +143,8 @@ namespace Gym.Tests.Parity.Pair {
         public void SeedActionSpace(long seed) => _env.ActionSpace.Seed(seed);
 
         /// <inheritdoc />
-        public object SampleAction() => _env.ActionSpace.Sample();
+        /// <exception cref="InvalidOperationException">Thrown when the space samples <c>None</c>, which no action space of an env in the suite does.</exception>
+        public object SampleAction() => _env.ActionSpace.Sample() ?? throw new InvalidOperationException($"{Name}'s action space sampled None.");
 
         /// <summary>Closes the env.</summary>
         public void Dispose() => _env.Dispose();

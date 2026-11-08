@@ -38,11 +38,10 @@ namespace Gym.Tests.Parity.Tests.Envs {
         }
 
         /// <summary>
-        ///     The continuous action space is <c>Box(-1, 1, (2,), float32)</c> in Gymnasium: two throttles. Gym.NET's is 0-d
-        ///     (B-20), so its samples cannot drive the lander.
+        ///     The continuous action space is <c>Box(-1, 1, (2,), float32)</c> in Gymnasium: two throttles. Gym.NET's is the
+        ///     same since P2 (it was 0-d, B-20, so its samples could not drive the lander).
         /// </summary>
         [TestMethod]
-        [OpenBugs("B-20")]
         public void GymNet_ContinuousActionSpace_MatchesGymnasium() {
             var kwargs = new Dictionary<string, object?> { ["continuous"] = true };
             using PyRef python = PyRef.Of(() => CartPoleLiveParityTests.MadeSpace("LunarLander-v3", Python.gymnasium.Env.action_space, kwargs));

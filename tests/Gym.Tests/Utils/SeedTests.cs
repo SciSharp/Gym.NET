@@ -113,14 +113,20 @@ namespace Gym.Tests.Utils {
             }
         }
 
-        /// <summary>A constructor seed of -1 still means "no seed"; any other negative constructor seed is rejected.</summary>
+        /// <summary>
+        ///     A constructor seed is Gymnasium's: <see langword="null"/> (Python's <c>None</c>) means no seed, and every negative
+        ///     seed, -1 included, is rejected with Gymnasium's message. Gym.NET's earlier spaces read -1 as "no seed"; P2's
+        ///     <see cref="SpaceSeed"/> parameter has <c>None</c> for that.
+        /// </summary>
         [TestMethod]
-        public void ConstructorSeed_MinusOneMeansUnseeded_OtherNegativesThrow()
+        public void ConstructorSeed_NoneMeansUnseeded_EveryNegativeThrows()
         {
-            new Discrete(4, seed: -1);
-            new Box(-1f, 1f, new Shape(2), np.float32, seed: -1);
+            using (var unseeded = new Discrete(4, seed: null))
+                Assert.IsNull(unseeded.NpRandomOrNull, "No seed creates no generator until the first draw.");
+            using (new Box(-1f, 1f, new Shape(2), np.float32, seed: null)) { }
+            AssertSeedRejected(() => new Discrete(4, seed: -1), -1);
             AssertSeedRejected(() => new Discrete(4, seed: -2), -2);
-            AssertSeedRejected(() => new Box(-1f, 1f, new Shape(2), np.float32, seed: -2), -2);
+            AssertSeedRejected(() => new Box(-1f, 1f, new Shape(2), np.float32, seed: -1), -1);
         }
 
         /// <summary>
@@ -138,7 +144,7 @@ namespace Gym.Tests.Utils {
             var twinGenerator = Seeding.NpRandom(1).Rng;
             twinGenerator.integers(-9999, 9999).Dispose();
             twinGenerator.integers(-9999, 9999).Dispose();
-            var twin = new Discrete(4, random_state: twinGenerator);
+            var twin = new Discrete(4, seed: twinGenerator);
 
             env.Reset(seed: 7).Observation.Dispose();
 

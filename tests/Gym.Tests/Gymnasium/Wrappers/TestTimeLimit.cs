@@ -23,7 +23,7 @@ namespace Gym.Tests.Gymnasium.Wrappers {
         /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/tests/wrappers/test_time_limit.py#L10">tests/wrappers/test_time_limit.py (test_time_limit_reset_info)</see>.</remarks>
         [TestMethod]
         public void TestTimeLimitResetInfo() {
-            var env = new TimeLimit<NDArray, long>(MakeCartPole(), 100);
+            var env = new TimeLimit<NDArray, NDArray>(MakeCartPole(), 100);
             var obSpace = env.ObservationSpace;
             var (obs, info) = env.Reset();
             Assert.IsTrue(obSpace.Contains(obs));
@@ -81,15 +81,15 @@ namespace Gym.Tests.Gymnasium.Wrappers {
         /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/tests/wrappers/test_time_limit.py#L62">tests/wrappers/test_time_limit.py (test_max_episode_steps)</see>.</remarks>
         [TestMethod]
         public void TestMaxEpisodeSteps() {
-            var env = new TimeLimit<NDArray, long>(MakeCartPole(), 500);
+            var env = new TimeLimit<NDArray, NDArray>(MakeCartPole(), 500);
 
             Assert.AreEqual(500L, env.Spec!.MaxEpisodeSteps);
-            Assert.AreEqual(10L, new TimeLimit<NDArray, long>(env, maxEpisodeSteps: 10).Spec!.MaxEpisodeSteps);
+            Assert.AreEqual(10L, new TimeLimit<NDArray, NDArray>(env, maxEpisodeSteps: 10).Spec!.MaxEpisodeSteps);
 
-            var valueError = Assert.ThrowsExactly<ValueError>(() => new TimeLimit<NDArray, long>(env, maxEpisodeSteps: -1));
+            var valueError = Assert.ThrowsExactly<ValueError>(() => new TimeLimit<NDArray, NDArray>(env, maxEpisodeSteps: -1));
             StringAssert.Contains(valueError.Message, "Expect the `max_episode_steps` to be positive, actually: -1");
 
-            var typeError = Assert.ThrowsExactly<TypeError>(() => new TimeLimit<NDArray, long>(env, maxEpisodeSteps: null));
+            var typeError = Assert.ThrowsExactly<TypeError>(() => new TimeLimit<NDArray, NDArray>(env, maxEpisodeSteps: null));
             StringAssert.Contains(typeError.Message, "Expect the `max_episode_steps` to be an integer");
 
             env.Close();
@@ -101,12 +101,12 @@ namespace Gym.Tests.Gymnasium.Wrappers {
         ///     <c>gym.make("CartPole-v1", disable_env_checker=True)</c> beneath its <c>TimeLimit</c>.
         /// </summary>
         /// <returns>The order-enforced CartPole.</returns>
-        internal static OrderEnforcing<NDArray, long> MakeCartPole() {
+        internal static OrderEnforcing<NDArray, NDArray> MakeCartPole() {
             var cartPole = new CartPoleEnv {
                 Spec = new EnvSpec("CartPole-v1", "Gym.Environments.Envs.Classic:CartPoleEnv", rewardThreshold: 475.0, maxEpisodeSteps: null, orderEnforce: false,
                     disableEnvChecker: true)
             };
-            return new OrderEnforcing<NDArray, long>(cartPole);
+            return new OrderEnforcing<NDArray, NDArray>(cartPole);
         }
     }
 }

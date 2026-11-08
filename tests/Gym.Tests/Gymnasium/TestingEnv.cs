@@ -108,15 +108,16 @@ namespace Gym.Tests.Gymnasium {
             Func<GenericTestEnv, object?, StepResult<object?>>? stepFunc, Func<GenericTestEnv, RenderResult>? renderFunc,
             Metadata? metadata = null, string? renderMode = null, EnvSpec? spec = null) {
             if (ReferenceEquals(actionSpace, DefaultSpace))
-                ActionSpace = new Box(0f, 1f, new Shape(1));
+                ActionSpace = new ObjectSpace(new Box(0, 1, new Shape(1)));
             else if (actionSpace is not null)
-                ActionSpace = actionSpace;
+                // Through the untyped view, which wraps any space for this Env<object?, object?>.
+                ((IEnv)this).ActionSpace = actionSpace;
             // If actionSpace is null, don't set the attribute (for testing error cases).
 
             if (ReferenceEquals(observationSpace, DefaultSpace))
-                ObservationSpace = new Box(0f, 1f, new Shape(1));
+                ObservationSpace = new ObjectSpace(new Box(0, 1, new Shape(1)));
             else if (observationSpace is not null)
-                ObservationSpace = observationSpace;
+                ((IEnv)this).ObservationSpace = observationSpace;
 
             _resetFunc = resetFunc;
             _stepFunc = stepFunc;
@@ -164,24 +165,24 @@ namespace Gym.Tests.Gymnasium {
 
         /// <summary>A sentinel type standing for "the default space", never sampled.</summary>
         /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/tests/testing_env.py#L20">tests/testing_env.py (DefaultTestSpace)</see>.</remarks>
-        private sealed class DefaultTestSpace : Space {
-            /// <summary>The sentinel.</summary>
-            public DefaultTestSpace() : base(Shape.Scalar, np.float32) { }
+        private sealed class DefaultTestSpace : Space<NDArray> {
+            /// <summary>The sentinel: a float32 scalar shape, never sampled.</summary>
+            public DefaultTestSpace() : base(NumSharp.Shape.Scalar, np.float32, null) { }
+
+            /// <summary>The sentinel does not flatten.</summary>
+            public override bool IsNpFlattenable => false;
 
             /// <summary>Never called: the sentinel is replaced before use.</summary>
             /// <param name="mask">Ignored.</param>
+            /// <param name="probability">Ignored.</param>
             /// <returns>Nothing; always throws.</returns>
             /// <exception cref="NotSupportedException">Always.</exception>
-            public override NDArray Sample(NDArray? mask = null) => throw new NotSupportedException("DEFAULT_SPACE is a sentinel.");
+            public override NDArray Sample(object? mask = null, object? probability = null) => throw new NotSupportedException("DEFAULT_SPACE is a sentinel.");
 
             /// <summary>The sentinel contains nothing.</summary>
-            /// <param name="ndArray">Ignored.</param>
+            /// <param name="x">Ignored.</param>
             /// <returns><see langword="false"/>.</returns>
-            public override bool Contains(object ndArray) => false;
-
-            /// <summary>Nothing to seed.</summary>
-            /// <param name="seed">Ignored.</param>
-            public override void Seed(BigInteger seed) { }
+            public override bool Contains(object? x) => false;
         }
     }
 }

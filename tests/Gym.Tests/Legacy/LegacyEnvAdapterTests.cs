@@ -51,7 +51,7 @@ namespace Gym.Tests.Legacy {
             Assert.AreEqual(false, step.Information!["TimeLimit.truncated"]);
             Assert.AreEqual(1.0, step.Reward, "The reward stays float64.");
 
-            var truncating = new LegacyEnvAdapter(new TimeLimit<NDArray, long>(new CartPoleEnv(), 2));
+            var truncating = new LegacyEnvAdapter(new TimeLimit<NDArray, NDArray>(new CartPoleEnv(), 2));
             truncating.Seed(0);
             truncating.Reset().Dispose();
             step = truncating.Step(0);

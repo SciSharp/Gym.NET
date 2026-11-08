@@ -156,7 +156,7 @@ namespace Gym.Environments.Envs.Aether
     ///     (the physics engine, v2 geometry and observation bounds, the draw order), the live parity suite keeps the gaps as
     ///     open bugs (F6, B-17, B-18). Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/envs/box2d/lunar_lander.py#L79">gymnasium/envs/box2d/lunar_lander.py</see>.
     /// </remarks>
-    public class LunarLanderEnv : Env<NDArray, object>
+    public class LunarLanderEnv : Env<NDArray, NDArray>
     {
         private IEnvironmentViewerFactoryDelegate _viewerFactory;
         private IEnvViewer _viewer;
@@ -313,6 +313,8 @@ namespace Gym.Environments.Envs.Aether
 
         internal class ContactDetector
         {
+            /// <summary>The env whose lander the detector watches: a back-reference the env owns, never this detector's to release.</summary>
+            [NDBorrowed]
             private LunarLanderEnv _env { get; set; }
 
             public ContactDetector(LunarLanderEnv env)
@@ -463,11 +465,12 @@ namespace Gym.Environments.Envs.Aether
             ObservationSpace = new Box(low, high);
             if (ContinuousMode)
             {
-                ActionSpace = new Box(-1f, 1f, random_state : random_state);
+                // Gymnasium's Box(-1, +1, (2,), dtype=np.float32); a null random_state is seed=None (SpaceSeed).
+                ActionSpace = new Box(-1, 1, shape: new NumSharp.Shape(2L), seed: random_state);
             }
             else
             {
-                ActionSpace = new Discrete(4, random_state: random_state);
+                ActionSpace = new Discrete(4, seed: random_state);
             }
 
         }
@@ -684,7 +687,7 @@ namespace Gym.Environments.Envs.Aether
         ///     space samples today (B-20), or a single throttle. The messages are NumPy's for <c>action[0]</c> and
         ///     <c>action[1]</c>.
         /// </exception>
-        public override StepResult<NDArray> Step(object action)
+        public override StepResult<NDArray> Step(NDArray action)
         {
             long i_action = -1;
             NDArray c_action = null;
@@ -694,7 +697,7 @@ namespace Gym.Environments.Envs.Aether
             LunarLanderDiscreteActions l_action = LunarLanderDiscreteActions.Nothing;
             if (ContinuousMode)
             {
-                c_action = (NDArray)action;
+                c_action = action;
             }
             else
             {

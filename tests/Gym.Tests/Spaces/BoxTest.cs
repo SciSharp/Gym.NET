@@ -14,34 +14,36 @@ namespace Gym.Tests.Spaces
         [TestMethod]
         public void TestBoxBoundedTest()
         {
-            Box box = new Box(-5.0f, 5.0f, np.float32);
+            Box box = new Box(-5.0f, 5.0f, dtype: np.float32);
             Assert.IsTrue(box.IsBounded(Gym.Spaces.BoundedMannerEnum.Both), "Box should be bounded at both boundaries.");
             
-            box = new Box(-np.inf, 5.0f, np.float32);
+            box = new Box(-np.inf, 5.0f, dtype: np.float32);
             Assert.IsFalse(box.IsBounded(Gym.Spaces.BoundedMannerEnum.Below), "Box should be unbound at the low bound.");
             Assert.IsTrue(box.IsBounded(Gym.Spaces.BoundedMannerEnum.Above), "Box should be bounded at the high bound.");
             Assert.IsFalse(box.IsBounded(Gym.Spaces.BoundedMannerEnum.Both), "Box should not be bounded.");
 
-            box = new Box(5.0f, np.inf, np.float32);
+            box = new Box(5.0f, np.inf, dtype: np.float32);
             Assert.IsFalse(box.IsBounded(Gym.Spaces.BoundedMannerEnum.Above), "Box should be unbound at the high bound.");
             Assert.IsTrue(box.IsBounded(Gym.Spaces.BoundedMannerEnum.Below), "Box should be bounded at the low bound.");
             Assert.IsFalse(box.IsBounded(Gym.Spaces.BoundedMannerEnum.Both), "Box should not be bounded.");
 
-            box = new Box(-np.inf, np.inf, np.float32);
+            box = new Box(-np.inf, np.inf, dtype: np.float32);
             Assert.IsFalse(box.IsBounded(Gym.Spaces.BoundedMannerEnum.Above), "Box should be unbound at the high bound.");
             Assert.IsFalse(box.IsBounded(Gym.Spaces.BoundedMannerEnum.Below), "Box should be unbound at the low bound.");
             Assert.IsFalse(box.IsBounded(Gym.Spaces.BoundedMannerEnum.Both), "Box should not be bounded.");
         }
 
         /// <summary>
-        ///     A 0-d box samples a 0-d value inside its bounds. The explicit <c>(float)</c> is required by NumSharp, whose
-        ///     array-to-scalar conversions are explicit and accept 0-d arrays only (NumPy's <c>float(arr)</c>).
+        ///     A box of scalar bounds and no shape has shape <c>(1,)</c>, as in Gymnasium, and samples inside its bounds.
+        ///     Gym.NET's earlier box was 0-d here.
         /// </summary>
         [TestMethod]
         public void TestBoxBoundedSampling()
         {
-            Box box = new Box(-5.0, 5.0);
-            float sample = (float)box.Sample(null);
+            using Box box = new Box(-5.0, 5.0);
+            CollectionAssert.AreEqual(new long[] { 1 }, box.Shape.dimensions);
+            using NDArray drawn = box.Sample();
+            float sample = drawn.GetSingle(0);
             Assert.IsTrue(sample >= -5.0 && sample <= 5.0, "Box sampling should be on the range [-5.0,5.0]");
         }
 
@@ -70,7 +72,7 @@ namespace Gym.Tests.Spaces
         {
             var low = np.array(new[] { float.NegativeInfinity, 0f, float.NegativeInfinity, -1f });
             var high = np.array(new[] { float.PositiveInfinity, float.PositiveInfinity, 0f, 1f });
-            var box = new Box(low, high, np.float32, seed: 11);
+            var box = new Box(low, high, dtype: np.float32, seed: 11);
 
             for (int i = 0; i < 100; i++)
             {
@@ -188,13 +190,17 @@ namespace Gym.Tests.Spaces
             Assert.AreEqual("Box low.shape and high.shape don't match, low.shape=(3,), high.shape=(2,)", error.Message);
         }
 
-        /// <summary>A box cannot be sampled under a mask, as in Gymnasium.</summary>
+        /// <summary>A box cannot be sampled under a mask or a probability mask: Gymnasium's <c>gymnasium.error.Error</c>, with its message.</summary>
         [TestMethod]
         public void Sample_WithMask_Throws()
         {
-            var box = new Box(-1f, 1f, new Shape(3), np.float32);
+            using var box = new Box(-1f, 1f, new Shape(3), np.float32);
+            using NDArray ones = np.ones(new Shape(3));
 
-            Assert.ThrowsExactly<NotSupportedException>(() => box.Sample(np.ones(new Shape(3))));
+            Assert.AreEqual("Box.sample cannot be provided a mask, actual value: [1. 1. 1.]",
+                Assert.ThrowsExactly<Gym.Exceptions.Error>(() => box.Sample(ones)).Message);
+            Assert.AreEqual("Box.sample cannot be provided a probability mask, actual value: [1. 1. 1.]",
+                Assert.ThrowsExactly<Gym.Exceptions.Error>(() => box.Sample(probability: ones)).Message);
         }
     }
 }

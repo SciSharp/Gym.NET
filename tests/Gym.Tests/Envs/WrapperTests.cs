@@ -27,7 +27,7 @@ namespace Gym.Tests.Envs {
         /// </summary>
         [TestMethod]
         public void Spec_PropagatesUpTheStack() {
-            var made = new TimeLimit<NDArray, long>(new OrderEnforcing<NDArray, long>(new CartPoleEnv { Spec = MadeSpec() }), 500);
+            var made = new TimeLimit<NDArray, NDArray>(new OrderEnforcing<NDArray, NDArray>(new CartPoleEnv { Spec = MadeSpec() }), 500);
 
             var plain = new PlainWrapper(made);
             EnvSpec spec = plain.Spec!;
@@ -38,9 +38,9 @@ namespace Gym.Tests.Envs {
             Assert.AreEqual(0, made.Spec!.AdditionalWrappers.Count, "The wrapped env's spec is a copy, untouched.");
             Assert.AreSame(spec, plain.Spec, "The spec is cached (_cached_spec).");
 
-            Assert.AreEqual(7L, new TimeLimit<NDArray, long>(made, 7).Spec!.MaxEpisodeSteps);
-            Assert.AreEqual(0, new OrderEnforcing<NDArray, long>(made).Spec!.AdditionalWrappers.Count);
-            Assert.IsNull(new PlainWrapper(new TimeLimit<NDArray, long>(new CartPoleEnv(), 5)).Spec, "No spec beneath, no spec.");
+            Assert.AreEqual(7L, new TimeLimit<NDArray, NDArray>(made, 7).Spec!.MaxEpisodeSteps);
+            Assert.AreEqual(0, new OrderEnforcing<NDArray, NDArray>(made).Spec!.AdditionalWrappers.Count);
+            Assert.IsNull(new PlainWrapper(new TimeLimit<NDArray, NDArray>(new CartPoleEnv(), 5)).Spec, "No spec beneath, no spec.");
         }
 
         /// <summary>A wrapper that records its arguments puts them in its spec, without <c>env</c>.</summary>
@@ -51,14 +51,14 @@ namespace Gym.Tests.Envs {
             WrapperSpec wrapperSpec = recording.Spec!.AdditionalWrappers[0];
             Assert.AreEqual("{'scale': 2.5}", wrapperSpec.Kwargs!.ToString());
             Assert.IsTrue(recording.SavedKwargs.ContainsKey("env"), "The saved arguments keep env; only the spec drops it.");
-            Assert.AreEqual("{'max_episode_steps': 10}", new TimeLimit<NDArray, long>(new CartPoleEnv(), 10).SavedKwargs.ToString());
-            Assert.AreEqual("{'disable_render_order_enforcing': False}", new OrderEnforcing<NDArray, long>(new CartPoleEnv()).SavedKwargs.ToString());
+            Assert.AreEqual("{'max_episode_steps': 10}", new TimeLimit<NDArray, NDArray>(new CartPoleEnv(), 10).SavedKwargs.ToString());
+            Assert.AreEqual("{'disable_render_order_enforcing': False}", new OrderEnforcing<NDArray, NDArray>(new CartPoleEnv()).SavedKwargs.ToString());
         }
 
         /// <summary><c>spec</c> and <c>render_mode</c> are read-only on a wrapper, with Python's messages.</summary>
         [TestMethod]
         public void ReadOnlyProperties_RaiseAttributeError() {
-            var wrapper = new TimeLimit<NDArray, long>(new CartPoleEnv(), 5);
+            var wrapper = new TimeLimit<NDArray, NDArray>(new CartPoleEnv(), 5);
 
             Assert.AreEqual("property 'spec' of 'TimeLimit' object has no setter", Assert.ThrowsExactly<AttributeError>(() => wrapper.Spec = null).Message);
             Assert.AreEqual("property 'render_mode' of 'TimeLimit' object has no setter", Assert.ThrowsExactly<AttributeError>(() => PyAttributes.SetAttr(wrapper, "render_mode", "human")).Message);
@@ -72,7 +72,7 @@ namespace Gym.Tests.Envs {
         [TestMethod]
         public void Descriptions_And_Forwarding() {
             var cartPole = new CartPoleEnv();
-            var env = new TimeLimit<NDArray, long>(new OrderEnforcing<NDArray, long>(cartPole), 10);
+            var env = new TimeLimit<NDArray, NDArray>(new OrderEnforcing<NDArray, NDArray>(cartPole), 10);
 
             Assert.AreEqual("<TimeLimit<OrderEnforcing<CartPoleEnv instance>>>", env.ToString());
             Assert.AreEqual("TimeLimit", env.ClassName());
@@ -108,7 +108,7 @@ namespace Gym.Tests.Envs {
         /// <summary>A wrapper whose types differ from its env's must convert; the default pass-through says so instead of corrupting data.</summary>
         [TestMethod]
         public void PassThrough_OfMismatchedTypes_Throws() {
-            var mismatched = new Wrapper<string, long, NDArray, long>(new CartPoleEnv());
+            var mismatched = new Wrapper<string, long, NDArray, NDArray>(new CartPoleEnv());
 
             var error = Assert.ThrowsExactly<InvalidCastException>(() => mismatched.Reset(seed: 0));
             StringAssert.Contains(error.Message, "override Step and Reset");
@@ -117,7 +117,7 @@ namespace Gym.Tests.Envs {
         /// <summary>A missing env raises Gymnasium's <c>TypeError</c>.</summary>
         [TestMethod]
         public void NullEnv_RaisesTypeError() {
-            Assert.AreEqual("Expected env to be a `gymnasium.Env` but got <class 'NoneType'>", Assert.ThrowsExactly<TypeError>(() => new Wrapper<NDArray, long>(null!)).Message);
+            Assert.AreEqual("Expected env to be a `gymnasium.Env` but got <class 'NoneType'>", Assert.ThrowsExactly<TypeError>(() => new Wrapper<NDArray, NDArray>(null!)).Message);
         }
 
         /// <summary>The <c>make</c>-style spec of the unwrapped env: the wrappers' settings cleared, so each wrapper puts its own back.</summary>
@@ -125,18 +125,18 @@ namespace Gym.Tests.Envs {
         private static EnvSpec MadeSpec() => new("CartPole-v1", "Gym.Environments.Envs.Classic:CartPoleEnv", rewardThreshold: 475.0, orderEnforce: false, disableEnvChecker: true);
 
         /// <summary>A wrapper that changes nothing and records no arguments.</summary>
-        private sealed class PlainWrapper : Wrapper<NDArray, long> {
+        private sealed class PlainWrapper : Wrapper<NDArray, NDArray> {
             /// <summary>Wraps <paramref name="env"/>.</summary>
             /// <param name="env">The env.</param>
-            public PlainWrapper(Env<NDArray, long> env) : base(env) { }
+            public PlainWrapper(Env<NDArray, NDArray> env) : base(env) { }
         }
 
         /// <summary>A wrapper that records its arguments, including <c>env</c>, as some Gymnasium wrappers do.</summary>
-        private sealed class RecordingWrapper : Wrapper<NDArray, long>, IRecordConstructorArgs {
+        private sealed class RecordingWrapper : Wrapper<NDArray, NDArray>, IRecordConstructorArgs {
             /// <summary>Wraps <paramref name="env"/>.</summary>
             /// <param name="env">The env.</param>
             /// <param name="scale">An argument to record.</param>
-            public RecordingWrapper(Env<NDArray, long> env, double scale) : base(env) {
+            public RecordingWrapper(Env<NDArray, NDArray> env, double scale) : base(env) {
                 SavedKwargs = RecordConstructorArgs.Record(new Info { ["env"] = env, ["scale"] = scale }, disableDeepcopy: true);
             }
 

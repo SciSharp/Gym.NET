@@ -137,8 +137,9 @@ namespace Gym.Tests.Envs {
             ((NDArray)env.Reset().Observation!).Dispose();
             for (int i = 0; i < 2000; i++)
             {
-                env.ObservationSpace.Sample().Dispose();
-                using NDArray action = env.ActionSpace.Sample();
+                // Through IEnv the spaces are untyped: their samples are NDArrays, boxed.
+                ((NDArray)env.ObservationSpace.Sample()!).Dispose();
+                using NDArray action = (NDArray)env.ActionSpace.Sample()!;
                 var step = env.Step(action);
                 ((NDArray)step.Observation!).Dispose();
                 if (step.Terminated || step.Truncated)

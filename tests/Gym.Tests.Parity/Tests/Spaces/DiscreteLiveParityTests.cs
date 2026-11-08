@@ -123,10 +123,9 @@ namespace Gym.Tests.Parity.Tests.Spaces {
 
         /// <summary>
         ///     Gymnasium also requires <c>np.can_cast(x.dtype, self.dtype)</c>, so an in-range <c>np.uint64</c> is not a member of
-        ///     an int64 space; Gym.NET accepts it.
+        ///     an int64 space, nor in Gym.NET's since P2.3 (an open cell until then).
         /// </summary>
         [TestMethod]
-        [OpenBugs("P2")]
         public void Contains_RequiresCastableDtypes_LikeGymnasium() {
             using PyRef python = PyRef.Of(() => Python.gymnasium.spaces.Discrete(3, start: 5));
             var dotnet = new Discrete(3, start: 5);
@@ -149,9 +148,8 @@ namespace Gym.Tests.Parity.Tests.Spaces {
             ByteContract.AssertSame($"{constructor}.dtype", Outcome.CapturePython(() => Python.gymnasium.spaces.space.Space.dtype(python.Object)), Outcome.Returned(ValueFacts.Of(dotnet.DType)));
         }
 
-        /// <summary>Gymnasium's <c>Discrete</c> is 0-d, <c>shape == ()</c>; Gym.NET's is <c>(n,)</c> (B-03).</summary>
+        /// <summary>Gymnasium's <c>Discrete</c> is 0-d, <c>shape == ()</c>, and Gym.NET's is too since P2.3 (it was <c>(n,)</c>, B-03).</summary>
         [TestMethod]
-        [OpenBugs("B-03")]
         public void Shape_MatchesGymnasium() {
             using PyRef python = PyRef.Of(() => Python.gymnasium.spaces.Discrete(4));
             var dotnet = new Discrete(4);
@@ -165,9 +163,8 @@ namespace Gym.Tests.Parity.Tests.Spaces {
             ByteContract.AssertSame("repr(Discrete(4))", Outcome.CapturePython(() => Python.builtins.repr(python.Object)), Outcome.Returned(ValueFacts.FromText(new Discrete(4).ToString())));
         }
 
-        /// <summary>Gymnasium's <c>repr</c> names a non-zero start (<c>Discrete(3, start=5)</c>); Gym.NET's <c>ToString()</c> does not.</summary>
+        /// <summary>Gymnasium's <c>repr</c> names a non-zero start (<c>Discrete(3, start=5)</c>), and so does Gym.NET's <c>ToString()</c> since P2.3.</summary>
         [TestMethod]
-        [OpenBugs("P2")]
         public void Repr_WithAStart_MatchesGymnasium() {
             using PyRef python = PyRef.Of(() => Python.gymnasium.spaces.Discrete(3, start: 5));
             ByteContract.AssertSame("repr(Discrete(3, start=5))", Outcome.CapturePython(() => Python.builtins.repr(python.Object)), Outcome.Returned(ValueFacts.FromText(new Discrete(3, start: 5).ToString())));
@@ -175,10 +172,9 @@ namespace Gym.Tests.Parity.Tests.Spaces {
 
         /// <summary>
         ///     Gymnasium rejects a non-positive <c>n</c> with <c>ValueError("n (counts) have to be positive, actual value: 0")</c>;
-        ///     Gym.NET constructs the space (B-10's counterpart for <c>Discrete</c>).
+        ///     Gym.NET raises the same error since P2.3 (it constructed the space before, B-10's counterpart for <c>Discrete</c>).
         /// </summary>
         [TestMethod]
-        [OpenBugs("B-10", "P2")]
         public void Constructor_RejectsANonPositiveN_LikeGymnasium() {
             ByteContract.AssertSame("Discrete(0)", Outcome.CapturePython(() => Python.gymnasium.spaces.Discrete(0)), Outcome.Capture(() => new Discrete(0)));
         }

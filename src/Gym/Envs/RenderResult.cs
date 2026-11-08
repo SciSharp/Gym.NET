@@ -22,12 +22,19 @@ namespace Gym.Envs {
     ///     a depth frame (both <c>ndarray</c>) is the render mode's; it is kept here so consumers need not look it up.
     ///     </para>
     /// </remarks>
-    public abstract class RenderResult : IEquatable<RenderResult> {
+    public abstract class RenderResult : IEquatable<RenderResult>, IDisposable {
         /// <summary>Only the nested cases derive from this class, so a switch over them is exhaustive.</summary>
         private RenderResult() { }
 
         /// <summary>The single <see cref="NoneResult"/> value: Python's <c>None</c> from <c>render()</c>.</summary>
         public static RenderResult None { get; } = new NoneResult();
+
+        /// <summary>
+        ///     Releases the frame arrays this result carries (D19): <c>using var frame = env.Render();</c>. A frame is the
+        ///     caller's from <c>render()</c> on, so disposing it never affects the env; <see cref="None"/> and
+        ///     <see cref="Ansi"/> hold no arrays, and disposing them does nothing.
+        /// </summary>
+        public virtual void Dispose() { }
 
         /// <summary>Whether this is <see cref="None"/>, what <c>render()</c> returns in <c>human</c> mode or without a render mode.</summary>
         public bool IsNone => this is NoneResult;
@@ -96,6 +103,9 @@ namespace Gym.Envs {
             /// <summary>Describes the frame by shape and dtype, not by its pixels.</summary>
             /// <returns>For example <c>Rgb((400, 600, 3), uint8)</c>.</returns>
             public override string ToString() => $"Rgb({Frame.Shape}, {Frame.dtype.name})";
+
+            /// <summary>Releases the frame.</summary>
+            public override void Dispose() => Frame.Dispose();
         }
 
         /// <summary>A <c>depth_array</c> frame: a <c>(height, width)</c> float array of depths (MuJoCo).</summary>
@@ -119,6 +129,9 @@ namespace Gym.Envs {
             /// <summary>Describes the frame by shape and dtype.</summary>
             /// <returns>For example <c>Depth((480, 480), float32)</c>.</returns>
             public override string ToString() => $"Depth({Frame.Shape}, {Frame.dtype.name})";
+
+            /// <summary>Releases the frame.</summary>
+            public override void Dispose() => Frame.Dispose();
         }
 
         /// <summary>An <c>rgbd_tuple</c> frame: the RGB frame and the depth frame of the same view (MuJoCo), Python's <c>(rgb, depth)</c>.</summary>
@@ -147,6 +160,12 @@ namespace Gym.Envs {
             /// <summary>Describes both frames by shape and dtype.</summary>
             /// <returns>The text.</returns>
             public override string ToString() => $"RgbDepth({RgbFrame.Shape}, {RgbFrame.dtype.name}; {DepthFrame.Shape}, {DepthFrame.dtype.name})";
+
+            /// <summary>Releases both frames.</summary>
+            public override void Dispose() {
+                RgbFrame.Dispose();
+                DepthFrame.Dispose();
+            }
         }
 
         /// <summary>An <c>ansi</c> frame: text, possibly with newlines and ANSI escape sequences (toy_text).</summary>
@@ -210,6 +229,12 @@ namespace Gym.Envs {
             /// <summary>Describes the list by its length.</summary>
             /// <returns>For example <c>Frames(3)</c>.</returns>
             public override string ToString() => $"Frames({Items.Count})";
+
+            /// <summary>Releases every collected frame.</summary>
+            public override void Dispose() {
+                foreach (RenderResult item in Items)
+                    item.Dispose();
+            }
         }
     }
 }

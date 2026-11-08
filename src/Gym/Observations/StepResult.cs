@@ -32,7 +32,14 @@ namespace Gym.Observations {
     ///     <see cref="double.Equals(double)"/>, which, unlike Python's <c>==</c>, treats NaN as equal to NaN so equality stays
     ///     reflexive. Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/core.py#L79">gymnasium/core.py (Env.step)</see>.
     /// </remarks>
-    public readonly record struct StepResult<TObs>(TObs Observation, double Reward, bool Terminated, bool Truncated, Info Info) {
+    public readonly record struct StepResult<TObs>(TObs Observation, double Reward, bool Terminated, bool Truncated, Info Info) : INDArrayCarrier {
+        /// <summary>
+        ///     Hands the observation's and the info's arrays to an <see cref="NDScope"/> (D19): an <c>[NDScoped]</c> method that
+        ///     returns a transition keeps them alive while its temporaries are reclaimed.
+        /// </summary>
+        /// <param name="scope">The scope the arrays leave through.</param>
+        void INDArrayCarrier.YieldTo(NDScope scope) => ResultEquality.Yield(scope, Observation, Info);
+
         /// <summary>
         ///     Exact equality (see the type's remarks): observations, rewards, flags and infos all equal. Replaces the
         ///     compiler's member-wise equality, which would call <see cref="NDArray"/>'s broadcasting <c>Equals</c>.
@@ -63,7 +70,11 @@ namespace Gym.Observations {
     ///     Equality follows <see cref="StepResult{TObs}"/>'s: exact for array observations, Python's <c>==</c> otherwise.
     ///     Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/core.py#L124">gymnasium/core.py (Env.reset)</see>.
     /// </remarks>
-    public readonly record struct ResetResult<TObs>(TObs Observation, Info Info) {
+    public readonly record struct ResetResult<TObs>(TObs Observation, Info Info) : INDArrayCarrier {
+        /// <summary>Hands the observation's and the info's arrays to an <see cref="NDScope"/>, as <see cref="StepResult{TObs}"/> does.</summary>
+        /// <param name="scope">The scope the arrays leave through.</param>
+        void INDArrayCarrier.YieldTo(NDScope scope) => ResultEquality.Yield(scope, Observation, Info);
+
         /// <summary>Exact equality of the observations and Python equality of the infos (see the remarks).</summary>
         /// <param name="other">The other result.</param>
         /// <returns><see langword="true"/> when both are equal.</returns>
@@ -87,7 +98,11 @@ namespace Gym.Observations {
     /// <remarks>
     ///     Equality follows <see cref="StepResult{TObs}"/>'s. Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/utils/step_api_compatibility.py#L11">gymnasium/utils/step_api_compatibility.py (DoneStepType)</see>.
     /// </remarks>
-    public readonly record struct DoneStepResult<TObs>(TObs Observation, double Reward, bool Done, Info Info) {
+    public readonly record struct DoneStepResult<TObs>(TObs Observation, double Reward, bool Done, Info Info) : INDArrayCarrier {
+        /// <summary>Hands the observation's and the info's arrays to an <see cref="NDScope"/>, as <see cref="StepResult{TObs}"/> does.</summary>
+        /// <param name="scope">The scope the arrays leave through.</param>
+        void INDArrayCarrier.YieldTo(NDScope scope) => ResultEquality.Yield(scope, Observation, Info);
+
         /// <summary>Exact equality (see <see cref="StepResult{TObs}"/>'s remarks).</summary>
         /// <param name="other">The other transition.</param>
         /// <returns><see langword="true"/> when the transitions are equal.</returns>
@@ -102,6 +117,52 @@ namespace Gym.Observations {
 
     /// <summary>The equality rules the result types share, so the three stay consistent.</summary>
     internal static class ResultEquality {
+        /// <summary>
+        ///     Yields every array a result holds, the observation's and the info's, nested ones included (an info's
+        ///     <c>final_obs</c>, a composite observation's parts), so none is reclaimed with the scope's temporaries.
+        /// </summary>
+        /// <param name="scope">The scope.</param>
+        /// <param name="values">The observation and the info.</param>
+        internal static void Yield(NDScope scope, params object?[] values) {
+            foreach (object? value in values)
+                YieldOne(scope, value, depth: 0);
+        }
+
+        /// <summary>Yields one value's arrays, walking containers to a fixed depth so a self-containing info cannot recurse forever.</summary>
+        /// <param name="scope">The scope.</param>
+        /// <param name="value">The value.</param>
+        /// <param name="depth">How deep the walk is; containers below 16 levels are left alone.</param>
+        private static void YieldOne(NDScope scope, object? value, int depth) {
+            if (depth > 16)
+                return;
+            switch (value) {
+                case NDArray array:
+                    scope.Returns(array);
+                    break;
+                case INDArrayCarrier carrier:
+                    carrier.YieldTo(scope);
+                    break;
+                case string:
+                    break;
+                case IEnumerable<KeyValuePair<string, object?>> pairs:
+                    foreach (KeyValuePair<string, object?> pair in pairs)
+                        YieldOne(scope, pair.Value, depth + 1);
+                    break;
+                case System.Collections.IDictionary dictionary:
+                    foreach (System.Collections.DictionaryEntry entry in dictionary)
+                        YieldOne(scope, entry.Value, depth + 1);
+                    break;
+                case System.Runtime.CompilerServices.ITuple tuple:
+                    for (int i = 0; i < tuple.Length; i++)
+                        YieldOne(scope, tuple[i], depth + 1);
+                    break;
+                case System.Collections.IEnumerable items:
+                    foreach (object? item in items)
+                        YieldOne(scope, item, depth + 1);
+                    break;
+            }
+        }
+
         /// <summary>
         ///     Two observations are equal when both are arrays of the same shape, dtype and elements, or, for anything else,
         ///     when Python's <c>==</c> says so.

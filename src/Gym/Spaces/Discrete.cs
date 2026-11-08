@@ -1,173 +1,193 @@
-﻿using System;
-using Gym.Exceptions;
+﻿#nullable enable
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
+using System.Numerics;
 using Gym.Utils;
 using NumSharp;
 
 namespace Gym.Spaces {
     /// <summary>
     ///     The integers <c>{Start, ..., Start + N - 1}</c>: a categorical action or observation, such as CartPole's two
-    ///     pushes or LunarLander's four engine choices.
+    ///     pushes or FrozenLake's 16 cells. An element is a 0-d array of <see cref="Space.DType"/> (int64 by default), Gym.NET's
+    ///     stand-in for NumPy's <c>np.int64</c> scalar (DR-08).
     /// </summary>
-    /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/spaces/discrete.py#L27">gymnasium/spaces/discrete.py</see>.</remarks>
-    public class Discrete : Space {
-        /// <summary>The number of elements, <see cref="long"/> like Gymnasium's <c>np.int64</c> <c>n</c>.</summary>
-        public long N { get; }
-
-        /// <summary>The smallest element, <see cref="long"/> like Gymnasium's <c>np.int64</c> <c>start</c>.</summary>
-        public long Start { get; private set; }
-
-        /// <summary>
-        ///     The generator this space samples from: NumPy's <c>Generator(PCG64)</c>, Gymnasium's <c>np_random</c>. The space
-        ///     owns it, unless one was passed in to be shared (LunarLander shares its own with its action space).
-        /// </summary>
-        /// <remarks>Named <c>RandomState</c> and typed as NumPy's legacy <c>RandomState</c> (MT19937) before Gym.NET adopted Gymnasium's seeding.</remarks>
-        protected Generator NpRandom;
-
-        /// <summary>
-        ///     The space of the <paramref name="n"/> integers <c>{start, ..., start + n - 1}</c>.
-        /// </summary>
-        /// <param name="n">The number of elements.</param>
-        /// <param name="dType">
-        ///     The declared element type; <see langword="null"/> means int64, Gymnasium's default. <see cref="Sample"/> returns
-        ///     int64 regardless.
-        /// </param>
+    /// <remarks>
+    ///     <para>
+    ///     The shape is <c>()</c>, as in Gymnasium. Code that read the number of actions from <c>Shape.Size</c> must read
+    ///     <see cref="N"/> instead (B-03).
+    ///     </para>
+    ///     <para>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/spaces/discrete.py#L27">gymnasium/spaces/discrete.py</see>.</para>
+    /// </remarks>
+    public class Discrete : Space<NDArray>, IEquatable<Discrete> {
+        /// <summary>The space <c>{start, ..., start + n - 1}</c> (Gymnasium's <c>Discrete(n, seed, start, dtype)</c>).</summary>
+        /// <param name="n">The number of elements; must be positive.</param>
         /// <param name="seed">
-        ///     A non-negative seed for this space's own generator, drawing what Gymnasium's <c>Discrete(n, seed=seed)</c> draws;
-        ///     or -1 to use <paramref name="random_state"/> instead.
+        ///     An integer seed for the space's own generator (it then samples what Gymnasium's <c>Discrete(n, seed=seed)</c>
+        ///     samples), a generator to share, or <see langword="null"/> for one drawn from OS entropy on first use.
         /// </param>
         /// <param name="start">The smallest element.</param>
-        /// <param name="random_state">
-        ///     The generator to draw from when <paramref name="seed"/> is -1 (it may be shared, for example with the env), or
-        ///     <see langword="null"/> for a generator of the space's own, seeded from OS entropy.
+        /// <param name="dtype">
+        ///     The integer dtype of the elements and of <see cref="N"/> and <see cref="Start"/>; <see langword="null"/> is
+        ///     int64, Gymnasium's default. Samples are drawn in this dtype, so another dtype draws other values.
         /// </param>
-        /// <exception cref="Error">Thrown when <paramref name="seed"/> is negative but not -1, with Gymnasium's message.</exception>
-        /// <remarks>
-        ///     The shape stays <c>(n)</c> instead of Gymnasium's <c>()</c> (B-03, P2): the examples read
-        ///     <c>ActionSpace.Shape.Size</c> as the number of actions. The default dtype was float32 under NumSharp.Lite.
-        /// </remarks>
-        public Discrete(long n, DType dType = null, long seed = -1, long start=0, Generator random_state = null) : base(new Shape(n), (dType = dType ?? np.int64)) {
-            N = n;
-            Start = start;
-            // A generator of the space's own unless one is shared on purpose: a shared generator couples two streams, and
-            // generators are not synchronized, so two threads drawing from one corrupt its state.
-            NpRandom = seed != -1 ? Seeding.NpRandom(seed).Rng : random_state ?? Seeding.NpRandom().Rng;
+        /// <exception cref="NumSharp.ValueError">Thrown when <paramref name="n"/> is not positive: <c>n (counts) have to be positive, actual value: 0</c>.</exception>
+        /// <exception cref="NumSharp.TypeError">Thrown when <paramref name="dtype"/> is not an integer dtype.</exception>
+        /// <exception cref="OverflowException">Thrown when <paramref name="n"/> or <paramref name="start"/> does not fit <paramref name="dtype"/>, as NumPy's <c>OverflowError</c>.</exception>
+        /// <exception cref="Gym.Exceptions.Error">Thrown when an integer <paramref name="seed"/> is negative.</exception>
+        public Discrete(long n, SpaceSeed? seed = null, long start = 0, DType? dtype = null)
+            : base(new Shape(Array.Empty<long>()), ValidateDType(dtype), null) {
+            if (n <= 0)
+                throw new ValueError($"n (counts) have to be positive, actual value: {n.ToString(CultureInfo.InvariantCulture)}");
+            DType elementType = DType!;
+            // self.n = self.dtype.type(n): NumPy refuses a Python int outside the dtype instead of wrapping it.
+            N = FitInDType(n, elementType);
+            Start = FitInDType(start, elementType);
+            // Seeded after validation, as Gymnasium's super().__init__ runs last: a rejected space draws nothing.
+            if (seed is { } given) {
+                if (given.Generator != null)
+                    NpRandom = given.Generator;
+                else
+                    Seed(given.Value);
+            }
         }
 
+        /// <summary>The number of elements (Gymnasium's <c>n</c>, a scalar of the space's dtype).</summary>
+        public long N { get; }
+
+        /// <summary>The smallest element (Gymnasium's <c>start</c>, a scalar of the space's dtype).</summary>
+        public long Start { get; }
+
+        /// <summary>The element dtype; never <see langword="null"/> for a discrete space (int64 by default).</summary>
+        public new DType DType => base.DType!;
+
+        /// <summary>The shape of every element, <c>()</c>.</summary>
+        public new Shape Shape => base.Shape!.Value;
+
+        /// <inheritdoc />
+        public override bool IsNpFlattenable => true;
+
         /// <summary>
-        ///     Draws one element uniformly, or uniformly among the elements a mask allows. The result is a fresh 0-d int64
-        ///     array (Gymnasium's <c>np.int64</c>) that the caller owns.
+        ///     Draws one element (Gymnasium's <c>sample</c>): uniformly, uniformly among the elements a mask allows, or by the
+        ///     probabilities of a probability mask.
         /// </summary>
         /// <param name="mask">
-        ///     <see langword="null"/> to draw from all <see cref="N"/> elements; otherwise a 1-D array of length <see cref="N"/>
-        ///     in which <c>1</c> marks an allowed element. It is not validated yet (Gymnasium asserts int8, shape and 0/1 values).
+        ///     <see langword="null"/>, or an int8 array of shape <c>(n,)</c> whose <c>1</c>s mark the allowed elements and
+        ///     <c>0</c>s the others; when nothing is allowed, <see cref="Start"/> is returned.
         /// </param>
-        /// <returns>
-        ///     A 0-d int64 array: <see cref="Start"/> plus the drawn offset, or <see cref="Start"/> itself when the mask allows
-        ///     nothing, as in Gymnasium.
-        /// </returns>
-        /// <remarks>
-        ///     The mask and uniform branches make Gymnasium's generator calls (<c>choice(np.where(mask == 1)[0])</c> and
-        ///     <c>integers(n, dtype=int64)</c>), so a space seeded like Gymnasium's samples the same values. Not supported yet
-        ///     (P2): the probability mask, the mask assertions, and sampling in a dtype other than int64 (Gymnasium draws in
-        ///     the space's dtype, int64 by default). Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/spaces/discrete.py#L127">gymnasium/spaces/discrete.py</see>.
-        /// </remarks>
-        public override NDArray Sample(NDArray mask = null) {
-            // `mask != null` is element-wise in NumSharp (an NDArray<bool>, not a bool), which made every call throw (B-01).
-            if (mask is not null)
-            {
-                using NDArray bmask = (mask == 1); // Valid action mask with boolean selector
-                if (np.any(bmask))
-                {
-                    // Gymnasium draws uniformly among the valid actions: np_random.choice(np.where(mask == 1)[0]). A Discrete
-                    // mask is 1-D, so nonzero returns exactly one index array.
-                    using NDArray validActions = np.nonzero(bmask)[0];
-                    using NDArray chosen = NpRandom.choice(validActions);
-                    return NDArray.Scalar<long>(Start + SingleValue(chosen));
-                }
-                return NDArray.Scalar<long>(Start);
-            }
-            // Gymnasium: self.start + self.np_random.integers(self.n, dtype=self.dtype.type), i.e. [0, n).
-            using NDArray drawn = NpRandom.integers(N, dtype: np.int64);
-            return NDArray.Scalar<long>(Start + SingleValue(drawn));
-        }
-
-        /// <summary>
-        ///     The one integer a size-less draw returns: since NumSharp 0.80.0 both <c>Generator.integers</c> and
-        ///     <c>Generator.choice(array)</c> return it as a 0-d array, NumSharp's stand-in for the NumPy scalar NumPy returns.
-        ///     NumSharp 0.70's <c>choice</c> returned a one-element 1-D array instead, which this method used to accept too.
-        /// </summary>
-        /// <param name="draw">A 0-d array; the caller keeps ownership.</param>
-        /// <returns>The drawn value.</returns>
-        /// <exception cref="InvalidOperationException">
-        ///     Thrown when <paramref name="draw"/> is not 0-d, which would also surface a NumSharp regression to the old shape
-        ///     instead of reading past it.
+        /// <param name="probability">
+        ///     <see langword="null"/>, or a float64 array of shape <c>(n,)</c> with values in <c>[0, 1]</c> summing to 1 (within
+        ///     <c>np.isclose</c>).
+        /// </param>
+        /// <returns>A new 0-d array of the space's dtype, owned by the caller.</returns>
+        /// <exception cref="NumSharp.ValueError">Thrown when both masks are given.</exception>
+        /// <exception cref="NumSharp.AssertionError">
+        ///     Thrown for a mask or probability of the wrong type, dtype, shape or values, with Gymnasium's assertion messages.
         /// </exception>
-        private static long SingleValue(NDArray draw) {
-            if (draw.ndim != 0)
-                throw new InvalidOperationException($"Expected a 0-d drawn value, got shape {draw.Shape}.");
-            return Convert.ToInt64(draw.GetAtIndex(0));
+        /// <remarks>
+        ///     The three branches make Gymnasium's generator calls, <c>choice(np.where(mask == 1)[0])</c>,
+        ///     <c>choice(np.arange(n, dtype=dtype), p=probability)</c> and <c>integers(n, dtype=dtype)</c>, so a space seeded
+        ///     like Gymnasium's draws the same values. Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/spaces/discrete.py#L121">gymnasium/spaces/discrete.py</see>.
+        /// </remarks>
+        public override NDArray Sample(object? mask = null, object? probability = null) {
+            if (mask is not null && probability is not null)
+                throw new ValueError($"Only one of `mask` or `probability` can be provided, actual values: mask={PyBuiltins.Str(mask)}, probability={PyBuiltins.Str(probability)}");
+
+            if (mask is not null) {
+                NDArray m = mask as NDArray
+                            ?? throw new AssertionError($"The expected type of the sample mask is np.ndarray, actual type: {PyBuiltins.TypeRepr(mask)}");
+                if (m.dtype != np.int8)
+                    throw new AssertionError($"The expected dtype of the sample mask is np.int8, actual dtype: {DTypeName(m.dtype)}");
+                if (!IsVectorOfN(m))
+                    throw new AssertionError($"The expected shape of the sample mask is ({N.ToString(CultureInfo.InvariantCulture)},), actual shape: {ShapeRepr(m.Shape)}");
+
+                using NDArray valid = m == 1;
+                using NDArray zero = m == 0;
+                using NDArray either = np.logical_or(zero, valid);
+                if (!np.all(either))
+                    throw new AssertionError($"All values of the sample mask should be 0 or 1, actual values: {PyBuiltins.Str(m)}");
+
+                if (!np.any(valid))
+                    return Scalar(Start);
+                // A 1-D mask: np.where returns exactly one index array, int64 like NumPy's intp.
+                using NDArray candidates = np.nonzero(valid)[0];
+                using NDArray chosen = NpRandom.choice(candidates);
+                return Scalar(Start + ToInt64(chosen));
+            }
+
+            if (probability is not null) {
+                NDArray p = probability as NDArray
+                            ?? throw new AssertionError($"The expected type of the sample probability is np.ndarray, actual type: {PyBuiltins.TypeRepr(probability)}");
+                if (p.dtype != np.float64)
+                    throw new AssertionError($"The expected dtype of the sample probability is np.float64, actual dtype: {DTypeName(p.dtype)}");
+                if (!IsVectorOfN(p))
+                    throw new AssertionError($"The expected shape of the sample probability is ({N.ToString(CultureInfo.InvariantCulture)},), actual shape: {ShapeRepr(p.Shape)}");
+
+                using NDArray atLeastZero = p >= 0;
+                using NDArray atMostOne = p <= 1;
+                using NDArray inRange = np.logical_and(atLeastZero, atMostOne);
+                if (!np.all(inRange))
+                    throw new AssertionError($"All values of the sample probability should be between 0 and 1, actual values: {PyBuiltins.Str(p)}");
+                using NDArray total = np.sum(p);
+                using NDArray close = np.isclose(total, 1.0);
+                if (!close.GetBoolean())
+                    throw new AssertionError($"The sum of the sample probability should be equal to 1, actual sum: {PyBuiltins.Str(total)}");
+
+                using NDArray elements = np.arange(N, dtype: DType);
+                using NDArray chosen = NpRandom.choice(elements, p: p);
+                return Scalar(Start + ToInt64(chosen));
+            }
+
+            // Gymnasium: self.start + self.np_random.integers(self.n, dtype=self.dtype.type), i.e. [0, n) drawn in the dtype.
+            using NDArray drawn = NpRandom.integers(N, dtype: DType);
+            return Scalar(Start + ToInt64(drawn));
         }
 
         /// <summary>
-        ///     Whether <paramref name="ndArray"/> denotes an element of this space: any integer (<see cref="TryToInt64"/>'s
-        ///     inputs) in <c>[Start, Start + N)</c>. Anything that is not an integer returns <see langword="false"/>, as in
-        ///     Gymnasium; under NumSharp.Lite it threw <see cref="NotSupportedException"/> for everything but a boxed
-        ///     <see cref="int"/>.
+        ///     Whether <paramref name="x"/> is an element (Gymnasium's <c>contains</c>): a .NET integer, <see cref="bool"/> or
+        ///     enum member (a Python <c>int</c>: it must fit the dtype), or a 0-d integer array whose dtype casts safely to the
+        ///     space's, with a value in <c>[Start, Start + N)</c>.
         /// </summary>
-        /// <param name="ndArray">The candidate: a boxed integer of any width, a <see cref="bool"/>, an enum member, or a 0-d integer array.</param>
-        /// <returns><see langword="true"/> when the candidate converts to an integer inside the space.</returns>
-        /// <remarks>
-        ///     Accepts what Gymnasium accepts, except that Gymnasium also requires <c>np.can_cast(x.dtype, self.dtype)</c>,
-        ///     which rejects, for example, a uint64 value in an int64 space (P2). Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/spaces/discrete.py#L198">gymnasium/spaces/discrete.py</see>.
-        /// </remarks>
-        public override bool Contains(object ndArray) {
-            try {
-                return TryToInt64(ndArray, out long x) && Contains(x);
-            } catch (OverflowException) {
-                // Only an unsigned 64-bit value above long.MaxValue gets here. It cannot be an element of an int64 space;
-                // Gymnasium returns False for an integer outside the dtype's range as well.
+        /// <param name="x">The candidate.</param>
+        /// <returns><see langword="true"/> for an element; anything else, a 0-d boolean or floating array included, is <see langword="false"/>.</returns>
+        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/spaces/discrete.py#L202">gymnasium/spaces/discrete.py</see>.</remarks>
+        public override bool Contains(object? x) {
+            BigInteger value;
+            DType valueType;
+            if (TryPythonInt(x, out BigInteger pythonInt)) {
+                // isinstance(x, int): it must fit the dtype, then it is that dtype's scalar.
+                iinfo info = np.iinfo(DType);
+                if (pythonInt < info.min || pythonInt > MaxOf(info, DType))
+                    return false;
+                value = pythonInt;
+                valueType = DType;
+            } else if (x is NDArray array && array.ndim == 0 && array.dtype.kind is 'i' or 'u') {
+                value = array.dtype.kind == 'u' ? new BigInteger(Convert.ToUInt64(array.GetAtIndex(0), CultureInfo.InvariantCulture))
+                                                : new BigInteger(Convert.ToInt64(array.GetAtIndex(0), CultureInfo.InvariantCulture));
+                valueType = array.dtype;
+            } else {
                 return false;
             }
+
+            bool inSpace = Start <= value && value < (BigInteger)Start + N;
+            return inSpace && np.can_cast(valueType, DType);
         }
 
-        /// <summary>Whether <paramref name="x"/> lies in <c>[Start, Start + N)</c>.</summary>
+        /// <summary>Whether <paramref name="x"/> lies in <c>[Start, Start + N)</c>, as a Python <c>int</c> of the dtype's range.</summary>
         /// <param name="x">The candidate element.</param>
-        /// <returns><see langword="true"/> when <paramref name="x"/> is an element of this space.</returns>
-        /// <remarks>
-        ///     Honours <see cref="Start"/> (B-02: <c>Discrete(3, start: 5)</c> accepted 0 and rejected 5 and 7). The upper bound
-        ///     is computed in <see cref="Int128"/>, because Gymnasium compares unbounded Python ints and
-        ///     <c>Start + N</c> can exceed <see cref="long.MaxValue"/>.
-        /// </remarks>
-        public bool Contains(long x) {
-            return x >= Start && (Int128) x < (Int128) Start + N;
-        }
-
-        /// <summary>Whether the value of the enum member <paramref name="x"/> is an element of this space.</summary>
-        /// <param name="x">The candidate, for example a <c>LunarLanderDiscreteActions</c> member.</param>
-        /// <returns><see langword="true"/> when the member's underlying value lies in <c>[Start, Start + N)</c>.</returns>
-        /// <remarks>
-        ///     Works for every underlying type. The former <c>(int)(object)x</c> unboxed exactly and threw
-        ///     <see cref="InvalidCastException"/> for enums not backed by <see cref="int"/>.
-        /// </remarks>
-        public bool Contains(Enum x) {
-            return Contains((object) x);
-        }
+        /// <returns><see langword="true"/> when it is an element.</returns>
+        public bool Contains(long x) => Contains((object)x);
 
         /// <summary>
-        ///     Converts an action handed to <c>Env.Step(object)</c> into the discrete value it denotes. Envs must call this
-        ///     instead of casting: <c>(int)action</c> unboxes exactly and throws <see cref="InvalidCastException"/> as soon as
-        ///     the action is a <see langword="long"/>, or the 0-d int64 <see cref="NDArray"/> that <see cref="Sample"/> returns.
+        ///     Converts an action given to <c>Env.Step(object)</c> to the integer it denotes; envs call this rather than casting,
+        ///     because <c>(int)action</c> unboxes exactly and throws for a <see langword="long"/> or a 0-d array.
         /// </summary>
-        /// <param name="action">A boxed integer of any width, a <see cref="bool"/>, an enum member, or a 0-d integer <see cref="NDArray"/>.</param>
-        /// <returns>The action as <see langword="long"/>, the .NET spelling of Gymnasium's <c>np.int64</c>.</returns>
-        /// <exception cref="ArgumentException">
-        ///     Thrown when <paramref name="action"/> is <see langword="null"/>, not an integer, or an array that is not 0-d.
-        /// </exception>
-        /// <exception cref="OverflowException">
-        ///     Thrown when an unsigned 64-bit action exceeds <see cref="long.MaxValue"/> (see <see cref="TryToInt64"/>).
-        /// </exception>
-        public static long ToInt64(object action)
-        {
+        /// <param name="action">A boxed integer of any width, a <see cref="bool"/>, an enum member, or a 0-d integer array.</param>
+        /// <returns>The integer.</returns>
+        /// <exception cref="ArgumentException">Thrown when the action is <see langword="null"/>, not an integer, or an array that is not 0-d.</exception>
+        /// <exception cref="OverflowException">Thrown when an unsigned 64-bit action exceeds <see cref="long.MaxValue"/>.</exception>
+        public static long ToInt64(object action) {
             if (TryToInt64(action, out long value))
                 return value;
             throw new ArgumentException(
@@ -175,26 +195,18 @@ namespace Gym.Spaces {
                 nameof(action));
         }
 
-        /// <summary>
-        ///     Non-throwing form of <see cref="ToInt64"/> for membership tests, so that <see cref="Contains(object)"/> decides
-        ///     what an input that is not an integer means instead of surfacing a conversion error.
-        /// </summary>
-        /// <param name="action">The candidate action.</param>
-        /// <param name="value">The converted value when the method returns <see langword="true"/>; otherwise 0.</param>
-        /// <returns><see langword="true"/> when <paramref name="action"/> denotes an integer.</returns>
-        /// <exception cref="OverflowException">
-        ///     Thrown when an unsigned 64-bit action (a <see langword="ulong"/>, a 0-d uint64 array or an enum backed by
-        ///     <see langword="ulong"/>) exceeds <see cref="long.MaxValue"/>.
-        /// </exception>
+        /// <summary>The non-throwing form of <see cref="ToInt64"/>, for membership tests and action conversion.</summary>
+        /// <param name="action">The candidate.</param>
+        /// <param name="value">The integer when <see langword="true"/> is returned; otherwise 0.</param>
+        /// <returns><see langword="true"/> when the candidate denotes an integer.</returns>
+        /// <exception cref="OverflowException">Thrown when an unsigned 64-bit value exceeds <see cref="long.MaxValue"/>.</exception>
         /// <remarks>
-        ///     Accepts what Gymnasium's <c>Discrete.contains</c> accepts: Python ints, which include <c>bool</c> (a subclass
-        ///     of <c>int</c>, so <c>True</c> is 1), and 0-d arrays of an integer dtype (NumPy scalars). A 0-d <em>boolean</em>
-        ///     array is rejected, because <c>np.bool_</c> is not an <c>np.integer</c>.
+        ///     Accepts what Gymnasium's envs accept as a discrete action: Python ints (a <see cref="bool"/> is one, as
+        ///     Python's <c>bool</c> subclasses <c>int</c>) and 0-d arrays of an integer dtype. A 0-d boolean array is rejected,
+        ///     because <c>np.bool_</c> is not an <c>np.integer</c>.
         /// </remarks>
-        public static bool TryToInt64(object action, out long value)
-        {
-            switch (action)
-            {
+        public static bool TryToInt64(object? action, out long value) {
+            switch (action) {
                 case long l: value = l; return true;
                 case int i: value = i; return true;
                 case short s: value = s; return true;
@@ -203,13 +215,14 @@ namespace Gym.Spaces {
                 case ushort us: value = us; return true;
                 case uint ui: value = ui; return true;
                 case ulong ul: value = checked((long)ul); return true;
+                case BigInteger big: value = (long)big; return true;
                 case bool flag: value = flag ? 1 : 0; return true;
-                case Enum e: value = Convert.ToInt64(e); return true;
-                // Gymnasium's Discrete.contains accepts 0-d integer arrays (np.int64 scalars) as well as Python ints.
+                case Enum e: value = Convert.ToInt64(e, CultureInfo.InvariantCulture); return true;
                 case NDArray nd when nd.ndim == 0 && nd.dtype.kind is 'i' or 'u':
-                    // NumSharp's (long) is a C-style cast: a uint64 above long.MaxValue wraps silently (ulong.MaxValue
-                    // becomes -1, measured), so that dtype takes a checked conversion.
-                    value = nd.typecode == NPTypeCode.UInt64 ? checked((long)(ulong)nd) : (long)nd;
+                    // NumSharp's (long) is a C-style cast that wraps a uint64 above long.MaxValue (measured), so that
+                    // dtype takes a checked conversion.
+                    value = nd.typecode == NPTypeCode.UInt64 ? checked((long)Convert.ToUInt64(nd.GetAtIndex(0), CultureInfo.InvariantCulture))
+                                                             : Convert.ToInt64(nd.GetAtIndex(0), CultureInfo.InvariantCulture);
                     return true;
                 default:
                     value = 0;
@@ -218,28 +231,134 @@ namespace Gym.Spaces {
         }
 
         /// <summary>
-        ///     Gives this space a fresh generator, <c>Generator(PCG64(SeedSequence(seed)))</c>, so it samples what Gymnasium's
-        ///     space samples after <c>space.seed(seed)</c>. A generator the space shared (for example with its env) is left
-        ///     untouched, so reseeding the space never moves the env's stream.
+        ///     Converts samples to Python ints (Gymnasium's <c>to_jsonable</c>: <c>[int(x) for x in sample_n]</c>), as
+        ///     <see langword="long"/>s.
         /// </summary>
-        /// <param name="seed">Any non-negative seed.</param>
-        /// <exception cref="Error">Thrown when <paramref name="seed"/> is negative, with Gymnasium's message.</exception>
-        /// <remarks>
-        ///     Gymnasium's <c>seed</c> also accepts no seed and returns the one it used; that shape of the API arrives with P2.
-        ///     Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/spaces/space.py#L112">gymnasium/spaces/space.py</see>.
-        /// </remarks>
-        public override void Seed(System.Numerics.BigInteger seed) {
-            NpRandom = Seeding.NpRandom(seed).Rng;
-        }
+        /// <param name="samples">Samples of this space.</param>
+        /// <returns>One integer per sample.</returns>
+        /// <exception cref="ArgumentException">Thrown for a sample that is not a 0-d integer array.</exception>
+        public override IList<object?> ToJsonable(IEnumerable<NDArray> samples) => samples.Select(s => (object?)ToInt64(s)).ToList();
 
-        #region Object Overrides
+        /// <summary>Converts integers back to 0-d arrays of the space's dtype (Gymnasium's <c>from_jsonable</c>).</summary>
+        /// <param name="jsonable">Integers, as <see cref="ToJsonable(IEnumerable{NDArray})"/> made them.</param>
+        /// <returns>New 0-d arrays, owned by the caller.</returns>
+        /// <exception cref="ArgumentException">Thrown for a value that is not an integer.</exception>
+        public override IList<NDArray> FromJsonable(IList<object?> jsonable) => jsonable.Select(v => Scalar(ToInt64(v!))).ToList();
 
-        /// <summary>Returns a string that represents the current object.</summary>
-        /// <returns>A string that represents the current object.</returns>
+        /// <summary>
+        ///     Gymnasium's <c>repr</c>: <c>Discrete(2)</c>, with <c>start=…</c> when it is not 0 and <c>dtype=…</c> when it is
+        ///     not int64.
+        /// </summary>
+        /// <returns>The text.</returns>
         public override string ToString() {
-            return "Discrete" + Shape;
+            var info = new List<string> { N.ToString(CultureInfo.InvariantCulture) };
+            if (Start != 0)
+                info.Add($"start={Start.ToString(CultureInfo.InvariantCulture)}");
+            if (DType != np.int64)
+                info.Add($"dtype={DTypeName(DType)}");
+            return $"Discrete({string.Join(", ", info)})";
         }
 
-        #endregion
+        /// <summary>Gymnasium's <c>==</c>: the same <see cref="N"/>, <see cref="Start"/> and dtype.</summary>
+        /// <param name="other">The other space.</param>
+        /// <returns><see langword="true"/> when equal.</returns>
+        public bool Equals(Discrete? other) => other is not null && N == other.N && Start == other.Start && DType == other.DType;
+
+        /// <inheritdoc />
+        public override bool Equals(object? obj) => obj is Discrete other && Equals(other);
+
+        /// <inheritdoc />
+        public override int GetHashCode() => HashCode.Combine(N, Start, DTypeName(DType));
+
+        /// <summary>The dtype a constructor was given, validated: <see langword="null"/> is int64, anything else must be an integer dtype.</summary>
+        /// <param name="dtype">The dtype.</param>
+        /// <returns>The dtype to use.</returns>
+        /// <exception cref="NumSharp.TypeError">Thrown for a dtype that is not an integer dtype.</exception>
+        private static DType ValidateDType(DType? dtype) {
+            DType resolved = dtype ?? np.int64;
+            if (resolved.kind is not ('i' or 'u'))
+                throw new TypeError($"Invalid Discrete dtype ({DTypeName(resolved)}), must be an integer dtype");
+            return resolved;
+        }
+
+        /// <summary>A value as a scalar of the dtype, refused when it does not fit, as NumPy's <c>dtype.type(x)</c> refuses a Python int.</summary>
+        /// <param name="value">The value.</param>
+        /// <param name="dtype">The integer dtype.</param>
+        /// <returns>The value.</returns>
+        /// <exception cref="OverflowException">Thrown when the value is outside the dtype: <c>Python integer 300 out of bounds for uint8</c>.</exception>
+        private static long FitInDType(long value, DType dtype) {
+            iinfo info = np.iinfo(dtype);
+            if (value < info.min || value > MaxOf(info, dtype))
+                throw new OverflowException($"Python integer {value.ToString(CultureInfo.InvariantCulture)} out of bounds for {DTypeName(dtype)}");
+            return value;
+        }
+
+        /// <summary>A dtype's maximum as an exact integer, also for uint64, whose maximum exceeds <see cref="long"/>.</summary>
+        /// <param name="info">The dtype's <c>iinfo</c>.</param>
+        /// <param name="dtype">The dtype.</param>
+        /// <returns>The maximum.</returns>
+        private static BigInteger MaxOf(iinfo info, DType dtype) => dtype.typecode == NPTypeCode.UInt64 ? ulong.MaxValue : info.max;
+
+        /// <summary>Whether a Python value is a Python <c>int</c> (a .NET integer, <see cref="bool"/> or enum member), and its value.</summary>
+        /// <param name="x">The value.</param>
+        /// <param name="value">The integer.</param>
+        /// <returns><see langword="true"/> for a Python int.</returns>
+        private static bool TryPythonInt(object? x, out BigInteger value) {
+            switch (x) {
+                case ulong ul:
+                    value = ul;
+                    return true;
+                case BigInteger big:
+                    value = big;
+                    return true;
+                case Enum e: {
+                    // Through the underlying type, so a ulong-backed member above long.MaxValue stays exact (Python's
+                    // IntEnum is an int of any size) instead of overflowing a conversion to long.
+                    object underlying = Convert.ChangeType(e, Enum.GetUnderlyingType(e.GetType()), CultureInfo.InvariantCulture);
+                    value = underlying is ulong large ? new BigInteger(large) : new BigInteger(Convert.ToInt64(underlying, CultureInfo.InvariantCulture));
+                    return true;
+                }
+                case NDArray:
+                case null:
+                    value = default;
+                    return false;
+                default:
+                    if (TryToInt64(x, out long l)) {
+                        value = l;
+                        return true;
+                    }
+
+                    value = default;
+                    return false;
+            }
+        }
+
+        /// <summary>Whether an array has shape <c>(n,)</c>.</summary>
+        /// <param name="array">The array.</param>
+        /// <returns><see langword="true"/> for a 1-D array of <see cref="N"/> elements.</returns>
+        private bool IsVectorOfN(NDArray array) => array.ndim == 1 && array.shape[0] == N;
+
+        /// <summary>A 0-d array of the space's dtype holding <paramref name="value"/>, NumPy's <c>dtype.type(value)</c> scalar.</summary>
+        /// <param name="value">The value, which fits the dtype for every element of the space.</param>
+        /// <returns>A new 0-d array, owned by the caller.</returns>
+        private NDArray Scalar(long value) {
+            using NDArray int64 = NDArray.Scalar<long>(value);
+            return int64.astype(DType);
+        }
+
+        /// <summary>The integer a 0-d draw holds.</summary>
+        /// <param name="draw">A 0-d integer array; the caller keeps ownership.</param>
+        /// <returns>The value.</returns>
+        /// <exception cref="InvalidOperationException">Thrown when the draw is not 0-d, which would surface a NumSharp regression to the 1-element shape of 0.70.</exception>
+        private static long ToInt64(NDArray draw) {
+            if (draw.ndim != 0)
+                throw new InvalidOperationException($"Expected a 0-d drawn value, got shape {draw.Shape}.");
+            return Convert.ToInt64(draw.GetAtIndex(0), CultureInfo.InvariantCulture);
+        }
+
+        /// <summary>A dtype's NumPy name, <c>int64</c>, <c>uint8</c>: what <c>str(dtype)</c> prints.</summary>
+        /// <param name="dtype">The dtype.</param>
+        /// <returns>The name.</returns>
+        internal static string DTypeName(DType dtype) => dtype.name;
     }
 }

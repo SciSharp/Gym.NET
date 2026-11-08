@@ -42,7 +42,7 @@ namespace Gym.Environments.Envs.Classic {
     ///     </para>
     ///     <para>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/envs/classic_control/cartpole.py#L21">gymnasium/envs/classic_control/cartpole.py</see>.</para>
     /// </remarks>
-    public class CartPoleEnv : Env<NDArray, long> {
+    public class CartPoleEnv : Env<NDArray, NDArray> {
         /// <summary>
         ///     Gymnasium's warning for a step after termination, issued once (then Python's filter suppresses repeats from the
         ///     same line).
@@ -93,7 +93,7 @@ namespace Gym.Environments.Envs.Classic {
             using NDArray low = -high;
             ActionSpace = new Discrete(2);
             // Box copies (astype) both bounds, so the temporaries above can be released.
-            ObservationSpace = new Box(low, high, np.float32);
+            ObservationSpace = new Box(low, high, dtype: np.float32);
 
             RenderMode = renderMode;
             _viewerFactory = viewerFactory;
@@ -220,7 +220,10 @@ namespace Gym.Environments.Envs.Classic {
         ///     Pushes the cart left (0) or right (1) with <see cref="ForceMag"/> and integrates one step of <see cref="Tau"/>
         ///     seconds with Gymnasium's equations, operation for operation in float64. Renders in human mode.
         /// </summary>
-        /// <param name="action">An element of <c>Discrete(2)</c>: 0 or 1.</param>
+        /// <param name="action">
+        ///     An element of <c>Discrete(2)</c>: a 0-d integer array holding 0 or 1, what <c>ActionSpace.Sample()</c> returns
+        ///     (DR-08). The untyped <see cref="IEnv.Step"/> also takes a plain .NET integer. Read during the step, never kept.
+        /// </param>
         /// <returns>
         ///     The float32 observation, the reward (1.0 per step and on termination, 0.0 after it; 0.0, -1.0 and -1.0 with
         ///     <see cref="SuttonBartoReward"/>), <c>terminated</c>, <c>truncated=False</c> and <c>{}</c>.
@@ -234,7 +237,7 @@ namespace Gym.Environments.Envs.Classic {
         ///     Stepping after termination warns once through <see cref="Logger.Warn"/>, as Gymnasium does, and keeps going.
         ///     Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/envs/classic_control/cartpole.py#L165">gymnasium/envs/classic_control/cartpole.py</see>.
         /// </remarks>
-        public override StepResult<NDArray> Step(long action) {
+        public override StepResult<NDArray> Step(NDArray action) {
             // The asserts of the source, in its order: the action first, then the reset.
             AssertValidAction(action);
             double[] state = State ?? throw new AssertionError("Call reset before using step method.");
@@ -245,7 +248,8 @@ namespace Gym.Environments.Envs.Classic {
                 throw new ValueError($"not enough values to unpack (expected 4, got {state.Length})");
             double x = state[0], xDot = state[1], theta = state[2], thetaDot = state[3];
 
-            double force = action == 1 ? ForceMag : -ForceMag;
+            // action == 1 on Gymnasium's np.int64: a value comparison, never NumSharp's element-wise ==.
+            double force = Discrete.ToInt64(action) == 1 ? ForceMag : -ForceMag;
             double costheta = Math.Cos(theta);
             double sintheta = Math.Sin(theta);
 
@@ -430,11 +434,12 @@ namespace Gym.Environments.Envs.Classic {
         ///     'numpy.int64'&gt;) invalid</c>, <c>'x' (&lt;class 'str'&gt;) invalid</c>).
         /// </summary>
         /// <param name="action">The action as given to <see cref="IEnv.Step"/>: any integer, a <see langword="bool"/>, an enum member, or a 0-d integer array.</param>
-        /// <returns>The action as <see langword="long"/>.</returns>
+        /// <returns>The action as a 0-d array: the one given, or a new int64 one for a plain integer.</returns>
         /// <exception cref="AssertionError">Thrown for anything <c>Discrete(2).contains</c> rejects.</exception>
-        protected override long ConvertAction(object? action) {
+        protected override NDArray ConvertAction(object? action) {
+            // Asserted on the value as given, so the message shows its Python counterpart (2 (<class 'int'>) invalid).
             AssertValidAction(action);
-            return Discrete.ToInt64(action!);
+            return base.ConvertAction(action);
         }
 
         /// <summary><c>assert self.action_space.contains(action), f"{action!r} ({type(action)}) invalid"</c>.</summary>

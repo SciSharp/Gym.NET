@@ -265,7 +265,13 @@ Each numbered step is one commit, unless it says otherwise.
 
 Specs: the port plan's §7; sources `gymnasium/spaces` (3,816 lines at v1.4.0); tests `tests/spaces`.
 
-- **P2.1 `Space<T>`, typed env spaces and ownership (DR-07, DR-08, D19).**
+- **P2.1 `Space<T>`, typed env spaces and ownership (DR-07, DR-08, D19).** *Done 2026-11-09 with P2.2 and P2.3, one
+  commit: `Space`/`Space<T>`, `SpaceSeed` (int, BigInteger or a shared generator; a null generator is `None`),
+  `ObjectSpace` (any space as a `Space<object?>`, for object-typed envs), typed `Env`/`Wrapper` spaces with the untyped
+  `IEnv` view, CartPole and the Aether lander on `Env<NDArray, NDArray>`, `Env.Dispose` releasing the env's spaces (a
+  wrapper releases its own and its env), `INDArrayCarrier` results, disposable `RenderResult`, NumSharp.Build
+  referenced; the analyzer's src sites are all fixed. Not yet: measuring `[NDScoped]` (no ported method needs it yet:
+  every temporary is disposed by hand) and the source generator, which starts with P2.5.*
   - The generic `Space<T>` over an untyped `Space` base: lazy `NpRandom`, `Seed` returning the seed list,
     `ToString`/`Equals`, `to_jsonable`/`from_jsonable`, `Contains(object?)`.
   - `Env<TObs, TAct>` exposes `Space<TObs> ObservationSpace` and `Space<TAct> ActionSpace`; `IEnv` keeps the untyped
@@ -279,9 +285,9 @@ Specs: the port plan's §7; sources `gymnasium/spaces` (3,816 lines at v1.4.0); 
   - Measure what `[NDScoped]` saves on `Box.Sample` and CartPole's step: NUMSHARP_MIGRATION_PLAN §8.4 measured
     0.634 µs per undisposed small array against 0.217 µs disposed.
   - The source-generator project (DR-13, DR-34) starts here, with the `[GymTuple]`/dict records P2.5 needs.
-- **P2.2 `Box`**: validation with Gymnasium's messages, float64 bounds kept in float64 (closes the `Box(float, float)`
+- **P2.2 `Box`**: *Done 2026-11-09 (with P2.1).* validation with Gymnasium's messages, float64 bounds kept in float64 (closes the `Box(float, float)`
   defect), sampling per bound category, `contains` with `np.can_cast` and lists, `repr`.
-- **P2.3 `Discrete`**: shape `()`, int64 0-d samples (DR-08), `start`, masks and probabilities, `repr`, `n > 0`
+- **P2.3 `Discrete`**: *Done 2026-11-09 (with P2.1).* shape `()`, int64 0-d samples (DR-08), `start`, masks and probabilities, `repr`, `n > 0`
   validation (B-03, and B-10 as `Discrete`'s cell tags it).
 - **P2.4 `MultiBinary`, `MultiDiscrete`.**
 - **P2.5 `Tuple`, `Dict`, `Sequence`**: the generic forms (`object?[]`, an insertion-ordered map) with

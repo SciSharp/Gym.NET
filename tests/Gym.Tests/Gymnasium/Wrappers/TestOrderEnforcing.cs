@@ -23,7 +23,7 @@ namespace Gym.Tests.Gymnasium.Wrappers {
             Assert.IsFalse(WrapperTestUtils.HasWrapper(env, typeof(OrderEnforcing<,>)));
 
             // Assert that the order enforcing works for step and render before reset.
-            var orderEnforcedEnv = new OrderEnforcing<NDArray, long>(env);
+            var orderEnforcedEnv = new OrderEnforcing<NDArray, NDArray>(env);
             Assert.IsFalse(orderEnforcedEnv.HasReset);
             Assert.ThrowsExactly<ResetNeeded>(() => orderEnforcedEnv.Step(0));
             Assert.ThrowsExactly<ResetNeeded>(() => orderEnforcedEnv.Render());
@@ -37,14 +37,14 @@ namespace Gym.Tests.Gymnasium.Wrappers {
 
             // Assert that disable_render_order_enforcing works; the environment has not been reset.
             env = new CartPoleEnv(renderMode: "rgb_array_list");
-            var renderEnforcingDisabled = new OrderEnforcing<NDArray, long>(env, disableRenderOrderEnforcing: true);
+            var renderEnforcingDisabled = new OrderEnforcing<NDArray, NDArray>(env, disableRenderOrderEnforcing: true);
             renderEnforcingDisabled.Render(); // no error
         }
 
         /// <summary>The messages of both errors are Gymnasium's, verbatim (the source's docstring shows them).</summary>
         [TestMethod]
         public void TestOrderEnforcing_Messages() {
-            var env = new OrderEnforcing<NDArray, long>(new CartPoleEnv(renderMode: "rgb_array"));
+            var env = new OrderEnforcing<NDArray, NDArray>(new CartPoleEnv(renderMode: "rgb_array"));
 
             Assert.AreEqual("Cannot call env.step() before calling env.reset()", Assert.ThrowsExactly<ResetNeeded>(() => env.Step(0)).Message);
             Assert.AreEqual("Cannot call `env.render()` before calling `env.reset()`, if this is an intended action, set `disable_render_order_enforcing=True` on the OrderEnforcer wrapper.",

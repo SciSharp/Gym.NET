@@ -45,10 +45,10 @@ namespace Gym.Envs {
         private Metadata _metadata = new() { [Metadata.RenderModesKey] = new List<string>() };
 
         /// <summary>The action space, <see langword="null"/> while unset (reading it then raises <see cref="AttributeError"/>).</summary>
-        private Space? _actionSpace;
+        private Space<TAct>? _actionSpace;
 
         /// <summary>The observation space, <see langword="null"/> while unset.</summary>
-        private Space? _observationSpace;
+        private Space<TObs>? _observationSpace;
 
         /// <summary>Python's <c>_np_random</c>: <see langword="null"/> until first used or seeded.</summary>
         private Generator? _npRandom;
@@ -78,21 +78,44 @@ namespace Gym.Envs {
         /// <summary>The spec <c>make</c> attached (<c>spec</c>), or <see langword="null"/> (the default) for an env built with its constructor.</summary>
         public virtual EnvSpec? Spec { get; set; }
 
-        /// <summary>The space every action must belong to (<c>action_space</c>); the env sets it in its constructor.</summary>
+        /// <summary>
+        ///     The space every action must belong to (<c>action_space</c>), typed by the action type (DR-07): a
+        ///     <see cref="Discrete"/> or <see cref="Box"/> for <see cref="NDArray"/> actions. The env sets it in its constructor
+        ///     and owns it: <see cref="Dispose()"/> disposes it, so a space must not be shared between envs.
+        /// </summary>
         /// <exception cref="AttributeError">
         ///     Thrown by the getter while unset, as reading Python's annotated-only attribute does
         ///     (<c>'GenericTestEnv' object has no attribute 'action_space'</c>).
         /// </exception>
-        public virtual Space ActionSpace {
+        public virtual Space<TAct> ActionSpace {
             get => _actionSpace ?? throw MissingAttribute("action_space");
             set => _actionSpace = value;
         }
 
-        /// <summary>The space every observation belongs to (<c>observation_space</c>); the env sets it in its constructor.</summary>
+        /// <summary>
+        ///     The space every observation belongs to (<c>observation_space</c>), typed by the observation type. The env sets it
+        ///     in its constructor and owns it, like <see cref="ActionSpace"/>.
+        /// </summary>
         /// <exception cref="AttributeError">Thrown by the getter while unset.</exception>
-        public virtual Space ObservationSpace {
+        public virtual Space<TObs> ObservationSpace {
             get => _observationSpace ?? throw MissingAttribute("observation_space");
             set => _observationSpace = value;
+        }
+
+        /// <summary>The action space, untyped, for code that handles any env (<see cref="IEnv"/>).</summary>
+        /// <exception cref="AttributeError">Thrown by the getter while unset.</exception>
+        /// <exception cref="TypeError">Thrown by the setter for a space whose elements are not <typeparamref name="TAct"/>.</exception>
+        Space IEnv.ActionSpace {
+            get => ActionSpace;
+            set => ActionSpace = Typed<TAct>(value, "action_space");
+        }
+
+        /// <summary>The observation space, untyped, for code that handles any env.</summary>
+        /// <exception cref="AttributeError">Thrown by the getter while unset.</exception>
+        /// <exception cref="TypeError">Thrown by the setter for a space whose elements are not <typeparamref name="TObs"/>.</exception>
+        Space IEnv.ObservationSpace {
+            get => ObservationSpace;
+            set => ObservationSpace = Typed<TObs>(value, "observation_space");
         }
 
         /// <summary>
@@ -227,10 +250,29 @@ namespace Gym.Envs {
         /// </summary>
         public virtual void Close() { }
 
-        /// <summary>Calls <see cref="Close"/>, so <c>using</c> plays the role of Python's <c>with</c> statement (<c>__exit__</c>).</summary>
+        /// <summary>
+        ///     Calls <see cref="Close"/>, so <c>using</c> plays the role of Python's <c>with</c> statement (<c>__exit__</c>), then
+        ///     releases the spaces this env owns (D19). Idempotent in effect: a second call closes again, which every env's
+        ///     <see cref="Close"/> tolerates, and finds the spaces already released.
+        /// </summary>
         public void Dispose() {
-            Close();
+            Dispose(true);
             GC.SuppressFinalize(this);
+        }
+
+        /// <summary>
+        ///     What <see cref="Dispose()"/> does: <see cref="Close"/>, then the env's own action and observation spaces. A wrapper
+        ///     overrides it to release its own spaces and the env it wraps.
+        /// </summary>
+        /// <param name="disposing"><see langword="true"/> from <see cref="Dispose()"/>; envs have no finalizers.</param>
+        protected virtual void Dispose(bool disposing) {
+            Close();
+            if (!disposing)
+                return;
+            // The fields, not the virtual properties: a wrapper's properties return the wrapped env's spaces, which that env
+            // releases itself.
+            _actionSpace?.Dispose();
+            _observationSpace?.Dispose();
         }
 
         /// <summary>
@@ -301,7 +343,10 @@ namespace Gym.Envs {
         /// <summary>
         ///     Converts an action given to the untyped <see cref="IEnv.Step"/> to <typeparamref name="TAct"/>: an instance of it
         ///     as is; for an integer or enum action type, any .NET integer, <see langword="bool"/>, enum member or 0-d integer
-        ///     array (what <c>Discrete.Sample()</c> returns); for a floating-point action type, any number or 0-d array.
+        ///     array (what <c>Discrete.Sample()</c> returns); for a floating-point action type, any number or 0-d array; for an
+        ///     <see cref="NDArray"/> action type, what <c>np.asarray</c> makes of it: a .NET integer (or <see langword="bool"/>,
+        ///     Python's <c>int</c> subclass) a 0-d int64 array, a <see langword="double"/> or <see langword="float"/> a 0-d float64
+        ///     or float32 array, a .NET array an array of its element type.
         /// </summary>
         /// <param name="action">The action as given.</param>
         /// <returns>The typed action.</returns>
@@ -331,6 +376,21 @@ namespace Gym.Envs {
                     double real = PyBuiltins.Float(action);
                     return (TAct)(target == typeof(float) ? (object)(float)real : real);
                 }
+            } else if (target == typeof(NDArray)) {
+                // A Discrete action space's element is a 0-d int64 array (DR-08), so a plain .NET integer becomes one, as
+                // Gymnasium's envs accept a Python int where they sample an np.int64.
+                switch (action) {
+                    case double d:
+                        return (TAct)(object)NDArray.Scalar<double>(d);
+                    case float f:
+                        return (TAct)(object)NDArray.Scalar<float>(f);
+                    case Array array:
+                        return (TAct)(object)np.array(array);
+                    default:
+                        if (action is not NDArray && Discrete.TryToInt64(action, out long integer))
+                            return (TAct)(object)NDArray.Scalar<long>(integer);
+                        break;
+                }
             }
 
             throw new TypeError($"{PyAttributes.PyTypeName(GetType())} takes actions of type {target.Name}, not {PyBuiltins.Repr(action)} ({PyBuiltins.TypeRepr(action)})");
@@ -340,8 +400,13 @@ namespace Gym.Envs {
         /// <param name="action">The action.</param>
         /// <returns>The transition with its observation boxed.</returns>
         StepResult<object?> IEnv.Step(object? action) {
-            StepResult<TObs> result = Step(ConvertAction(action));
-            return new StepResult<object?>(result.Observation, result.Reward, result.Terminated, result.Truncated, result.Info);
+            TAct typed = ConvertAction(action);
+            try {
+                StepResult<TObs> result = Step(typed);
+                return new StepResult<object?>(result.Observation, result.Reward, result.Terminated, result.Truncated, result.Info);
+            } finally {
+                ReleaseConverted(typed, action);
+            }
         }
 
         /// <summary>
@@ -352,8 +417,13 @@ namespace Gym.Envs {
         /// <param name="cancellationToken">Checked before the step starts.</param>
         /// <returns>A value task that completes with the transition, its observation boxed.</returns>
         async ValueTask<StepResult<object?>> IEnv.StepAsync(object? action, CancellationToken cancellationToken) {
-            StepResult<TObs> result = await StepAsync(ConvertAction(action), cancellationToken).ConfigureAwait(false);
-            return new StepResult<object?>(result.Observation, result.Reward, result.Terminated, result.Truncated, result.Info);
+            TAct typed = ConvertAction(action);
+            try {
+                StepResult<TObs> result = await StepAsync(typed, cancellationToken).ConfigureAwait(false);
+                return new StepResult<object?>(result.Observation, result.Reward, result.Terminated, result.Truncated, result.Info);
+            } finally {
+                ReleaseConverted(typed, action);
+            }
         }
 
         /// <summary>The untyped reset: resets and boxes the observation.</summary>
@@ -364,6 +434,44 @@ namespace Gym.Envs {
             ResetResult<TObs> result = Reset(seed, options);
             return new ResetResult<object?>(result.Observation, result.Info);
         }
+
+        /// <summary>
+        ///     Releases an action <see cref="ConvertAction"/> made (a 0-d array from an integer) once the step is over; an action
+        ///     the caller passed as is stays the caller's. Actions are borrowed for the step (D19): an env that keeps one past
+        ///     <see cref="Step"/> must copy it.
+        /// </summary>
+        /// <param name="converted">The typed action the step received.</param>
+        /// <param name="given">The action as the caller gave it.</param>
+        private static void ReleaseConverted(TAct converted, object? given) {
+            if (!ReferenceEquals(converted, given) && converted is IDisposable disposable)
+                disposable.Dispose();
+        }
+
+        /// <summary>
+        ///     An untyped space as the env's typed one: the space itself when its elements are <typeparamref name="T"/>, or an
+        ///     <see cref="ObjectSpace"/> view of it when <typeparamref name="T"/> is <see cref="object"/>, so an
+        ///     <c>Env&lt;object?, object?&gt;</c> can hold any space.
+        /// </summary>
+        /// <typeparam name="T">The env's element type.</typeparam>
+        /// <param name="space">The space assigned.</param>
+        /// <param name="attribute">The Python attribute, for the error.</param>
+        /// <returns>The typed space.</returns>
+        /// <exception cref="TypeError">Thrown for a space whose elements are another type.</exception>
+        private Space<T> Typed<T>(Space? space, string attribute) {
+            if (space is Space<T> typed)
+                return typed;
+            if (space is not null && typeof(T) == typeof(object))
+                return (Space<T>)(object)new ObjectSpace(space);
+            throw SpaceTypeMismatch(space, typeof(T), attribute);
+        }
+
+        /// <summary>The error for assigning an untyped space whose elements are not the env's type.</summary>
+        /// <param name="space">The space assigned.</param>
+        /// <param name="expected">The element type the env requires.</param>
+        /// <param name="attribute">The Python attribute, <c>action_space</c> or <c>observation_space</c>.</param>
+        /// <returns>The error to throw.</returns>
+        private TypeError SpaceTypeMismatch(Space? space, Type expected, string attribute) =>
+            new($"{PyAttributes.PyTypeName(GetType())}.{attribute} must be a space of {expected.Name}, not {(space is null ? "None" : space.GetType().Name)}");
 
         /// <summary>The error Python raises for an attribute that was declared but never assigned.</summary>
         /// <param name="name">The attribute.</param>

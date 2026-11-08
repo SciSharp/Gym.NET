@@ -59,7 +59,9 @@ namespace Gym.Tests.Envs.Classic {
         /// <summary>
         ///     A value that is not an element of <c>Discrete(2)</c> is rejected as Gymnasium's <c>assert</c> rejects it: an
         ///     <see cref="AssertionError"/> (in Release builds too, B-14) with Python's rendering of the action and its type,
-        ///     through the typed and the untyped step alike.
+        ///     through the typed and the untyped step alike. The untyped step takes a plain integer as Python's <c>int</c>
+        ///     (<c>env.step(2)</c>); the typed step takes the 0-d array a <c>Discrete</c> samples (DR-08), Gymnasium's
+        ///     <c>np.int64</c>, so its message is <c>np.int64(2)</c>'s.
         /// </summary>
         [TestMethod]
         public void Step_ActionOutsideTheActionSpace_ThrowsGymnasiumsAssertionError() {
@@ -68,7 +70,9 @@ namespace Gym.Tests.Envs.Classic {
             env.Reset(seed: 0).Observation.Dispose();
 
             Assert.AreEqual("0.5 (<class 'float'>) invalid", Assert.ThrowsExactly<AssertionError>(() => untyped.Step(0.5)).Message);
-            Assert.AreEqual("2 (<class 'int'>) invalid", Assert.ThrowsExactly<AssertionError>(() => env.Step(2L)).Message);
+            using (NDArray two = NDArray.Scalar<long>(2L))
+                Assert.AreEqual("np.int64(2) (<class 'numpy.int64'>) invalid", Assert.ThrowsExactly<AssertionError>(() => env.Step(two)).Message);
+            Assert.AreEqual("2 (<class 'int'>) invalid", Assert.ThrowsExactly<AssertionError>(() => untyped.Step(2L)).Message);
             Assert.AreEqual("2 (<class 'int'>) invalid", Assert.ThrowsExactly<AssertionError>(() => untyped.Step(2)).Message);
             Assert.AreEqual("np.int64(5) (<class 'numpy.int64'>) invalid", Assert.ThrowsExactly<AssertionError>(() => untyped.Step(NDArray.Scalar<long>(5L))).Message);
             Assert.AreEqual("'x' (<class 'str'>) invalid", Assert.ThrowsExactly<AssertionError>(() => untyped.Step("x")).Message);

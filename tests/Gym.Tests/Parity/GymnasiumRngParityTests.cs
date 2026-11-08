@@ -121,7 +121,7 @@ namespace Gym.Tests.Parity {
                     Emit(lines, $"box.bounded.s{seed}", s.ToArray<float>().Select(F32));
                 using (NDArray low = np.array(new[] { float.NegativeInfinity, 0f, float.NegativeInfinity, -1f }))
                 using (NDArray high = np.array(new[] { float.PositiveInfinity, float.PositiveInfinity, 0f, 1f }))
-                using (NDArray s = new Box(low, high, np.float32, seed: seed).Sample())
+                using (NDArray s = new Box(low, high, dtype: np.float32, seed: seed).Sample())
                     Emit(lines, $"box.mixed.s{seed}", s.ToArray<float>().Select(F32));
                 using (NDArray s = new Box(float.NegativeInfinity, float.PositiveInfinity, new Shape(3), np.float64, seed: seed).Sample())
                     Emit(lines, $"box.normal.s{seed}", s.ToArray<double>().Select(F64));

@@ -66,12 +66,13 @@ namespace Gym.Tests.Gymnasium {
 
             Assert.AreEqual(env.Spec, wrapperEnv.Spec);
 
-            env.ObservationSpace = new Box(0f, 1f, Shape.Scalar);
-            env.ActionSpace = new Box(0f, 1f, Shape.Scalar);
+            // ExampleEnv is an Env<object?, object?>: its spaces are ObjectSpace views of the boxes (DR-07).
+            env.ObservationSpace = new ObjectSpace(new Box(0, 1, Shape.Scalar));
+            env.ActionSpace = new ObjectSpace(new Box(0, 1, Shape.Scalar));
             Assert.AreEqual(env.ObservationSpace, wrapperEnv.ObservationSpace);
             Assert.AreEqual(env.ActionSpace, wrapperEnv.ActionSpace);
-            wrapperEnv.ObservationSpace = new Box(1f, 2f, Shape.Scalar);
-            wrapperEnv.ActionSpace = new Box(1f, 2f, Shape.Scalar);
+            wrapperEnv.ObservationSpace = new ObjectSpace(new Box(1, 2, Shape.Scalar));
+            wrapperEnv.ActionSpace = new ObjectSpace(new Box(1, 2, Shape.Scalar));
             Assert.AreNotEqual(env.ObservationSpace, wrapperEnv.ObservationSpace);
             Assert.AreNotEqual(env.ActionSpace, wrapperEnv.ActionSpace);
 
@@ -143,7 +144,7 @@ namespace Gym.Tests.Gymnasium {
             Assert.AreEqual(10.0, ((IWrapper)env).Env.GetWrapperAttr("gravity"));
 
             // Test with OrderEnforcing (intermediate wrapper)
-            Assert.IsFalse(env is OrderEnforcing<NDArray, long>);
+            Assert.IsFalse(env is OrderEnforcing<NDArray, NDArray>);
 
             // Show that the base and top level objects don't contain the attribute.
             Assert.ThrowsExactly<AttributeError>(() => PyAttributes.GetAttr(env, "_disable_render_order_enforcing"));
@@ -239,12 +240,12 @@ namespace Gym.Tests.Gymnasium {
         ///     (the wrappers' settings cleared, so that each wrapper puts its own back).
         /// </summary>
         /// <returns>The outermost wrapper.</returns>
-        private static TimeLimit<NDArray, long> MakeCartPole() {
+        private static TimeLimit<NDArray, NDArray> MakeCartPole() {
             var cartPole = new CartPoleEnv {
                 Spec = new EnvSpec("CartPole-v1", "Gym.Environments.Envs.Classic:CartPoleEnv", rewardThreshold: 475.0, maxEpisodeSteps: null, orderEnforce: false,
                     disableEnvChecker: true)
             };
-            return new TimeLimit<NDArray, long>(new OrderEnforcing<NDArray, long>(cartPole), 500);
+            return new TimeLimit<NDArray, NDArray>(new OrderEnforcing<NDArray, NDArray>(cartPole), 500);
         }
 
         /// <summary>The minimal env of the core tests: <c>Box(0, 1)</c> spaces, every step returns <c>(0, 0, False, False, {})</c>, reset seeds and returns <c>(0, {})</c>.</summary>
@@ -252,8 +253,8 @@ namespace Gym.Tests.Gymnasium {
         private sealed class ExampleEnv : Env<object?, object?> {
             /// <summary>Constructor for example environment.</summary>
             public ExampleEnv() {
-                ObservationSpace = new Box(0f, 1f, Shape.Scalar);
-                ActionSpace = new Box(0f, 1f, Shape.Scalar);
+                ObservationSpace = new ObjectSpace(new Box(0, 1, Shape.Scalar));
+                ActionSpace = new ObjectSpace(new Box(0, 1, Shape.Scalar));
             }
 
             /// <summary>Steps through the environment.</summary>

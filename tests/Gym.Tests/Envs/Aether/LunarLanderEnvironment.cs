@@ -67,7 +67,8 @@ namespace Gym.Tests.Envs.Aether {
                 NDArray state = env.Reset().Observation;
                 while (true) {
                     object a = PID(env, (float[]) state);
-                    var (observation, reward, terminated, truncated, information) = env.Step(a);
+                    // PID returns an int (discrete) or an NDArray (continuous): the untyped step converts either.
+                    var (observation, reward, terminated, truncated, information) = ((Gym.Envs.IEnv)env).Step(a);
                     // The reward is float32 arithmetic widened to float64 (P8 moves it to Gymnasium's float64), so narrowing is exact.
                     total_reward += (float)reward;
                     steps++;
@@ -79,7 +80,7 @@ namespace Gym.Tests.Envs.Aether {
                         break;
                     }
 
-                    state = observation;
+                    state = (NDArray)observation!;
                 }
                 if (seed.HasValue)
                 {
@@ -256,8 +257,9 @@ namespace Gym.Tests.Envs.Aether {
         /// <summary>
         ///     A continuous action with fewer than two throttles is rejected with NumPy's <see cref="IndexError"/>, before
         ///     the env reads the throttles. The reads are unchecked (NumSharp's <c>GetSingle</c>): a Debug build of NumSharp
-        ///     fails an assertion that terminates the process, and a Release build would read past the action's buffer. The
-        ///     0-d case is what <c>ActionSpace.Sample()</c> returns today (B-20).
+        ///     fails an assertion that terminates the process, and a Release build would read past the action's buffer.
+        ///     <c>ActionSpace.Sample()</c> returned the 0-d case until P2 (B-20); the action space is now Gymnasium's
+        ///     <c>Box(-1, 1, (2,), float32)</c>, whose samples have both throttles.
         /// </summary>
         [TestMethod]
         public void Step_ContinuousActionWithFewerThanTwoThrottles_ThrowsIndexError()
@@ -266,7 +268,9 @@ namespace Gym.Tests.Envs.Aether {
             env.Reset().Observation.Dispose();
 
             using NDArray sampled = env.ActionSpace.Sample();
-            var zeroD = Assert.ThrowsExactly<IndexError>(() => env.Step(sampled));
+            CollectionAssert.AreEqual(new long[] { 2 }, sampled.shape, "The continuous action space samples both throttles (B-20).");
+            using NDArray zeroDAction = NDArray.Scalar<float>(0.5f);
+            var zeroD = Assert.ThrowsExactly<IndexError>(() => env.Step(zeroDAction));
             Assert.AreEqual("too many indices for array: array is 0-dimensional, but 1 were indexed", zeroD.Message);
 
             using NDArray single = np.array(new float[] { 0.5f });

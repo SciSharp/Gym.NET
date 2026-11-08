@@ -127,17 +127,23 @@ namespace Gym.Envs {
             set => throw new AttributeError($"property 'spec' of '{PyAttributes.PyTypeName(GetType())}' object has no setter");
         }
 
-        /// <summary>The env's action space, unless this wrapper was assigned its own (Python's <c>_action_space</c>).</summary>
+        /// <summary>
+        ///     The env's action space, unless this wrapper was assigned its own (Python's <c>_action_space</c>). Forwarding needs
+        ///     the env's space to hold <typeparamref name="TWAct"/> elements: a wrapper that changes the action type assigns its
+        ///     own space, as Gymnasium's action wrappers do.
+        /// </summary>
         /// <exception cref="AttributeError">Thrown by the getter when neither this wrapper nor the env has one.</exception>
-        public override Space ActionSpace {
-            get => WrapperActionSpace ?? Env.ActionSpace;
+        /// <exception cref="TypeError">Thrown by the getter when the env's space holds another element type and this wrapper has none of its own.</exception>
+        public override Space<TWAct> ActionSpace {
+            get => WrapperActionSpace ?? Env.ActionSpace as Space<TWAct> ?? throw ForwardedSpaceMismatch("action_space", typeof(TWAct));
             set => WrapperActionSpace = value;
         }
 
         /// <summary>The env's observation space, unless this wrapper was assigned its own (Python's <c>_observation_space</c>).</summary>
         /// <exception cref="AttributeError">Thrown by the getter when neither this wrapper nor the env has one.</exception>
-        public override Space ObservationSpace {
-            get => WrapperObservationSpace ?? Env.ObservationSpace;
+        /// <exception cref="TypeError">Thrown by the getter when the env's space holds another element type and this wrapper has none of its own.</exception>
+        public override Space<TWObs> ObservationSpace {
+            get => WrapperObservationSpace ?? Env.ObservationSpace as Space<TWObs> ?? throw ForwardedSpaceMismatch("observation_space", typeof(TWObs));
             set => WrapperObservationSpace = value;
         }
 
@@ -167,13 +173,13 @@ namespace Gym.Envs {
             set => throw new AttributeError($"property '_np_random' of '{PyAttributes.PyTypeName(GetType())}' object has no setter");
         }
 
-        /// <summary>This wrapper's own action space (Python's <c>_action_space</c>), <see langword="null"/> to forward the env's.</summary>
+        /// <summary>This wrapper's own action space (Python's <c>_action_space</c>), <see langword="null"/> to forward the env's; the wrapper owns it.</summary>
         [PyName("_action_space")]
-        protected Space? WrapperActionSpace { get; set; }
+        protected Space<TWAct>? WrapperActionSpace { get; set; }
 
-        /// <summary>This wrapper's own observation space (Python's <c>_observation_space</c>), <see langword="null"/> to forward the env's.</summary>
+        /// <summary>This wrapper's own observation space (Python's <c>_observation_space</c>), <see langword="null"/> to forward the env's; the wrapper owns it.</summary>
         [PyName("_observation_space")]
-        protected Space? WrapperObservationSpace { get; set; }
+        protected Space<TWObs>? WrapperObservationSpace { get; set; }
 
         /// <summary>This wrapper's own metadata (Python's <c>_metadata</c>), <see langword="null"/> to forward the env's.</summary>
         [PyName("_metadata")]
@@ -212,6 +218,28 @@ namespace Gym.Envs {
 
         /// <summary>Closes the env beneath (<c>self.env.close()</c>).</summary>
         public override void Close() => Env.Close();
+
+        /// <summary>
+        ///     Closes through <see cref="Close"/>, then releases this wrapper's own spaces and disposes the env it wraps, which
+        ///     closes again (every env's close tolerates that) and releases the env's spaces: disposing the outermost wrapper
+        ///     disposes the whole stack.
+        /// </summary>
+        /// <param name="disposing"><see langword="true"/> from <see cref="Env{TObs, TAct}.Dispose()"/>.</param>
+        protected override void Dispose(bool disposing) {
+            base.Dispose(disposing);
+            if (!disposing)
+                return;
+            WrapperActionSpace?.Dispose();
+            WrapperObservationSpace?.Dispose();
+            Env.Dispose();
+        }
+
+        /// <summary>The error for forwarding an env space whose elements are not this wrapper's type.</summary>
+        /// <param name="attribute"><c>action_space</c> or <c>observation_space</c>.</param>
+        /// <param name="expected">The wrapper's element type.</param>
+        /// <returns>The error to throw.</returns>
+        private TypeError ForwardedSpaceMismatch(string attribute, Type expected) =>
+            new($"{PyAttributes.PyTypeName(GetType())} forwards the env's {attribute}, whose elements are not {expected.Name}; assign the wrapper its own {attribute}.");
 
         /// <summary>The wrapper's class name (<c>class_name()</c>): the type name without generic arity, <c>TimeLimit</c>.</summary>
         /// <returns>The name its <see cref="WrapperSpec"/> records.</returns>

@@ -52,7 +52,7 @@ namespace Gym.Tests.Parity.Tests.Spaces {
                 seed => {
                     using NDArray low = MixedLow();
                     using NDArray high = MixedHigh();
-                    return new Box(low, high, np.float64, seed: seed);
+                    return new Box(low, high, dtype: np.float64, seed: seed);
                 }),
             ("spaces.Box(0, 5, (8,), np.int32, seed={seed})",
                 seed => ScalarBox(0L, 5L, new long[] { 8 }, "int32", seed),
@@ -92,8 +92,8 @@ namespace Gym.Tests.Parity.Tests.Spaces {
             Box dotnet = create(0);
             ByteContract.AssertSame($"{code}.low", Outcome.CapturePython(() => Python.gymnasium.spaces.box.Box.low(python.Object)), Outcome.Returned(ValueFacts.Of(dotnet.Low)));
             ByteContract.AssertSame($"{code}.high", Outcome.CapturePython(() => Python.gymnasium.spaces.box.Box.high(python.Object)), Outcome.Returned(ValueFacts.Of(dotnet.High)));
-            ByteContract.AssertSame($"{code}.bounded_below", Outcome.CapturePython(() => Python.gymnasium.spaces.box.Box.bounded_below(python.Object)), Outcome.Returned(ValueFacts.Of(dotnet.BoundedLow)));
-            ByteContract.AssertSame($"{code}.bounded_above", Outcome.CapturePython(() => Python.gymnasium.spaces.box.Box.bounded_above(python.Object)), Outcome.Returned(ValueFacts.Of(dotnet.BoundedHigh)));
+            ByteContract.AssertSame($"{code}.bounded_below", Outcome.CapturePython(() => Python.gymnasium.spaces.box.Box.bounded_below(python.Object)), Outcome.Returned(ValueFacts.Of(dotnet.BoundedBelow)));
+            ByteContract.AssertSame($"{code}.bounded_above", Outcome.CapturePython(() => Python.gymnasium.spaces.box.Box.bounded_above(python.Object)), Outcome.Returned(ValueFacts.Of(dotnet.BoundedAbove)));
             ByteContract.AssertSame($"{code}.dtype", Outcome.CapturePython(() => Python.gymnasium.spaces.space.Space.dtype(python.Object)), Outcome.Returned(ValueFacts.Of(dotnet.DType)));
             ByteContract.AssertSame($"{code}.shape", Outcome.CapturePython(() => Python.gymnasium.spaces.space.Space.shape(python.Object)), Outcome.Returned(DiscreteLiveParityTests.ShapeFacts(dotnet.Shape)));
             foreach ((string manner, BoundedMannerEnum value) in new[] { ("both", BoundedMannerEnum.Both), ("below", BoundedMannerEnum.Below), ("above", BoundedMannerEnum.Above) })
@@ -151,10 +151,9 @@ namespace Gym.Tests.Parity.Tests.Spaces {
 
         /// <summary>
         ///     Gymnasium also requires <c>np.can_cast(x.dtype, self.dtype)</c>, so a float64 point is not a member of a float32
-        ///     box even when its values are in range; Gym.NET accepts it.
+        ///     box even when its values are in range, and neither is it in Gym.NET's since P2.2 (an open cell until then).
         /// </summary>
         [TestMethod]
-        [OpenBugs("P2")]
         public void Contains_RequiresCastableDtypes_LikeGymnasium() {
             using PyRef python = PyRef.Of(() => ScalarBox(-1.0, 1.0, new long[] { 3 }, "float32", null));
             var dotnet = new Box(-1f, 1f, new Shape(3), np.float32);
@@ -163,11 +162,10 @@ namespace Gym.Tests.Parity.Tests.Spaces {
         }
 
         /// <summary>
-        ///     Gymnasium converts a point that is not an array (a list) with <c>np.asarray(x, dtype=self.dtype)</c> and answers;
-        ///     Gym.NET throws <see cref="NotSupportedException"/>.
+        ///     Gymnasium converts a point that is not an array (a list) with <c>np.asarray(x, dtype=self.dtype)</c> and answers,
+        ///     after warning; Gym.NET does the same since P2.2 (it threw <see cref="NotSupportedException"/> before).
         /// </summary>
         [TestMethod]
-        [OpenBugs("P2")]
         public void Contains_AcceptsAList_LikeGymnasium() {
             using PyRef python = PyRef.Of(() => ScalarBox(-1.0, 1.0, new long[] { 3 }, "float32", null));
             var dotnet = new Box(-1f, 1f, new Shape(3), np.float32);
@@ -180,14 +178,13 @@ namespace Gym.Tests.Parity.Tests.Spaces {
 
         /// <summary>
         ///     A float64 box keeps its bounds in double precision: Gymnasium's <c>Box(-0.1, 0.1, (2,), np.float64)</c> stores
-        ///     -0.1 exactly as the double -0.1. Gym.NET's scalar constructor takes <see cref="float"/> bounds, so it stores
-        ///     -0.10000000149011612, and every sample shifts with it.
+        ///     -0.1 exactly as the double -0.1, and so does Gym.NET's scalar constructor, which takes <see cref="double"/> bounds
+        ///     since P2.2. The <see cref="float"/> constructor it replaced stored -0.10000000149011612, and every sample shifted.
         /// </summary>
         [TestMethod]
-        [OpenBugs("P2")]
         public void Bounds_OfAFloat64Box_KeepDoublePrecision() {
             using PyRef python = PyRef.Of(() => ScalarBox(-0.1, 0.1, new long[] { 2 }, "float64", null));
-            var dotnet = new Box(-0.1f, 0.1f, new Shape(2), np.float64);
+            using var dotnet = new Box(-0.1, 0.1, new Shape(2), np.float64);
             ByteContract.AssertSame("Box(-0.1, 0.1, (2,), float64).low", Outcome.CapturePython(() => Python.gymnasium.spaces.box.Box.low(python.Object)), Outcome.Returned(ValueFacts.Of(dotnet.Low)));
         }
 

@@ -24,11 +24,51 @@ namespace Gym.Tests.Envs {
         /// <summary>An action enum backed by <see cref="long"/>: the former <c>(TAction)(object)action</c> could not unbox even a boxed int into it.</summary>
         private enum Move : long { Left = 0, Right = 1 }
 
+        /// <summary>
+        ///     The moves as a space: a <c>Discrete(2)</c> whose samples are the enum members, which is what an enum-typed env's
+        ///     action space must be now that spaces are typed by their elements (DR-07).
+        /// </summary>
+        private sealed class MoveSpace : Space<Move> {
+            /// <summary>The integers the moves stand for.</summary>
+            private readonly Discrete _moves;
+
+            /// <summary>Two moves, drawn from a fixed seed.</summary>
+            /// <param name="seed">The seed of the underlying <c>Discrete(2)</c>.</param>
+            public MoveSpace(long seed) : base(NumSharp.Shape.Scalar, np.int64, null) {
+                _moves = new Discrete(2, seed: seed);
+            }
+
+            /// <summary>A move flattens as its integer does.</summary>
+            public override bool IsNpFlattenable => true;
+
+            /// <summary>A move drawn as <c>Discrete(2)</c> draws its integer.</summary>
+            /// <param name="mask">The <c>Discrete</c> mask, or <see langword="null"/>.</param>
+            /// <param name="probability">The <c>Discrete</c> probability mask, or <see langword="null"/>.</param>
+            /// <returns>The move.</returns>
+            public override Move Sample(object? mask = null, object? probability = null) {
+                using NDArray drawn = _moves.Sample(mask, probability);
+                return (Move)Discrete.ToInt64(drawn);
+            }
+
+            /// <summary>Whether the value is one of the two moves' integers.</summary>
+            /// <param name="x">The candidate.</param>
+            /// <returns><see langword="true"/> for 0 or 1 (or a member).</returns>
+            public override bool Contains(object? x) => _moves.Contains(x);
+
+            /// <summary>Releases the underlying space.</summary>
+            /// <param name="disposing"><see langword="true"/> from <see cref="Space.Dispose()"/>.</param>
+            protected override void Dispose(bool disposing) {
+                if (disposing)
+                    _moves.Dispose();
+                base.Dispose(disposing);
+            }
+        }
+
         /// <summary>The smallest enum-typed env: it records the last typed action it was stepped with.</summary>
         private sealed class RecordingEnv : Env<NDArray, Move> {
             /// <summary>Two moves, drawn from a fixed seed so tests are reproducible.</summary>
             public RecordingEnv() {
-                ActionSpace = new Discrete(2, seed: 0);
+                ActionSpace = new MoveSpace(seed: 0);
             }
 
             /// <summary>The typed action of the last <see cref="Step(Move)"/> call.</summary>
@@ -65,9 +105,12 @@ namespace Gym.Tests.Envs {
                 Assert.AreEqual(Move.Right, env.Last, $"{action} ({action.GetType().Name})");
             }
 
-            using var sampled = env.ActionSpace.Sample();
+            // A sampled Discrete action, the 0-d int64 array an untyped caller would pass (DR-08).
+            using var moves = new Discrete(2, seed: 0);
+            using NDArray sampled = moves.Sample();
             untyped.Step(sampled);
-            Assert.AreEqual((Move)(long)sampled, env.Last);
+            Assert.AreEqual((Move)Discrete.ToInt64(sampled), env.Last);
+            Assert.IsTrue(Enum.IsDefined(env.ActionSpace.Sample()), "The typed action space samples a defined move.");
         }
 
         /// <summary>An untyped action that denotes no integer is refused with Python's <c>TypeError</c>, naming the value.</summary>

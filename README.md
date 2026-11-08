@@ -33,7 +33,7 @@ using Gym.Wrappers;
 
 // "human" renders every reset and step into the window, paced at metadata["render_fps"] (50 fps);
 // "rgb_array" would instead make Render() return each frame as a RenderResult.Rgb.
-using var cp = new TimeLimit<NDArray, long>(
+using var cp = new TimeLimit<NDArray, NDArray>(
     new CartPoleEnv(renderMode: "human", viewerFactory: WinFormEnvViewer.Factory), //or AvaloniaEnvViewer.Factory
     maxEpisodeSteps: 500);
 

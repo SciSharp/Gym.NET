@@ -52,6 +52,14 @@
     <None Include="..\..\eng\icon.png" Pack="true" PackagePath="\" Visible="false" />
     <None Include="..\..\README.md" Pack="true" PackagePath="\" Visible="false" />
   </ItemGroup>
+  <!-- NumSharp.Build, the [NDScoped] IL weaver of decision D19: after compile it wraps each [NDScoped] method's body in an
+       NDScope, so a method's temporary arrays are reclaimed while its results (and the INDArrayCarrier results,
+       StepResult/ResetResult) survive. A development dependency: PrivateAssets="all" keeps it out of the package's
+       dependencies, and it rewrites only this assembly. -p:SkipNDScopeWeave=true builds without weaving. -->
+  <ItemGroup>
+    <PackageReference Include="NumSharp.Build" Version="0.80.0" PrivateAssets="all" />
+  </ItemGroup>
+
   <!-- NumSharp: the regular NuGet reference, used as it stands by default (NumSharpSource=Package; 0.80.0 is the first
        release with the DType API). -p:NumSharpSource=Submodule makes eng/NumSharp.props swap it for refs/NumSharp's source
        build, with its ownership analyzer, to try a NumSharp fix before NumSharp releases it. The import stays last: it

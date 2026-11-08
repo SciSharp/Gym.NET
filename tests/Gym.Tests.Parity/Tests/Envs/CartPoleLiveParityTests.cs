@@ -392,9 +392,11 @@ namespace Gym.Tests.Parity.Tests.Envs {
             ValueFacts pythonWarnings = Outcome.CapturePython(() => Python.evalStmts(stepsAfterTermination, "recorded", ("env", python.Object))).Expect("three steps after termination");
 
             IReadOnlyList<WarningMessage> records;
+            // One 0-d action for the three steps (DR-08's discrete action), released with the observations it produced.
+            using (NDArray right = NDArray.Scalar<long>(1L))
             using (WarningCatcher catcher = Warnings.Catch()) {
                 for (int i = 0; i < 3; i++)
-                    dotnet.Step(1L);
+                    dotnet.Step(right).Observation.Dispose();
                 records = catcher.Records;
             }
 
@@ -466,8 +468,8 @@ namespace Gym.Tests.Parity.Tests.Envs {
             var space = (Box)new CartPoleEnv().ObservationSpace;
             ByteContract.AssertSame("CartPole observation_space.high", Outcome.CapturePython(() => Python.gymnasium.spaces.box.Box.high(python.Object)), Outcome.Returned(ValueFacts.Of(space.High)));
             ByteContract.AssertSame("CartPole observation_space.low", Outcome.CapturePython(() => Python.gymnasium.spaces.box.Box.low(python.Object)), Outcome.Returned(ValueFacts.Of(space.Low)));
-            ByteContract.AssertSame("CartPole observation_space.bounded_above", Outcome.CapturePython(() => Python.gymnasium.spaces.box.Box.bounded_above(python.Object)), Outcome.Returned(ValueFacts.Of(space.BoundedHigh)));
-            ByteContract.AssertSame("CartPole observation_space.bounded_below", Outcome.CapturePython(() => Python.gymnasium.spaces.box.Box.bounded_below(python.Object)), Outcome.Returned(ValueFacts.Of(space.BoundedLow)));
+            ByteContract.AssertSame("CartPole observation_space.bounded_above", Outcome.CapturePython(() => Python.gymnasium.spaces.box.Box.bounded_above(python.Object)), Outcome.Returned(ValueFacts.Of(space.BoundedAbove)));
+            ByteContract.AssertSame("CartPole observation_space.bounded_below", Outcome.CapturePython(() => Python.gymnasium.spaces.box.Box.bounded_below(python.Object)), Outcome.Returned(ValueFacts.Of(space.BoundedBelow)));
             ByteContract.AssertSame("CartPole observation_space.dtype", Outcome.CapturePython(() => Python.gymnasium.spaces.space.Space.dtype(python.Object)), Outcome.Returned(ValueFacts.Of(space.DType)));
             ByteContract.AssertSame("CartPole observation_space.shape", Outcome.CapturePython(() => Python.gymnasium.spaces.space.Space.shape(python.Object)), Outcome.Returned(Spaces.DiscreteLiveParityTests.ShapeFacts(space.Shape)));
         }
