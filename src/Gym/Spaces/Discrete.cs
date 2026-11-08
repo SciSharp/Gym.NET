@@ -92,16 +92,19 @@ namespace Gym.Spaces {
         }
 
         /// <summary>
-        ///     The one integer a size-less draw returns. NumSharp's <c>Generator.choice(array)</c> returns it as a one-element
-        ///     1-D array where NumPy returns a scalar, while <c>Generator.integers</c> returns a 0-d array; both hold the same
-        ///     value NumPy draws.
+        ///     The one integer a size-less draw returns: since NumSharp 0.80.0 both <c>Generator.integers</c> and
+        ///     <c>Generator.choice(array)</c> return it as a 0-d array, NumSharp's stand-in for the NumPy scalar NumPy returns.
+        ///     NumSharp 0.70's <c>choice</c> returned a one-element 1-D array instead, which this method used to accept too.
         /// </summary>
-        /// <param name="draw">A 0-d or one-element array; the caller keeps ownership.</param>
+        /// <param name="draw">A 0-d array; the caller keeps ownership.</param>
         /// <returns>The drawn value.</returns>
-        /// <exception cref="InvalidOperationException">Thrown when <paramref name="draw"/> does not hold exactly one element.</exception>
+        /// <exception cref="InvalidOperationException">
+        ///     Thrown when <paramref name="draw"/> is not 0-d, which would also surface a NumSharp regression to the old shape
+        ///     instead of reading past it.
+        /// </exception>
         private static long SingleValue(NDArray draw) {
-            if (draw.size != 1)
-                throw new InvalidOperationException($"Expected a single drawn value, got {draw.size}.");
+            if (draw.ndim != 0)
+                throw new InvalidOperationException($"Expected a 0-d drawn value, got shape {draw.Shape}.");
             return Convert.ToInt64(draw.GetAtIndex(0));
         }
 

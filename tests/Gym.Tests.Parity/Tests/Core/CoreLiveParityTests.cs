@@ -285,15 +285,31 @@ namespace Gym.Tests.Parity.Tests.Core {
         }
 
         /// <summary>
-        ///     <c>render()</c> without a render mode: a bare <c>AssertionError</c> when the env has no spec (an env built with its
-        ///     constructor), and with a spec the warning naming its id and <c>None</c>.
+        ///     <c>render()</c> without a render mode and without a spec (an env built with its constructor): Gymnasium's bare
+        ///     <c>assert self.spec is not None</c>, an <c>AssertionError</c> whose <c>str()</c> is empty.
         /// </summary>
+        /// <remarks>
+        ///     Open until NumSharp's parameterless <c>AssertionError()</c> carries Python's empty message (N-1, DR-02): Gym.NET
+        ///     throws NumSharp's type, which matches, but its message reads <c>"AssertionError"</c> today. Split from the
+        ///     spec-and-warning half below, which stays gated.
+        /// </remarks>
         [TestMethod]
-        public void RenderWithoutRenderMode_MatchesGymnasium() {
+        [OpenBugs("N-1")]
+        public void RenderWithoutRenderMode_WithoutSpec_RaisesGymnasiumsBareAssertion() {
             using PyRef python = PyRef.Of(() => Python.gymnasium.envs.classic_control.CartPoleEnv());
             var dotnet = new CartPoleEnv();
             ByteContract.AssertSame("reset(seed=0)", Outcome.CapturePython(() => Python.gymnasium.Env.reset(python.Object, 0)), Outcome.Capture(() => TupleOf(dotnet.Reset(0))));
             ByteContract.AssertSame("render() without a spec", Outcome.CapturePython(() => Python.gymnasium.Env.render(python.Object)), Outcome.Capture(() => FrameOf(dotnet.Render())));
+        }
+
+        /// <summary>
+        ///     <c>render()</c> without a render mode on an env that has a spec: the warning naming its id, and <c>None</c>.
+        /// </summary>
+        [TestMethod]
+        public void RenderWithoutRenderMode_WithSpec_MatchesGymnasium() {
+            using PyRef python = PyRef.Of(() => Python.gymnasium.envs.classic_control.CartPoleEnv());
+            var dotnet = new CartPoleEnv();
+            ByteContract.AssertSame("reset(seed=0)", Outcome.CapturePython(() => Python.gymnasium.Env.reset(python.Object, 0)), Outcome.Capture(() => TupleOf(dotnet.Reset(0))));
 
             const string renderWithSpec =
                 "import warnings\n" +

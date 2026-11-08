@@ -3,6 +3,7 @@
 | | |
 |---|---|
 | **Status** | Draft 2, 2026-11-08: the implementation designs are reviewed and approved in [`DESIGN_REVIEW.md`](DESIGN_REVIEW.md) (DR-01…DR-36). **A step starts only when every design it depends on is approved there** |
+| **Progress** | Approved to run on 2026-11-09: R0, P0r, P2, P3, P7, P4, P5, P6 (what is necessary; the rest deferred and listed), then P10 prepared without publishing or pushing. Done: R0.2 (`e4e5215`), R0.1 + R0.3 (2026-11-09) |
 | **Scope** | Everything [`GYMNASIUM_PORT_PLAN.md`](GYMNASIUM_PORT_PLAN.md) still has open, up to one 2.0 release that includes Box2D (D21); MuJoCo is postponed out of 2.0 (DR-35) |
 | **Starting point** | branch `journey1` @ `7b7c919`, cut from `feat/numsharp-master-migration` (13 commits ahead of `master`, pushed 2026-09-27, no PR); all work continues on `journey1` until 2.0 (D20) |
 | **Source of truth** | `refs/Gymnasium` @ `9e04324` today; `v1.4.0` (`8ba8c3a6`) after step R0.4 (D2) |
@@ -166,7 +167,9 @@ Each numbered step is one commit, unless it says otherwise.
 
 ### R0 Re-baseline
 
-- **R0.1 NumSharp 0.80.0.**
+- **R0.1 NumSharp 0.80.0.** *Done 2026-11-09, with R0.3 in one commit (R0.1 alone cannot pack in Package mode):
+  unit 207/207 gated (203 + the 4 gated inner-exception rows), 8 `[OpenBugs]` (N-1, N-3) failing as designed; parity
+  163/163 gated, 15 `[OpenBugs]` (the 14 + one N-1 cell), all on net8.0 and net10.0, Debug and Release.*
   - Raise `NumSharp` to 0.80.0 in the five projects that declare it, and `NumSharp.Interop.pythonnet` to 0.80.0 in
     the parity suite.
   - Make `NumSharpSource=Package` the default in `eng/NumSharp.props`. Submodule mode stays, with its guards and the
@@ -183,11 +186,11 @@ Each numbered step is one commit, unless it says otherwise.
       `SeedTests`' inconclusive case for a zero top word;
     - the parity harness's `np.atleast_1d` around `choice()` (`SeedingLiveParityTests`, the 9 failing cells).
   - Update `NUMSHARP_MIGRATION_PLAN.md`'s status and §14, and the root `CLAUDE.md`.
-- **R0.2 ImageSharp advisories (D18).** A root `Directory.Build.props`, new and holding only the five
+- **R0.2 ImageSharp advisories (D18).** *Done (`e4e5215`).* A root `Directory.Build.props`, new and holding only the five
   `NuGetAuditSuppress` items, each with its advisory's title and the reason it doesn't apply. The comment also records
   that the suppression covers only our build: consumers' restores still report the advisories. A new advisory against
   2.1.13 fails the build again, by design, and gets the same review.
-- **R0.3 Package metadata.** `PackageLicenseExpression` `Apache-2.0`, a packed `PackageIcon`, and a `PackageReadmeFile`
+- **R0.3 Package metadata.** *Done 2026-11-09, with R0.1.* `PackageLicenseExpression` `Apache-2.0`, a packed `PackageIcon`, and a `PackageReadmeFile`
   replace `PackageLicenseUrl`/`PackageIconUrl` in the five packable projects (NU5048/NU5125). `JetBrains.Annotations`
   gets `PrivateAssets="all"`, and `Gym.csproj` drops `SixLabors.ImageSharp.Drawing`, which nothing in `src/Gym` uses
   (both found by the 2026-09-23 NuGet review).

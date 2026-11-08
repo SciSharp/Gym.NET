@@ -89,14 +89,20 @@ dotnet build src/Gym.Rendering.WinForm/Gym.Rendering.WinForm.csproj -c Release
 
 ### 3.2 Running Automated Tests
 
-Tests are located in `tests/Gym.Tests/` using MSTest.
+Tests are located in `tests/Gym.Tests/` using MSTest. Tests that assert a reference behavior Gym.NET or NumSharp doesn't
+provide yet are `[OpenBugs("N-x")]` (decision DR-01; `tests/Gym.Tests/NumSharpGaps` proves each NumSharp gap): gated runs
+exclude them, as in the parity suite. The viewer tests (`*AvaloniaEnv`, `*WinFormEnv`) open windows; exclude them on a
+machine whose screen must not be used.
 
 ```powershell
-# Run full test suite
-dotnet test tests/Gym.Tests/Gym.Tests.csproj
+# The gate: every unit test that must pass, headless
+dotnet test tests/Gym.Tests/Gym.Tests.csproj --filter "FullyQualifiedName!~AvaloniaEnv&FullyQualifiedName!~WinFormEnv&TestCategory!=OpenBugs"
+
+# The open gaps (NumSharp items N-1, N-3, ...), each failing until its fix lands
+dotnet test tests/Gym.Tests/Gym.Tests.csproj --filter "TestCategory=OpenBugs"
 
 # Run tests targeting a specific framework
-dotnet test tests/Gym.Tests/Gym.Tests.csproj -f net6.0-windows
+dotnet test tests/Gym.Tests/Gym.Tests.csproj -f net10.0-windows
 
 # Run a specific test class
 dotnet test tests/Gym.Tests/Gym.Tests.csproj --filter "FullyQualifiedName~CartpoleEnvironment"
@@ -131,7 +137,11 @@ dotnet test tests/Gym.Tests.Parity/Gym.Tests.Parity.csproj --filter "TestCategor
 ### 3.4 Submodule Management
 
 ```powershell
-# Initialize the Gymnasium and NumSharp SOT submodules. The build compiles NumSharp from refs/NumSharp (eng/NumSharp.props).
-# Not --recursive: that would also clone NumSharp's own submodules (numpy, OpenBLAS, onnxruntime, ...), which the build does not need.
+# Initialize the Gymnasium and NumSharp SOT submodules (refs/NumSharp at its v0.80.0 tag, the agents' NumSharp reference).
+# Not --recursive: that would also clone NumSharp's own submodules (numpy, OpenBLAS, onnxruntime, ...), which nothing needs.
 git submodule update --init refs/Gymnasium refs/NumSharp
+
+# The build uses NuGet NumSharp 0.80.0 by default (eng/NumSharp.props, decision D3). To try a NumSharp fix before it is
+# released, check it out in refs/NumSharp and build from source:
+dotnet build Gym.NET.sln -p:NumSharpSource=Submodule
 ```

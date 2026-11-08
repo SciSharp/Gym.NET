@@ -119,8 +119,9 @@ namespace Gym.Tests.Parity.Oracle {
 
     /// <summary>
     ///     Which .NET exception type a Python exception must correspond to, following the port plan's §3.4: Python's
-    ///     built-ins map to NumSharp's counterparts (decision D17), <c>gymnasium.error</c> types to the classes of the same
-    ///     names in <c>Gym.Exceptions</c>, and built-ins NumSharp lacks to <c>Gym.Exceptions</c> as well.
+    ///     built-ins map to NumSharp's counterparts (decisions D17 and DR-02), <c>gymnasium.error</c> types to the classes of
+    ///     the same names in <c>Gym.Exceptions</c>, and the built-ins NumSharp still lacks (open item N-3) to
+    ///     <c>Gym.Exceptions</c> as well, until NumSharp adds them.
     /// </summary>
     public static class ExceptionMap {
         /// <summary>Python built-ins that NumSharp has counterparts for, by the name <c>ValueFacts.PythonTypeName</c> prints for them.</summary>
@@ -137,8 +138,10 @@ namespace Gym.Tests.Parity.Oracle {
             ["OverflowError"] = "System.OverflowException",
             // .NET's own counterpart, which PyMath throws with Python's messages, as OverflowError maps to OverflowException.
             ["ZeroDivisionError"] = "System.DivideByZeroException",
-            // Not in NumSharp: the port plan puts them in Gym.Exceptions (D17), which defines them.
-            ["AssertionError"] = "Gym.Exceptions.AssertionError",
+            // NumSharp 0.80.0 added AssertionError, so Gym.NET throws NumSharp's (DR-02).
+            ["AssertionError"] = "NumSharp.AssertionError",
+            // Not in NumSharp 0.80.0: Gym.Exceptions keeps them until NumSharp adds them (DR-01's stuck-case workaround,
+            // open item N-3); this row then moves to NumSharp's type names.
             ["NotImplementedError"] = "Gym.Exceptions.NotImplementedError",
             ["ImportError"] = "Gym.Exceptions.ImportError",
         };

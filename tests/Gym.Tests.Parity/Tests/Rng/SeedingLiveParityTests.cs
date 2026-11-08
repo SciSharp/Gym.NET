@@ -51,22 +51,22 @@ namespace Gym.Tests.Parity.Tests.Rng {
                 using PyObject int64 = Python.numpy.dtype("int64");
                 return Python.numpy.random.Generator.integers(g, 4, dtype: int64);
             }, g => g.integers(4, dtype: np.int64)),
-            ("np.atleast_1d(g.choice(np.array([0, 2, 3])))", g => {
+            // A size-less choice is a scalar in NumPy and, since NumSharp 0.80.0, a 0-d array in NumSharp; the comparer's
+            // scalar rule equates the two, so both sides are compared as returned (0.70's (1,) shape needed np.atleast_1d).
+            ("g.choice(np.array([0, 2, 3]))", g => {
                 using NDArray valid = np.array(new long[] { 0, 2, 3 });
                 using PyObject population = valid.ToNumpyCopy();
-                using PyObject drawn = Python.numpy.random.Generator.choice(g, population);
-                return Python.numpy.atleast_1d(drawn);
+                return Python.numpy.random.Generator.choice(g, population);
             }, g => {
                 using NDArray valid = np.array(new long[] { 0, 2, 3 });
                 return g.choice(valid);
             }),
-            ("np.atleast_1d(g.choice(np.arange(4), p=np.array([0.1, 0.2, 0.3, 0.4])))", g => {
+            ("g.choice(np.arange(4), p=np.array([0.1, 0.2, 0.3, 0.4]))", g => {
                 using NDArray values = np.arange(4L);
                 using NDArray probability = np.array(new[] { 0.1, 0.2, 0.3, 0.4 });
                 using PyObject population = values.ToNumpyCopy();
                 using PyObject p = probability.ToNumpyCopy();
-                using PyObject drawn = Python.numpy.random.Generator.choice(g, population, p: p);
-                return Python.numpy.atleast_1d(drawn);
+                return Python.numpy.random.Generator.choice(g, population, p: p);
             }, g => {
                 using NDArray values = np.arange(4L);
                 using NDArray probability = np.array(new[] { 0.1, 0.2, 0.3, 0.4 });
@@ -163,14 +163,12 @@ namespace Gym.Tests.Parity.Tests.Rng {
 
         /// <summary>
         ///     An unseeded generator reports its 128-bit entropy as the seed, and Gymnasium, given that seed, builds the same
-        ///     generator: the entropy path of <c>NpRandom()</c> crosses over to NumPy's <c>SeedSequence</c> intact.
+        ///     generator: the entropy path of <c>NpRandom()</c> crosses over to NumPy's <c>SeedSequence</c> intact, a zero top
+        ///     32-bit word included, since NumSharp 0.80.0 builds the unseeded pool from the reported integer as NumPy does.
         /// </summary>
         [TestMethod]
         public void NpRandom_Unseeded_ReportsASeedGymnasiumRebuildsTheGeneratorFrom() {
             (Generator rng, BigInteger reported) = Seeding.NpRandom();
-            // Seeding's documented 1-in-2^32 exception: with a zero top word NumPy derives the pool from three words.
-            if (reported >> 96 == BigInteger.Zero)
-                Assert.Inconclusive("The drawn entropy's top 32-bit word is zero; NumPy would rebuild a different pool from it.");
             (_, Outcome pythonState) = GymnasiumNpRandom(reported);
             ByteContract.AssertSame($"seeding.np_random({reported.ToString(CultureInfo.InvariantCulture)})[0].bit_generator.state", pythonState, Outcome.Returned(RngFacts.Of(rng)));
         }

@@ -38,13 +38,12 @@
     <ProjectReference Include="..\..\src\Gym.Rendering\Gym.Rendering.csproj" />
   </ItemGroup>
 
-  <!-- NumSharp and its pythonnet bridge: the regular NuGet references, co-versioned. While NumSharpSource=Submodule (the
-       default until a NumSharp release contains the DType API), eng/NumSharp.props replaces both with refs/NumSharp's
-       source builds; -p:NumSharpSource=Package builds against them as they stand. The import stays last: an item Remove
-       only sees the items declared before it. -->
+  <!-- NumSharp and its pythonnet bridge: the regular NuGet references, co-versioned, used as they stand by default
+       (NumSharpSource=Package). -p:NumSharpSource=Submodule makes eng/NumSharp.props replace both with refs/NumSharp's
+       source builds. The import stays last: an item Remove only sees the items declared before it. -->
   <ItemGroup>
-    <PackageReference Include="NumSharp" Version="0.70.0" />
-    <PackageReference Include="NumSharp.Interop.pythonnet" Version="0.70.0" />
+    <PackageReference Include="NumSharp" Version="0.80.0" />
+    <PackageReference Include="NumSharp.Interop.pythonnet" Version="0.80.0" />
   </ItemGroup>
   <Import Project="..\..\eng\NumSharp.props" />
 

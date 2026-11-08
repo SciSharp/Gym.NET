@@ -35,11 +35,11 @@
   </ItemGroup>
 
   <!-- NumSharp: the regular NuGet reference, declared here as well so the ownership analyzer also covers the tests (a
-       package's analyzer does not flow to projects that reference it only through another project). While
-       NumSharpSource=Submodule (the default until a NumSharp release contains the DType API), eng/NumSharp.props removes
-       it and builds refs/NumSharp from source; -p:NumSharpSource=Package builds against it as it stands. -->
+       package's analyzer does not flow to projects that reference it only through another project). Used as it stands by
+       default (NumSharpSource=Package); -p:NumSharpSource=Submodule makes eng/NumSharp.props swap it for refs/NumSharp's
+       source build. -->
   <ItemGroup>
-    <PackageReference Include="NumSharp" Version="0.70.0" />
+    <PackageReference Include="NumSharp" Version="0.80.0" />
   </ItemGroup>
   <Import Project="..\..\eng\NumSharp.props" />
 

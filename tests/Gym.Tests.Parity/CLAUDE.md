@@ -126,7 +126,9 @@ Gym.NET's `TimeLimit(OrderEnforcing(env))` until Gym.NET's own `make` (P3).
 `Outcome.CapturePython(() => Python.gymnasium.utils.seeding.np_random(seed))` (with `seed` a `PyInt` of -1) against
 `Outcome.Capture(() => Seeding.NpRandom(-1))` passes when Gym.NET throws `Gym.Exceptions.Error` with Gymnasium's message. `ExceptionMap` holds the port plan's §3.4 mapping
 (`ValueError` → `NumSharp.ValueError`, `gymnasium.error.X` → `Gym.Exceptions.X`, `AssertionError` →
-`Gym.Exceptions.AssertionError`, `OverflowError` → `System.OverflowException`, the type NumSharp throws for NumPy's).
+`NumSharp.AssertionError` since NumSharp 0.80.0, `OverflowError` → `System.OverflowException`, the type NumSharp throws
+for NumPy's). The built-ins NumSharp still lacks (`NotImplementedError`, `ImportError`: open item N-3) map to
+`Gym.Exceptions` until NumSharp adds them (decisions DR-01, DR-02).
 
 ---
 
@@ -138,8 +140,9 @@ Gym.NET's `TimeLimit(OrderEnforcing(env))` until Gym.NET's own `make` (P3).
   Rewards compare as float64 bits (`FieldPolicy.Float64Value`, plan §5), so a float32 reward still shows its ulp distance.
 - **The expectation is always Gymnasium's**, never today's Gym.NET output. A cell Gym.NET fails today gets
   `[OpenBugs("B-xx", ...)]` with the ids from the port plan's defect register (Appendix B) or its workstreams (`F6`,
-  `P2`). Lifecycle, as in NumSharp: the port lands, the cell passes, **remove the attribute** so it becomes a gate.
-  A deliberate, documented deviation is not an open bug.
+  `P2`); a cell that fails because of a NumSharp gap gets that gap's N-item from docs/plans/COMPLETION_PLAN.md §7
+  (`[OpenBugs("N-1")]`, decision DR-01). Lifecycle, as in NumSharp: the port or the NumSharp release lands, the cell
+  passes, **remove the attribute** so it becomes a gate. A deliberate, documented deviation is not an open bug.
 - **Split a cell where only part diverges**, so the part that matches stays gated (`Contains_MatchesGymnasium` gated,
   `Contains_RequiresCastableDtypes_LikeGymnasium` open).
 - **Pin libm-dependent cells to the reference platform** with `SkipOffReferencePlatform(...)` (CartPole's `cos`/`sin`):
@@ -172,7 +175,7 @@ Gym.NET's `TimeLimit(OrderEnforcing(env))` until Gym.NET's own `make` (P3).
 | CartPole-v1 | reference transcription: 4 seeds × 500 steps, and through termination. **The port, byte for byte:** reset; 4 × 500-step episodes of the balancing policy and 5 random-action episodes, each past termination; `sutton_barto_reward`; semi-implicit Euler; `tau = 0.05`; 51 steps from an injected state; 17 reset-option cases (seeded and unseeded, `ValueError`/`OverflowError` messages, state and generator after a failed reset); 13 invalid actions and 3 pre-reset steps (`AssertionError` messages); the post-termination warning (text, category, count); frames at A.9's states, along 4 episodes, at 20 extreme states (clipped, Sint16-wrapped, quarter-turn snapped, and pygame's NaN/overflow errors) and before reset (`None`); observation and action spaces; metadata | |
 | Rendering (`Gym.Rendering` vs pygame-ce 2.5.8) | `aapolygon`, `filled_polygon`, `aacircle`, `filled_circle` (150 random shapes each, clipping and translucency), `hline`/`vline`, compositions, Sint16 wrap-around polygons, CartPole's shapes, `transform.flip`, `Vector2.rotate_rad` bit for bit (NaN payloads included), pygame's argument errors | |
 | LunarLander-v3 | Gym.NET discrete action space | continuous action space (B-20); observation space (B-19); heuristic episodes, both variants (F6, P8, B-17, B-19) |
-| Core API (P1) | `make("CartPole-v1")`'s stack against `TimeLimit(OrderEnforcing(CartPoleEnv))` through truncation at step 500 (2 seeds); `OrderEnforcing` and `TimeLimit` call by call (`ResetNeeded`/`TypeError`/`ValueError` messages, `has_reset`, `_elapsed_steps`, truncation past the limit, `str`); the attribute protocol through a stack (plain `getattr`/`setattr`, `has/get/set_wrapper_attr`, run-time attributes, read-only properties, a wrapper's `_np_random`); `np_random`/`np_random_seed` (lazy, seeded, -1 once assigned, through a wrapper); `render()` without a render mode; `EnvSpec` repr and `pprint`; `parse_env_id`/`get_env_id`; the single-env step-API conversions; dict repr | |
+| Core API (P1) | `make("CartPole-v1")`'s stack against `TimeLimit(OrderEnforcing(CartPoleEnv))` through truncation at step 500 (2 seeds); `OrderEnforcing` and `TimeLimit` call by call (`ResetNeeded`/`TypeError`/`ValueError` messages, `has_reset`, `_elapsed_steps`, truncation past the limit, `str`); the attribute protocol through a stack (plain `getattr`/`setattr`, `has/get/set_wrapper_attr`, run-time attributes, read-only properties, a wrapper's `_np_random`); `np_random`/`np_random_seed` (lazy, seeded, -1 once assigned, through a wrapper); `render()` without a render mode on an env with a spec (the warning and `None`); `EnvSpec` repr and `pprint`; `parse_env_id`/`get_env_id`; the single-env step-API conversions; dict repr | `render()` without a render mode or spec: the bare `AssertionError`'s empty message (N-1, NumSharp) |
 | `PyMath` (F3) | `//`, `%`, `divmod` on ints and floats, `min`/`max`, `round` with and without digits, `np.clip` (512 triples), `np.sign`, bit for bit against CPython 3.12 and NumPy 2.4.2 | |
 
 Not built yet (plan §8–§10): the reverse bridge (`check_env` on a Gym.NET env through a Python shim), the golden
@@ -188,8 +191,9 @@ wait for their ports (P3–P6).
   `NativeEnvironment` also calls `_wputenv_s` (UCRT) or `setenv` (libc), and the stack check verifies it took effect.
 - **Reading Gymnasium's `np_random` creates a generator** when none exists. `GymPair` compares generator states only
   after a seeded reset; without one it notes the skip instead of reporting two unrelated entropy-seeded generators.
-- **NumSharp's size-less `Generator.choice(array)` returns a one-element array** where NumPy returns a scalar; the
-  draw-pattern cell compares it through `np.atleast_1d`, and Gym.NET's `Discrete` reads it through `SingleValue`.
+- **NumSharp 0.70's size-less `Generator.choice(array)` returned a one-element array** where NumPy returns a scalar.
+  NumSharp 0.80.0 returns a 0-d array like `integers`, so the draw-pattern cells compare `choice` as returned (no
+  `np.atleast_1d` any more) and `Discrete.SingleValue` now rejects anything but a 0-d draw, so a regression would surface.
 - **MSTest 4.4.1's `TestContext.Current` is experimental** (MSTESTEXP, an error under warnings-as-errors);
   `ParityTestBase.CurrentContext` replaces it (tests run one at a time, `[DoNotParallelize]`).
 - **`dotnet sln add` (SDK 10) adds referenced projects and x64/x86 platforms** to the solution; add a project to

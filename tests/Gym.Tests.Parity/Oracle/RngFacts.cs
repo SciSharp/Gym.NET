@@ -26,15 +26,18 @@ namespace Gym.Tests.Parity.Oracle {
         public static ValueFacts Of(Generator generator) {
             if (generator.bit_generator is not PCG64 pcg)
                 throw new NotSupportedException($"Only PCG64 states are described; this generator uses {generator.bit_generator.GetType().Name}.");
-            PCG64.Pcg64StateData state = pcg.state;
+            // NumSharp 0.80.0's typed state (it replaced 0.70's Pcg64StateData): a snapshot, so reading it never advances or
+            // aliases the generator.
+            PCG64.State state = pcg.state;
             return ValueFacts.FromDict(new[] {
                 Entry("bit_generator", ValueFacts.FromText("PCG64")),
                 Entry("state", ValueFacts.FromDict(new[] {
                     Entry("state", PythonInt(state.state)),
                     Entry("inc", PythonInt(state.inc)),
                 })),
-                // NumPy stores the flag as a C int, which the property returns as a Python int, not a bool.
-                Entry("has_uint32", PythonInt(state.has_uint32 ? 1 : 0)),
+                // NumPy stores the flag as a C int, which the property returns as a Python int; NumSharp 0.80.0 keeps it an
+                // int too, so it crosses as is.
+                Entry("has_uint32", PythonInt(state.has_uint32)),
                 Entry("uinteger", PythonInt(state.uinteger)),
             });
         }

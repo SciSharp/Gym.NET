@@ -11,9 +11,10 @@
     <Product>Gym.NET</Product>
     <Description>openai/gym's popular toolkit for developing and comparing reinforcement learning algorithms port to C#. This package contains the base classes to mimic gym's OOP structure.</Description>
     <Copyright>2023 © SciSharp STACK Team</Copyright>
-    <PackageLicenseUrl>https://github.com/SciSharp/Gym.NET/blob/master/README.md</PackageLicenseUrl>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/SciSharp/Gym.NET</PackageProjectUrl>
-    <PackageIconUrl>https://avatars3.githubusercontent.com/u/44989469?s=200&amp;v=4</PackageIconUrl>
+    <PackageIcon>icon.png</PackageIcon>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
     <RepositoryUrl>https://github.com/SciSharp/Gym.NET</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageTags>gym, openai, reinforcement learning,learning,learning,NumPy, NumSharp, MachineLearning</PackageTags>
@@ -23,18 +24,25 @@
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
   </PropertyGroup>
   <ItemGroup>
-    <!-- SixLabors stays on its last Apache-2.0 releases (ImageSharp 2.1.x, Drawing 1.0.x, Fonts 1.0.x). Newer majors ship
-         under the Six Labors Split License and fail Release builds without a Six Labors license key. -->
+    <!-- ImageSharp stays on its last Apache-2.0 release line (2.1.x): newer majors ship under the Six Labors Split
+         License and fail Release builds without a Six Labors license key. Its 2026-10-07 advisories are suppressed in
+         Directory.Build.props (D18). src/Gym needs ImageSharp only (the legacy Render result), not ImageSharp.Drawing. -->
     <PackageReference Include="SixLabors.ImageSharp" Version="2.1.13" />
-    <PackageReference Include="JetBrains.Annotations" Version="2026.2.0" />
-    <PackageReference Include="SixLabors.ImageSharp.Drawing" Version="1.0.0" />
+    <PackageReference Include="JetBrains.Annotations" Version="2026.2.0" PrivateAssets="all" />
   </ItemGroup>
-  <!-- NumSharp: the regular NuGet reference. While NumSharpSource=Submodule (the default until a NumSharp release contains
-       the DType API), eng/NumSharp.props removes it and builds refs/NumSharp from source, with its ownership analyzer;
-       -p:NumSharpSource=Package builds against this reference as it stands. The import stays last: it removes the
-       reference declared before it and overrides GeneratePackageOnBuild above. -->
+  <!-- The package's icon and readme, packed at its root (NuGet's PackageIcon / PackageReadmeFile). They replace the
+       deprecated PackageIconUrl / PackageLicenseUrl, which fail packing as NU5048 / NU5125 where warnings are errors. -->
   <ItemGroup>
-    <PackageReference Include="NumSharp" Version="0.70.0" />
+    <None Include="..\..\eng\icon.png" Pack="true" PackagePath="\" Visible="false" />
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" Visible="false" />
+  </ItemGroup>
+
+  <!-- NumSharp: the regular NuGet reference, used as it stands by default (NumSharpSource=Package; 0.80.0 is the first
+       release with the DType API). -p:NumSharpSource=Submodule makes eng/NumSharp.props swap it for refs/NumSharp's source
+       build, with its ownership analyzer, to try a NumSharp fix before NumSharp releases it. The import stays last: it
+       removes the reference declared before it and overrides GeneratePackageOnBuild above. -->
+  <ItemGroup>
+    <PackageReference Include="NumSharp" Version="0.80.0" />
   </ItemGroup>
   <Import Project="..\..\eng\NumSharp.props" />
 </Project>

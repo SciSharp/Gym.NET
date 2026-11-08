@@ -11,9 +11,10 @@
     <Product>Gym.NET.Rendering.Avalonia</Product>
     <Description>openai/gym's popular toolkit for developing and comparing reinforcement learning algorithms port to C#.  This package contains ported gym's environments.</Description>
     <Copyright>2019 © SciSharp STACK Team</Copyright>
-    <PackageLicenseUrl>https://github.com/SciSharp/Gym.NET/blob/master/README.md</PackageLicenseUrl>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/SciSharp/Gym.NET</PackageProjectUrl>
-    <PackageIconUrl>https://avatars3.githubusercontent.com/u/44989469?s=200&amp;v=4</PackageIconUrl>
+    <PackageIcon>icon.png</PackageIcon>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
     <RepositoryUrl>https://github.com/SciSharp/Gym.NET</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageTags>gym, openai, reinforcement learning,learning,learning,NumPy, NumSharp, MachineLearning</PackageTags>
@@ -59,4 +60,11 @@
       <Generator>MSBuild:Compile</Generator>
     </None>
   </ItemGroup>
+  <!-- The package's icon and readme, packed at its root (NuGet's PackageIcon / PackageReadmeFile). They replace the
+       deprecated PackageIconUrl / PackageLicenseUrl, which fail packing as NU5048 / NU5125 where warnings are errors. -->
+  <ItemGroup>
+    <None Include="..\..\eng\icon.png" Pack="true" PackagePath="\" Visible="false" />
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" Visible="false" />
+  </ItemGroup>
+
 </Project>

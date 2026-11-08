@@ -169,7 +169,7 @@ namespace Gym.Exceptions {
     }
 
     /// <summary>
-    ///     An action outside the action space. The envs mostly assert instead (<see cref="AssertionError"/>), as Gymnasium's
+    ///     An action outside the action space. The envs mostly assert instead (<see cref="NumSharp.AssertionError"/>), as Gymnasium's
     ///     do; the legacy <see cref="InvalidActionError"/> is Gym.NET's older counterpart, kept for the legacy API.
     /// </summary>
     /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/9e04324f6b0adbe19112206dfe247edc4142e7ec/gymnasium/error.py#L50">gymnasium/error.py</see>.</remarks>

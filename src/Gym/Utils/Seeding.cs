@@ -29,8 +29,8 @@ namespace Gym.Utils {
         /// <returns>
         ///     The generator, and <c>seed_seq.entropy</c>: <paramref name="seed"/> itself, or for an unseeded generator the
         ///     128-bit entropy it was drawn from, which is why it is a <see cref="BigInteger"/>. Passing that value back
-        ///     rebuilds the same generator, except in the 1-in-2^32 case where the entropy's top 32-bit word is zero: NumPy
-        ///     would then derive the pool from three words, while NumSharp drew four.
+        ///     rebuilds the same generator, here and in Gymnasium: since NumSharp 0.80.0 an unseeded sequence builds its pool
+        ///     from that very integer, as NumPy does, so even an entropy whose top 32-bit word is zero (1 in 2^32) round-trips.
         /// </returns>
         /// <exception cref="Error">
         ///     Thrown when <paramref name="seed"/> is negative, with Gymnasium's message
@@ -52,12 +52,15 @@ namespace Gym.Utils {
 
         /// <summary>
         ///     NumPy's <c>SeedSequence.entropy</c> as an integer. NumSharp keeps the entropy in the form it was given (a
-        ///     <see langword="long"/>, a <see cref="BigInteger"/>), except for an unseeded sequence, where it keeps the four
-        ///     32-bit words it drew; NumPy holds the integer those words encode, least significant word first.
+        ///     <see langword="long"/>, a <see cref="BigInteger"/>), and since 0.80.0 an unseeded sequence holds the 128-bit
+        ///     <see cref="BigInteger"/> NumPy reports (NumSharp 0.70 kept its four 32-bit words instead, which this method used
+        ///     to reassemble; that path is gone with the fix).
         /// </summary>
         /// <param name="seedSeq">The sequence a generator was built from.</param>
         /// <returns>The entropy as a non-negative integer.</returns>
-        /// <exception cref="InvalidOperationException">Thrown for an entropy form Gym.NET never creates.</exception>
+        /// <exception cref="InvalidOperationException">
+        ///     Thrown for an entropy form Gym.NET never creates, which would also catch a NumSharp regression back to raw words.
+        /// </exception>
         private static BigInteger Entropy(SeedSequence seedSeq) {
             switch (seedSeq.entropy) {
                 case long l:
@@ -66,11 +69,6 @@ namespace Gym.Utils {
                     return ul;
                 case BigInteger b:
                     return b;
-                case uint[] words:
-                    var value = BigInteger.Zero;
-                    for (int i = words.Length - 1; i >= 0; i--)
-                        value = (value << 32) | words[i];
-                    return value;
                 default:
                     throw new InvalidOperationException($"Unexpected SeedSequence entropy of type {seedSeq.entropy?.GetType().Name ?? "null"}.");
             }

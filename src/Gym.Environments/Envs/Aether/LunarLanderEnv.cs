@@ -919,7 +919,7 @@ namespace Gym.Environments.Envs.Aether
         ///     Gym.NET's ImageSharp approximation, not pygame's pixels (P8).
         /// </summary>
         /// <returns>The frame in <c>rgb_array</c> mode; <see cref="RenderResult.None"/> otherwise.</returns>
-        /// <exception cref="Gym.Exceptions.AssertionError">Thrown without a render mode when the env has no spec (<c>assert self.spec is not None</c>).</exception>
+        /// <exception cref="NumSharp.AssertionError">Thrown without a render mode when the env has no spec (<c>assert self.spec is not None</c>).</exception>
         public override RenderResult Render()
         {
             if (RenderMode == null)

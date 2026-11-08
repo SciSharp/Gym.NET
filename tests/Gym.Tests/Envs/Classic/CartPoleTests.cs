@@ -202,20 +202,38 @@ namespace Gym.Tests.Envs.Classic {
 
         /// <summary>
         ///     Without a render mode, Gymnasium asserts a spec exists (a bare <see cref="AssertionError"/> for an env built
-        ///     with its constructor), and with a spec it warns, naming the id, and returns <c>None</c>.
+        ///     with its constructor), and with a spec it warns, naming the id, and returns <c>None</c>. The bare assertion's
+        ///     empty message is checked apart, in <see cref="Render_WithoutRenderModeOrSpec_HasPythonsEmptyMessage"/>.
         /// </summary>
         [TestMethod]
         public void Render_WithoutRenderMode_AssertsSpecThenWarns() {
             var env = new CartPoleEnv();
             env.Reset(seed: 0).Observation.Dispose();
 
-            Assert.AreEqual("", Assert.ThrowsExactly<AssertionError>(() => env.Render()).Message);
+            Assert.ThrowsExactly<AssertionError>(() => env.Render());
 
             env.Spec = new EnvSpec("CartPole-v1");
             using WarningCatcher catcher = Warnings.Catch();
             Assert.IsTrue(env.Render().IsNone);
             Assert.AreEqual(1, catcher.Records.Count);
             StringAssert.Contains(catcher.Records[0].Message, "You are calling render method without specifying any render mode. You can specify the render_mode at initialization, e.g. gym.make(\"CartPole-v1\", render_mode=\"rgb_array\")");
+        }
+
+        /// <summary>
+        ///     The bare <c>assert self.spec is not None</c> of <c>render()</c> without a render mode carries Python's empty
+        ///     <c>str()</c>.
+        /// </summary>
+        /// <remarks>
+        ///     Open until NumSharp's parameterless <see cref="AssertionError"/> carries Python's empty message instead of
+        ///     <c>"AssertionError"</c> (N-1, decisions DR-01 and DR-02).
+        /// </remarks>
+        [TestMethod]
+        [OpenBugs("N-1")]
+        public void Render_WithoutRenderModeOrSpec_HasPythonsEmptyMessage() {
+            var env = new CartPoleEnv();
+            env.Reset(seed: 0).Observation.Dispose();
+
+            Assert.AreEqual("", Assert.ThrowsExactly<AssertionError>(() => env.Render()).Message);
         }
 
         /// <summary>

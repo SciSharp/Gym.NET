@@ -59,7 +59,8 @@ namespace Gym.Tests.Utils {
 
         /// <summary>
         ///     An unseeded generator reports the 128-bit entropy it drew, as Gymnasium's <c>np_random()</c> does, different on
-        ///     every call; passing it back rebuilds the same stream.
+        ///     every call; passing it back rebuilds the same stream. There is no exception for an entropy whose top 32-bit word
+        ///     is zero any more: NumSharp 0.80.0 builds the unseeded pool from the reported integer itself, as NumPy does.
         /// </summary>
         [TestMethod]
         public void NpRandom_Unseeded_ReportsItsEntropyAndRebuildsFromIt()
@@ -68,8 +69,6 @@ namespace Gym.Tests.Utils {
 
             Assert.IsTrue(seed.Sign >= 0 && seed < BigInteger.One << 128, $"{seed} is not a 128-bit value.");
             Assert.AreNotEqual(seed, Seeding.NpRandom().Seed, "Two unseeded generators must draw different entropy.");
-            if (seed < BigInteger.One << 96)
-                Assert.Inconclusive("The entropy's top 32-bit word is zero (1 in 2^32): NumPy would rebuild from three words, not four.");
             var (rebuilt, _) = Seeding.NpRandom(seed);
             using NDArray original = rng.random(8);
             using NDArray again = rebuilt.random(8);
