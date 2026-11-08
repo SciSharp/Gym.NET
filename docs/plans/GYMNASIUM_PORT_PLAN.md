@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Draft 1, 2026-09-23 |
+| **Status** | Draft 1, 2026-09-23. The remaining work is ordered in [`COMPLETION_PLAN.md`](COMPLETION_PLAN.md) (2026-11-08), which also records decisions D18–D22 |
 | **Goal** | Gym.NET becomes a byte-perfect clone of `refs/Gymnasium`, plus its own additions |
 | **Source of truth** | `refs/Gymnasium` @ `9e04324` (v1.3.0 + 75 commits, `__version__ = "1.4.0"` dev, 2026-08-29) |
 | **Array engine** | `refs/NumSharp` master @ `93967990` (v0.70.0 + 46) |
@@ -305,6 +305,8 @@ Registration of the bundled envs happens in each env assembly (a module initiali
 Consume NumSharp from NuGet at a pinned version ≥ 0.70.0 for releases, and keep `refs/NumSharp` as a git submodule for development and agent reference (decision D3). 0.60.0 is not enough: `PCG64`, `SeedSequence` and `default_rng` first ship in 0.70.0 (commit `e868d8ae`).
 
 NuGet 0.70.0 is not enough either. The `DType` API that F1 adopts ("Stage B", commits `c916c579` and `68a02258`) landed on NumSharp master after 0.70.0 was released, so Gym.NET builds `refs/NumSharp` from source until the next NumSharp release. [`NUMSHARP_MIGRATION_PLAN.md`](NUMSHARP_MIGRATION_PLAN.md) §3.2 and §4 give the measurements and the source/package switch.
+
+NumSharp 0.80.0 (2026-11-08) is that release. Decision D3 now makes NuGet 0.80.0 the default and keeps the source build as an opt-in for co-developing NumSharp fixes; the switch and what it costs are step R0.1 of [`COMPLETION_PLAN.md`](COMPLETION_PLAN.md).
 
 ### 4.3 Licensing
 
@@ -921,6 +923,10 @@ by call (`Tests/Core/CoreLiveParityTests.cs`, `Tests/Utils/PyMathLiveParityTests
 Open ends P1 leaves on purpose: spaces stay the non-generic `Space` until P2 (`Space<T>`), and `Metadata.AutoresetMode`
 arrives with the vector API's `AutoresetMode` (P6).
 
+**Next (2026-11-08).** [`COMPLETION_PLAN.md`](COMPLETION_PLAN.md) orders everything left: R0 (NumSharp 0.80.0, the
+ImageSharp advisories, Gymnasium v1.4.0), P0's rest, then P2, P3, P7, P4, P5, P6, P8 and P9. Decision D21 replaces the
+release cut above: one 2.0 ships after all of them, Box2D and MuJoCo included.
+
 ---
 
 ## 18. External contributions
@@ -966,22 +972,27 @@ arrives with the vector API's `AutoresetMode` (P6).
 | # | Decision | Options | Recommendation |
 |---|---|---|---|
 | D1 | Root namespace and package ids | `Gym` (current) or `Gymnasium` | **Decided 2026-09-23: it stays Gym.NET.** Root namespace `Gym` with today's namespaces kept (§3.8), NuGet ids `Gym.NET.*`, and project names in the existing `Gym.*` families (§4.1). Class names are Gymnasium's; no type can be named `Gym` (§3.8), so the entry point is the static class `Gymnasium` (D16) |
-| D2 | Reference platform and Gymnasium pin | Windows x64 or Linux x64; current SHA or next release tag | Windows x64 (§1.3); move to the next Gymnasium release tag once it exists |
-| D3 | NumSharp consumption | Project reference to `refs/NumSharp`, or NuGet ≥ 0.70 | NuGet pinned for releases; submodule for development |
-| D4 | Rasterizer licensing | LGPL sub-package; clean-room port verified by pixel tests; native SDL + pygame interop | Port `gfxdraw` (zlib) freely; clean-room `draw` verified by golden frames; LGPL sub-package only if clean-room parity fails |
-| D5 | Box2D | C# port or native interop | C# port (portable, debuggable) with engine goldens; native interop as fallback |
+| D2 | Reference platform and Gymnasium pin | Windows x64 or Linux x64; current SHA or next release tag | Windows x64 (§1.3). **Decided 2026-11-08: re-pin to the v1.4.0 release** (`8ba8c3a6`, 2026-10-05), before any further port ([`COMPLETION_PLAN.md`](COMPLETION_PLAN.md) R0.4) |
+| D3 | NumSharp consumption | Project reference to `refs/NumSharp`, or NuGet ≥ 0.70 | **Decided 2026-11-08: NuGet NumSharp 0.80.0 by default**, the first release with Stage B; `-p:NumSharpSource=Submodule` stays for co-developing NumSharp fixes, with `refs/NumSharp` at `v0.80.0` (R0.1) |
+| D4 | Rasterizer licensing | LGPL sub-package; clean-room port verified by pixel tests; native SDL + pygame interop | **Decided 2026-11-08: Gym.NET's own `draw` (and `transform.scale`/`smoothscale`) implementations, proven pixel-exact against live pygame-ce**; `gfxdraw` (zlib) is ported. No LGPL code enters Gym.NET; a primitive that won't converge goes back to the maintainer (P7) |
+| D5 | Box2D | C# port or native interop | **Decided 2026-11-08: a managed C# port of the Box2D 2.3.x core**, float32, operation order kept, engine goldens first (P8) |
 | D6 | MuJoCo version | Any 3.x | Pin the version Gymnasium's CI uses at the pinned SHA |
 | D7 | `AsyncVectorEnv` model | Threads or processes | Threads by default; processes later if isolation is needed |
 | D8 | Generic API | Generic `Env<TObs, TAct>` or object-typed only | Generic plus non-generic `IEnv` (§6) |
 | D9 | Legacy shim | Keep one major version, or hard break | Keep in 2.x (§16) |
-| D10 | Aether-based LunarLander in 2.0 | Ship it as an extra, or drop it until P8 | Drop; it's broken (Appendix B) and not Gymnasium |
+| D10 | Aether-based LunarLander in 2.0 | Ship it as an extra, or drop it until P8 | Drop; it's broken (Appendix B) and not Gymnasium. **Settled 2026-11-08 by D21**: it is deleted when LunarLander-v3 lands in P8, which is before 2.0 |
 | D11 | PR #24 | Merge as is, merge trimmed, or close | Merge trimmed (§18) |
 | D12 | Fork cb9dcb6 | Merge or re-port | Re-port (§18) |
 | D13 | `examples/` | Update or remove | Rewrite one CartPole example on the new API; remove the rest |
 | D14 | toy_text assets | Ship in packages, or load from a Gymnasium checkout | Seek permission; until then load from `refs/Gymnasium` |
 | D15 | Golden storage | In repo, Git LFS, or CI artifacts | In repo, gzip-compressed JSONL (small for classic and toy_text); LFS for MuJoCo |
 | D16 | Home of the top-level registration API (`make`, `make_vec`, `spec`, `register`, `registry`, `pprint_registry`, `register_envs`); follows from D1 | A static class `Gymnasium` in `Gym` (`Gymnasium.Make(…)`, named after the Python package); a static class `Env` next to `Env<TObs, TAct>` (`Env.Make(…)`). A static class `Gym` is ruled out: CS0234 and CS0426 (§3.8) | **Decided 2026-09-23: the static class `Gymnasium` in namespace `Gym`.** Class names follow Gymnasium, so `gymnasium.make(…)` becomes `Gymnasium.Make(…)`, and `Env` stays Gymnasium's base class rather than doubling as a factory. Projects, folders and namespaces keep their `Gym.*` names |
-| D17 | Python built-in exceptions (`ValueError`, `TypeError`, `KeyError`, …) | Throw NumSharp's ports (namespace `NumSharp`), or define Gym.NET's own in `Gym.Exceptions` | **Decided 2026-09-23: reuse NumSharp's** (§3.4). Python has one `ValueError` for NumPy and Gymnasium alike, and a second definition is ambiguous (CS0104) wherever both namespaces are imported. `Gym.Exceptions` holds `gymnasium.error`'s types plus the built-ins NumSharp lacks (`AssertionError`, `NotImplementedError`, …). Recommendation: add those to NumSharp as well (§5.2 item 4). A later NumSharp copy, for example for `np.testing` (whose asserts raise `AssertionError`), would otherwise bring the collision back |
+| D17 | Python built-in exceptions (`ValueError`, `TypeError`, `KeyError`, …) | Throw NumSharp's ports (namespace `NumSharp`), or define Gym.NET's own in `Gym.Exceptions` | **Decided 2026-09-23: reuse NumSharp's** (§3.4). Python has one `ValueError` for NumPy and Gymnasium alike, and a second definition is ambiguous (CS0104) wherever both namespaces are imported. `Gym.Exceptions` holds `gymnasium.error`'s types plus the built-ins NumSharp lacks (`AssertionError`, `NotImplementedError`, …). Recommendation: add those to NumSharp as well (§5.2 item 4). A later NumSharp copy, for example for `np.testing` (whose asserts raise `AssertionError`), would otherwise bring the collision back. That happened in NumSharp 0.80.0, which adds `NumSharp.AssertionError` (4 × CS0104 in the trial); Gym.NET's copy is deleted in R0.1 |
+| D18 | ImageSharp 2.1.13's five advisories (2026-10-07; fixes only in the Split-Licensed 3.2.0/4.1.2) | Suppress and keep; suppress, then remove ImageSharp; remove first; upgrade to 4.1.3 | **Decided 2026-11-08: suppress the five advisories and keep 2.1.13**, each suppression with its reason (R0.2) |
+| D19 | Array ownership (NumSharp migration step 4, M5) | Explicit ownership plus `[NDScoped]`; explicit `using` only; finalizer only | **Decided 2026-11-08: explicit ownership plus `[NDScoped]`**: spaces own their arrays, carried arrays are `[NDBorrowed]`, results implement `INDArrayCarrier`, and NumSharp.Build weaves `[NDScoped]` for temporaries (P2.1) |
+| D20 | Branch and CI | PR per phase with a CI gate; one branch until 2.0; straight to `master` | **Decided 2026-11-08: one branch until 2.0**; CI runs on it, informational (P0r.1, P10.5) |
+| D21 | Release cut | 2.0 = P0–P7; 2.0 with Box2D; one 2.0 with everything | **Decided 2026-11-08: one 2.0 with everything**, Box2D and MuJoCo included |
+| D22 | Text rendering for CarRacing (pygame's default font) | FreeType interop; a managed rasterizer | Open; default FreeType through P/Invoke at the version pygame-ce 2.5.8 bundles (P8) |
 
 ---
 

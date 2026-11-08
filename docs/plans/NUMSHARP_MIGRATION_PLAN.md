@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Draft 1, 2026-09-23 |
+| **Status** | Draft 1, 2026-09-23. Steps 1–3 are done (`801f123`, `c110cbc`, `c141717`, plus `684ca1d`). NumSharp 0.80.0 (2026-11-08) contains Stage B: the flip to the package is [`COMPLETION_PLAN.md`](COMPLETION_PLAN.md) R0.1, step 4 is its P2.1 (decision D19), and §14's items are re-assessed in its §7 |
 | **Goal** | Replace `NumSharp.Lite 0.1.12` with current NumSharp, adopt NumSharp's `long` (int64) indexing across Gym.NET's own API, and keep every test green |
 | **Target** | `refs/NumSharp` master @ `93967990` (v0.70.0 + 46). The published NuGet 0.70.0 is not enough (§3.2) |
 | **Audited Gym.NET** | the code of `pr/24` @ `2639785`, as carried by `docs/gymnasium-port-plan` @ `48e095d` |

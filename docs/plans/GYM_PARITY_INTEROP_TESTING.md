@@ -371,6 +371,8 @@ kept out of the gated corpus).
 3. One case catalog for live, record and replay (§9), with the port plan's golden harness (F4).
 4. As each port lands (P2 spaces, P3 registry and checkers, P7 rasterizer, P8 LunarLander; P1 core API and the CartPole slice of P4/P7 are in), remove its `[OpenBugs]` and add the cells its new surface needs (`Gymnasium.Make`, `PassiveEnvChecker`, the remaining wrappers, vector envs, the registry, §7).
 
+Since 2026-11-08 these steps are scheduled in [`COMPLETION_PLAN.md`](COMPLETION_PLAN.md): CI is P0r.1, the case catalog with the golden harness P0r.3, the reverse bridge P3.5, and step 4 runs through every port phase. Its R0.1 measured the suite against NumSharp 0.80.0: 150/163 gated cells before the six fixes it lists. The first open question below is settled by decision D20 (one branch until 2.0, CI informational), the second by D15's default (in the repo, gzip JSONL); the third stays open.
+
 **Open questions for the maintainer:**
 - Whether the live suite should be required on PRs, or only on the reference job and nightly.
 - Where golden files live (port plan D15).
