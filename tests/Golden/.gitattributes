@@ -1,0 +1,4 @@
+# Goldens are compared after decompression and decoding, so Git must never touch their bytes (core.autocrlf would
+# otherwise be free to guess): the trajectories are gzip streams and the frames lossless PNGs.
+*.gz binary
+*.png binary

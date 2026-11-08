@@ -38,6 +38,12 @@ dotnet test tests/Gym.Tests.Parity/Gym.Tests.Parity.csproj --filter "TestCategor
 
 # One area
 dotnet test tests/Gym.Tests.Parity/Gym.Tests.Parity.csproj -f net10.0 --filter "FullyQualifiedName~CartPoleLiveParityTests"
+
+# The goldens, replayed without Python (what the Linux CI job runs; works with no stack and no refs/Gymnasium)
+dotnet test tests/Gym.Tests.Parity/Gym.Tests.Parity.csproj --filter "TestCategory=Golden"
+
+# Record (or re-record) the goldens from the live cells that verify them; unchanged goldens are left untouched
+GYMNET_PARITY_RECORD=1 dotnet test tests/Gym.Tests.Parity/Gym.Tests.Parity.csproj -f net10.0 --filter "FullyQualifiedName~GoldenLiveTests"
 ```
 
 A plain `dotnet test` (also `dotnet test Gym.NET.sln`) runs the open gaps too, and they fail: that is NumSharp's
@@ -52,6 +58,7 @@ file: a runsettings `TestCaseFilter` is combined with the command line's `--filt
 | `GYMNET_PYTHONNET_REQUIRE_ENGINE` | `1` | `0`: no Python means Inconclusive instead of failure |
 | `GYMNET_PARITY_ALLOW_STACK_DRIFT` | `0` | `1`: a stack that differs from the manifest no longer fails every test; only `Stack_MatchesTheManifest` reports Inconclusive |
 | `GYMNET_PARITY_ARTIFACTS` | the test results directory | Where failed frame comparisons write `python.png`, `dotnet.png`, `diff.png`, `stats.txt` |
+| `GYMNET_PARITY_RECORD` | unset | `1`: the live golden cells (`GoldenLiveTests`) write what they verified into `tests/Golden` |
 
 The first thing every run prints (test `Stack_MatchesTheManifest`) is the stack it ran on, including the Gymnasium commit,
 where `gymnasium` and `numpy` were imported from, and whether `refs/Gymnasium` has local modifications.
@@ -76,6 +83,8 @@ where `gymnasium` and `numpy` were imported from, and whether `refs/Gymnasium` h
 | `RngFacts`, `GeneratorProbe` | `Oracle/RngFacts.cs`, `Oracle/GeneratorProbe.cs` | A NumSharp `Generator`'s PCG64 state in NumPy's `bit_generator.state` shape; finds the generator of a Gym.NET env or space. |
 | `FrameDiff` | `Frames/FrameDiff.cs` | Pixel parity (plan §6): differing pixels, bounding box, max channel delta, delta histogram, and PNG artifacts. |
 | `CartPoleReference` | `Reference/CartPoleReference.cs` | A test-local float64 transcription of `cartpole.py`: the harness's positive control, and with a knob its negative controls. Not product code. |
+| Golden catalog | `Golden/GoldenCatalog.cs`, `Golden/GoldenCase.cs` | Plan §9's one case catalog (DR-04): each `GoldenCase` (id, kwargs, seed, actions, steps, frames, state attribute, the .NET factory) drives a live cell (`GoldenLiveTests`), its recording, and its Python-free replay (`GoldenReplayTests`, category `Golden`). |
+| Recording and replay | `Golden/GoldenRecorder.cs`, `Golden/GoldenAssert.cs`, `Golden/GoldenStore.cs`, `Golden/GoldenTrajectory.cs`, `Golden/GoldenCodec.cs` | `GymPair.Recorder` receives each call and frame **after** it was verified; `GoldenStore` writes `tests/Golden/<suite>/<case>.jsonl.gz` and PNG frames only when their content changed, atomically; `GoldenAssert.Replay` drives the .NET env through the recording (recorded actions, or re-sampled and checked for a sampled case) with the same `ByteContract`, and refuses a stale golden (other case parameters, or another Gymnasium commit than the manifest pins). Format: `tests/Golden/README.md`. |
 | `[OpenBugs]` | `OpenBugsAttribute.cs` | NumSharp's category for known gaps, with the port plan's defect ids attached. |
 
 ---
@@ -118,6 +127,24 @@ State injection (one step of dynamics, isolated from reset and the generator): `
 built with `renderMode: "rgb_array"` (the render mode is fixed at construction, as in Gymnasium), and
 `pair.CompareFrame("label")`. A wrapper stack: `PyGymEnv.Make(id, viaMake: true)` keeps `make`'s stack, compared with
 Gym.NET's `TimeLimit(OrderEnforcing(env))` until Gym.NET's own `make` (P3).
+
+### A golden case (a trajectory that also replays without Python)
+
+Add a `GoldenCase` to `Golden/GoldenCatalog.cs`; the live cell, its recording and its replay come with it:
+
+```csharp
+new GoldenCase {
+    Suite = "classic_control", Name = "CartPole-v1.policy.seed0", EnvId = "CartPole-v1", Seed = 0,
+    Actions = new GoldenActions.Policy("cartpole_balance"),    // or Sampled(seed), Constant(action)
+    MaxSteps = 500, FrameEvery = 100, StateAttribute = "state",
+    PlatformDependence = "CartPole's cos/sin",                 // strict on the reference platform only
+    CreateDotNet = renderMode => new GymNetEnv(new CartPoleEnv(renderMode: renderMode)),
+},
+```
+
+Then record it with `GYMNET_PARITY_RECORD=1` (§1) and commit `tests/Golden/<suite>/<name>.jsonl.gz` with its frame
+directory. Changing a case's parameters, or re-pinning Gymnasium, makes its golden stale: the replay fails with the
+re-record command instead of comparing against another trajectory.
 
 ### Errors
 

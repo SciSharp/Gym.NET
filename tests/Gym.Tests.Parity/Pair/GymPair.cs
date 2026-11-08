@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using Gym.Tests.Parity.Frames;
+using Gym.Tests.Parity.Golden;
 using Gym.Tests.Parity.Oracle;
 
 namespace Gym.Tests.Parity.Pair {
@@ -77,6 +78,16 @@ namespace Gym.Tests.Parity.Pair {
         /// <summary>Qualifications of this comparison, printed with any divergence and in <see cref="PairRun"/>.</summary>
         public IReadOnlyList<string> Notes => _notes;
 
+        /// <summary>
+        ///     Receives every call and frame this pair has verified, so a golden is always a recording of a live cell that
+        ///     passed (DR-04); <see langword="null"/> (the default) records nothing.
+        /// </summary>
+        /// <remarks>
+        ///     The recorder is handed Gymnasium's side only after the two sides matched, so what it keeps is also what Gym.NET
+        ///     produced. A call that diverges throws before it reaches the recorder, and the test then fails without saving.
+        /// </remarks>
+        public GoldenRecorder? Recorder { get; set; }
+
         /// <summary>The trajectory position for a report: the step count after a seeded reset, none before one.</summary>
         private int? Position => _seeded ? StepsTaken : null;
 
@@ -91,7 +102,7 @@ namespace Gym.Tests.Parity.Pair {
             _actions.Clear();
             CallResult python = Python.Reset(seed);
             CallResult dotnet = DotNet.Reset(seed);
-            return Verify($"reset(seed={seed.ToString(CultureInfo.InvariantCulture)})", 0, python, dotnet);
+            return Verify($"reset(seed={seed.ToString(CultureInfo.InvariantCulture)})", 0, python, dotnet, action: null);
         }
 
         /// <summary>Steps both sides with the same action and verifies the results.</summary>
@@ -103,7 +114,7 @@ namespace Gym.Tests.Parity.Pair {
             _actions.Add(action.ToString());
             CallResult python = Python.Step(action);
             CallResult dotnet = DotNet.Step(action.DotNet);
-            return Verify($"step #{StepsTaken}: step({action})", StepsTaken, python, dotnet);
+            return Verify($"step #{StepsTaken}: step({action})", StepsTaken, python, dotnet, action.Facts);
         }
 
         /// <summary>
@@ -157,8 +168,11 @@ namespace Gym.Tests.Parity.Pair {
             Frame python = Python.Render();
             Frame dotnet = DotNet.Render();
             FrameComparison comparison = FrameDiff.Compare(python, dotnet);
-            if (comparison.Identical)
+            if (comparison.Identical) {
+                // Only an identical frame is recorded, so a golden frame is always one both sides drew.
+                Recorder?.Frame(label, StepsTaken, python);
                 return;
+            }
             IReadOnlyList<string> artifacts = FrameDiff.WriteArtifacts(python, dotnet, comparison, $"{label} step {StepsTaken}");
             throw new ParityException(new Divergence {
                 Case = Case,
@@ -204,13 +218,16 @@ namespace Gym.Tests.Parity.Pair {
         /// <param name="step">The trajectory position.</param>
         /// <param name="python">Gymnasium's result.</param>
         /// <param name="dotnet">Gym.NET's result.</param>
+        /// <param name="action">The step's action as Gymnasium received it, for the <see cref="Recorder"/>; <see langword="null"/> for a reset.</param>
         /// <returns>Gymnasium's result, when the two match.</returns>
         /// <exception cref="ParityException">Thrown when anything differs.</exception>
-        private CallResult Verify(string call, int step, CallResult python, CallResult dotnet) {
+        private CallResult Verify(string call, int step, CallResult python, CallResult dotnet, ValueFacts? action) {
             ValueFacts? pythonBefore = _pythonState, dotnetBefore = _dotnetState;
             ReadStates();
 
             var fields = new List<FieldDivergence>();
+            // What this call compared beyond the transition, for the recorder: a golden holds exactly what was verified.
+            ValueFacts? comparedState = null, comparedRng = null;
             if (python.Raised != null || dotnet.Raised != null) {
                 fields.AddRange(ByteContract.Compare("raised", python.ToOutcome(), dotnet.ToOutcome()));
             } else {
@@ -220,9 +237,12 @@ namespace Gym.Tests.Parity.Pair {
                 fields.AddRange(ByteContract.Compare("terminated", p.Terminated, d.Terminated));
                 fields.AddRange(ByteContract.Compare("truncated", p.Truncated, d.Truncated));
                 fields.AddRange(ByteContract.Compare("info", p.Info, d.Info));
-                if (_stateAttribute != null)
+                if (_stateAttribute != null) {
                     fields.AddRange(ByteContract.Compare("state", _pythonState, _dotnetState));
-                fields.AddRange(CompareRng());
+                    comparedState = _pythonState;
+                }
+
+                fields.AddRange(CompareRng(out comparedRng));
             }
 
             if (fields.Count > 0) {
@@ -241,6 +261,7 @@ namespace Gym.Tests.Parity.Pair {
             }
 
             Ended = python.Transition?.Ended ?? false;
+            Recorder?.Call(call, step, action, python, comparedState, comparedRng);
             return python;
         }
 
@@ -248,8 +269,10 @@ namespace Gym.Tests.Parity.Pair {
         ///     Compares the generators' states, or records once why the .NET side cannot expose its generator, so a skipped
         ///     check is visible in every report rather than silent.
         /// </summary>
+        /// <param name="python">Gymnasium's state when it was compared, for the <see cref="Recorder"/>; <see langword="null"/> when the check was skipped.</param>
         /// <returns>The differences; empty when they match or cannot be compared.</returns>
-        private IReadOnlyList<FieldDivergence> CompareRng() {
+        private IReadOnlyList<FieldDivergence> CompareRng(out ValueFacts? python) {
+            python = null;
             if (!_seeded) {
                 const string unseeded = "rng not compared: no seeded reset yet, so both generators are entropy-seeded and unrelated";
                 if (!_notes.Contains(unseeded))
@@ -264,7 +287,8 @@ namespace Gym.Tests.Parity.Pair {
                 return Array.Empty<FieldDivergence>();
             }
 
-            return ByteContract.Compare("rng", Python.RngState(), dotnet);
+            python = Python.RngState();
+            return ByteContract.Compare("rng", python, dotnet);
         }
 
         /// <summary>Reads both sides' state attribute, when one is configured, into the "after" slots.</summary>

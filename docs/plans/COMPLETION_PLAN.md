@@ -232,7 +232,14 @@ Each numbered step is one commit, unless it says otherwise.
   - Both set `AVALONIA_TELEMETRY_OPTOUT=1` and exclude the viewer tests.
 - **P0r.2 Static rules: none (DR-03).** No analyzers and no rule scripts; the port plan's §14.7 bans are not enforced
   by tooling.
-- **P0r.3 Golden harness (F4, DR-04).**
+- **P0r.3 Golden harness (F4, DR-04).** *Done 2026-11-09. `GymPair.Recorder` receives each call and frame after the
+  pair verified it; `GYMNET_PARITY_RECORD=1` makes `GoldenLiveTests` save it to `tests/Golden/<suite>/<case>.jsonl.gz`
+  plus PNG frames, written only when the content changed (atomically; the gzip bytes of .NET 8 and 10 differ). Replay
+  (`GoldenReplayTests`, category `Golden`) needs no Python: it feeds the recorded actions back or re-samples a sampled
+  case, compares through the same `ByteContract`, and refuses a stale golden (other case parameters or another Gymnasium
+  commit). Two CartPole-v1 goldens (balanced 500 steps with 6 frames; seeded random actions to termination with 7
+  frames; 104 KB) replay 8/8 with Python disabled, and the replay's controls catch a float32 `tau` at step 1 and an
+  extra draw at the reset. Format: `tests/Golden/README.md`.*
   - The live suite (`tests/Gym.Tests.Parity`) holds the code that records and regenerates goldens: one case catalog
     drives its live, record and replay modes (the interop design's §9), so a golden is always a recording of a live
     cell. No separate Python recorder script.

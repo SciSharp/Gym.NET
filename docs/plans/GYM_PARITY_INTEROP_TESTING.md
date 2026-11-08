@@ -101,7 +101,7 @@ tests/Gym.Tests.Parity/                 live-interop test project (net8.0;net10.
 tools/parity/requirements.txt, setup_venv.ps1, setup_venv.sh, manifest.json
 ```
 
-Not built yet: `Bridge/` (§8) and `Cases/` (§9).
+Not built yet: `Bridge/` (§8). §9's catalog was built on 2026-11-09 as `Golden/` (`GoldenCatalog`, `GoldenCase`, `GoldenRecorder`, `GoldenAssert`, `GoldenStore`, `GoldenTrajectory`, `GoldenCodec`) with the cells `Tests/Golden/GoldenLiveTests.cs` and `Tests/Golden/GoldenReplayTests.cs`; the goldens live in `tests/Golden`.
 
 Environment variables, mirroring NumSharp's:
 
@@ -231,6 +231,9 @@ Gymnasium ships verification utilities: `check_env`, `passive_env_checker`, `che
 GIL trap (from NumSharp): pythonnet releases the GIL around managed method bodies. Any conversion performed *inside* a shim callback must therefore acquire it itself. NumSharp's interop does this by default (`RequireGIL = true`); keep it on.
 
 ## 9. One case catalog, three modes
+
+**As built (2026-11-09, completion plan P0r.3, DR-04).** The catalog is `tests/Gym.Tests.Parity/Golden/GoldenCatalog.cs`. Recording is not a separate Python-side runner: `GymPair.Recorder` receives Gymnasium's side of each call and frame only after the pair verified it, so a golden is always a recording of a live cell that passed, and `GYMNET_PARITY_RECORD=1` makes the live golden cells save it. Replay (`GoldenAssert`, category `Golden`) needs no Python. It feeds the recorded actions back (open-loop) or, for a sampled case, re-samples the .NET action space and requires each sample to equal the recorded one. It compares with the same `ByteContract` in the pair's field order, and refuses a golden recorded for other parameters or another Gymnasium commit. Files: `tests/Golden/<suite>/<case>.jsonl.gz` (gzip JSON lines, D15) plus PNG frames; each header carries the recording stack, and the format is `tests/Golden/README.md`. The sketch below is the original design; `GoldenCase` replaced `ParityCase`, with a .NET factory instead of `Id`-based construction until `Gymnasium.Make` exists (P3).
+
 
 ```csharp
 /// <summary>
