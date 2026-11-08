@@ -7,7 +7,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Gym.NET is a native C# (.NET) reinforcement learning environment toolkit and benchmark suite, API-compatible with Farama Gymnasium (the successor of OpenAI Gym) and aligned with it byte for byte. It is its own codebase: Gymnasium is the reference it measures itself against, not an identity it claims. It is part of the SciSharp STACK ecosystem and uses `NumSharp` for multidimensional tensor/array operations and `SixLabors.ImageSharp` for rendering.
 
 - **Canonical SOT Submodule:** `refs/Gymnasium` (Farama Foundation Gymnasium Git submodule for behavioral, mathematical, and algorithmic parity).
-- **Roadmap:** `docs/plans/COMPLETION_PLAN.md` orders the remaining work to one 2.0 release (phases R0, P0r, P2, P3, P7, P4, P5, P6, P8, P9, P10) and records the 2026-11-08 decisions; `docs/plans/GYMNASIUM_PORT_PLAN.md` holds the per-area specifications.
+- **Roadmap:** `docs/plans/COMPLETION_PLAN.md` orders the remaining work to one 2.0 release (phases R0, P0r, P2, P3, P7, P4, P5, P6, P8, P10; MuJoCo's P9 is postponed) and records the 2026-11-08 decisions; `docs/plans/GYMNASIUM_PORT_PLAN.md` holds the per-area specifications.
+- **Design gate:** `docs/plans/DESIGN_REVIEW.md` holds the approved implementation designs (DR-01…DR-36). Implement only what an approved design covers; a design question no DR-xx answers goes back to the maintainer for review before the step continues.
+- **Working branch:** `journey1` until 2.0 (decision D20); it merges into `master` once, at the release.
 
 ---
 

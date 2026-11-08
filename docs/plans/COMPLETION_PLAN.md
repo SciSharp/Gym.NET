@@ -2,16 +2,17 @@
 
 | | |
 |---|---|
-| **Status** | Draft 1, 2026-11-08 |
-| **Scope** | Everything [`GYMNASIUM_PORT_PLAN.md`](GYMNASIUM_PORT_PLAN.md) still has open, up to one 2.0 release that includes Box2D and MuJoCo (decision D21) |
-| **Starting point** | branch `feat/numsharp-master-migration` @ `ed68964` (13 commits ahead of `master`, pushed 2026-09-27, no PR) |
+| **Status** | Draft 2, 2026-11-08: the implementation designs are reviewed and approved in [`DESIGN_REVIEW.md`](DESIGN_REVIEW.md) (DR-01…DR-36). **A step starts only when every design it depends on is approved there** |
+| **Scope** | Everything [`GYMNASIUM_PORT_PLAN.md`](GYMNASIUM_PORT_PLAN.md) still has open, up to one 2.0 release that includes Box2D (D21); MuJoCo is postponed out of 2.0 (DR-35) |
+| **Starting point** | branch `journey1` @ `7b7c919`, cut from `feat/numsharp-master-migration` (13 commits ahead of `master`, pushed 2026-09-27, no PR); all work continues on `journey1` until 2.0 (D20) |
 | **Source of truth** | `refs/Gymnasium` @ `9e04324` today; `v1.4.0` (`8ba8c3a6`) after step R0.4 (D2) |
 | **Array engine** | NuGet NumSharp 0.80.0 (released 2026-11-08); `refs/NumSharp` @ `v0.80.0` (`d523eb48`) after step R0.1 (D3) |
 | **Per-area specs** | [`GYMNASIUM_PORT_PLAN.md`](GYMNASIUM_PORT_PLAN.md) §6–§13 (what each area must do), [`NUMSHARP_MIGRATION_PLAN.md`](NUMSHARP_MIGRATION_PLAN.md) §8 (array ownership), [`GYM_PARITY_INTEROP_TESTING.md`](GYM_PARITY_INTEROP_TESTING.md) (the live suite) |
 
 This plan doesn't restate what the port plan specifies per area. It records where the work stands, what changed
 around it since the last session, the decisions taken on 2026-11-08, and the order of everything left, with an exit
-gate per step. Every number below was measured on 2026-11-08 on Windows 11 x64, .NET SDK 10.0.101, Python 3.12.12,
+gate per step. How each piece is built (types, names, packaging, threading, engines) is fixed by the approved designs
+in [`DESIGN_REVIEW.md`](DESIGN_REVIEW.md); the steps below cite them by id. Every number below was measured on 2026-11-08 on Windows 11 x64, .NET SDK 10.0.101, Python 3.12.12,
 NumPy 2.4.2, pygame-ce 2.5.8 (SDL 2.32.10) and Box2D 2.3.10, unless it says otherwise.
 
 ---
@@ -63,7 +64,7 @@ A trial in a scratch export of `ed68964` (Package mode, Release, net8.0 and net1
 |---|---|---|
 | Compile | 4 × CS0104 | `AssertionError` is now also `NumSharp.AssertionError`, the collision D17 predicted. Delete `Gym.Exceptions.AssertionError` and throw NumSharp's |
 | Compile | 1 × CS0426 | `PCG64.Pcg64StateData` is now `PCG64.State`, whose `has_uint32` is an `int` (`tests/Gym.Tests.Parity/Oracle/RngFacts.cs`) |
-| Compile | after both fixes, with NuGet audit and packing off | 0 errors, 0 warnings; the 0.80.0 ownership analyzer reports no NDW site |
+| Compile | after both fixes, with NuGet audit and packing off | 0 errors. The 0.80.0 ownership analyzer reports 10 sites, all migration step 4 work (P2.1): 6 × NDW016 in `src` (`Box`, `RenderResult.Rgb`/`Depth`/`RgbDepth`, the legacy `Step`, LunarLander's `ContactDetector`) and 4 × NDW012 in `tests/Gym.Tests` |
 | Pack | NU5048, NU5125 as errors | Package mode packs on build, and the deprecated `PackageIconUrl`/`PackageLicenseUrl` fail it (R0.3) |
 | Unit tests (headless) | 202/203 on both frameworks | NumSharp's parameterless `AssertionError()` says `"AssertionError"`; Python's `str(AssertionError())` is `""`. Bare-assert sites pass `""` |
 | Parity gate | 150/163 on both frameworks | 9 `DrawPatterns` cells still wrapped Python's `choice()` result in `np.atleast_1d` to match NumSharp's old `(1,)` shape, which 0.80.0 fixed: the workaround goes. 4 cells map Python's `AssertionError` to `Gym.Exceptions.AssertionError` |
@@ -85,7 +86,7 @@ commits further. What the 24 commits change, by our phase:
 |---|---|---|
 | `core.py`, `cartpole.py` | `TypeVar` defaults, type hints, and a docs note that `reset`/`step` must return new objects (#1683) | No behavior change; P1 and CartPole stay as they are |
 | `registration.py` | `_check_metadata`'s message names the right variable; wrapper classes as entry points (#1672) | P3 ports the fixed version |
-| toy_text | New Farama pixel art for all four envs (#1713, #1732, #1733, #1744); `Minecraft.ttf` and the 52 card PNGs deleted (77 assets removed, 97 added); Blackjack draws its numbers from digit images | P5 needs no font, so FreeType is needed only for CarRacing (P8) |
+| toy_text | New Farama pixel art for all four envs (#1713, #1732, #1733, #1744); `Minecraft.ttf` and the 52 card PNGs deleted (77 assets removed, 97 added); Blackjack draws its numbers from digit images | P5 needs no font; CarRacing's score is the only text left (P8, DR-27) |
 | `spaces/utils.py`, `env_checker.py`, `passive_env_checker.py`, `env_match.py` | `OneOf` flatten agreement, Tuple-length compatibility, determinism snapshots, RNG-state comparison | P2 and P3 port the fixed versions |
 | `vector/*`, `wrappers/*` | `AsyncVectorEnv(max_concurrency)`, `DiscretizeObservation`/`DiscretizeAction` on n-d boxes, `ResizeObservation` singleton channels, `DtypeObservation` descriptors | P6 ports the fixed versions |
 
@@ -121,40 +122,40 @@ Gymnasium.
 | D3 | NumSharp consumption | **NuGet 0.80.0 by default; `-p:NumSharpSource=Submodule` kept** for co-developing NumSharp fixes, with `refs/NumSharp` at `v0.80.0` | R0.1 |
 | D4 | pygame `draw.*` (LGPL-2.1) | **Gym.NET's own implementations**, proven pixel-exact against live pygame-ce by the parity suite; no LGPL code enters Gym.NET | P7 |
 | D5 | Box2D | **Managed C# port of the Box2D 2.3.x core** that `box2d==2.3.10` compiles, float32, C++ operation order kept, proven by engine goldens first | P8 |
-| D10 | The Aether LunarLander | Removed when LunarLander-v3 lands in P8, which is before 2.0 (follows from D21) | P8 |
+| D10 | The Aether LunarLander | Removed when LunarLander-v3 lands in P8, which is before 2.0 (follows from D21) | P8.5 |
 | D18 | ImageSharp advisories | **Suppress the five advisories and keep ImageSharp 2.1.13** | R0.2; consumers of the packages still see the advisories in their own restores (§8) |
 | D19 | Array ownership (migration step 4, and NUMSHARP_MIGRATION_PLAN's M5) | **Explicit ownership plus `[NDScoped]`**: spaces own and dispose their arrays, carried arrays are `[NDBorrowed]`, `StepResult`/`ResetResult` implement `INDArrayCarrier`, and ported methods' temporaries are reclaimed by `[NDScoped]`, woven by NumSharp.Build (a development dependency, never in consumers' graphs) | P2.1, then every phase |
-| D20 | Branch and CI | **One branch until 2.0**: all work stays on `feat/numsharp-master-migration` and merges into `master` once, at the release. CI runs on the branch, informational | P0r.1, P10.5 |
-| D21 | Release cut | **One 2.0 with everything**: P2–P9, Box2D and MuJoCo included, then P10 | §4 |
+| D20 | Branch and CI | **One branch until 2.0**: all work continues on `journey1` (cut from `feat/numsharp-master-migration` on 2026-11-08) and merges into `master` once, at the release. CI runs on the branch, informational | P0r.1, P10.5 |
+| D21 | Release cut | **One 2.0 with everything except MuJoCo**: P2–P8, then P10. MuJoCo (P9) was postponed out of 2.0 by DR-35 | §4 |
+| DR-01…DR-36 | The implementation designs | Approved in [`DESIGN_REVIEW.md`](DESIGN_REVIEW.md) in ten rounds; its "Coverage by phase" table lists which designs each phase rests on | Every phase |
 
 ### 3.2 Still open, with the default that applies unless the maintainer overrides it
 
 | # | Decision | Default | Needed by |
 |---|---|---|---|
-| D6 | MuJoCo version | The newest MuJoCo 3.x release at P9's start that Gymnasium v1.4.0's mujoco tests pass with (its `pyproject.toml` only asks `mujoco >=2.1.5`), recorded in `tools/parity/manifest.json` | P9 |
-| D7 | `AsyncVectorEnv` model | Threads; results equal `SyncVectorEnv` bit for bit | P6 |
+| D6 | MuJoCo version | Decided when MuJoCo resumes (DR-35); the managed port (DR-30) is checked against a pinned Python `mujoco` | P9 (postponed) |
 | D9 | Legacy shim | `Gym.Legacy` stays through 2.x, `[Obsolete]` | P10 |
 | D13 | `examples/` | Rewrite one CartPole example on the new API, remove the rest | P10 |
-| D14 | toy_text assets | Ship v1.4.0's Farama pixel art once its license is confirmed in R0.4; until then load it from `refs/Gymnasium` | P5 |
-| D15 | Golden storage | In the repo as gzip JSONL; Git LFS only for MuJoCo | P0r.3 |
-| D22 | Text rendering for CarRacing (pygame's default font) | FreeType through P/Invoke at the version pygame-ce 2.5.8 bundles (FreeType License, permissive with attribution) | P8 |
-| — | The last session's three open points | (1) The two concurrency tests that start threads with `Task.Run` move to explicit `Thread`s; (2) the SDL_gfx header keeps "C# port of", which zlib's clause 2 requires of altered versions; (3) the `Gym.Tests.Ported` namespace and folder become `Gym.Tests.Gymnasium` (they mirror Gymnasium's test suite), and the README/PRD tagline "A port of openai/gym" is rewritten in P10 | R0.5, P10 |
+| D15 | Golden storage | In the repo as gzip JSONL (DR-04 decides how they are made) | P0r.3 |
+| — | Two of the last session's open points | (1) The two concurrency tests that start threads with `Task.Run` move to explicit `Thread`s; (2) the SDL_gfx header keeps "C# port of", which zlib's clause 2 requires of altered versions. The third (renaming `Ported`) is DR-06, approved; the README/PRD tagline "A port of openai/gym" is rewritten in P10 | R0.5, P10 |
+
+D7 (`AsyncVectorEnv`) is settled by DR-22, D14 (toy_text assets) by DR-19, and D22 (CarRacing's text) by DR-27.
 
 ## 4. The road to 2.0
 
 | Phase | Deliverables | Exit gate | Size |
 |---|---|---|---|
 | **R0 Re-baseline** | NumSharp 0.80.0, the ImageSharp suppressions, package metadata, Gymnasium v1.4.0, housekeeping | Builds clean; unit 212/212; parity 163/163 gated, 14 `[OpenBugs]` failing as documented, all on both frameworks | S |
-| **P0r P0's rest** | CI (informational), static rules, golden harness (F4), inventory tool | CI green on the branch; CartPole-v1 golden passes; the inventory test reports the missing-names list | M |
-| **P2 Spaces** | 10 spaces, `spaces.utils`, `Space<T>`, array ownership (D19) | `tests/spaces` (109) green; live cells for every space; 0 space `[OpenBugs]` | L |
-| **P3 Registry and checkers** | `Gymnasium.Make` and friends, `PassiveEnvChecker`, `check_env`, `env_match`, `Autoreset`, `RecordEpisodeStatistics` | Registration and checker tests green; Gymnasium's `make("CartPole-v1")` stack equals ours, built by `Gymnasium.Make` | M |
+| **P0r P0's rest** | CI (informational), golden record/replay from the live suite (F4, DR-04), inventory tool; no static rules (DR-03) | CI green on the branch; the CartPole-v1 golden replays; the inventory test reports the missing-names list | M |
+| **P2 Spaces** | 10 spaces, `spaces.utils`, `Space<T>` with typed env spaces (DR-07), 0-d `NDArray` discrete samples (DR-08), generated composite records (DR-13), array ownership (D19) | `tests/spaces` (109) green; live cells for every space; 0 space `[OpenBugs]` | L |
+| **P3 Registry and checkers** | `Gymnasium.Make` typed and untyped (DR-10), generated options records and dictionary/anonymous kwargs (DR-11, DR-34), registration by module initializers (DR-12, DR-14, DR-17), the human-viewer default (DR-20), `PassiveEnvChecker`, `check_env`, `env_match`, `Autoreset`, `RecordEpisodeStatistics` | Registration and checker tests green; Gymnasium's `make("CartPole-v1")` stack equals ours, built by `Gymnasium.Make` | M |
 | **P7 Rasterizer** | pygame `draw.*` (D4), `transform.scale`/`smoothscale`, `image.load`, the frame path for every family | 150+ random shapes per primitive pixel-exact against pygame | L |
-| **P4 classic_control** | MountainCar, Continuous_MountainCar, Pendulum, Acrobot, `CartPoleVectorEnv` | L3 and L4 for all 6 ids | M |
-| **P5 toy_text** | Blackjack, FrozenLake, CliffWalking, Taxi with `ansi` and v1.4.0's art | L3 and L4 for all 6 ids | M |
-| **P6 Vector and wrappers** | `VectorEnv`, `SyncVectorEnv`, `AsyncVectorEnv`, vector utils, 35 wrappers, vector wrappers, F8, F9 | `tests/vector` (76) and `tests/wrappers` (146) green; async equals sync bitwise | L |
-| **P8 Box2D** | Box2D.NET (D5), LunarLander, BipedalWalker, CarRacing, fonts (D22); Aether removed | Engine goldens; L3 and L4 for all 5 ids; 0 `[OpenBugs]` | XL |
-| **P9 MuJoCo** | MuJoCo.NET bindings, `MujocoEnv`, `MujocoRenderer`, 22 ids | Hopper-v5 golden, then all 22 at L3 | XL |
-| **P10 Release 2.0.0** | Docs, migration guide, examples, packages; merge into `master` | The port plan's definition of done (§1.5), whole | M |
+| **P4 classic_control** | `MountainCarEnv(continuous)` for both MountainCar ids (DR-32), Pendulum, Acrobot, `CartPoleVectorEnv` | L3 and L4 for all 6 ids | M |
+| **P5 toy_text** | Blackjack, FrozenLake, CliffWalking, Taxi with `ansi` and v1.4.0's art embedded (DR-19) | L3 and L4 for all 6 ids | M |
+| **P6 Vector and wrappers** | `VectorEnv` typed and untyped (DR-21), `SyncVectorEnv`, `AsyncVectorEnv` in three modes (DR-22), vector utils, 35 wrappers, vector wrappers named by DR-24, F8 (DR-23), F9 (DR-25), `play`/`PlayPlot`, `FuncEnv`, `performance` (DR-36); `AtariPreprocessing` out | `tests/vector` (76) and `tests/wrappers` (146) green; async equals sync bitwise in every mode | L |
+| **P8 Box2D** | The managed Box2D 2.3.x engine, core plus pybox2d facade (D5, DR-26, DR-29), `LunarLanderEnv`, `BipedalWalkerEnv`, `CarRacingEnv` (DR-32), CarRacing's text from recorded glyphs (DR-27); Aether removed | Engine goldens; L3 and L4 for all 5 ids; 0 `[OpenBugs]` | XL |
+| **P9 MuJoCo** | **Postponed out of 2.0 (DR-35).** When it resumes: a managed port (DR-30) of what Gymnasium's 22 envs reach (DR-33), with MuJoCo's own renderer offscreen (DR-31) | Hopper-v5 bitwise against Python `mujoco`, then all 22 at L3 | XXL |
+| **P10 Release 2.0.0** | Docs, migration guide, examples, packages; merge into `master` | The port plan's definition of done (§1.5) for everything but MuJoCo | M |
 
 The order is sequential. P7 moves in front of P4 because MountainCar and Acrobot already call `pygame.draw`, and P5
 needs `draw.rect`, `image.load` and `transform.scale`.
@@ -171,8 +172,10 @@ Each numbered step is one commit, unless it says otherwise.
   - Make `NumSharpSource=Package` the default in `eng/NumSharp.props`. Submodule mode stays, with its guards and the
     analyzer reference, and its comments say why it now exists: to build a NumSharp fix before NumSharp releases it.
   - Check out `refs/NumSharp` at `v0.80.0` (`d523eb48`) and record the new gitlink.
-  - Delete `Gym.Exceptions.AssertionError`; every site throws `NumSharp.AssertionError`, and bare asserts pass `""`
-    (N-1).
+  - Delete `Gym.Exceptions.AssertionError`; every site throws `NumSharp.AssertionError` (DR-02). Bare asserts throw
+    `new AssertionError()`; until NumSharp releases the `""` message (N-1), the cells and tests that compare a bare
+    assert's text are `[OpenBugs("N-1")]` (DR-01). `NotImplementedError` and `ImportError` stay in `Gym.Exceptions`
+    until NumSharp has them, each gap proven by an `[OpenBugs("N-3")]` test (DR-01, DR-02).
   - Switch `RngFacts` to `PCG64.State`. Map Python's `AssertionError` to NumSharp's type in the parity harness.
   - Remove the workarounds for the bugs 0.80.0 fixed:
     - `Discrete`'s unwrapping of the one-element array `choice()` used to return;
@@ -196,10 +199,11 @@ Each numbered step is one commit, unless it says otherwise.
   - Port what the four changed sources mean for ported code: `_check_metadata`'s message, and the core docs note.
   - Confirm the license of the new toy_text art (D14).
   - Re-run every gate. A cell whose verdict moves is reviewed, never re-recorded blindly.
-- **R0.5 Housekeeping.** The two `Task.Run` concurrency tests move to explicit threads; `Gym.Tests.Ported` becomes
-  `Gym.Tests.Gymnasium` (§3.2).
-- **Exit:** Debug and Release build with 0 errors on net8.0 and net10.0; unit 212/212 (203 headless + 9 viewer);
-  parity 163/163 gated; the 14 `[OpenBugs]` cells fail at their documented divergences and nowhere else.
+- **R0.5 Housekeeping.** The two `Task.Run` concurrency tests move to explicit threads (§3.2); `tests/Gym.Tests/Ported`
+  becomes `tests/Gym.Tests/Gymnasium`, namespace `Gym.Tests.Gymnasium.*`, mirroring `refs/Gymnasium/tests` (DR-06).
+- **Exit:** Debug and Release build with 0 errors on net8.0 and net10.0; unit 212/212 (203 headless + 9 viewer), the
+  N-1 tests aside; parity 163/163 gated, the N-1 cells aside; the 14 `[OpenBugs]` cells fail at their documented
+  divergences and nowhere else.
 
 ### P0r P0's rest
 
@@ -208,42 +212,49 @@ Each numbered step is one commit, unless it says otherwise.
     Python stack with `tools/parity/setup_venv.ps1`, and runs the parity gate with `GYMNET_PYTHONNET_REQUIRE_ENGINE=1`.
   - `ubuntu-latest` builds and runs the unit suite.
   - Both set `AVALONIA_TELEMETRY_OPTOUT=1` and exclude the viewer tests.
-- **P0r.2 Static rules (port plan §14.7)** as a script that CI runs: float32 literals and `MathF` in ported math,
-  `Debug.Assert`, `Console.WriteLine`, sync-over-async, `lock (this)`, the `Thread.Abort` family, global or unseeded
-  RNG, `throw new Exception`, public mutable constant-like fields, `NDArray == null`. Each rule gets a fixture that must
-  trip it.
-- **P0r.3 Golden harness (F4).**
-  - `tools/golden/record.py` records trajectories and frames from the pinned stack into `tests/Golden` (D15).
-  - The C# side gets `GoldenTrajectory`/`GoldenAssert`, with open-loop and sampled action modes.
-  - One case catalog drives the live, record and replay modes (the interop design's §9), so a golden is always a
-    recording of a live cell.
-  - Goldens let the ubuntu job and machines without Python check L3/L4. The live suite stays the oracle on the
-    reference job.
+- **P0r.2 Static rules: none (DR-03).** No analyzers and no rule scripts; the port plan's §14.7 bans are not enforced
+  by tooling.
+- **P0r.3 Golden harness (F4, DR-04).**
+  - The live suite (`tests/Gym.Tests.Parity`) holds the code that records and regenerates goldens: one case catalog
+    drives its live, record and replay modes (the interop design's §9), so a golden is always a recording of a live
+    cell. No separate Python recorder script.
+  - Record mode writes trajectories and frames into `tests/Golden` as gzip JSONL plus PNG, with a manifest of the
+    pinned stack (D15). The C# side gets `GoldenTrajectory`/`GoldenAssert`, with open-loop and sampled action modes.
+  - Replay needs no Python: the ubuntu job and machines without the stack check L3/L4 from the files. The live suite
+    stays the oracle on the reference job.
 - **P0r.4 Inventory (port plan §14.6).**
   - `tools/parity/inventory.py` lists Gymnasium's public names by AST.
   - A reflection test maps them through §3.8 and reports the missing ones against a committed expected-missing list.
     Each phase shrinks the list, and 2.0 needs it empty.
-- **Exit:** both CI jobs green on the branch; the CartPole-v1 golden passes; the inventory test runs.
+- **Exit:** both CI jobs green on the branch; the CartPole-v1 golden, recorded by the live suite, replays without
+  Python; the inventory test runs.
 
 ### P2 Spaces
 
 Specs: the port plan's §7; sources `gymnasium/spaces` (3,816 lines at v1.4.0); tests `tests/spaces`.
 
-- **P2.1 `Space<T>` and ownership (D19).**
-  - The generic base: lazy `NpRandom`, `Seed` returning the seed list, `ToString`/`Equals`, `to_jsonable`/`from_jsonable`.
-  - `Space : IDisposable`; `Env.Dispose` disposes both spaces after `Close`.
-  - `[NDBorrowed]` on carried arrays; `StepResult`/`ResetResult` implement `INDArrayCarrier`.
-  - NumSharp.Build added as a development dependency, so `[NDScoped]` methods are woven.
+- **P2.1 `Space<T>`, typed env spaces and ownership (DR-07, DR-08, D19).**
+  - The generic `Space<T>` over an untyped `Space` base: lazy `NpRandom`, `Seed` returning the seed list,
+    `ToString`/`Equals`, `to_jsonable`/`from_jsonable`, `Contains(object?)`.
+  - `Env<TObs, TAct>` exposes `Space<TObs> ObservationSpace` and `Space<TAct> ActionSpace`; `IEnv` keeps the untyped
+    view; wrappers follow their `TWObs`/`TWAct` (DR-07).
+  - `Discrete : Space<NDArray>`, a 0-d int64 array standing for `np.int64` (DR-08), so the discrete-action envs move to
+    `Env<NDArray, NDArray>`: CartPole and LunarLander change here, with their tests and parity cells.
+  - `Space : IDisposable`; `Env.Dispose` disposes both spaces after `Close`; `[NDBorrowed]` on carried arrays;
+    `StepResult`/`ResetResult` implement `INDArrayCarrier`; NumSharp.Build added as a development dependency, so
+    `[NDScoped]` methods are woven (D19). The 0.80.0 analyzer's 10 NDW sites are fixed by this work; warnings never
+    gate a step (DR-05).
   - Measure what `[NDScoped]` saves on `Box.Sample` and CartPole's step: NUMSHARP_MIGRATION_PLAN §8.4 measured
     0.634 µs per undisposed small array against 0.217 µs disposed.
-  - NDW findings become errors in `src/` (the migration plan's M6).
+  - The source-generator project (DR-13, DR-34) starts here, with the `[GymTuple]`/dict records P2.5 needs.
 - **P2.2 `Box`**: validation with Gymnasium's messages, float64 bounds kept in float64 (closes the `Box(float, float)`
   defect), sampling per bound category, `contains` with `np.can_cast` and lists, `repr`.
-- **P2.3 `Discrete`**: shape `()`, int64, `start`, masks and probabilities, `repr`, `n > 0` validation (B-03, and
-  B-10 as `Discrete`'s cell tags it).
+- **P2.3 `Discrete`**: shape `()`, int64 0-d samples (DR-08), `start`, masks and probabilities, `repr`, `n > 0`
+  validation (B-03, and B-10 as `Discrete`'s cell tags it).
 - **P2.4 `MultiBinary`, `MultiDiscrete`.**
-- **P2.5 `Tuple`, `Dict`, `Sequence`**: subseeds through `integers(int32.MaxValue, size: n)`, `geometric(0.25)` for
-  `Sequence`, which NumSharp 0.80.0 now provides.
+- **P2.5 `Tuple`, `Dict`, `Sequence`**: the generic forms (`object?[]`, an insertion-ordered map) with
+  source-generated typed records over them (DR-09, DR-13); subseeds through `integers(int32.MaxValue, size: n)`,
+  `geometric(0.25)` for `Sequence`, which NumSharp 0.80.0 now provides.
 - **P2.6 `Text`, `Graph`, `OneOf`.**
 - **P2.7 `spaces.utils`**: `flatdim`, `flatten`, `unflatten`, `flatten_space`, `is_space_dtype_shape_equiv`, with
   v1.4.0's `OneOf` and `Tuple` fixes.
@@ -257,9 +268,17 @@ Specs: the port plan's §7; sources `gymnasium/spaces` (3,816 lines at v1.4.0); 
 
 Specs: the port plan's §8, §9 (the `make()` stack) and §12.
 
-- **P3.1 Registration**: `Gymnasium.Make`, `MakeVec` (scaffold), `Spec`, `Register`, `Registry`, `PprintRegistry`,
-  `RegisterEnvs`, with v1.4.0's entry-point and metadata fixes and exact error texts. CartPole-v0/v1 register now;
-  each later phase registers its ids.
+- **P3.1 Registration**: `Gymnasium.Make` in an untyped and a typed form (DR-10), `MakeVec` (scaffold), `Spec`,
+  `Register`, `Registry`, `PprintRegistry`, `RegisterEnvs`, with v1.4.0's entry-point and metadata fixes and exact
+  error texts.
+  - Each env assembly registers its ids from a module initializer (DR-12), with `typeof(...)` entry points; an
+    environment variable disarms it (DR-14); the env package's `buildTransitive` targets compile a one-line app-side
+    initializer into consuming C# apps so registration runs before `Main` (DR-17). CartPole-v0/v1 register now; each
+    later phase registers its ids.
+  - kwargs: generated `<Class>Options` records (`[GymOptions]`, DR-34), plus dictionary and anonymous-object overloads,
+    all bound by Python name (DR-11).
+  - `render_mode="human"`: `Gymnasium.HumanViewerFactory`, a `viewer_factory` override, and `DependencyNotInstalled`
+    when neither is set (DR-20).
 - **P3.2 Checkers**: `utils/passive_env_checker.py` and the `PassiveEnvChecker` wrapper, `utils/env_checker.py`
   (`check_env`, including v1.4.0's distinct-object and RNG-state checks), `utils/env_match.py`.
 - **P3.3 Common wrappers**: `Autoreset`, `RecordEpisodeStatistics` (its time entry excluded from goldens), vector
@@ -296,7 +315,9 @@ Specs: the port plan's §5.5 and Appendix E. pygame-ce calls at v1.4.0:
 
 Specs: the port plan's §11.1; sources 2,028 lines.
 
-- **P4.1** MountainCar-v0 and MountainCarContinuous-v0.
+- **P4.1** MountainCar-v0 and MountainCarContinuous-v0 through one `MountainCarEnv(continuous: bool)` (DR-32): both
+  sources' dynamics, spaces and rewards behind the flag; `repr` prints `Continuous_MountainCarEnv` in continuous mode;
+  the continuous id's `EnvSpec.kwargs` carries `continuous=True` (accepted deviation).
 - **P4.2** Pendulum-v1: `np.sin(th)`, the NEP 50 float32/float64 mix in its reward, array-bound `uniform` in `reset`,
   `clockwise.png`.
 - **P4.3** Acrobot-v1: the RK4 integrator, `wrap` and `bound`.
@@ -310,8 +331,11 @@ Specs: the port plan's §11.1; sources 2,028 lines.
 
 Specs: the port plan's §11.2, with v1.4.0's sources (1,868 lines) and art.
 
-- **P5.1** `categorical_sample`, and the `'c'` map helper: N-2 fixed upstream, or a local builder from per-character
-  rows until it is.
+- **P5.0 Assets (DR-19)**: v1.4.0's toy_text images copied once from a Gymnasium installation into the repo and
+  embedded as resources (re-copied on a re-pin), their license confirmed when copied.
+- **P5.1** `categorical_sample`, and the `'c'` map: N-2 is proven by an `[OpenBugs("N-2")]` test (DR-01); P5 can't
+  proceed without the map, so a local builder from per-character rows is the stuck-case workaround until NumSharp splits
+  strings itself.
 - **P5.2** FrozenLake-v1 and FrozenLake8x8-v1: `generate_random_map`, slippery transitions, `ansi`.
 - **P5.3** CliffWalking-v1 and CliffWalkingSlippery-v1.
 - **P5.4** Taxi-v4: action masks in `info`.
@@ -322,42 +346,64 @@ Specs: the port plan's §11.2, with v1.4.0's sources (1,868 lines) and art.
 
 Specs: the port plan's §9 and §10; sources `vector` 3,113 lines and `wrappers` 7,569 lines at v1.4.0.
 
-- **P6.1** `VectorEnv`, `AutoresetMode` (NEXT_STEP, SAME_STEP, DISABLED), `SyncVectorEnv`, the vector utils
-  (`batch_space`, `batch_differing_spaces`, `iterate`, `concatenate`, `create_empty_array`).
-- **P6.2** `AsyncVectorEnv` on threads (D7), with v1.4.0's `max_concurrency`; bit-equal to sync.
-- **P6.3** Observation, action and reward wrappers, in the port plan's §9 groups.
-- **P6.4** F8: `cv2.resize(INTER_AREA)` for `ResizeObservation`, byte-exact against recorded OpenCV outputs.
-- **P6.5** Rendering wrappers; F9: `RecordVideo` over an FFmpeg wrapper (frame parity, not file parity),
-  `HumanRendering` on the viewers.
+- **P6.1** `VectorEnv<TObs, TAct>` with batched types and the untyped `IVectorEnv`, `MakeVec` in both forms (DR-21),
+  `AutoresetMode` (NEXT_STEP, SAME_STEP, DISABLED), `SyncVectorEnv`, the vector utils (`batch_space`,
+  `batch_differing_spaces`, `iterate`, `concatenate`, `create_empty_array`).
+- **P6.2** `AsyncVectorEnv` with the three execution modes of DR-22: `ThreadPool` (default), `DedicatedThreads` (env
+  *i* pinned to thread *i* % `threadCount`), `ThreadPerEnv`; Gymnasium's `*_async`/`*_wait` API, `max_concurrency` as a
+  semaphore, errors returned with the env index, and a thread-bound sub-env given its own thread automatically in
+  ThreadPool mode. Results gathered in env order, so every mode is bit-equal to sync; the tests run all three.
+- **P6.3** Observation, action and reward wrappers, in the port plan's §9 groups. The 18 vector twins take the suffix
+  names of DR-24 (`RecordEpisodeStatisticsVector`, …), each with `[PyName]` carrying Gymnasium's name.
+- **P6.4** F8: a managed port of OpenCV's `INTER_AREA` paths (DR-23) for `ResizeObservation`, byte-exact against live
+  `cv2` at a pinned version.
+- **P6.5** Rendering wrappers; F9: `RecordVideo` over a pluggable `IVideoWriter`, PNG frame sequences by default and
+  an ffmpeg writer as a pluggable implementation (DR-25; frame parity, not file parity); `HumanRendering` on the
+  viewers (DR-20).
 - **P6.6** Vector wrappers.
-- **P6.7** Tests: port `tests/vector` (76) and `tests/wrappers` (146).
-- **Exit:** both suites green; every vector cell equal between sync and async, bit for bit.
+- **P6.7** `utils.play` and `PlayPlot` (keyboard input and a plot window in the viewers), the `FuncEnv` protocol
+  without JAX, and the `utils.performance` benchmarks (DR-36). `AtariPreprocessing` is out of 2.0.
+- **P6.8** Tests: port `tests/vector` (76) and `tests/wrappers` (146).
+- **Exit:** both suites green; every vector cell equal between sync and async, bit for bit, in every execution mode.
 
 ### P8 Box2D
 
 Specs: the port plan's §5.6 and §11.3; sources 2,979 lines.
 
-- **P8.1 Box2D.NET (D5):** settings, math, the dynamic tree and pair ordering, distance, TOI, manifolds, contact
-  solver, island, joints, ray casts, and the contact-listener callback order. Engine goldens come from live pybox2d
-  scenes (free fall, stacking, joints, contacts, ray casts), compared per step in float32 bits. The first goldens also
-  settle whether .NET's `MathF` trigonometry matches the CRT calls Box2D makes (§8).
-- **P8.2** LunarLander-v3 and LunarLanderContinuous-v3, with `heuristic`; the 8 LunarLander `[OpenBugs]` cells turn
-  green.
-- **P8.3** BipedalWalker-v3 and BipedalWalkerHardcore-v3 (lidar ray casts).
-- **P8.4** CarRacing-v3 with `car_dynamics` and text (D22); coordinate with PR #13.
+- **P8.1 The Box2D engine (D5, DR-26, DR-29):** an assembly `Gym.Box2D` inside `Gym.NET.Environments` (DR-16; the
+  NuGet id `Box2D.NET` is taken). It opens with DR-29's measurement: the contact solver's and broad-phase's hot loops
+  written on NumSharp `NDArray`s and on float32 structs; each subsystem uses NDArrays only where they are no slower and
+  no larger in code. Then the core faithful to Box2D 2.3.x's C++ (settings, math, the dynamic tree and pair ordering,
+  distance, TOI, manifolds, contact solver, island, joints, ray casts, the contact-listener callback order) and the
+  pybox2d-shaped facade the envs call. Engine goldens come from live pybox2d scenes (free fall, stacking, joints,
+  contacts, ray casts), compared per step in float32 bits; the first ones also settle whether .NET's `MathF`
+  trigonometry matches the CRT calls Box2D makes (§8).
+- **P8.2** LunarLander-v3 and LunarLanderContinuous-v3 as `LunarLanderEnv` (DR-32, `[PyName("LunarLander")]`), with
+  `heuristic` and a private nested `ContactDetector` (DR-28); the 8 LunarLander `[OpenBugs]` cells turn green.
+- **P8.3** BipedalWalker-v3 and BipedalWalkerHardcore-v3 as `BipedalWalkerEnv` (lidar ray casts), with its own private
+  `ContactDetector`.
+- **P8.4** CarRacing-v3 as `CarRacingEnv` with `car_dynamics`; its score text drawn from glyph data recorded once from
+  live pygame and SDL_ttf's shaded layout (DR-27), after the font-data license check; coordinate with PR #13.
 - **P8.5** Delete the Aether LunarLander (D10) and the `Aether.Physics2D`, `ImageSharp.Drawing` and `Fonts`
   references in `Gym.Environments`; B-17…B-30 close.
 - **Exit:** engine goldens; L3 and L4 for all five ids; no `[OpenBugs]` cell left in the suite.
 
-### P9 MuJoCo
+### P9 MuJoCo (postponed out of 2.0, DR-35)
 
-Specs: the port plan's §5.7 and §11.4; sources 6,153 lines.
+Specs: the port plan's §5.7 and §11.4; sources 6,153 lines. Nothing here starts before MuJoCo resumes; the approved
+designs for that time are:
 
-- **P9.1 MuJoCo.NET:** P/Invoke bindings generated from the pinned `mujoco.h` (D6), native packages per RID from the
-  official release, and an offscreen GL context (WGL on Windows, EGL on Linux).
-- **P9.2** `MujocoEnv` and `MujocoRenderer`; the 14 XML assets.
-- **P9.3** Hopper-v5 golden first, then the other 21 ids (11 envs × v4/v5), with v5's constructor options.
-- **Exit:** all 22 ids at L3 on the pinned native build; frames best-effort, as the port plan's §1.2 allows.
+- **A managed port, 100%** (DR-30), inside `Gym.NET.Environments` with no native binaries, using NumSharp where it fits
+  (`np.evaluate`, accelerated `np.*`).
+- **Scope** (DR-33): the engine paths, MJCF compiler subset and renderer path that Gymnasium's 22 envs and their 14
+  bundled models (primitive geoms only) reach. MuJoCo's engine alone is 2.56 MB of C in 90 files, and its compiler and
+  renderer another 2.63 MB of C/C++, so this is the largest phase (XXL).
+- **Proof**: bitwise against live Python `mujoco` at a pinned version (D6), after measuring whether native builds fuse
+  multiply-adds; any non-bitwise quantity documented with its ulp bound.
+- **Frames** (DR-31): MuJoCo's own `mjr_*` renderer, ported, drawing through a managed OpenGL binding in a hidden WGL or
+  EGL context; best-effort, as the port plan's §1.2 allows.
+- **Names** (DR-24): `AntEnvV4` / `AntEnvV5` and the other 10 pairs, each `[PyName("AntEnv")]`; models embedded
+  (DR-19).
 
 ### P10 Release 2.0.0
 
@@ -366,14 +412,17 @@ Specs: the port plan's §5.7 and §11.4; sources 6,153 lines.
   README.
 - **P10.2** The migration guide (port plan §16); `Gym.Legacy` stays (D9).
 - **P10.3** One CartPole example on the new API; the rest removed (D13, B-36).
-- **P10.4** Packages at 2.0.0: Gym.NET, .Rendering, .Environments, .Environments.ToyText, .Environments.Box2D,
-  .Environments.MuJoCo, .Rendering.Avalonia, .Rendering.WinForm, Box2D.NET, MuJoCo.NET. Release notes include D18's
-  advisory note.
-- **P10.5** Merge `feat/numsharp-master-migration` into `master` (D20), tag, publish.
-- **Exit:** the port plan's definition of done (§1.5) in full; the inventory's expected-missing list is empty.
+- **P10.4** Packages at 2.0.0 (DR-16): Gym.NET, Gym.NET.Rendering, Gym.NET.Environments (classic_control, toy_text
+  and box2d with the `Gym.Box2D` engine), Gym.NET.Rendering.Avalonia, Gym.NET.Rendering.WinForm. Release notes include
+  D18's advisory note and MuJoCo's postponement (DR-35).
+- **P10.5** Merge `journey1` into `master` (D20), tag, publish.
+- **Exit:** the port plan's definition of done (§1.5) for everything but MuJoCo; the inventory's expected-missing list
+  holds only MuJoCo's names and `AtariPreprocessing` (DR-36).
 
 ## 6. How every step is done
 
+- **Designs first.** The step's designs are approved in [`DESIGN_REVIEW.md`](DESIGN_REVIEW.md). A design question
+  found while implementing (a choice no DR-xx covers) stops the step until the maintainer reviews it the same way.
 - **Source first.** Port from the pinned `refs/Gymnasium` (and pygame-ce, CPython, NumPy, Box2D, MuJoCo sources at
   their pins), following the port plan's §3 rules; each member based on a source carries its pinned GitHub
   permalink in `<remarks>`, in Gym.NET's own voice.
@@ -396,7 +445,7 @@ What the earlier plans asked of NumSharp, and what 0.80.0 did with it:
 | `Generator.geometric` | port plan F2.1 | Fixed | Probe: identical to NumPy 2.4.2 for 4 seeds |
 | Array-parameter `uniform`/`normal`/`exponential` | F2.2, U6 | Fixed | Probe: `uniform` identical; the release notes cover all 29 samplers |
 | `'S1'`/`'c'` dtype | F2.3 | `S1` exists; the `'c'` split from strings does not (N-2) | Probe: shape `(4,)` against NumPy's `(4, 4)` |
-| `AssertionError`, `NotImplementedError` in NumSharp | F2.4, D17 | `AssertionError` added (N-1); `NotImplementedError` still absent, so Gym.NET keeps its own | Trial build: 4 × CS0104 |
+| `AssertionError`, `NotImplementedError` in NumSharp | F2.4, D17, DR-02 | `AssertionError` added (its parameterless message is N-1); `NotImplementedError` and `ImportError` still absent (N-3) | Trial build: 4 × CS0104 |
 | A release with the `DType` API | U1 | Fixed | Trial build |
 | Unseeded `RandomState` from OS entropy | U2 | Fixed (release notes) | Not re-measured: Gym.NET no longer uses `RandomState` |
 | `RandomState(long)` | U3 | Moot | Gym.NET seeds through `SeedSequence` |
@@ -411,15 +460,21 @@ What the earlier plans asked of NumSharp, and what 0.80.0 did with it:
 | Legacy `choice` ignores `replace`; `randint(-5, -1)` read as "no high" | 2026-09-23 | `replace` fixed (release notes); `high = -1` not re-checked | Legacy API, unused by Gym.NET |
 | Legacy `randint` diverges for 2^31–2^32 | 2026-09-25 | Moot for Gym.NET | Probe: `Generator.integers` identical over that range |
 
-New items:
+New items. Under DR-01 each is documented here and proven by an `[OpenBugs("N-x")]` test that asserts NumPy's or
+Python's behavior and fails until NumSharp provides it; a Gym.NET workaround exists only where a step is stuck without
+one:
 
 - **N-1.** NumSharp's parameterless `AssertionError()` carries the message `"AssertionError"`; Python's
-  `str(AssertionError())` is `""`. Gym.NET passes `""` at its bare asserts (R0.1); whether NumSharp should match
-  `str()` is NumSharp's call.
+  `str(AssertionError())` is `""`. DR-02: NumSharp changes it. Gym.NET throws `new AssertionError()` at bare asserts,
+  and the tests and cells that compare such a message are `[OpenBugs("N-1")]` until the NumSharp release (R0.1).
 - **N-2.** `np.array(string[], "c")` (and `np.asarray`) should split each string into characters, as NumPy does for the
-  `'c'` code: `np.asarray(["SFFF", "FHFH", "FFFH", "HFFG"], dtype="c")` is a `(4, 4)` `S1` array. P5 needs it, or
-  works around it.
-- **N-3.** `NotImplementedError` (D17's recommendation that NumSharp define every Python built-in), low priority.
+  `'c'` code: `np.asarray(["SFFF", "FHFH", "FFFH", "HFFG"], dtype="c")` is a `(4, 4)` `S1` array. P5 is stuck without
+  it, so it carries a local map builder until NumSharp has it (P5.1).
+- **N-3.** DR-02: NumSharp owns every Python and NumPy exception. It lacks `NotImplementedError` and `ImportError`
+  today (and any other a later port needs, such as `ModuleNotFoundError`), and each needs public constructors
+  `()`, `(message)` and `(message, innerException)`. `AttributeError` can't carry an inner exception today, so
+  `get_wrapper_attr` loses Python's `raise ... from e` chain (found in P1). Gym.NET keeps its own two until NumSharp
+  has them.
 
 ## 8. Risks
 
@@ -429,6 +484,8 @@ New items:
 | One branch until 2.0 (D20) | A long-lived branch with many commits merges once; contributors keep targeting `master` | The branch sits on `master`'s tip (13 ahead, 0 behind), so while `master` doesn't move the final merge is a fast-forward; CI runs on the branch from P0r |
 | pygame `draw` from our own code (D4) | A primitive that won't converge stalls P7 | The random-shape harness reports the first differing pixel and its neighbourhood; the maintainer decides before any other route |
 | Box2D float32 trigonometry (D5) | Box2D calls `sinf`/`cosf`/`atan2f` from MSVC's CRT; .NET's `MathF` must agree on win-x64 | The first engine goldens include rotation-heavy scenes; a mismatch surfaces at P8.1, before any env |
-| MuJoCo native builds (D6) | L3 depends on the exact native binary | Pin the version, ship the official binaries per RID, record them in the manifest |
-| FreeType text for CarRacing (D22) | Text pixels depend on FreeType's version and hinting | Bind the FreeType version pygame-ce 2.5.8 ships; limited to one env |
+| Box2D on NumSharp (DR-29) | `NDArray`s in the solver's hot loops could cost performance or code size | P8.1 measures both forms per subsystem before choosing; float32 structs where NDArrays lose |
+| CarRacing's recorded glyphs (DR-27) | The font is GNU FreeFont (GPL with a font exception); its glyph data ships in Gym.NET | License check before P8.4; if the data can't ship, the text design goes back to review before P8.4 continues |
+| The source generator (DR-13, DR-34) | One generator project feeds composite records and options records; a defect there reaches every env | Its output is covered by the same parity cells as hand-written code (`repr`, `==`, kwargs binding) |
+| MuJoCo postponed (DR-35) | 2.0 ships without Gymnasium's mujoco family | Release notes say so; DR-30, DR-31 and DR-33 keep the approved design for when it resumes (a managed port is XXL, and its bitwise parity with native MuJoCo is uncertain until measured) |
 | Gymnasium moves past v1.4.0 | Work against a superseded pin | Re-pin only at a release tag, by the port plan's §14.10, between phases |

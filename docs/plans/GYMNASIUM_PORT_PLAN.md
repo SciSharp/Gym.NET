@@ -804,7 +804,9 @@ Record NumPy draws for every pattern in Appendix A.6 (plus new ones as ports add
 
 ### 14.7 Static rules
 
-Encode the Appendix A.3 hazards as analyzer diagnostics:
+**Dropped on 2026-11-08 (DR-03 in [`DESIGN_REVIEW.md`](DESIGN_REVIEW.md)): no analyzers and no rule scripts.** The
+hazards below stay as review guidance only. The original proposal was to encode the Appendix A.3 hazards as analyzer
+diagnostics:
 
 - float32 literals and `MathF` in ported math;
 - `Debug.Assert` in `src/`;
@@ -990,9 +992,15 @@ release cut above: one 2.0 ships after all of them, Box2D and MuJoCo included.
 | D17 | Python built-in exceptions (`ValueError`, `TypeError`, `KeyError`, …) | Throw NumSharp's ports (namespace `NumSharp`), or define Gym.NET's own in `Gym.Exceptions` | **Decided 2026-09-23: reuse NumSharp's** (§3.4). Python has one `ValueError` for NumPy and Gymnasium alike, and a second definition is ambiguous (CS0104) wherever both namespaces are imported. `Gym.Exceptions` holds `gymnasium.error`'s types plus the built-ins NumSharp lacks (`AssertionError`, `NotImplementedError`, …). Recommendation: add those to NumSharp as well (§5.2 item 4). A later NumSharp copy, for example for `np.testing` (whose asserts raise `AssertionError`), would otherwise bring the collision back. That happened in NumSharp 0.80.0, which adds `NumSharp.AssertionError` (4 × CS0104 in the trial); Gym.NET's copy is deleted in R0.1 |
 | D18 | ImageSharp 2.1.13's five advisories (2026-10-07; fixes only in the Split-Licensed 3.2.0/4.1.2) | Suppress and keep; suppress, then remove ImageSharp; remove first; upgrade to 4.1.3 | **Decided 2026-11-08: suppress the five advisories and keep 2.1.13**, each suppression with its reason (R0.2) |
 | D19 | Array ownership (NumSharp migration step 4, M5) | Explicit ownership plus `[NDScoped]`; explicit `using` only; finalizer only | **Decided 2026-11-08: explicit ownership plus `[NDScoped]`**: spaces own their arrays, carried arrays are `[NDBorrowed]`, results implement `INDArrayCarrier`, and NumSharp.Build weaves `[NDScoped]` for temporaries (P2.1) |
-| D20 | Branch and CI | PR per phase with a CI gate; one branch until 2.0; straight to `master` | **Decided 2026-11-08: one branch until 2.0**; CI runs on it, informational (P0r.1, P10.5) |
-| D21 | Release cut | 2.0 = P0–P7; 2.0 with Box2D; one 2.0 with everything | **Decided 2026-11-08: one 2.0 with everything**, Box2D and MuJoCo included |
-| D22 | Text rendering for CarRacing (pygame's default font) | FreeType interop; a managed rasterizer | Open; default FreeType through P/Invoke at the version pygame-ce 2.5.8 bundles (P8) |
+| D20 | Branch and CI | PR per phase with a CI gate; one branch until 2.0; straight to `master` | **Decided 2026-11-08: one branch until 2.0**, `journey1` (cut from `feat/numsharp-master-migration`); CI runs on it, informational (P0r.1, P10.5) |
+| D21 | Release cut | 2.0 = P0–P7; 2.0 with Box2D; one 2.0 with everything | **Decided 2026-11-08: one 2.0 with everything**, Box2D included; **MuJoCo was then postponed out of 2.0** ([`DESIGN_REVIEW.md`](DESIGN_REVIEW.md) DR-35) |
+| D22 | Text rendering for CarRacing (pygame's default font) | FreeType interop; a managed rasterizer; glyph data recorded from pygame | **Decided 2026-11-08: glyph data recorded once from live pygame**, with SDL_ttf's shaded layout re-implemented (DR-27) |
+
+The implementation designs behind these decisions (types, names, packaging, registration, threading, engines) were
+reviewed on 2026-11-08 and are recorded as DR-01…DR-36 in [`DESIGN_REVIEW.md`](DESIGN_REVIEW.md). Several refine this
+plan: the §14.7 static rules and F3's analyzer are dropped (DR-03); D16's class-name rule becomes C# naming
+conventions, with Gymnasium's name kept through `[PyName]` on the classes that had to be renamed (DR-15, DR-18, DR-24,
+DR-28, DR-32); D17 extends to every Python exception living in NumSharp (DR-02).
 
 ---
 
