@@ -1,0 +1,37 @@
+<Project>
+  <!-- ==================================================================================================================
+       Imported by every Gym.NET project (src/, tests/, examples/). refs/NumSharp keeps its own Directory.Build.props, which
+       MSBuild finds first for NumSharp's projects, so nothing here reaches them.
+
+       NuGet audit suppressions for SixLabors.ImageSharp 2.1.13 (decision D18, docs/plans/COMPLETION_PLAN.md step R0.2).
+
+       2.1.13 is the last ImageSharp release under Apache-2.0; every later version ships under the Six Labors Split
+       License, whose build check fails Release builds and packs without a license key (measured 2026-09-23). On
+       2026-10-07 GitHub published five advisories against 2.1.13, fixed only in 3.2.0 and 4.1.2. NuGet audit reports
+       them as NU1902/NU1903, and the projects that set TreatWarningsAsErrors (Gym.Rendering, Gym.Tests.Parity) then fail
+       restore. The maintainer chose to suppress them and keep 2.1.13.
+
+       Why none of them applies to Gym.NET: Gym.NET builds images from pixel buffers for the human viewers and the legacy
+       Render(), draws the Aether LunarLander with ImageSharp.Drawing, writes PNG artifacts in the parity suite, and decodes
+       only the PNG assets copied from Gymnasium (step P7.4). It never encodes TIFF, never reads BigTIFF, never runs
+       HistogramEqualization, and never decodes an untrusted image, which is the only way to reach the ICC-profile parser.
+
+       Scope: these suppressions quiet Gym.NET's own build only. A consumer of the Gym.NET packages still restores 2.1.13
+       and gets the same advisories in their own build; the release notes say so (P10.4). A new advisory against 2.1.13 is
+       NOT suppressed here: it fails the build again on purpose, and gets the same review before a line is added below.
+       ================================================================================================================== -->
+  <ItemGroup>
+    <!-- High: "HistogramEqualization uses an unvalidated luminance as an unchecked histogram index". Gym.NET never applies
+         histogram equalization. -->
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-j3p4-wp97-rph4" />
+    <!-- High: "TIFF CCITT T4 encoder can write past its compressed output buffer". Gym.NET never encodes TIFF. -->
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-j9gm-c75j-xc9q" />
+    <!-- High: "TIFF CCITT T6 encoder writes beyond an undersized output buffer". Gym.NET never encodes TIFF. -->
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-jjfr-hcj7-qf5w" />
+    <!-- Moderate: "ICC CLUT parsing allocates from unvalidated channel and grid dimensions". Reached only by decoding an
+         image with an embedded ICC profile; Gym.NET decodes only Gymnasium's own PNG assets, never untrusted input. -->
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-gwg2-r3hj-4w44" />
+    <!-- Moderate: "BigTIFF IFD count can keep a decoder thread in a non-progressing loop". Gym.NET never decodes TIFF. -->
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-wmxv-xphr-5c9g" />
+  </ItemGroup>
+</Project>
