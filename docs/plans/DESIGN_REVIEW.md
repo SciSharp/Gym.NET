@@ -166,6 +166,17 @@ Effects of approved designs that only showed up in code. None changes a design; 
   would return an array reward, since rewards are float64. An untyped env's spaces are `ObjectSpace` views, so every
   space tool that dispatches on the space's class unviews it first (`ObjectSpace.Unview`). The discretizing wrappers need
   NumPy's float32 `linspace`, which NumSharp lacks (N-4, COMPLETION_PLAN §7).
+- **The stateful wrappers with D19** (found in P6.3, 2026-11-10): Python's wrappers keep references to the objects they
+  were given, and the garbage collector decides when those die; under D19 the caller owns its actions and the
+  observations it receives, and may dispose them when a call returns (the parity harness does). `StickyAction` therefore
+  keeps a deep copy of the last action and hands the env a fresh copy at every repeated step (keeping the caller's
+  object, as Python does, repeated a disposed array: measured over Pendulum and MountainCarContinuous). The wrappers
+  that keep the env's observations (`DelayObservation`'s queue, `FrameStackObservation`'s deque and reset padding)
+  release only what they created (`FrameStackObservation`'s buffer and zero padding, `MaxAndSkipObservation`'s buffer):
+  the env's info may hold an observation, so the ones they drop are left to NumSharp's finalizer. `FrameStackObservation`
+  is typed by the env's observation type, which the stacks of an array, `Dict` or `Tuple` space share; a space whose
+  stack is another type (`Text`, `Graph`, `Sequence`, `OneOf` stack into tuples) needs the untyped form. The vector
+  utils (`batch_space`, `iterate`, `concatenate`, `create_empty_array`) unview `ObjectSpace` as the space utils do.
 - **DR-34's generated docs** (found in P10.4, 2026-11-09): an options record copies each constructor `<param>` onto its
   property, and a `<paramref>` inside it is a broken reference on a property (CS1734 wherever documentation is generated,
   so in a consumer's build too). The generator now turns it into a `<see cref>` to the sibling property, or `<c>` text for

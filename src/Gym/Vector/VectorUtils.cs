@@ -38,6 +38,8 @@ namespace Gym.Vector {
         ///     <c>deepcopy(space.np_random)</c> does. Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/vector/utils/space_utils.py#L50">gymnasium/vector/utils/space_utils.py (batch_space)</see>.
         /// </remarks>
         public static Space BatchSpace(Space space, int n = 1) {
+            // An untyped env's spaces are ObjectSpace views, Gym.NET's own wrapper: the space inside is the one Gymnasium's function gets.
+            space = ObjectSpace.Unview(space)!;
             switch (space) {
                 case null:
                     throw new TypeError("The space provided to `batch_space` is not a gymnasium Space instance, type: <class 'NoneType'>, None");
@@ -191,6 +193,8 @@ namespace Gym.Vector {
         /// <exception cref="TypeError">Thrown for a <see cref="Discrete"/> space, or items that cannot be iterated.</exception>
         /// <exception cref="CustomSpaceError">Thrown for a space type with no iteration.</exception>
         public static IEnumerable<object?> Iterate(Space space, object? items) {
+            // An untyped env's spaces are ObjectSpace views, Gym.NET's own wrapper: the space inside is the one Gymnasium's function gets.
+            space = ObjectSpace.Unview(space)!;
             switch (space) {
                 case null:
                     throw new TypeError("The space provided to `iterate` is not a gymnasium Space instance, type: <class 'NoneType'>, None");
@@ -230,6 +234,8 @@ namespace Gym.Vector {
         /// <returns><paramref name="out"/> filled, a new tuple or dict holding the filled parts, or a tuple of the items.</returns>
         /// <exception cref="TypeError">Thrown when <paramref name="space"/> is <see langword="null"/>.</exception>
         public static object? Concatenate(Space space, IEnumerable<object?> items, object? @out) {
+            // An untyped env's spaces are ObjectSpace views, Gym.NET's own wrapper: the space inside is the one Gymnasium's function gets.
+            space = ObjectSpace.Unview(space)!;
             switch (space) {
                 case null:
                     throw new TypeError("The space provided to `concatenate` is not a gymnasium Space instance, type: <class 'NoneType'>, None");
@@ -278,6 +284,8 @@ namespace Gym.Vector {
         /// <exception cref="TypeError">Thrown when <paramref name="space"/> is <see langword="null"/>.</exception>
         public static object? CreateEmptyArray(Space space, int n = 1, Func<Shape, DType, NDArray>? fn = null) {
             fn ??= (shape, dtype) => np.zeros(shape, dtype);
+            // An untyped env's spaces are ObjectSpace views, Gym.NET's own wrapper: the space inside is the one Gymnasium's function gets.
+            space = ObjectSpace.Unview(space)!;
             switch (space) {
                 case null:
                     throw new TypeError("The space provided to `create_empty_array` is not a gymnasium Space instance, type: <class 'NoneType'>, None");

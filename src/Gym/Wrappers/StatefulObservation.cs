@@ -311,4 +311,359 @@ namespace Gym.Wrappers {
         /// <returns>The value in that precision.</returns>
         private static double Round(double value, bool single) => single ? (float)value : value;
     }
+
+    /// <summary>
+    ///     Delays every observation by <c>delay</c> steps, as Gymnasium's <c>DelayObservation</c> does: until the delay has
+    ///     passed, the wrapper returns the space's zero (<see cref="WrapperFunctions.CreateZeroArray"/>), then the observation
+    ///     the env returned <c>delay</c> steps earlier. Use it to test an agent's tolerance of stale observations.
+    /// </summary>
+    /// <typeparam name="TObs">The observation type, unchanged.</typeparam>
+    /// <typeparam name="TAct">The action type, passed through.</typeparam>
+    /// <remarks>
+    ///     <para>
+    ///     The reset's observation is delayed too: with a delay of 2, the reset and the first step return zeros. A delayed
+    ///     observation is the env's own object, handed on when its turn comes; each zero is a new element the caller owns.
+    ///     The observations still queued at a reset are dropped, not released: the env's info may hold them, so they are
+    ///     left to NumSharp's finalizer, as elsewhere in Gym.NET.
+    ///     </para>
+    ///     <para>
+    ///     Gymnasium refuses a non-integer delay with <c>TypeError</c>; here the parameter is a <see cref="long"/>, so the
+    ///     compiler refuses it instead.
+    ///     </para>
+    ///     <para>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/wrappers/stateful_observation.py#L35">gymnasium/wrappers/stateful_observation.py</see>.</para>
+    /// </remarks>
+    [GymOptions]
+    public partial class DelayObservation<TObs, TAct> : ObservationWrapper<TObs, TObs, TAct>, IRecordConstructorArgs {
+        /// <summary>Wraps <paramref name="env"/>.</summary>
+        /// <param name="env">The env.</param>
+        /// <param name="delay">The number of steps observations are delayed; 0 delays nothing.</param>
+        /// <exception cref="ValueError">Thrown for a negative delay: <c>The delay needs to be greater than zero, actual value: -1</c>.</exception>
+        /// <exception cref="TypeError">Thrown when <paramref name="env"/> is <see langword="null"/>.</exception>
+        public DelayObservation(Env<TObs, TAct> env, long delay) : base(CheckDelay(env, delay)) {
+            SavedKwargs = RecordConstructorArgs.Record(new Info { ["delay"] = delay });
+            Delay = delay;
+        }
+
+        /// <summary>The recorded constructor arguments, <c>{'delay': 3}</c> (Python's <c>_saved_kwargs</c>).</summary>
+        [PyName("_saved_kwargs")]
+        public Info SavedKwargs { get; }
+
+        /// <summary>The delay in steps (<c>delay</c>).</summary>
+        public long Delay { get; }
+
+        /// <summary>The observations not returned yet, oldest first (<c>observation_queue</c>); the reset clears it.</summary>
+        public Queue<TObs> ObservationQueue { get; } = new();
+
+        /// <summary>Clears the queued observations, then resets the env.</summary>
+        /// <param name="seed">The seed, passed on.</param>
+        /// <param name="options">The options, passed on.</param>
+        /// <returns>The space's zero (the env's first observation when the delay is 0) and the env's info.</returns>
+        /// <exception cref="Error">Thrown for a negative seed.</exception>
+        public override ResetResult<TObs> Reset(BigInteger? seed = null, IReadOnlyDictionary<string, object?>? options = null) {
+            ObservationQueue.Clear();
+            return base.Reset(seed, options);
+        }
+
+        /// <summary>Queues the env's observation and returns the one <see cref="Delay"/> steps old, or the space's zero before then.</summary>
+        /// <param name="observation">The env's observation; the wrapper holds it until its turn.</param>
+        /// <returns>The delayed observation (the env's own object), or a new zero element.</returns>
+        public override TObs Observation(TObs observation) {
+            ObservationQueue.Enqueue(observation);
+            if (ObservationQueue.Count > Delay)
+                return ObservationQueue.Dequeue();
+            return (TObs)WrapperFunctions.CreateZeroArray(ObservationSpace)!;
+        }
+
+        /// <summary>Gymnasium's check of <paramref name="delay"/>, made before the wrapper is built, as Python checks it before <c>__init__</c> runs.</summary>
+        /// <param name="env">The env, passed through.</param>
+        /// <param name="delay">The delay.</param>
+        /// <returns><paramref name="env"/>.</returns>
+        /// <exception cref="ValueError">Thrown for a negative delay.</exception>
+        private static Env<TObs, TAct> CheckDelay(Env<TObs, TAct> env, long delay) {
+            if (!(0 <= delay))
+                throw new ValueError($"The delay needs to be greater than zero, actual value: {delay}");
+            return env;
+        }
+    }
+
+    /// <summary>
+    ///     Stacks the last <c>stack_size</c> observations along a new first axis, as Gymnasium's <c>FrameStackObservation</c>
+    ///     does: the space is <c>batch_space(env.observation_space, stack_size)</c>, and after a reset the stack is padded
+    ///     with the reset's observation (<c>"reset"</c>, the default), the space's zero (<c>"zero"</c>), or a given element.
+    ///     Use it to give a memoryless agent motion (velocities from frames).
+    /// </summary>
+    /// <typeparam name="TObs">
+    ///     The env's observation type, which the stacks share: an array space stacks into an array, a <c>Dict</c> into a
+    ///     dict, a <c>Tuple</c> into a tuple. A space whose stack is of another type (a <c>Text</c> space stacks into a
+    ///     tuple of strings) needs the untyped form, <see langword="object"/>; the constructor refuses the typed one.
+    /// </typeparam>
+    /// <typeparam name="TAct">The action type, passed through.</typeparam>
+    /// <remarks>
+    ///     <para>
+    ///     Every stack returned is a deep copy of the wrapper's buffer, so the caller owns it and later steps never change
+    ///     it. The wrapper keeps the env's last <c>stack_size</c> observations (Python's deque) and releases only what it
+    ///     created: the buffer, and the zero padding (when the reset's padding replaces it, or with the wrapper). The env's
+    ///     observations that fall out of the stack are left to NumSharp's finalizer, since the env's info may hold them; a
+    ///     custom padding stays the caller's.
+    ///     </para>
+    ///     <para>
+    ///     Gymnasium refuses a non-integer <c>stack_size</c> with <c>TypeError</c>; here it is a <see cref="long"/>.
+    ///     </para>
+    ///     <para>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/wrappers/stateful_observation.py#L305">gymnasium/wrappers/stateful_observation.py</see>.</para>
+    /// </remarks>
+    [GymOptions]
+    public partial class FrameStackObservation<TObs, TAct> : Wrapper<TObs, TAct>, IRecordConstructorArgs {
+        /// <summary>The env's observation space, unviewed: what each stack is concatenated by.</summary>
+        private readonly Space _envSpace;
+
+        /// <summary>The buffer each stack is concatenated into (<c>stacked_obs</c>, from <c>create_empty_array</c>); owned.</summary>
+        private readonly object? _stackedObs;
+
+        /// <summary>The zero padding this wrapper created and still owns, or <see langword="null"/> once a reset's observation replaced it.</summary>
+        private object? _ownedPadding;
+
+        /// <summary>Wraps <paramref name="env"/>.</summary>
+        /// <param name="env">The env.</param>
+        /// <param name="stackSize">The number of observations stacked; positive.</param>
+        /// <param name="paddingType">
+        ///     <c>"reset"</c> (<see langword="null"/>, the default: pad with each episode's first observation), <c>"zero"</c>
+        ///     (pad with the space's zero), or an element of the env's observation space to pad with, which stays the
+        ///     caller's.
+        /// </param>
+        /// <exception cref="ValueError">
+        ///     Thrown for a stack size below 1 (<c>The stack_size needs to be greater than zero, actual value: 0</c>), or a
+        ///     padding that is neither a mode nor an element of the space (<c>Unexpected `padding_type`, ...</c>).
+        /// </exception>
+        /// <exception cref="TypeError">Thrown when the stacks are not of <typeparamref name="TObs"/>, or <paramref name="env"/> is <see langword="null"/>.</exception>
+        public FrameStackObservation(Env<TObs, TAct> env, long stackSize, object? paddingType = null) : base(env) {
+            paddingType ??= "reset";
+            // Python records the arguments before it checks them, so a refused wrapper has recorded them too.
+            SavedKwargs = RecordConstructorArgs.Record(new Info { ["stack_size"] = stackSize, ["padding_type"] = paddingType });
+            if (!(0 < stackSize))
+                throw new ValueError($"The stack_size needs to be greater than zero, actual value: {stackSize}");
+
+            _envSpace = ObjectSpace.Unview(env.ObservationSpace)!;
+            string mode;
+            if (paddingType is "reset" or "zero") {
+                _ownedPadding = PaddingValue = WrapperFunctions.CreateZeroArray(_envSpace);
+                mode = (string)paddingType;
+            } else if (_envSpace.Contains(paddingType)) {
+                PaddingValue = paddingType;
+                mode = "_custom";
+            } else if (paddingType is string text) {
+                // We are guessing that the user just entered the "reset" or "zero" wrong.
+                throw new ValueError($"Unexpected `padding_type`, expected 'reset', 'zero' or a custom observation space, actual value: {PyBuiltins.Repr(text)}");
+            } else {
+                throw new ValueError($"Unexpected `padding_type`, expected 'reset', 'zero' or a custom observation space, actual value: {PyBuiltins.Repr(paddingType)} not an instance of env observation ({_envSpace})");
+            }
+
+            Space batched = Vector.VectorUtils.BatchSpace(_envSpace, checked((int)stackSize));
+            try {
+                ObservationSpace = ObservationWrapperFunctions.Typed<TObs>(batched);
+            } catch {
+                // The wrapper never got the batched space or the zero padding: release both before the refusal leaves.
+                batched.Dispose();
+                DisposeElement(_ownedPadding);
+                throw;
+            }
+
+            StackSize = stackSize;
+            PaddingType = mode;
+            for (long i = 0; i < stackSize; i++)
+                ObsQueue.AddLast(PaddingValue);
+            _stackedObs = Vector.VectorUtils.CreateEmptyArray(_envSpace, checked((int)stackSize));
+        }
+
+        /// <summary>The recorded constructor arguments, <c>{'stack_size': 3, 'padding_type': 'reset'}</c> (Python's <c>_saved_kwargs</c>).</summary>
+        [PyName("_saved_kwargs")]
+        public Info SavedKwargs { get; }
+
+        /// <summary>The number of observations stacked (<c>stack_size</c>).</summary>
+        public long StackSize { get; }
+
+        /// <summary>The padding mode: <c>reset</c>, <c>zero</c>, or <c>_custom</c> for a given element (<c>padding_type</c>).</summary>
+        public string PaddingType { get; }
+
+        /// <summary>The element the stack is padded with (<c>padding_value</c>): the space's zero, the given one, or the last reset's observation.</summary>
+        public object? PaddingValue { get; private set; }
+
+        /// <summary>The last <see cref="StackSize"/> observations, oldest first (<c>obs_queue</c>, a deque of fixed length).</summary>
+        public LinkedList<object?> ObsQueue { get; } = new();
+
+        /// <summary>Steps the env and returns the stack with its new observation last.</summary>
+        /// <param name="action">The action, passed on.</param>
+        /// <returns>A new stack (a deep copy), and the env's reward, flags and info.</returns>
+        public override StepResult<TObs> Step(TAct action) {
+            (TObs obs, double reward, bool terminated, bool truncated, Info info) = Env.Step(action);
+            Append(obs);
+            return new StepResult<TObs>(Stacked(), reward, terminated, truncated, info);
+        }
+
+        /// <summary>Resets the env and returns <c>stack_size - 1</c> paddings followed by the first observation.</summary>
+        /// <param name="seed">The seed, passed on.</param>
+        /// <param name="options">The options, passed on.</param>
+        /// <returns>A new stack and the env's info.</returns>
+        /// <exception cref="Error">Thrown for a negative seed.</exception>
+        public override ResetResult<TObs> Reset(BigInteger? seed = null, IReadOnlyDictionary<string, object?>? options = null) {
+            (TObs obs, Info info) = Env.Reset(seed, options);
+            if (PaddingType == "reset")
+                PaddingValue = obs;
+            for (long i = 0; i < StackSize - 1; i++)
+                Append(PaddingValue);
+            Append(obs);
+            // The stack_size appends pushed every earlier slot out, so the first zero padding is now referenced by nothing
+            // when the reset's observation replaced it.
+            if (_ownedPadding is not null && !ReferenceEquals(_ownedPadding, PaddingValue)) {
+                DisposeElement(_ownedPadding);
+                _ownedPadding = null;
+            }
+
+            return new ResetResult<TObs>(Stacked(), info);
+        }
+
+        /// <summary>Releases the buffer and the zero padding this wrapper created, then disposes the wrapper as every wrapper does.</summary>
+        /// <param name="disposing"><see langword="true"/> from <see cref="Env{TObs, TAct}.Dispose()"/>.</param>
+        protected override void Dispose(bool disposing) {
+            if (disposing) {
+                ObsQueue.Clear();
+                DisposeElement(_stackedObs);
+                DisposeElement(_ownedPadding);
+                _ownedPadding = null;
+            }
+
+            base.Dispose(disposing);
+        }
+
+        /// <summary>Appends an observation to the fixed-length queue (<c>deque(maxlen=stack_size).append</c>): the oldest falls out.</summary>
+        /// <param name="observation">The observation.</param>
+        private void Append(object? observation) {
+            ObsQueue.AddLast(observation);
+            if (ObsQueue.Count > StackSize)
+                ObsQueue.RemoveFirst();
+        }
+
+        /// <summary><c>deepcopy(concatenate(env.observation_space, obs_queue, stacked_obs))</c>.</summary>
+        /// <returns>A new stack the caller owns.</returns>
+        private TObs Stacked() {
+            object? concatenated = Vector.VectorUtils.Concatenate(_envSpace, ObsQueue, _stackedObs);
+            return (TObs)PyCopy.DeepCopy(concatenated)!;
+        }
+
+        /// <summary>Releases the arrays of an element the wrapper created: an array, or the arrays inside a tuple or dict.</summary>
+        /// <param name="element">The element, or <see langword="null"/>.</param>
+        private static void DisposeElement(object? element) {
+            switch (element) {
+                case IDisposable disposable:
+                    disposable.Dispose();
+                    break;
+                case object?[] items:
+                    foreach (object? item in items)
+                        DisposeElement(item);
+                    break;
+                case IReadOnlyDictionary<string, object?> dict:
+                    foreach (object? value in dict.Values)
+                        DisposeElement(value);
+                    break;
+            }
+        }
+    }
+
+    /// <summary>
+    ///     Repeats each action for <c>skip</c> steps, sums the rewards, and returns the element-wise maximum of the last two
+    ///     observations, as Gymnasium's <c>MaxAndSkipObservation</c> does: the frame skipping of Atari agents, where the
+    ///     maximum removes the flicker of sprites drawn on alternate frames.
+    /// </summary>
+    /// <typeparam name="TObs">The env's observation type: arrays (<see cref="NDArray"/>, or <see langword="object"/> holding arrays or numbers).</typeparam>
+    /// <typeparam name="TAct">The action type, passed through.</typeparam>
+    /// <remarks>
+    ///     <para>
+    ///     An episode that ends early stops the repetition, and the maximum then reads what the earlier steps left in the
+    ///     buffer, as in Gymnasium: after a one-step episode the second slot still holds the previous episode's frame. A
+    ///     reset is the env's own, not a maximum. The rewards are summed as Python floats. Each step returns a new array of
+    ///     the space's dtype; the env's frames are copied into the buffer and left to their owner.
+    ///     </para>
+    ///     <para>
+    ///     Gymnasium refuses a non-integer <c>skip</c> with <c>TypeError</c>; here it is a <see cref="long"/>.
+    ///     </para>
+    ///     <para>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/wrappers/stateful_observation.py#L565">gymnasium/wrappers/stateful_observation.py</see>.</para>
+    /// </remarks>
+    [GymOptions]
+    public partial class MaxAndSkipObservation<TObs, TAct> : Wrapper<TObs, TAct>, IRecordConstructorArgs {
+        /// <summary>The last two observations of a step (<c>_obs_buffer</c>), <c>(2, *shape)</c> in the space's dtype; owned.</summary>
+        private readonly NDArray _obsBuffer;
+
+        /// <summary>Wraps <paramref name="env"/>.</summary>
+        /// <param name="env">The env; its observation space must have a shape.</param>
+        /// <param name="skip">The number of steps each action is repeated; at least 2.</param>
+        /// <exception cref="ValueError">
+        ///     Thrown for a skip below 2 (<c>The skip value needs to be equal or greater than two, actual value: 0</c>), or a
+        ///     space without a shape (<c>The observation space must have the shape attribute.</c>).
+        /// </exception>
+        /// <exception cref="TypeError">Thrown when <paramref name="env"/> is <see langword="null"/>.</exception>
+        public MaxAndSkipObservation(Env<TObs, TAct> env, long skip = 4) : base(env) {
+            // Python records the arguments before it checks them.
+            SavedKwargs = RecordConstructorArgs.Record(new Info { ["skip"] = skip });
+            if (skip < 2)
+                throw new ValueError($"The skip value needs to be equal or greater than two, actual value: {skip}");
+            Space space = ObjectSpace.Unview(env.ObservationSpace)!;
+            if (space.Shape is not Shape shape)
+                throw new ValueError("The observation space must have the shape attribute.");
+            Skip = skip;
+            _obsBuffer = np.zeros(new Shape(new[] { 2L }.Concat(shape.dimensions).ToArray()), space.DType!);
+        }
+
+        /// <summary>The recorded constructor arguments, <c>{'skip': 4}</c> (Python's <c>_saved_kwargs</c>).</summary>
+        [PyName("_saved_kwargs")]
+        public Info SavedKwargs { get; }
+
+        /// <summary>The number of steps each action is repeated (<c>_skip</c>).</summary>
+        [PyName("_skip")]
+        public long Skip { get; }
+
+        /// <summary>Steps the env <see cref="Skip"/> times with the action (fewer when the episode ends) and returns the maximum of the last two observations.</summary>
+        /// <param name="action">The action, repeated.</param>
+        /// <returns>The maximum frame (a new array), the summed reward, and the last step's flags and info.</returns>
+        public override StepResult<TObs> Step(TAct action) {
+            double totalReward = 0.0;
+            bool terminated = false, truncated = false;
+            Info info = new();
+            for (long i = 0; i < Skip; i++) {
+                (TObs obs, double reward, bool stepTerminated, bool stepTruncated, Info stepInfo) = Env.Step(action);
+                (terminated, truncated, info) = (stepTerminated, stepTruncated, stepInfo);
+                if (i == Skip - 2)
+                    Store(0, obs);
+                if (i == Skip - 1)
+                    Store(1, obs);
+                totalReward += reward;
+                if (terminated || truncated)
+                    break;
+            }
+
+            NDArray maxFrame = np.max(_obsBuffer, axis: 0);
+            return new StepResult<TObs>((TObs)(object)maxFrame, totalReward, terminated, truncated, info);
+        }
+
+        /// <summary>Releases the buffer, then disposes the wrapper as every wrapper does.</summary>
+        /// <param name="disposing"><see langword="true"/> from <see cref="Env{TObs, TAct}.Dispose()"/>.</param>
+        protected override void Dispose(bool disposing) {
+            if (disposing)
+                _obsBuffer.Dispose();
+            base.Dispose(disposing);
+        }
+
+        /// <summary><c>self._obs_buffer[slot] = obs</c>: the observation cast into the buffer's dtype, as NumPy's setitem casts it.</summary>
+        /// <param name="slot">0 or 1.</param>
+        /// <param name="observation">The env's observation, an array or a number.</param>
+        /// <exception cref="TypeError">Thrown for an observation that is neither.</exception>
+        private void Store(int slot, TObs observation) {
+            NDArray frame = ObservationWrapperFunctions.AsArray(observation);
+            try {
+                _obsBuffer[slot] = frame;
+            } finally {
+                // Only the 0-d array made for a number is this method's; the env's array stays its own.
+                if (!ReferenceEquals(frame, observation))
+                    frame.Dispose();
+            }
+        }
+    }
 }

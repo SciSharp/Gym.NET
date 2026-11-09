@@ -587,6 +587,19 @@ Specs: the port plan's §9 and §10; sources `vector` 3,113 lines and `wrappers`
     and seed) where Gymnasium's return tuples of the sub-envs' (`GetAttr` gives those); a `reset_mask` stays in the caller's options dict (Python pops it); `TimeAwareObservation`'s observations
     are `object`s (the type depends on `flatten` at run time); `FlattenObservation` is typed for array results and
     refuses spaces whose flat form is not an array.*
+- *Done 2026-11-10, the rest of P6.3 (the maintainer's "continue with P6"):*
+  - *The stateless wrappers (`e63168e`): `TransformObservation` and its eight subclasses (`FilterObservation`,
+    `FlattenObservation` rebased on it, `GrayscaleObservation`, `ReshapeObservation`, `RescaleObservation`,
+    `DtypeObservation`, `AddRenderObservation`, `DiscretizeObservation`), `TransformAction` with `ClipAction`,
+    `RescaleAction`, `DiscretizeAction`, `TransformReward` with `ClipReward`, and the helpers `create_zero_array` and
+    `rescale_box`; 137 parity cells; 15 test files mirrored. NumSharp gap N-4 (`np.linspace` over float32 bounds, §7).*
+  - *The stateful wrappers: `DelayObservation`, `FrameStackObservation`, `MaxAndSkipObservation`, `StickyAction`,
+    `RepeatAction`; 34 parity cells (`StatefulObservationLiveParityTests`, `StatefulActionLiveParityTests`); their five
+    test files mirrored, and the four test files of the wrappers built earlier (`test_normalize_observation`,
+    `test_normalize_reward`, `test_time_aware_observation`, `test_record_constructor_args`; CarRacing's case is
+    `[OpenBugs("P8")]`). `test_import_wrappers` is Python's module protocol: the inventory test covers its names.*
+  - *Consequences recorded in DESIGN_REVIEW: typed delegates for `func`, subspace copies, `StickyAction`'s copy of the
+    last action (D19), dropped observations left to the finalizer, `ObjectSpace.Unview` in the space and vector utils.*
 
 ### P8 Box2D
 

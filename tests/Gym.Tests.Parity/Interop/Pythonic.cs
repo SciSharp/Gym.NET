@@ -1140,6 +1140,45 @@ namespace Gym.Tests.Parity {
                 internal static PyObject ClipReward(PyObject env, object? min_reward, object? max_reward) =>
                     Construct("ClipReward", env, ("min_reward", min_reward), ("max_reward", max_reward));
 
+                /// <summary><c>wrappers.DelayObservation(env, delay=delay)</c>.</summary>
+                /// <param name="env">The env; the wrapper keeps its own reference.</param>
+                /// <param name="delay">The delay in steps.</param>
+                /// <returns>A new owned reference to the wrapper.</returns>
+                /// <exception cref="PythonException">Thrown for a negative delay (<c>ValueError</c>).</exception>
+                internal static PyObject DelayObservation(PyObject env, long delay) => Construct("DelayObservation", env, ("delay", delay));
+
+                /// <summary><c>wrappers.FrameStackObservation(env, stack_size, padding_type=padding_type)</c>.</summary>
+                /// <param name="env">The env; the wrapper keeps its own reference.</param>
+                /// <param name="stack_size">The number of observations stacked.</param>
+                /// <param name="padding_type"><c>"reset"</c>, <c>"zero"</c>, or a padding element (a <see cref="PyObject"/> stays the caller's; anything else is converted).</param>
+                /// <returns>A new owned reference to the wrapper.</returns>
+                /// <exception cref="PythonException">Thrown for a non-positive size or an unknown padding (<c>ValueError</c>).</exception>
+                internal static PyObject FrameStackObservation(PyObject env, long stack_size, object? padding_type = null) =>
+                    Construct("FrameStackObservation", env, ("stack_size", stack_size), ("padding_type", padding_type ?? "reset"));
+
+                /// <summary><c>wrappers.MaxAndSkipObservation(env, skip=skip)</c>.</summary>
+                /// <param name="env">The env; the wrapper keeps its own reference.</param>
+                /// <param name="skip">The number of steps each action is repeated.</param>
+                /// <returns>A new owned reference to the wrapper.</returns>
+                /// <exception cref="PythonException">Thrown for a skip below 2 or a space without a shape (<c>ValueError</c>).</exception>
+                internal static PyObject MaxAndSkipObservation(PyObject env, long skip = 4) => Construct("MaxAndSkipObservation", env, ("skip", skip));
+
+                /// <summary><c>wrappers.StickyAction(env, repeat_action_probability, repeat_action_duration=...)</c>.</summary>
+                /// <param name="env">The env; the wrapper keeps its own reference.</param>
+                /// <param name="repeat_action_probability">The probability that a run of repeats starts.</param>
+                /// <param name="repeat_action_duration">An int, or a Python tuple or list built by the caller (a <see cref="PyObject"/> stays the caller's).</param>
+                /// <returns>A new owned reference to the wrapper.</returns>
+                /// <exception cref="PythonException">Thrown for an invalid probability or duration (<c>InvalidProbability</c>, <c>ValueError</c>, <c>InvalidBound</c>).</exception>
+                internal static PyObject StickyAction(PyObject env, double repeat_action_probability, object? repeat_action_duration = null) =>
+                    Construct("StickyAction", env, ("repeat_action_probability", repeat_action_probability), ("repeat_action_duration", repeat_action_duration ?? 1L));
+
+                /// <summary><c>wrappers.RepeatAction(env, num_repeats=num_repeats)</c>.</summary>
+                /// <param name="env">The env; the wrapper keeps its own reference.</param>
+                /// <param name="num_repeats">The number of steps each action is taken.</param>
+                /// <returns>A new owned reference to the wrapper.</returns>
+                /// <exception cref="PythonException">Thrown for a count below 1 (<c>ValueError</c>).</exception>
+                internal static PyObject RepeatAction(PyObject env, long num_repeats) => Construct("RepeatAction", env, ("num_repeats", num_repeats));
+
                 /// <summary>
                 ///     Calls a wrapper class of <c>gymnasium.wrappers</c> with the env and keyword arguments: a <see cref="PyObject"/>
                 ///     value is passed as it is (and stays the caller's), anything else is converted by
