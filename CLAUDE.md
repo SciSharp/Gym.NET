@@ -22,16 +22,21 @@ refs/Gym.NET/
 ├── src/
 │   ├── Gym/                       # Core API (env contract, wrappers, results, errors), spaces, utilities, legacy shim
 │   │   ├── Envs/                  # IEnv, Env<TObs, TAct> (Step, ValueTask StepAsync), Wrapper family (+ IWrapper), Info, Metadata, RenderResult
-│   │   │   ├── Registration/      # EnvSpec (Make, ToJson/FromJson), WrapperSpec, EnvCreator, EnvSpecRegistry, EnvRegistry (register, spec, make, pprint_registry)
+│   │   │   ├── Registration/      # EnvSpec (Make, ToJson/FromJson), WrapperSpec, EnvCreator, EnvSpecRegistry, EnvRegistry (register, spec, make, pprint_registry),
+│   │   │   │                      #   EnvRegistry.MakeVec.cs (make_vec: sync and vector entry point; async is P6.2, deferred), VectorizeMode
 │   │   │   └── Viewers/           # IEnvViewer, IEnvironmentViewerFactoryDelegate, NullEnvViewer (namespace Gym.Environments; DR-20)
 │   │   ├── Spaces/                # Space (base), Box (bounded/continuous), Discrete
 │   │   ├── Observations/          # StepResult<TObs> (5-tuple), ResetResult<TObs>, DoneStepResult<TObs> (pre-0.26 4-tuple)
-│   │   ├── Wrappers/              # Common.cs: TimeLimit, OrderEnforcing, PassiveEnvChecker, Autoreset, RecordEpisodeStatistics; Rendering.cs: RenderCollection
+│   │   ├── Vector/                # IVectorEnv, VectorEnv<TObs, TAct> (batched types, DR-21; _add_info), VectorStepResult/VectorResetResult, AutoresetMode,
+│   │   │                          #   SyncVectorEnv (typed, and untyped as SyncVectorEnv), VectorWrapper family, VectorUtils (batch_space, concatenate, iterate)
+│   │   ├── Wrappers/              # Common.cs: TimeLimit, OrderEnforcing, PassiveEnvChecker, Autoreset, RecordEpisodeStatistics; Rendering.cs: RenderCollection;
+│   │   │                          #   StatefulObservation.cs: TimeAwareObservation, NormalizeObservation; StatefulReward.cs: NormalizeReward;
+│   │   │                          #   TransformObservation.cs: FlattenObservation; WrapperFunctions.cs: RunningMeanStd, update_mean_var_count_from_moments
 │   │   ├── Legacy/                # [Obsolete] pre-0.26 API: Step, ILegacyEnv, LegacyEnvAdapter, VecEnv family
 │   │   ├── Internal/              # Dict (legacy info type), CircularQueue, Dynamic/Merging/Reflection helpers
 │   │   ├── Utils/                 # Seeding (PCG64), PyBuiltins, PyMath (F3), PyAttributes, PyEquality, PyCopy, PyKwargs (Python kwargs binding), PyJson, Deque,
 │   │   │                          # PassiveChecker, EnvChecker (check_env, data_equivalence), EnvMatch, StepApiCompatibility, RecordConstructorArgs, Warnings
-│   │   ├── Gymnasium.cs           # The `gymnasium` facade: Make, Spec, Register, Registry, PprintRegistry, HumanViewerFactory (DR-20)
+│   │   ├── Gymnasium.cs           # The `gymnasium` facade: Make, MakeVec, Spec, Register, Registry, PprintRegistry, HumanViewerFactory (DR-20)
 │   │   ├── Logger.cs              # Warnings as gymnasium.logger issues them (colourised, Python's default filters)
 │   │   └── Exceptions/            # Every gymnasium.error class (Error, ResetNeeded, ...), AssertionError, NotImplementedError, ImportError; legacy InvalidActionError etc.
 │   │
@@ -39,7 +44,8 @@ refs/Gym.NET/
 │   ├── Gym.Rendering/             # pygame-compatible rasterizer: Surface (opaque or per-pixel alpha), GfxDraw (SDL_gfx 2.0.26 port), Draw (line, rect, aaline/aalines),
 │   │                              #   Transform (flip, scale, smoothscale), ImageIO (image.load/frombytes), SurfArray, Vector2
 │   ├── Gym.Environments/          # Concrete environment implementations
-│   │   ├── Envs/Classic/          # CartPoleEnv, MountainCarEnv (MountainCar-v0 and MountainCarContinuous-v0, DR-32), PendulumEnv, AcrobotEnv, ClassicControlUtils
+│   │   ├── Envs/Classic/          # CartPoleEnv (+ CartPoleVectorEnv, CartPole's vector entry point), MountainCarEnv (MountainCar-v0 and
+│   │   │                          #   MountainCarContinuous-v0, DR-32), PendulumEnv, AcrobotEnv, ClassicControlUtils
 │   │   ├── Envs/ToyText/          # BlackjackEnv (+ BlackjackObservation, DR-13), FrozenLakeEnv, CliffWalkingEnv, TaxiEnv; ToyTextUtils (CategoricalSample,
 │   │   │                          #   CharMap: the 'c' map, N-2's workaround), PyKeys (Python's dict/list lookups of an action), ToyTextTransition
 │   │   ├── Envs/                  # NpScalar (NEP 50 scalars), HumanWindow (DR-20), EnvAssets (DR-19), RenderMath
@@ -75,10 +81,11 @@ refs/Gym.NET/
   - `RenderResult Render()`: per the `render_mode` fixed at construction (`RenderResult.Rgb` for `rgb_array`; `human` renders inside reset/step and returns `None`).
   - `NpRandom` (lazy, entropy-seeded on first use) / `NpRandomSeed` (-1 once a generator is assigned), `Metadata`, `Spec`, `Unwrapped`, `Close()` / `Dispose()`.
   - Python attributes by Python name: `HasWrapperAttr`/`GetWrapperAttr`/`SetWrapperAttr` and `Gym.Utils.PyAttributes` (`[PyName("_x")]` or snake_case of the property).
-- **Wrappers:** `Wrapper<TWObs, TWAct, TObs, TAct>` (and `Wrapper<TObs, TAct>`) forward to `Env`; `ObservationWrapper`, `RewardWrapper`, `ActionWrapper` add the hooks; `TimeLimit`, `OrderEnforcing`, `PassiveEnvChecker`, `Autoreset` and `RecordEpisodeStatistics` live in `Gym.Wrappers`.
+- **Wrappers:** `Wrapper<TWObs, TWAct, TObs, TAct>` (and `Wrapper<TObs, TAct>`) forward to `Env`; `ObservationWrapper`, `RewardWrapper`, `ActionWrapper` add the hooks; `TimeLimit`, `OrderEnforcing`, `PassiveEnvChecker`, `Autoreset`, `RecordEpisodeStatistics`, `NormalizeObservation`, `NormalizeReward`, `TimeAwareObservation` and `FlattenObservation` live in `Gym.Wrappers` (the other wrappers are P6, deferred).
+- **Vector envs (P6.1, DR-21):** `VectorEnv<TObs, TAct>` is typed by the batched types (`SyncVectorEnv<NDArray, NDArray>` steps an `NDArray` of actions into a `VectorStepResult<NDArray>` of `(observations, rewards, terminations, truncations, infos)`); `Gymnasium.MakeVec("CartPole-v1", 3, "sync")` builds `SyncVectorEnv` over `make`'s stacks, `"vector_entry_point"` (the default when registered) CartPole's `CartPoleVectorEnv`; `AutoresetMode`/`VectorizeMode` are Python-enum-like classes whose values convert from strings as Python's `Enum` call takes them (`"NextStep"`, `"sync"`). `AsyncVectorEnv` (P6.2) and the vector wrappers (P6.6) are deferred: `MakeVec(..., "async")` raises `NotImplementedError`.
 - **Registry and `make` (P3):** `Gymnasium.Make("CartPole-v1")` (or typed, `Make<NDArray, NDArray>(...)`, DR-10) builds Gymnasium's stack, `TimeLimit<OrderEnforcing<PassiveEnvChecker<CartPoleEnv>>>`; kwargs go as a dictionary, an anonymous object (`new { render_mode = "rgb_array" }`) or a generated options record (`new CartPoleEnvOptions { RenderMode = "rgb_array" }`, DR-11/DR-34), by Python name, bound to constructor parameters by `PyKwargs`. Entry points are a class (`typeof(CartPoleEnv)`), an `EnvCreator`, or a `"Namespace:Class"` string. The built-in ids register before `Main` (DR-12/14/17); the unit tests import the facade with `global using static Gym.Gymnasium` (DR-06's shadowing).
 - **Pluggable Viewer Architecture (DR-20):** `render_mode="human"` renders into the env's `viewer_factory`, else the app-wide `Gymnasium.HumanViewerFactory` (`AvaloniaEnvViewer.Factory`, `WinFormEnvViewer.Factory`, or `NullEnvViewer.Factory` headless), else raises `DependencyNotInstalled` at the first human render, as Gymnasium does without pygame; nothing falls back to a headless viewer silently. Human frames are paced by `Gym.Rendering.Clock` at `metadata["render_fps"]`.
-- **Legacy API (`Gym.Legacy`, `[Obsolete]`):** `LegacyEnvAdapter` exposes any env through the pre-0.26 4-tuple API (`Seed(s)` + `Reset()` is `Reset(seed: s)`; the reward stays float64, as everywhere in Gym.NET); the baselines-style `IVecEnv` / `VecEnv` / `DummyVecEnv` work over `ILegacyEnv` until `gymnasium.vector` (P6).
+- **Legacy API (`Gym.Legacy`, `[Obsolete]`):** `LegacyEnvAdapter` exposes any env through the pre-0.26 4-tuple API (`Seed(s)` + `Reset()` is `Reset(seed: s)`; the reward stays float64, as everywhere in Gym.NET); the baselines-style `IVecEnv` / `VecEnv` / `DummyVecEnv` work over `ILegacyEnv`; new code uses `Gym.Vector` (P6.1).
 - **Observation & Action Spaces:** Strongly-typed bounds checking and random sampling via `Box` (multi-dimensional continuous floats/bounds) and `Discrete` (categorical integer actions); `Seed(BigInteger)`.
 - **Documentation voice:** XML docs describe Gym.NET's own members (what they do, what they cost, their footguns) and never say "Port of ...". A member based on Gymnasium carries its source as a pinned GitHub permalink in `<remarks>`, e.g. `Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/core.py#L28">gymnasium/core.py</see>.`; pygame-ce, CPython and NumPy sources are referenced the same way at their pinned tags (port plan §3.1 rule 2).
 

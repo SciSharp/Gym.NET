@@ -149,6 +149,14 @@ Effects of approved designs that only showed up in code. None changes a design; 
   stands for: `env.ObservationSpace.Contains(obs)` holds for a `BlackjackObservation`. The generated indexer casts each
   member to `object?`, because NumSharp's implicit `long` → `NDArray` conversion would otherwise make the arms' common
   type `NDArray` and return a 0-d array for a `long` member (caught by `GymRecordsTests.TupleRecord_IsAnITuple`).
+- **DR-21 in P6.1** (2026-11-09): a sync vector env is typed by the batched types, so the untyped `MakeVec` builds
+  `SyncVectorEnv` (`SyncVectorEnv<object?, object?>`, its typed spaces viewed through `ObjectSpace`) and the typed one
+  `SyncVectorEnv<TObs, TAct>`, refusing types the batched spaces do not hold. The rewards being float64 makes
+  `CartPoleVectorEnv`'s a float64 array where Gymnasium's is float32 (equal values). `AutoresetMode` and `VectorizeMode`
+  are classes with three instances rather than C# enums, so they print, parse and compare as Python's `Enum` members.
+- **Typed wrappers whose type depends on an argument** (found in P6.3, 2026-11-09): `TimeAwareObservation` returns an
+  array when flattening and a dict or tuple otherwise, so its observations are `object`s; `FlattenObservation` is typed
+  for arrays and refuses spaces whose flat form is not one (`Graph`, `Sequence`).
 - **Float64 rewards with the registry** (found in P5.4, 2026-11-09): `EnvSpec.RewardThreshold` is a `double?`, so
   Taxi-v4's threshold, which Gymnasium registers as the `int` 8 (its annotation says `float`), prints `8.0` in
   `pprint` and `to_json`; the value is equal. Pinned by `RegistrationLiveParityTests.Spec_TaxiRewardThreshold_IsFloat64`,

@@ -62,6 +62,15 @@ now through `Gym.Legacy.LegacyEnvAdapter`.
   - [X] Env(object)
   - [ ] GoalEnv(Env)
 
+- Implement vector environments (`gymnasium.vector`)
+  - [X] `VectorEnv`, `SyncVectorEnv`, `Gymnasium.MakeVec` (sync and vector entry point), `CartPoleVectorEnv`
+  - [ ] `AsyncVectorEnv`, vector wrappers
+
+- Implement wrappers (`gymnasium.wrappers`)
+  - [X] `TimeLimit`, `OrderEnforcing`, `PassiveEnvChecker`, `Autoreset`, `RecordEpisodeStatistics`, `RenderCollection`
+  - [X] `NormalizeObservation`, `NormalizeReward`, `TimeAwareObservation`, `FlattenObservation`
+  - [ ] the other transform, rendering and stateful wrappers
+
  - Implement environments<br>
     To run an environment, see [Gym.Tests](./tests/Gym.Tests/)
    - [X] Convert Gym.Environments to a net-standard project.

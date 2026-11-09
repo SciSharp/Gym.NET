@@ -320,15 +320,88 @@ namespace Gym.Tests.Gymnasium.Envs.Registration {
 
         /// <summary>
         ///     The parts of re-making from specs that need <c>NormalizeReward</c>, <c>TimeAwareObservation</c> and
-        ///     <c>FlattenObservation</c> (P6): a placeholder that fails while those wrappers are missing, replaced by the port of
-        ///     these three Gymnasium tests when P6 brings them.
+        ///     <c>FlattenObservation</c> (P6): a stack of the three is re-made from its spec with an equal spec; a wrapper made by
+        ///     the entry point stays the entry point's; a wrapper listed in <c>additional_wrappers</c> is added by <c>make</c>.
         /// </summary>
-        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/tests/envs/registration/test_make.py#L302">test_make_with_env_spec</see>, <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/tests/envs/registration/test_make.py#L388">test_make_with_env_spec_levels</see>, <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/tests/envs/registration/test_make.py#L404">test_wrapped_env_entry_point</see>.</remarks>
+        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/tests/envs/registration/test_make.py#L302">test_make_with_env_spec</see>.</remarks>
         [TestMethod]
-        [OpenBugs("P6")]
         public void TestMakeWithEnvSpec_ObservationAndRewardWrappers() {
-            foreach (string wrapper in new[] { "NormalizeReward", "TimeAwareObservation", "FlattenObservation" })
-                Assert.IsNotNull(Type.GetType($"Gym.Wrappers.{wrapper}`2, Gym"), $"{wrapper} is not ported yet");
+            // make with applied wrappers
+            using (IEnv env2 = WrappedCartPole()) {
+                using IEnv env2Recreated = Make(env2.Spec!);
+                Assert.AreEqual(env2.Spec, env2Recreated.Spec);
+            }
+
+            // make with wrapper in env-creator
+            Register("CartPole-v3", (EnvCreator)(_ => new NormalizeReward<NDArray, NDArray>(new CartPoleEnv())), disableEnvChecker: true, orderEnforce: false);
+            Register("CartPole-v4", (EnvCreator)(_ => new CartPoleEnv()), disableEnvChecker: true, orderEnforce: false,
+                additionalWrappers: new[] { WrapperSpec.For(typeof(NormalizeReward<,>), new Info()) });
+            try {
+                using (IEnv env4 = Make(Spec("CartPole-v3"))) {
+                    Assert.IsInstanceOfType<NormalizeReward<NDArray, NDArray>>(env4);
+                    Assert.IsInstanceOfType<CartPoleEnv>(((IWrapper)env4).Env);
+                }
+
+                using (IEnv env5 = Make(Spec("CartPole-v4"))) {
+                    Assert.IsInstanceOfType<NormalizeReward<NDArray, NDArray>>(env5);
+                    Assert.IsInstanceOfType<CartPoleEnv>(((IWrapper)env5).Env);
+                }
+            } finally {
+                Registry.Remove("CartPole-v3");
+                Registry.Remove("CartPole-v4");
+            }
+        }
+
+        /// <summary>Each level of a wrapper stack is re-made from its own spec with an equal spec.</summary>
+        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/tests/envs/registration/test_make.py#L388">test_make_with_env_spec_levels</see>.</remarks>
+        [TestMethod]
+        public void TestMakeWithEnvSpecLevels() {
+            using IEnv stack = WrappedCartPole();
+            for (IEnv env = stack; !ReferenceEquals(env, env.Unwrapped); env = ((IWrapper)env).Env) {
+                using IEnv recreatedEnv = Make(env.Spec!);
+                Assert.AreEqual(env.Spec, recreatedEnv.Spec, $"Re-making {env}");
+            }
+        }
+
+        /// <summary>
+        ///     An entry point that wraps the env itself (<c>FlattenObservation</c>), wrapped further by the caller: the stack
+        ///     re-made from its spec resets and steps exactly as the original.
+        /// </summary>
+        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/tests/envs/registration/test_make.py#L404">test_wrapped_env_entry_point</see>.</remarks>
+        [TestMethod]
+        public void TestWrappedEnvEntryPoint() {
+            Register("TestingEnv-v0", (EnvCreator)(_ => new FlattenObservation<NDArray, NDArray>((Env<NDArray, NDArray>)Make("CartPole-v1", new { render_mode = "rgb_array" }))));
+            try {
+                var made = (Env<NDArray, NDArray>)Make("TestingEnv-v0");
+                using IEnv env = new NormalizeReward<object?, NDArray>(new TimeAwareObservation<NDArray, NDArray>(made), gamma: 0.8);
+                using IEnv recreatedEnv = Make(env.Spec!);
+
+                (object? obs, Info info) = env.Reset(seed: 42);
+                (object? recreatedObs, Info recreatedInfo) = recreatedEnv.Reset(seed: 42);
+                Assert.IsTrue(EnvChecker.DataEquivalence(obs, recreatedObs));
+                Assert.IsTrue(EnvChecker.DataEquivalence(info, recreatedInfo));
+
+                object action = env.ActionSpace.Sample()!;
+                (obs, double reward, bool terminated, bool truncated, info) = env.Step(action);
+                (recreatedObs, double recreatedReward, bool recreatedTerminated, bool recreatedTruncated, recreatedInfo) = recreatedEnv.Step(action);
+                Assert.IsTrue(EnvChecker.DataEquivalence(obs, recreatedObs));
+                Assert.AreEqual(reward, recreatedReward);
+                Assert.AreEqual(terminated, recreatedTerminated);
+                Assert.AreEqual(truncated, recreatedTruncated);
+                Assert.IsTrue(EnvChecker.DataEquivalence(info, recreatedInfo));
+            } finally {
+                Registry.Remove("TestingEnv-v0");
+            }
+        }
+
+        /// <summary>
+        ///     <c>NormalizeReward(TimeAwareObservation(FlattenObservation(make("CartPole-v1", render_mode="rgb_array"))),
+        ///     gamma=0.8)</c>, the stack Gymnasium's make-with-spec tests re-make.
+        /// </summary>
+        /// <returns>The stack; the caller owns it.</returns>
+        private static IEnv WrappedCartPole() {
+            var made = (Env<NDArray, NDArray>)Make("CartPole-v1", new { render_mode = "rgb_array" });
+            return new NormalizeReward<object?, NDArray>(new TimeAwareObservation<NDArray, NDArray>(new FlattenObservation<NDArray, NDArray>(made)), gamma: 0.8);
         }
 
         /// <summary>An unknown name is reported with Gymnasium's message.</summary>

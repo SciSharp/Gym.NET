@@ -20,7 +20,6 @@ gymnasium.envs.box2d.lunar_lander.LunarLander                                   
 gymnasium.envs.box2d.lunar_lander.LunarLanderContinuous                                  P8 box2d
 gymnasium.envs.box2d.lunar_lander.demo_heuristic_lander                                  P8 box2d
 gymnasium.envs.box2d.lunar_lander.heuristic                                              P8 box2d
-gymnasium.envs.classic_control.cartpole.CartPoleVectorEnv                                P4 classic_control
 gymnasium.envs.classic_control.continuous_mountain_car.Continuous_MountainCarEnv         by design: merged into MountainCarEnv(continuous) (DR-32)
 gymnasium.envs.functional_jax_env.FunctionalJaxEnv                                       n/a: JAX functional envs
 gymnasium.envs.functional_jax_env.FunctionalJaxVectorEnv                                 n/a: JAX functional envs
@@ -65,8 +64,6 @@ gymnasium.envs.phys2d.pendulum.PendulumFunctional                               
 gymnasium.envs.phys2d.pendulum.PendulumJaxEnv                                            n/a: JAX functional envs
 gymnasium.envs.phys2d.pendulum.PendulumJaxVectorEnv                                      n/a: JAX functional envs
 gymnasium.envs.phys2d.pendulum.PendulumParams                                            n/a: JAX functional envs
-gymnasium.envs.registration.VectorizeMode                                                P6 vector
-gymnasium.envs.registration.make_vec                                                     P6 vector
 gymnasium.envs.tabular.blackjack.BlackJackJaxEnv                                         n/a: JAX functional envs
 gymnasium.envs.tabular.blackjack.BlackJackParams                                         n/a: JAX functional envs
 gymnasium.envs.tabular.blackjack.BlackjackFunctional                                     n/a: JAX functional envs
@@ -89,35 +86,28 @@ gymnasium.envs.tabular.cliffwalking.CliffWalkingJaxEnv                          
 gymnasium.envs.tabular.cliffwalking.EnvState                                             n/a: JAX functional envs
 gymnasium.envs.tabular.cliffwalking.RenderStateType                                      n/a: JAX functional envs
 gymnasium.envs.tabular.cliffwalking.fell_off                                             n/a: JAX functional envs
-gymnasium.experimental.functional.FuncEnv                                                P6 FuncEnv (DR-36)
+gymnasium.experimental.functional.FuncEnv                                                P6 FuncEnv (DR-36), deferred in this run
 gymnasium.utils.ezpickle.EzPickle                                                        n/a: Python pickling
-gymnasium.utils.performance.benchmark_init                                               P6 performance (DR-36)
-gymnasium.utils.performance.benchmark_render                                             P6 performance (DR-36)
-gymnasium.utils.performance.benchmark_step                                               P6 performance (DR-36)
-gymnasium.utils.performance.benchmark_vector_step                                        P6 performance (DR-36)
-gymnasium.utils.play.MissingKeysToAction                                                 P6 play (DR-36)
-gymnasium.utils.play.PlayPlot                                                            P6 play (DR-36)
-gymnasium.utils.play.PlayableGame                                                        P6 play (DR-36)
-gymnasium.utils.play.display_arr                                                         P6 play (DR-36)
-gymnasium.utils.play.play                                                                P6 play (DR-36)
-gymnasium.utils.save_video.capped_cubic_video_schedule                                   P6 video (DR-25)
-gymnasium.utils.save_video.save_video                                                    P6 video (DR-25)
-gymnasium.utils.step_api_compatibility.step_api_compatibility                            P6 utils
-gymnasium.vector.async_vector_env.AsyncState                                             P6 vector
-gymnasium.vector.async_vector_env.AsyncVectorEnv                                         P6 vector
-gymnasium.vector.sync_vector_env.SyncVectorEnv                                           P6 vector
-gymnasium.vector.utils.misc.CloudpickleWrapper                                           P6 vector
-gymnasium.vector.utils.misc.clear_mpi_env_vars                                           P6 vector
-gymnasium.vector.utils.shared_memory.create_shared_memory                                P6 vector
-gymnasium.vector.utils.shared_memory.read_from_shared_memory                             P6 vector
-gymnasium.vector.utils.shared_memory.write_to_shared_memory                              P6 vector
-gymnasium.vector.vector_env.ArrayType                                                    P6 vector
-gymnasium.vector.vector_env.AutoresetMode                                                P6 vector
-gymnasium.vector.vector_env.VectorActionWrapper                                          P6 vector
-gymnasium.vector.vector_env.VectorEnv                                                    P6 vector
-gymnasium.vector.vector_env.VectorObservationWrapper                                     P6 vector
-gymnasium.vector.vector_env.VectorRewardWrapper                                          P6 vector
-gymnasium.vector.vector_env.VectorWrapper                                                P6 vector
+gymnasium.utils.performance.benchmark_init                                               P6 performance (DR-36), deferred in this run
+gymnasium.utils.performance.benchmark_render                                             P6 performance (DR-36), deferred in this run
+gymnasium.utils.performance.benchmark_step                                               P6 performance (DR-36), deferred in this run
+gymnasium.utils.performance.benchmark_vector_step                                        P6 performance (DR-36), deferred in this run
+gymnasium.utils.play.MissingKeysToAction                                                 P6 play (DR-36), deferred in this run
+gymnasium.utils.play.PlayPlot                                                            P6 play (DR-36), deferred in this run
+gymnasium.utils.play.PlayableGame                                                        P6 play (DR-36), deferred in this run
+gymnasium.utils.play.display_arr                                                         P6 play (DR-36), deferred in this run
+gymnasium.utils.play.play                                                                P6 play (DR-36), deferred in this run
+gymnasium.utils.save_video.capped_cubic_video_schedule                                   P6 video (DR-25), deferred in this run
+gymnasium.utils.save_video.save_video                                                    P6 video (DR-25), deferred in this run
+gymnasium.utils.step_api_compatibility.step_api_compatibility                            P6 utils, deferred in this run
+gymnasium.vector.async_vector_env.AsyncState                                             P6.2 vector, deferred in this run (DR-22 stays approved)
+gymnasium.vector.async_vector_env.AsyncVectorEnv                                         P6.2 vector, deferred in this run (DR-22 stays approved)
+gymnasium.vector.utils.misc.CloudpickleWrapper                                           P6 vector, deferred in this run
+gymnasium.vector.utils.misc.clear_mpi_env_vars                                           P6 vector, deferred in this run
+gymnasium.vector.utils.shared_memory.create_shared_memory                                P6 vector, deferred in this run
+gymnasium.vector.utils.shared_memory.read_from_shared_memory                             P6 vector, deferred in this run
+gymnasium.vector.utils.shared_memory.write_to_shared_memory                              P6 vector, deferred in this run
+gymnasium.vector.vector_env.ArrayType                                                    by design: a typing TypeVar; the batched types are VectorEnv<TObs, TAct>'s generic arguments (DR-21)
 gymnasium.wrappers.ArrayConversion                                                       n/a: JAX/PyTorch
 gymnasium.wrappers.JaxToNumpy                                                            n/a: JAX/PyTorch
 gymnasium.wrappers.JaxToTorch                                                            n/a: JAX/PyTorch
@@ -136,60 +126,54 @@ gymnasium.wrappers.numpy_to_torch.Device                                        
 gymnasium.wrappers.numpy_to_torch.NumpyToTorch                                           n/a: JAX/PyTorch
 gymnasium.wrappers.numpy_to_torch.numpy_to_torch                                         n/a: JAX/PyTorch
 gymnasium.wrappers.numpy_to_torch.torch_to_numpy                                         n/a: JAX/PyTorch
-gymnasium.wrappers.rendering.AddWhiteNoise                                               P6 wrappers
-gymnasium.wrappers.rendering.HumanRendering                                              P6 wrappers
-gymnasium.wrappers.rendering.ObstructView                                                P6 wrappers
-gymnasium.wrappers.rendering.RecordVideo                                                 P6 wrappers
-gymnasium.wrappers.stateful_action.RepeatAction                                          P6 wrappers
-gymnasium.wrappers.stateful_action.StickyAction                                          P6 wrappers
-gymnasium.wrappers.stateful_observation.DelayObservation                                 P6 wrappers
-gymnasium.wrappers.stateful_observation.FrameStackObservation                            P6 wrappers
-gymnasium.wrappers.stateful_observation.MaxAndSkipObservation                            P6 wrappers
-gymnasium.wrappers.stateful_observation.NormalizeObservation                             P6 wrappers
-gymnasium.wrappers.stateful_observation.TimeAwareObservation                             P6 wrappers
-gymnasium.wrappers.stateful_reward.NormalizeReward                                       P6 wrappers
-gymnasium.wrappers.transform_action.ClipAction                                           P6 wrappers
-gymnasium.wrappers.transform_action.DiscretizeAction                                     P6 wrappers
-gymnasium.wrappers.transform_action.RescaleAction                                        P6 wrappers
-gymnasium.wrappers.transform_action.TransformAction                                      P6 wrappers
-gymnasium.wrappers.transform_observation.AddRenderObservation                            P6 wrappers
-gymnasium.wrappers.transform_observation.DiscretizeObservation                           P6 wrappers
-gymnasium.wrappers.transform_observation.DtypeObservation                                P6 wrappers
-gymnasium.wrappers.transform_observation.FilterObservation                               P6 wrappers
-gymnasium.wrappers.transform_observation.FlattenObservation                              P6 wrappers
-gymnasium.wrappers.transform_observation.GrayscaleObservation                            P6 wrappers
-gymnasium.wrappers.transform_observation.RescaleObservation                              P6 wrappers
-gymnasium.wrappers.transform_observation.ReshapeObservation                              P6 wrappers
-gymnasium.wrappers.transform_observation.ResizeObservation                               P6 wrappers
-gymnasium.wrappers.transform_observation.TransformObservation                            P6 wrappers
-gymnasium.wrappers.transform_reward.ClipReward                                           P6 wrappers
-gymnasium.wrappers.transform_reward.TransformReward                                      P6 wrappers
-gymnasium.wrappers.utils.RunningMeanStd                                                  P6 wrappers
-gymnasium.wrappers.utils.create_zero_array                                               P6 wrappers
-gymnasium.wrappers.utils.update_mean_var_count_from_moments                              P6 wrappers
+gymnasium.wrappers.rendering.AddWhiteNoise                                               P6 wrappers, deferred in this run
+gymnasium.wrappers.rendering.HumanRendering                                              P6 wrappers, deferred in this run
+gymnasium.wrappers.rendering.ObstructView                                                P6 wrappers, deferred in this run
+gymnasium.wrappers.rendering.RecordVideo                                                 P6 wrappers, deferred in this run
+gymnasium.wrappers.stateful_action.RepeatAction                                          P6 wrappers, deferred in this run
+gymnasium.wrappers.stateful_action.StickyAction                                          P6 wrappers, deferred in this run
+gymnasium.wrappers.stateful_observation.DelayObservation                                 P6 wrappers, deferred in this run
+gymnasium.wrappers.stateful_observation.FrameStackObservation                            P6 wrappers, deferred in this run
+gymnasium.wrappers.stateful_observation.MaxAndSkipObservation                            P6 wrappers, deferred in this run
+gymnasium.wrappers.transform_action.ClipAction                                           P6 wrappers, deferred in this run
+gymnasium.wrappers.transform_action.DiscretizeAction                                     P6 wrappers, deferred in this run
+gymnasium.wrappers.transform_action.RescaleAction                                        P6 wrappers, deferred in this run
+gymnasium.wrappers.transform_action.TransformAction                                      P6 wrappers, deferred in this run
+gymnasium.wrappers.transform_observation.AddRenderObservation                            P6 wrappers, deferred in this run
+gymnasium.wrappers.transform_observation.DiscretizeObservation                           P6 wrappers, deferred in this run
+gymnasium.wrappers.transform_observation.DtypeObservation                                P6 wrappers, deferred in this run
+gymnasium.wrappers.transform_observation.FilterObservation                               P6 wrappers, deferred in this run
+gymnasium.wrappers.transform_observation.GrayscaleObservation                            P6 wrappers, deferred in this run
+gymnasium.wrappers.transform_observation.RescaleObservation                              P6 wrappers, deferred in this run
+gymnasium.wrappers.transform_observation.ReshapeObservation                              P6 wrappers, deferred in this run
+gymnasium.wrappers.transform_observation.ResizeObservation                               P6 wrappers, deferred in this run
+gymnasium.wrappers.transform_observation.TransformObservation                            P6 wrappers, deferred in this run
+gymnasium.wrappers.transform_reward.ClipReward                                           P6 wrappers, deferred in this run
+gymnasium.wrappers.transform_reward.TransformReward                                      P6 wrappers, deferred in this run
+gymnasium.wrappers.utils.create_zero_array                                               P6 wrappers, deferred in this run
 gymnasium.wrappers.vector.array_conversion.ArrayConversion                               n/a: JAX/PyTorch
-gymnasium.wrappers.vector.common.RecordEpisodeStatistics                                 P6 vector wrappers
-gymnasium.wrappers.vector.dict_info_to_list.DictInfoToList                               P6 vector wrappers
+gymnasium.wrappers.vector.common.RecordEpisodeStatistics                                 P6 vector wrappers, deferred in this run
+gymnasium.wrappers.vector.dict_info_to_list.DictInfoToList                               P6 vector wrappers, deferred in this run
 gymnasium.wrappers.vector.jax_to_numpy.JaxToNumpy                                        n/a: JAX/PyTorch
 gymnasium.wrappers.vector.jax_to_torch.JaxToTorch                                        n/a: JAX/PyTorch
 gymnasium.wrappers.vector.numpy_to_torch.NumpyToTorch                                    n/a: JAX/PyTorch
-gymnasium.wrappers.vector.rendering.HumanRendering                                       P6 vector wrappers
-gymnasium.wrappers.vector.rendering.RecordVideo                                          P6 vector wrappers
-gymnasium.wrappers.vector.stateful_observation.NormalizeObservation                      P6 vector wrappers
-gymnasium.wrappers.vector.stateful_reward.NormalizeReward                                P6 vector wrappers
-gymnasium.wrappers.vector.vectorize_action.ClipAction                                    P6 vector wrappers
-gymnasium.wrappers.vector.vectorize_action.RescaleAction                                 P6 vector wrappers
-gymnasium.wrappers.vector.vectorize_action.TransformAction                               P6 vector wrappers
-gymnasium.wrappers.vector.vectorize_action.VectorizeTransformAction                      P6 vector wrappers
-gymnasium.wrappers.vector.vectorize_observation.DtypeObservation                         P6 vector wrappers
-gymnasium.wrappers.vector.vectorize_observation.FilterObservation                        P6 vector wrappers
-gymnasium.wrappers.vector.vectorize_observation.FlattenObservation                       P6 vector wrappers
-gymnasium.wrappers.vector.vectorize_observation.GrayscaleObservation                     P6 vector wrappers
-gymnasium.wrappers.vector.vectorize_observation.RescaleObservation                       P6 vector wrappers
-gymnasium.wrappers.vector.vectorize_observation.ReshapeObservation                       P6 vector wrappers
-gymnasium.wrappers.vector.vectorize_observation.ResizeObservation                        P6 vector wrappers
-gymnasium.wrappers.vector.vectorize_observation.TransformObservation                     P6 vector wrappers
-gymnasium.wrappers.vector.vectorize_observation.VectorizeTransformObservation            P6 vector wrappers
-gymnasium.wrappers.vector.vectorize_reward.ClipReward                                    P6 vector wrappers
-gymnasium.wrappers.vector.vectorize_reward.TransformReward                               P6 vector wrappers
-gymnasium.wrappers.vector.vectorize_reward.VectorizeTransformReward                      P6 vector wrappers
+gymnasium.wrappers.vector.rendering.HumanRendering                                       P6 vector wrappers, deferred in this run
+gymnasium.wrappers.vector.rendering.RecordVideo                                          P6 vector wrappers, deferred in this run
+gymnasium.wrappers.vector.stateful_observation.NormalizeObservation                      P6 vector wrappers, deferred in this run
+gymnasium.wrappers.vector.stateful_reward.NormalizeReward                                P6 vector wrappers, deferred in this run
+gymnasium.wrappers.vector.vectorize_action.ClipAction                                    P6 vector wrappers, deferred in this run
+gymnasium.wrappers.vector.vectorize_action.RescaleAction                                 P6 vector wrappers, deferred in this run
+gymnasium.wrappers.vector.vectorize_action.TransformAction                               P6 vector wrappers, deferred in this run
+gymnasium.wrappers.vector.vectorize_action.VectorizeTransformAction                      P6 vector wrappers, deferred in this run
+gymnasium.wrappers.vector.vectorize_observation.DtypeObservation                         P6 vector wrappers, deferred in this run
+gymnasium.wrappers.vector.vectorize_observation.FilterObservation                        P6 vector wrappers, deferred in this run
+gymnasium.wrappers.vector.vectorize_observation.FlattenObservation                       P6 vector wrappers, deferred in this run
+gymnasium.wrappers.vector.vectorize_observation.GrayscaleObservation                     P6 vector wrappers, deferred in this run
+gymnasium.wrappers.vector.vectorize_observation.RescaleObservation                       P6 vector wrappers, deferred in this run
+gymnasium.wrappers.vector.vectorize_observation.ReshapeObservation                       P6 vector wrappers, deferred in this run
+gymnasium.wrappers.vector.vectorize_observation.ResizeObservation                        P6 vector wrappers, deferred in this run
+gymnasium.wrappers.vector.vectorize_observation.TransformObservation                     P6 vector wrappers, deferred in this run
+gymnasium.wrappers.vector.vectorize_observation.VectorizeTransformObservation            P6 vector wrappers, deferred in this run
+gymnasium.wrappers.vector.vectorize_reward.ClipReward                                    P6 vector wrappers, deferred in this run
+gymnasium.wrappers.vector.vectorize_reward.TransformReward                               P6 vector wrappers, deferred in this run
+gymnasium.wrappers.vector.vectorize_reward.VectorizeTransformReward                      P6 vector wrappers, deferred in this run

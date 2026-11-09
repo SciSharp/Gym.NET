@@ -1,10 +1,12 @@
 #nullable enable
+using System;
 using System.Collections.Generic;
 using Gym.Environments;
 using Gym.Envs;
 using Gym.Envs.Registration;
 using Gym.Exceptions;
 using Gym.Utils;
+using Gym.Vector;
 using NumSharp;
 
 namespace Gym {
@@ -132,6 +134,77 @@ namespace Gym {
         /// <exception cref="NotImplementedError">Thrown when <c>HumanRendering</c> would be needed.</exception>
         public static Env<TObs, TAct> Make<TObs, TAct>(EnvSpec spec, object? kwargs = null, long? maxEpisodeSteps = null, bool? disableEnvChecker = null) =>
             EnvRegistry.Make<TObs, TAct>(spec, kwargs, maxEpisodeSteps, disableEnvChecker);
+
+        /// <summary>
+        ///     Builds a vector env of copies of a registered env (<c>gymnasium.make_vec</c>): its own vectorized class when the
+        ///     spec has one, else a <c>SyncVectorEnv</c>; see <see cref="EnvRegistry.MakeVec(string, int, object, object, IEnumerable{Func{IEnv, IEnv}}, object)"/>.
+        /// </summary>
+        /// <param name="id">The id.</param>
+        /// <param name="numEnvs">The number of sub-envs.</param>
+        /// <param name="vectorizationMode">A <see cref="VectorizeMode"/> or its value (<c>"sync"</c>, <c>"vector_entry_point"</c>), or <see langword="null"/> for the spec's default.</param>
+        /// <param name="vectorKwargs">The vector env's constructor arguments by Python name (<c>autoreset_mode</c>, <c>copy</c>, <c>observation_mode</c>).</param>
+        /// <param name="wrappers">Wrappers applied to every sub-env, innermost first.</param>
+        /// <param name="kwargs">The env's constructor arguments by Python name.</param>
+        /// <returns>The vector env, untyped; the caller owns it.</returns>
+        /// <exception cref="TypeError">Thrown when the env cannot be built from the kwargs.</exception>
+        /// <exception cref="ValueError">Thrown for an unknown vectorization mode.</exception>
+        /// <exception cref="Error">Thrown when the id is not registered, has no (vector) entry point, or the vector entry point is asked for with vector kwargs or wrappers.</exception>
+        /// <exception cref="NotImplementedError">Thrown for the async mode, which arrives with P6.2.</exception>
+        public static IVectorEnv MakeVec(string id, int numEnvs = 1, object? vectorizationMode = null, object? vectorKwargs = null, IEnumerable<Func<IEnv, IEnv>>? wrappers = null,
+            object? kwargs = null) =>
+            EnvRegistry.MakeVec(id, numEnvs, vectorizationMode, vectorKwargs, wrappers, kwargs);
+
+        /// <summary>Builds a vector env from a spec (<c>gymnasium.make_vec(env_spec)</c>); see <see cref="EnvRegistry.MakeVec(EnvSpec, int, object, object, IEnumerable{Func{IEnv, IEnv}}, object)"/>.</summary>
+        /// <param name="spec">The spec: a registered one, or one a previous <c>MakeVec</c> recorded.</param>
+        /// <param name="numEnvs">The number of sub-envs.</param>
+        /// <param name="vectorizationMode">The vectorization mode, or <see langword="null"/>.</param>
+        /// <param name="vectorKwargs">The vector env's constructor arguments by Python name.</param>
+        /// <param name="wrappers">Wrappers applied to every sub-env.</param>
+        /// <param name="kwargs">The env's constructor arguments by Python name.</param>
+        /// <returns>The vector env, untyped; the caller owns it.</returns>
+        /// <exception cref="TypeError">Thrown when the env cannot be built.</exception>
+        /// <exception cref="ValueError">Thrown for an unknown vectorization mode.</exception>
+        /// <exception cref="Error">Thrown when the spec has no (vector) entry point.</exception>
+        /// <exception cref="NotImplementedError">Thrown for the async mode.</exception>
+        public static IVectorEnv MakeVec(EnvSpec spec, int numEnvs = 1, object? vectorizationMode = null, object? vectorKwargs = null, IEnumerable<Func<IEnv, IEnv>>? wrappers = null,
+            object? kwargs = null) =>
+            EnvRegistry.MakeVec(spec, numEnvs, vectorizationMode, vectorKwargs, wrappers, kwargs);
+
+        /// <summary>Builds a vector env typed by its batched types (DR-21); see <see cref="EnvRegistry.MakeVec{TObs, TAct}(string, int, object, object, IEnumerable{Func{IEnv, IEnv}}, object)"/>.</summary>
+        /// <typeparam name="TObs">The batched observation type (<c>NDArray</c> for array spaces).</typeparam>
+        /// <typeparam name="TAct">The batched action type.</typeparam>
+        /// <param name="id">The id.</param>
+        /// <param name="numEnvs">The number of sub-envs.</param>
+        /// <param name="vectorizationMode">The vectorization mode, or <see langword="null"/>.</param>
+        /// <param name="vectorKwargs">The vector env's constructor arguments by Python name.</param>
+        /// <param name="wrappers">Wrappers applied to every sub-env.</param>
+        /// <param name="kwargs">The env's constructor arguments by Python name.</param>
+        /// <returns>The vector env; the caller owns it.</returns>
+        /// <exception cref="TypeError">Thrown when the batched types are not the ones asked for, or the env cannot be built.</exception>
+        /// <exception cref="ValueError">Thrown for an unknown vectorization mode.</exception>
+        /// <exception cref="Error">Thrown when the id is not registered or has no (vector) entry point.</exception>
+        /// <exception cref="NotImplementedError">Thrown for the async mode.</exception>
+        public static VectorEnv<TObs, TAct> MakeVec<TObs, TAct>(string id, int numEnvs = 1, object? vectorizationMode = null, object? vectorKwargs = null,
+            IEnumerable<Func<IEnv, IEnv>>? wrappers = null, object? kwargs = null) =>
+            EnvRegistry.MakeVec<TObs, TAct>(id, numEnvs, vectorizationMode, vectorKwargs, wrappers, kwargs);
+
+        /// <summary>Builds a vector env from a spec, typed (DR-21); see <see cref="EnvRegistry.MakeVec{TObs, TAct}(EnvSpec, int, object, object, IEnumerable{Func{IEnv, IEnv}}, object)"/>.</summary>
+        /// <typeparam name="TObs">The batched observation type.</typeparam>
+        /// <typeparam name="TAct">The batched action type.</typeparam>
+        /// <param name="spec">The spec.</param>
+        /// <param name="numEnvs">The number of sub-envs.</param>
+        /// <param name="vectorizationMode">The vectorization mode, or <see langword="null"/>.</param>
+        /// <param name="vectorKwargs">The vector env's constructor arguments by Python name.</param>
+        /// <param name="wrappers">Wrappers applied to every sub-env.</param>
+        /// <param name="kwargs">The env's constructor arguments by Python name.</param>
+        /// <returns>The vector env; the caller owns it.</returns>
+        /// <exception cref="TypeError">Thrown when the batched types differ or the env cannot be built.</exception>
+        /// <exception cref="ValueError">Thrown for an unknown vectorization mode.</exception>
+        /// <exception cref="Error">Thrown when the spec has no (vector) entry point.</exception>
+        /// <exception cref="NotImplementedError">Thrown for the async mode.</exception>
+        public static VectorEnv<TObs, TAct> MakeVec<TObs, TAct>(EnvSpec spec, int numEnvs = 1, object? vectorizationMode = null, object? vectorKwargs = null,
+            IEnumerable<Func<IEnv, IEnv>>? wrappers = null, object? kwargs = null) =>
+            EnvRegistry.MakeVec<TObs, TAct>(spec, numEnvs, vectorizationMode, vectorKwargs, wrappers, kwargs);
 
         /// <summary>The spec registered under an id exactly (<c>gymnasium.spec</c>); see <see cref="EnvRegistry.Spec"/>.</summary>
         /// <param name="envId">The id.</param>

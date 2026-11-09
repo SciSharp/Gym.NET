@@ -50,9 +50,36 @@ namespace Gym.Tests.Parity.Oracle {
         /// <exception cref="ObjectDisposedException">Thrown after <see cref="Dispose"/>.</exception>
         private PyObject Env => (_viaMake ? _made : _unwrapped) ?? throw new ObjectDisposedException(Description);
 
+        /// <summary>
+        ///     The env reset and step go to, for a snippet that reads a wrapper's own attributes (a normalizer's statistics).
+        ///     Borrowed: use it under the GIL and never dispose it.
+        /// </summary>
+        /// <exception cref="ObjectDisposedException">Thrown after <see cref="Dispose"/>.</exception>
+        internal PyObject Stepped => Env;
+
         /// <summary>The unwrapped env, where attributes like <c>state</c> and <c>np_random</c> live. Borrowed; never dispose it.</summary>
         /// <exception cref="ObjectDisposedException">Thrown after <see cref="Dispose"/>.</exception>
         private PyObject Unwrapped => _unwrapped ?? throw new ObjectDisposedException(Description);
+
+        /// <summary>
+        ///     Wraps an env stack built by a tree call (<c>NormalizeReward(make("CartPole-v1"))</c>): the pair steps the stack as
+        ///     it is, wrappers included, and reads attributes on its <c>unwrapped</c> env.
+        /// </summary>
+        /// <param name="description">How reports name the stack.</param>
+        /// <param name="build">Builds the stack; runs under the GIL, and its result becomes this object's.</param>
+        /// <returns>The env; the caller disposes it.</returns>
+        /// <exception cref="PythonException">Thrown when building the stack raises.</exception>
+        public static PyGymEnv Wrap(string description, Func<PyObject> build) {
+            return PythonRuntime.Run(() => {
+                PyObject made = build();
+                try {
+                    return new PyGymEnv(made, Python.gymnasium.Env.unwrapped(made), viaMake: true, description);
+                } catch {
+                    made.Dispose();
+                    throw;
+                }
+            });
+        }
 
         /// <summary>Creates an env through <c>gymnasium.make</c>, exactly as a Gymnasium user would.</summary>
         /// <param name="envId">A registered id, for example <c>CartPole-v1</c>.</param>

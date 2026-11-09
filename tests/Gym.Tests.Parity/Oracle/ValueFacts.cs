@@ -203,9 +203,30 @@ namespace Gym.Tests.Parity.Oracle {
             if (IsInstance(value, PythonRuntimeBuiltin("bool")) || IsInstance(value, numpy, "bool_"))
                 return FromBool(value.IsTrue(), typeName);
             if (IsInstance(value, numpy, "ndarray")) {
+                // An object array (a vector env's final_obs, an info batch of strings) holds Python objects, which NumSharp has
+                // no dtype for: it is described item by item, as Gym.NET's object?[] counterpart is.
+                using (PyObject dtype = value.GetAttr("dtype"))
+                using (PyObject kind = dtype.GetAttr("kind")) {
+                    if (kind.As<string>() == "O") {
+                        var objects = new List<ValueFacts>();
+                        using var objectIterator = PyIter.GetIter(value);
+                        while (objectIterator.MoveNext()) {
+                            using PyObject item = objectIterator.Current;
+                            objects.Add(FromPython(item));
+                        }
+
+                        return FromSequence(objects, typeName);
+                    }
+                }
+
                 using NDArray array = value.ToNDArray();
                 return FromArray(array.dtype.str, (long[])array.shape.Clone(), array.data.tobytes("C"), typeName);
             }
+
+            // An enum member (a vector env's AutoresetMode) is compared by its repr, <AutoresetMode.NEXT_STEP: 'NextStep'>, as
+            // Gym.NET's AutoresetMode and VectorizeMode print themselves.
+            if (IsInstance(value, Interop.PythonRuntime.Import("enum"), "Enum"))
+                return FromOther("enum", value.Repr() ?? "");
 
             // A dtype is described by NumPy's own array-interface string (dtype.str: '<f4', '|u1'), the text NumSharp's
             // DType.str spells, so a space's dtype compares with Gym.NET's without either side printing a repr.
@@ -380,6 +401,9 @@ namespace Gym.Tests.Parity.Oracle {
                 case DType dtype:
                     // As FromPython describes numpy.dtype: by the array-interface string, '<f4', '|b1'.
                     return FromText(dtype.str, "DType");
+                case Gym.Vector.AutoresetMode or Gym.Envs.Registration.VectorizeMode:
+                    // Gym.NET's Python-style enums print Python's repr, which is how FromPython describes an enum member.
+                    return FromOther("enum", value.ToString() ?? "");
                 case Enum e:
                     return Of(Convert.ChangeType(e, Enum.GetUnderlyingType(e.GetType()), CultureInfo.InvariantCulture));
                 case IDictionary dictionary: {

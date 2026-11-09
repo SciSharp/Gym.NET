@@ -730,6 +730,31 @@ namespace Gym.Tests.Parity {
                 return function.Invoke(new[] { spec }, arguments);
             }
 
+            /// <summary>
+            ///     <c>gymnasium.make_vec(id, num_envs=num_envs, vectorization_mode=vectorization_mode, vector_kwargs=vector_kwargs,
+            ///     **kwargs)</c>: a vector env of copies of the env, its own vectorized class when the spec has one.
+            /// </summary>
+            /// <param name="id">The id.</param>
+            /// <param name="num_envs">The number of sub-envs.</param>
+            /// <param name="vectorization_mode"><c>"sync"</c>, <c>"vector_entry_point"</c>, <c>"async"</c>, or <see langword="null"/> for the spec's default.</param>
+            /// <param name="vector_kwargs">The vector env's constructor arguments in Python spelling, or <see langword="null"/>; values converted by <see cref="Oracle.PyConvert.ToPython"/>.</param>
+            /// <param name="kwargs">The env's constructor arguments in Python spelling, or <see langword="null"/>.</param>
+            /// <returns>A new owned reference to the vector env.</returns>
+            /// <exception cref="PythonException">Thrown when <c>make_vec</c> raises.</exception>
+            internal static PyObject make_vec(string id, long num_envs = 1, string? vectorization_mode = null, IReadOnlyDictionary<string, object?>? vector_kwargs = null,
+                IReadOnlyDictionary<string, object?>? kwargs = null) {
+                using PyObject function = Module.GetAttr("make_vec");
+                using var name = new PyString(id);
+                using var arguments = Oracle.PyConvert.ToKwargs(kwargs);
+                using var count = new PyInt(num_envs);
+                arguments["num_envs"] = count;
+                using PyObject mode = Oracle.PyConvert.ToPython(vectorization_mode);
+                arguments["vectorization_mode"] = mode;
+                using PyObject vectorArguments = vector_kwargs is null ? Oracle.PyConvert.ToPython(null) : (PyObject)Oracle.PyConvert.ToKwargs(vector_kwargs);
+                arguments["vector_kwargs"] = vectorArguments;
+                return function.Invoke(new PyObject[] { name }, arguments);
+            }
+
             /// <summary><c>gymnasium.spec(env_id)</c>: the registered spec, or the registry's error for a missing id.</summary>
             /// <param name="env_id">The id.</param>
             /// <returns>A new owned reference to the spec.</returns>
@@ -942,6 +967,60 @@ namespace Gym.Tests.Parity {
                     using PyObject flag = disable_render_order_enforcing.ToPython();
                     arguments["disable_render_order_enforcing"] = flag;
                     return constructor.Invoke(new[] { env }, arguments);
+                }
+
+                /// <summary><c>wrappers.NormalizeObservation(env, epsilon=epsilon)</c>.</summary>
+                /// <param name="env">The env; the wrapper keeps its own reference.</param>
+                /// <param name="epsilon">The variance's offset.</param>
+                /// <returns>A new owned reference to the wrapper.</returns>
+                /// <exception cref="PythonException">Thrown for a non-positive epsilon (<c>InvalidBound</c>) or a shapeless space.</exception>
+                internal static PyObject NormalizeObservation(PyObject env, double epsilon = 1e-8) {
+                    using PyObject constructor = Module.GetAttr("NormalizeObservation");
+                    using var arguments = new PyDict();
+                    using var value = new PyFloat(epsilon);
+                    arguments["epsilon"] = value;
+                    return constructor.Invoke(new[] { env }, arguments);
+                }
+
+                /// <summary><c>wrappers.NormalizeReward(env, gamma=gamma, epsilon=epsilon)</c>.</summary>
+                /// <param name="env">The env; the wrapper keeps its own reference.</param>
+                /// <param name="gamma">The discount of the tracked return.</param>
+                /// <param name="epsilon">The variance's offset.</param>
+                /// <returns>A new owned reference to the wrapper.</returns>
+                /// <exception cref="PythonException">Thrown for a gamma outside [0, 1] or a non-positive epsilon (<c>InvalidBound</c>).</exception>
+                internal static PyObject NormalizeReward(PyObject env, double gamma = 0.99, double epsilon = 1e-8) {
+                    using PyObject constructor = Module.GetAttr("NormalizeReward");
+                    using var arguments = new PyDict();
+                    using var gammaValue = new PyFloat(gamma);
+                    using var epsilonValue = new PyFloat(epsilon);
+                    arguments["gamma"] = gammaValue;
+                    arguments["epsilon"] = epsilonValue;
+                    return constructor.Invoke(new[] { env }, arguments);
+                }
+
+                /// <summary><c>wrappers.TimeAwareObservation(env, flatten=flatten, normalize_time=normalize_time)</c>.</summary>
+                /// <param name="env">The env; the wrapper keeps its own reference.</param>
+                /// <param name="flatten">Whether the observation and time are flattened.</param>
+                /// <param name="normalize_time">Whether the time is the fraction of the limit.</param>
+                /// <returns>A new owned reference to the wrapper.</returns>
+                /// <exception cref="PythonException">Thrown when no step limit is known (<c>ValueError</c>).</exception>
+                internal static PyObject TimeAwareObservation(PyObject env, bool flatten = true, bool normalize_time = false) {
+                    using PyObject constructor = Module.GetAttr("TimeAwareObservation");
+                    using var arguments = new PyDict();
+                    using PyObject flattenValue = flatten.ToPython();
+                    using PyObject normalizeValue = normalize_time.ToPython();
+                    arguments["flatten"] = flattenValue;
+                    arguments["normalize_time"] = normalizeValue;
+                    return constructor.Invoke(new[] { env }, arguments);
+                }
+
+                /// <summary><c>wrappers.FlattenObservation(env)</c>.</summary>
+                /// <param name="env">The env; the wrapper keeps its own reference.</param>
+                /// <returns>A new owned reference to the wrapper.</returns>
+                /// <exception cref="PythonException">Thrown when the construction fails.</exception>
+                internal static PyObject FlattenObservation(PyObject env) {
+                    using PyObject constructor = Module.GetAttr("FlattenObservation");
+                    return constructor.Invoke(env);
                 }
 
                 /// <summary><c>gymnasium.wrappers.common</c>, where the common wrappers are defined.</summary>
@@ -1427,6 +1506,83 @@ namespace Gym.Tests.Parity {
 
             /// <summary><c>gymnasium.vector</c>.</summary>
             internal static class vector {
+                /// <summary>
+                ///     <c>VectorEnv</c> members a vector env has beyond an env's (reset, step, render, close and the spaces, metadata and
+                ///     spec go through <see cref="Env"/>'s rows, which call them by name).
+                /// </summary>
+                internal static class VectorEnv {
+                    /// <summary><c>envs.reset(seed=[...], options=options)</c>: one seed per sub-env, <c>None</c> keeping that sub-env's generator.</summary>
+                    /// <param name="env">The vector env.</param>
+                    /// <param name="seeds">The seeds.</param>
+                    /// <param name="options">Reset options in Python spelling, or <see langword="null"/>.</param>
+                    /// <returns>A new owned reference to <c>(observations, infos)</c>.</returns>
+                    /// <exception cref="PythonException">Thrown when the reset raises (a list of the wrong length).</exception>
+                    internal static PyObject reset(PyObject env, IReadOnlyList<long?> seeds, IReadOnlyDictionary<string, object?>? options = null) {
+                        using PyObject method = env.GetAttr("reset");
+                        using var arguments = new PyDict();
+                        using PyObject seedList = Oracle.PyConvert.ToPython(seeds.Select(seed => (object?)seed).ToList());
+                        arguments["seed"] = seedList;
+                        using PyObject optionsValue = options is null ? Oracle.PyConvert.ToPython(null) : (PyObject)Oracle.PyConvert.ToKwargs(options);
+                        arguments["options"] = optionsValue;
+                        return method.Invoke(Array.Empty<PyObject>(), arguments);
+                    }
+
+                    /// <summary><c>envs.num_envs</c>.</summary>
+                    /// <param name="env">The vector env.</param>
+                    /// <returns>A new owned reference.</returns>
+                    /// <exception cref="PythonException">Thrown when the attribute lookup fails.</exception>
+                    internal static PyObject num_envs(PyObject env) => env.GetAttr("num_envs");
+
+                    /// <summary><c>envs.single_observation_space</c>.</summary>
+                    /// <param name="env">The vector env.</param>
+                    /// <returns>A new owned reference.</returns>
+                    /// <exception cref="PythonException">Thrown when the attribute lookup fails.</exception>
+                    internal static PyObject single_observation_space(PyObject env) => env.GetAttr("single_observation_space");
+
+                    /// <summary><c>envs.single_action_space</c>.</summary>
+                    /// <param name="env">The vector env.</param>
+                    /// <returns>A new owned reference.</returns>
+                    /// <exception cref="PythonException">Thrown when the attribute lookup fails.</exception>
+                    internal static PyObject single_action_space(PyObject env) => env.GetAttr("single_action_space");
+                }
+
+                /// <summary><c>SyncVectorEnv</c> members.</summary>
+                internal static class SyncVectorEnv {
+                    /// <summary><c>envs.get_attr(name)</c>: the attribute of every sub-env, as a tuple.</summary>
+                    /// <param name="env">The vector env.</param>
+                    /// <param name="name">The attribute.</param>
+                    /// <returns>A new owned reference to the tuple.</returns>
+                    /// <exception cref="PythonException">Thrown when a sub-env has no such attribute.</exception>
+                    internal static PyObject get_attr(PyObject env, string name) {
+                        using PyObject method = env.GetAttr("get_attr");
+                        using var attribute = new PyString(name);
+                        return method.Invoke(attribute);
+                    }
+
+                    /// <summary><c>envs.set_attr(name, values)</c>: one value per sub-env from a list or tuple, else the same value for all.</summary>
+                    /// <param name="env">The vector env.</param>
+                    /// <param name="name">The attribute.</param>
+                    /// <param name="values">The values; stays owned by the caller.</param>
+                    /// <returns>A new owned reference to <c>None</c>.</returns>
+                    /// <exception cref="PythonException">Thrown for a list of the wrong length.</exception>
+                    internal static PyObject set_attr(PyObject env, string name, PyObject values) {
+                        using PyObject method = env.GetAttr("set_attr");
+                        using var attribute = new PyString(name);
+                        return method.Invoke(attribute, values);
+                    }
+
+                    /// <summary><c>envs.call(name)</c>: every sub-env's attribute, called when it is callable.</summary>
+                    /// <param name="env">The vector env.</param>
+                    /// <param name="name">The attribute or method.</param>
+                    /// <returns>A new owned reference to the tuple of results.</returns>
+                    /// <exception cref="PythonException">Thrown when a sub-env has no such attribute.</exception>
+                    internal static PyObject call(PyObject env, string name) {
+                        using PyObject method = env.GetAttr("call");
+                        using var attribute = new PyString(name);
+                        return method.Invoke(attribute);
+                    }
+                }
+
                 /// <summary><c>gymnasium.vector.utils</c>: batching spaces and their samples.</summary>
                 internal static class utils {
                     /// <summary>The cached module; never dispose it.</summary>

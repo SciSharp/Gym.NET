@@ -62,8 +62,9 @@ namespace Gym.Environments {
 
             // Classic
             // ----------------------------------------
-            EnvRegistry.Register("CartPole-v0", typeof(CartPoleEnv), maxEpisodeSteps: 200, rewardThreshold: 195.0);
-            EnvRegistry.Register("CartPole-v1", typeof(CartPoleEnv), maxEpisodeSteps: 500, rewardThreshold: 475.0);
+            // Both CartPoles vectorize natively: MakeVec builds CartPoleVectorEnv unless another mode is asked for.
+            EnvRegistry.Register("CartPole-v0", typeof(CartPoleEnv), maxEpisodeSteps: 200, rewardThreshold: 195.0, vectorEntryPoint: typeof(CartPoleVectorEnv));
+            EnvRegistry.Register("CartPole-v1", typeof(CartPoleEnv), maxEpisodeSteps: 500, rewardThreshold: 475.0, vectorEntryPoint: typeof(CartPoleVectorEnv));
             EnvRegistry.Register("MountainCar-v0", typeof(MountainCarEnv), maxEpisodeSteps: 200, rewardThreshold: -110.0);
             // One class for both MountainCars (DR-32): the continuous id carries continuous=True in its kwargs, where
             // Gymnasium's entry point is a class of its own and its kwargs are empty.

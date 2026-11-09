@@ -559,6 +559,33 @@ Specs: the port plan's §9 and §10; sources `vector` 3,113 lines and `wrappers`
   without JAX, and the `utils.performance` benchmarks (DR-36). `AtariPreprocessing` is out of 2.0.
 - **P6.8** Tests: port `tests/vector` (76) and `tests/wrappers` (146).
 - **Exit:** both suites green; every vector cell equal between sync and async, bit for bit, in every execution mode.
+- *Done 2026-11-09, the necessary part (the run's approval: "P6 (only necessary, defer for later whats not)"):*
+  - *Necessary was read as: the vector API's core, which P4.4 and `make_vec` need, and the wrappers that `make`'s
+    spec re-creation (P3's own Gymnasium tests) needs. Built: `AutoresetMode`, `IVectorEnv` and `VectorEnv<TObs, TAct>`
+    of batched types with `VectorStepResult`/`VectorResetResult` (DR-21), the info merging of `_add_info`, the vector
+    wrapper bases (`VectorWrapper`, `VectorObservationWrapper`, `VectorActionWrapper`, `VectorRewardWrapper`),
+    `SyncVectorEnv` (typed, and untyped as `SyncVectorEnv`) in every autoreset mode with the observation modes,
+    `reset_mask`, `copy`, `call`/`get_attr`/`set_attr`, `VectorizeMode` and `Gymnasium.MakeVec` typed and untyped (sync
+    and vector entry point), `CartPoleVectorEnv` (P4.4) as CartPole-v0/v1's vector entry point, and the wrappers
+    `NormalizeObservation`, `NormalizeReward`, `TimeAwareObservation`, `FlattenObservation` with `RunningMeanStd` and
+    `WrapperFunctions.UpdateMeanVarCountFromMoments` (NumPy 2's dtype rules kept: float32 statistics stay float32,
+    integer observations promote them, weak Python counts cast first).*
+  - *Parity: 23 vector cells (`make_vec` in both modes, every autoreset mode over arrays, toy_text ints and int/float
+    infos, Taxi's masks, Blackjack's tuples, seeds and masks, observation modes, attributes, descriptions, errors,
+    frames, and `CartPoleVectorEnv` step for step with its state) and 16 wrapper cells (episodes and statistics of the
+    four wrappers over float32, integer and tuple observations, a stack of three, the refusals), all passing. Unit:
+    `VectorEnvTests`, and Gymnasium's three make-with-spec tests ported in place of P3's placeholder; inventory ratchet
+    −16 names, the 65 P6 names left marked "deferred in this run".*
+  - *Deferred, each with its design still approved: P6.2 `AsyncVectorEnv` (DR-22; `MakeVec(..., "async")` raises
+    `NotImplementedError` naming P6.2), the other 30 wrappers of P6.3, P6.4's F8 (DR-23), P6.5's rendering wrappers
+    (`HumanRendering`, so `make`'s human-rendering path still raises, and `RecordVideo`, DR-25), P6.6's vector wrappers
+    (DR-24's names), P6.7 (`play`, `PlayPlot`, `FuncEnv`, `performance`, DR-36), and P6.8's ports of `tests/vector` and
+    `tests/wrappers`.*
+  - *Deviations, documented on the members: `CartPoleVectorEnv`'s rewards are float64 (DR-21; Gymnasium's are float32,
+    the values equal); `SyncVectorEnv.NpRandom`/`NpRandomSeed` keep the base's meaning (the vector env's own generator
+    and seed) where Gymnasium's return tuples of the sub-envs' (`GetAttr` gives those); a `reset_mask` stays in the caller's options dict (Python pops it); `TimeAwareObservation`'s observations
+    are `object`s (the type depends on `flatten` at run time); `FlattenObservation` is typed for array results and
+    refuses spaces whose flat form is not an array.*
 
 ### P8 Box2D
 
