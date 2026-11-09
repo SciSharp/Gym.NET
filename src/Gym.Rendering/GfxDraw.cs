@@ -40,6 +40,7 @@ namespace Gym.Rendering {
         /// <param name="points">The vertices, at least 3, as <c>(x, y)</c> floats.</param>
         /// <param name="color">The colour; its alpha weights the blend.</param>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="surface"/> or <paramref name="points"/> is <see langword="null"/>.</exception>
+        /// <exception cref="NotSupportedException">Thrown for a surface with per-pixel alpha, which the SDL_gfx port does not model.</exception>
         /// <exception cref="ValueError">Thrown for fewer than 3 points (<c>points must contain more than 2 points</c>) or a NaN coordinate.</exception>
         /// <exception cref="OverflowException">Thrown for an infinite coordinate or one beyond a C long.</exception>
         public static void AAPolygon(Surface surface, IReadOnlyList<(double X, double Y)> points, Color color) {
@@ -52,6 +53,7 @@ namespace Gym.Rendering {
         /// <param name="points">The vertices, at least 3, as <c>(x, y)</c> floats.</param>
         /// <param name="color">The colour; below 255 its alpha blends each filled pixel.</param>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="surface"/> or <paramref name="points"/> is <see langword="null"/>.</exception>
+        /// <exception cref="NotSupportedException">Thrown for a surface with per-pixel alpha, which the SDL_gfx port does not model.</exception>
         /// <exception cref="ValueError">Thrown for fewer than 3 points or a NaN coordinate.</exception>
         /// <exception cref="OverflowException">Thrown for an infinite coordinate or one beyond a C long.</exception>
         public static void FilledPolygon(Surface surface, IReadOnlyList<(double X, double Y)> points, Color color) {
@@ -66,11 +68,13 @@ namespace Gym.Rendering {
         /// <param name="r">The radius.</param>
         /// <param name="color">The colour.</param>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="surface"/> is <see langword="null"/>.</exception>
+        /// <exception cref="NotSupportedException">Thrown for a surface with per-pixel alpha, which the SDL_gfx port does not model.</exception>
         /// <exception cref="OverflowException">Thrown for an argument outside Sint16 (with pygame's message for it).</exception>
         /// <exception cref="SdlError">Thrown for a negative radius, which SDL_gfx rejects.</exception>
         public static void AACircle(Surface surface, long x, long y, long r, Color color) {
             if (surface is null)
                 throw new ArgumentNullException(nameof(surface));
+            RequireOpaque(surface);
             short cx = ShortArgument(x), cy = ShortArgument(y), radius = ShortArgument(r);
             Check(SdlGfxPrimitives.AaellipseColor(surface, cx, cy, radius, radius, color.Packed), "aacircle");
         }
@@ -82,11 +86,13 @@ namespace Gym.Rendering {
         /// <param name="r">The radius.</param>
         /// <param name="color">The colour.</param>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="surface"/> is <see langword="null"/>.</exception>
+        /// <exception cref="NotSupportedException">Thrown for a surface with per-pixel alpha, which the SDL_gfx port does not model.</exception>
         /// <exception cref="OverflowException">Thrown for an argument outside Sint16.</exception>
         /// <exception cref="SdlError">Thrown for a negative radius.</exception>
         public static void FilledCircle(Surface surface, long x, long y, long r, Color color) {
             if (surface is null)
                 throw new ArgumentNullException(nameof(surface));
+            RequireOpaque(surface);
             short cx = ShortArgument(x), cy = ShortArgument(y), radius = ShortArgument(r);
             Check(SdlGfxPrimitives.FilledCircleColor(surface, cx, cy, radius, color.Packed), "filled_circle");
         }
@@ -98,10 +104,12 @@ namespace Gym.Rendering {
         /// <param name="y">The row.</param>
         /// <param name="color">The colour.</param>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="surface"/> is <see langword="null"/>.</exception>
+        /// <exception cref="NotSupportedException">Thrown for a surface with per-pixel alpha, which the SDL_gfx port does not model.</exception>
         /// <exception cref="OverflowException">Thrown for an argument outside Sint16.</exception>
         public static void HLine(Surface surface, long x1, long x2, long y, Color color) {
             if (surface is null)
                 throw new ArgumentNullException(nameof(surface));
+            RequireOpaque(surface);
             short a = ShortArgument(x1), b = ShortArgument(x2), row = ShortArgument(y);
             Check(SdlGfxPrimitives.HlineColor(surface, a, b, row, color.Packed), "hline");
         }
@@ -113,10 +121,12 @@ namespace Gym.Rendering {
         /// <param name="y2">The other end's row.</param>
         /// <param name="color">The colour.</param>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="surface"/> is <see langword="null"/>.</exception>
+        /// <exception cref="NotSupportedException">Thrown for a surface with per-pixel alpha, which the SDL_gfx port does not model.</exception>
         /// <exception cref="OverflowException">Thrown for an argument outside Sint16.</exception>
         public static void VLine(Surface surface, long x, long y1, long y2, Color color) {
             if (surface is null)
                 throw new ArgumentNullException(nameof(surface));
+            RequireOpaque(surface);
             short column = ShortArgument(x), a = ShortArgument(y1), b = ShortArgument(y2);
             Check(SdlGfxPrimitives.VlineColor(surface, column, a, b, color.Packed), "vline");
         }
@@ -161,11 +171,13 @@ namespace Gym.Rendering {
         /// <param name="points">The vertices.</param>
         /// <returns>The Sint16 columns and rows.</returns>
         /// <exception cref="ArgumentNullException">Thrown when an argument is <see langword="null"/>.</exception>
+        /// <exception cref="NotSupportedException">Thrown for a surface with per-pixel alpha.</exception>
         /// <exception cref="ValueError">Thrown for fewer than 3 points or a NaN coordinate.</exception>
         /// <exception cref="OverflowException">Thrown for an infinite coordinate or one beyond a C long.</exception>
         private static (short[] X, short[] Y) PolygonArguments(Surface surface, IReadOnlyList<(double X, double Y)> points) {
             if (surface is null)
                 throw new ArgumentNullException(nameof(surface));
+            RequireOpaque(surface);
             if (points is null)
                 throw new ArgumentNullException(nameof(points));
             if (points.Count < 3)
@@ -179,6 +191,17 @@ namespace Gym.Rendering {
             }
 
             return (vx, vy);
+        }
+
+        /// <summary>
+        ///     Refuses a surface with per-pixel alpha: the SDL_gfx port reads and writes <c>0x00RRGGBB</c> words, and SDL_gfx's
+        ///     blending on an alpha surface (it composites the alpha too) is not modelled, since no env draws on one.
+        /// </summary>
+        /// <param name="surface">The surface, not <see langword="null"/>.</param>
+        /// <exception cref="NotSupportedException">Thrown for a surface with per-pixel alpha.</exception>
+        private static void RequireOpaque(Surface surface) {
+            if (surface.HasAlpha)
+                throw new NotSupportedException("gfxdraw on a surface with per-pixel alpha is not modelled: no Gymnasium env draws on one.");
         }
 
         /// <summary>Turns SDL_gfx's -1 into pygame's <c>pygame.error</c>, as the gfxdraw wrappers do.</summary>

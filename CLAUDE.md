@@ -36,7 +36,8 @@ refs/Gym.NET/
 │   │   └── Exceptions/            # Every gymnasium.error class (Error, ResetNeeded, ...), AssertionError, NotImplementedError, ImportError; legacy InvalidActionError etc.
 │   │
 │   ├── Gym.SourceGenerators/      # Roslyn generator (DR-13, DR-34): <Class>Options records of [GymOptions] envs/wrappers; [GymTuple]/[GymDict] records
-│   ├── Gym.Rendering/             # pygame-compatible rasterizer: Surface, GfxDraw (SDL_gfx 2.0.26 port), Transform, SurfArray, Vector2
+│   ├── Gym.Rendering/             # pygame-compatible rasterizer: Surface (opaque or per-pixel alpha), GfxDraw (SDL_gfx 2.0.26 port), Draw (line, rect, aaline/aalines),
+│   │                              #   Transform (flip, scale, smoothscale), ImageIO (image.load/frombytes), SurfArray, Vector2
 │   ├── Gym.Environments/          # Concrete environment implementations
 │   │   ├── Envs/Classic/          # CartPoleEnv (CartPole-v1, byte-for-byte port), ClassicControlUtils
 │   │   ├── Envs/Aether/           # LunarLanderEnv (Aether.Physics2D 2D physics simulation)

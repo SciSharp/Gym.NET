@@ -485,6 +485,15 @@ namespace Gym.Tests.Parity {
                 /// <exception cref="PythonException">Thrown when the attribute lookup fails.</exception>
                 internal static PyObject shape(PyObject a) => a.GetAttr("shape");
 
+                /// <summary><c>a.tobytes()</c>: the elements in C order as a Python <c>bytes</c>, for calls that take bytes (<c>pygame.image.frombytes</c>).</summary>
+                /// <param name="a">The array.</param>
+                /// <returns>A new owned reference to the bytes.</returns>
+                /// <exception cref="PythonException">Thrown when the call fails.</exception>
+                internal static PyObject tobytes(PyObject a) {
+                    using PyObject method = a.GetAttr("tobytes");
+                    return method.Invoke();
+                }
+
                 /// <summary>
                 ///     <c>a.tobytes()</c> as a CLR array (the <c>_t</c> typed variant): the elements in C order, whatever the
                 ///     array's strides, converted by pythonnet rather than NumSharp. pythonnet's conversion is slow for large
@@ -1777,6 +1786,116 @@ namespace Gym.Tests.Parity {
                         using PyObject rgb = Oracle.PyConvert.ToTuple(new long[] { color.R, color.G, color.B });
                         using PyObject _ = method.Invoke(rgb);
                     }
+
+                    /// <summary><c>surface.get_flags()</c>: the surface's flags as an <c>int</c> (<c>pygame.SRCALPHA</c> is <c>0x10000</c>).</summary>
+                    /// <param name="surface">The surface; stays owned by the caller.</param>
+                    /// <returns>A new owned reference to the int.</returns>
+                    /// <exception cref="PythonException">Thrown when the call fails.</exception>
+                    internal static PyObject get_flags(PyObject surface) {
+                        using PyObject method = surface.GetAttr("get_flags");
+                        return method.Invoke();
+                    }
+
+                    /// <summary><c>surface.blit(source, (x, y))</c>: copies, or blends a source with per-pixel alpha, clipped to the surface.</summary>
+                    /// <param name="surface">The destination; stays owned by the caller.</param>
+                    /// <param name="source">The source; stays owned by the caller.</param>
+                    /// <param name="x">Where the source's left column lands.</param>
+                    /// <param name="y">Where the source's top row lands.</param>
+                    /// <exception cref="PythonException">Thrown when blitting raises.</exception>
+                    internal static void blit(PyObject surface, PyObject source, int x, int y) {
+                        using PyObject method = surface.GetAttr("blit");
+                        using PyObject position = Oracle.PyConvert.ToTuple(new long[] { x, y });
+                        using PyObject _ = method.Invoke(source, position);
+                    }
+                }
+            }
+
+            /// <summary><c>pygame.draw</c>: the primitives Gymnasium's envs draw with besides gfxdraw.</summary>
+            internal static class draw {
+                /// <summary>The cached module; never dispose it.</summary>
+                private static PyObject Module => PythonRuntime.Import("pygame.draw");
+
+                /// <summary><c>draw.line(surface, color, start_pos, end_pos)</c>, width 1.</summary>
+                /// <param name="surface">The surface; stays owned by the caller.</param>
+                /// <param name="color">The colour as <c>(r, g, b, a)</c>.</param>
+                /// <param name="start_pos">The start, an <c>(x, y)</c> value tuple of ints or floats (crossed by <see cref="Oracle.PyConvert.ToPython"/>).</param>
+                /// <param name="end_pos">The end, likewise.</param>
+                /// <exception cref="PythonException">Thrown when drawing raises.</exception>
+                internal static void line(PyObject surface, (int R, int G, int B, int A) color, object start_pos, object end_pos) =>
+                    Call("line", surface, color, start_pos, end_pos);
+
+                /// <summary><c>draw.rect(surface, color, (x, y, w, h), width)</c>.</summary>
+                /// <param name="surface">The surface; stays owned by the caller.</param>
+                /// <param name="color">The colour as <c>(r, g, b, a)</c>.</param>
+                /// <param name="rect">The rectangle as <c>(x, y, w, h)</c>.</param>
+                /// <param name="width">0 fills, a positive width outlines, a negative one draws nothing.</param>
+                /// <exception cref="PythonException">Thrown when drawing raises.</exception>
+                internal static void rect(PyObject surface, (int R, int G, int B, int A) color, (long X, long Y, long W, long H) rect, long width) =>
+                    Call("rect", surface, color, rect, width);
+
+                /// <summary><c>draw.aaline(surface, color, start_pos, end_pos)</c>.</summary>
+                /// <param name="surface">The surface; stays owned by the caller.</param>
+                /// <param name="color">The colour as <c>(r, g, b, a)</c>.</param>
+                /// <param name="start_pos">The start as an <c>(x, y)</c> value tuple.</param>
+                /// <param name="end_pos">The end as an <c>(x, y)</c> value tuple.</param>
+                /// <exception cref="PythonException">Thrown when drawing raises.</exception>
+                internal static void aaline(PyObject surface, (int R, int G, int B, int A) color, object start_pos, object end_pos) =>
+                    Call("aaline", surface, color, start_pos, end_pos);
+
+                /// <summary><c>draw.aalines(surface, color, closed, points)</c>.</summary>
+                /// <param name="surface">The surface; stays owned by the caller.</param>
+                /// <param name="color">The colour as <c>(r, g, b, a)</c>.</param>
+                /// <param name="closed">Whether the last point joins the first.</param>
+                /// <param name="points">The points, crossed as a list of <c>(x, y)</c> float tuples.</param>
+                /// <exception cref="PythonException">Thrown when drawing raises.</exception>
+                internal static void aalines(PyObject surface, (int R, int G, int B, int A) color, bool closed, IReadOnlyList<(double X, double Y)> points) =>
+                    Call("aalines", surface, color, closed, points.Select(point => (object?)point).ToList());
+
+                /// <summary>Calls a draw function with the surface, the colour and arguments converted by <see cref="Oracle.PyConvert.ToPython"/>.</summary>
+                /// <param name="name">The function.</param>
+                /// <param name="surface">The surface; stays owned by the caller.</param>
+                /// <param name="color">The colour.</param>
+                /// <param name="rest">The remaining positional arguments as CLR values.</param>
+                private static void Call(string name, PyObject surface, (int R, int G, int B, int A) color, params object?[] rest) {
+                    using PyObject function = Module.GetAttr(name);
+                    var arguments = new List<PyObject> { surface };
+                    try {
+                        arguments.Add(Oracle.PyConvert.ToTuple(new long[] { color.R, color.G, color.B, color.A }));
+                        foreach (object? value in rest)
+                            arguments.Add(Oracle.PyConvert.ToPython(value));
+                        using PyObject _ = function.Invoke(arguments.ToArray());
+                    } finally {
+                        // The surface is the caller's; everything after it was created here.
+                        for (int i = 1; i < arguments.Count; i++)
+                            arguments[i].Dispose();
+                    }
+                }
+            }
+
+            /// <summary><c>pygame.image</c>.</summary>
+            internal static class image {
+                /// <summary><c>pygame.image.load(path)</c>.</summary>
+                /// <param name="path">The file.</param>
+                /// <returns>A new owned reference to the surface.</returns>
+                /// <exception cref="PythonException">Thrown when loading raises.</exception>
+                internal static PyObject load(string path) {
+                    using PyObject function = PythonRuntime.Import("pygame.image").GetAttr("load");
+                    using var file = new PyString(path);
+                    return function.Invoke(file);
+                }
+
+                /// <summary><c>pygame.image.frombytes(bytes, (width, height), format)</c>: a surface from raw pixels (copied).</summary>
+                /// <param name="bytes">A Python <c>bytes</c>; stays owned by the caller.</param>
+                /// <param name="width">The width.</param>
+                /// <param name="height">The height.</param>
+                /// <param name="format"><c>RGBA</c>, <c>RGB</c>, ...</param>
+                /// <returns>A new owned reference to the surface.</returns>
+                /// <exception cref="PythonException">Thrown for a size or byte count that does not fit, or an unknown format.</exception>
+                internal static PyObject frombytes(PyObject bytes, int width, int height, string format) {
+                    using PyObject function = PythonRuntime.Import("pygame.image").GetAttr("frombytes");
+                    using PyObject size = Oracle.PyConvert.ToTuple(new long[] { width, height });
+                    using var formatName = new PyString(format);
+                    return function.Invoke(bytes, size, formatName);
                 }
             }
 
@@ -1883,6 +2002,30 @@ namespace Gym.Tests.Parity {
                     using PyObject y = flip_y.ToPython();
                     return function.Invoke(surface, x, y);
                 }
+
+                /// <summary><c>pygame.transform.scale(surface, (width, height))</c>: nearest-neighbour scaling.</summary>
+                /// <param name="surface">The surface; stays owned by the caller.</param>
+                /// <param name="width">The new width.</param>
+                /// <param name="height">The new height.</param>
+                /// <returns>A new owned reference to the scaled copy.</returns>
+                /// <exception cref="PythonException">Thrown for a negative size (<c>ValueError</c>).</exception>
+                internal static PyObject scale(PyObject surface, int width, int height) {
+                    using PyObject function = PythonRuntime.Import("pygame.transform").GetAttr("scale");
+                    using PyObject size = Oracle.PyConvert.ToTuple(new long[] { width, height });
+                    return function.Invoke(surface, size);
+                }
+
+                /// <summary><c>pygame.transform.smoothscale(surface, (width, height))</c>: area-averaging shrink, interpolating expansion.</summary>
+                /// <param name="surface">The surface; stays owned by the caller.</param>
+                /// <param name="width">The new width.</param>
+                /// <param name="height">The new height.</param>
+                /// <returns>A new owned reference to the scaled copy.</returns>
+                /// <exception cref="PythonException">Thrown for a negative size (<c>ValueError</c>).</exception>
+                internal static PyObject smoothscale(PyObject surface, int width, int height) {
+                    using PyObject function = PythonRuntime.Import("pygame.transform").GetAttr("smoothscale");
+                    using PyObject size = Oracle.PyConvert.ToTuple(new long[] { width, height });
+                    return function.Invoke(surface, size);
+                }
             }
 
             /// <summary><c>pygame.surfarray</c>.</summary>
@@ -1893,6 +2036,15 @@ namespace Gym.Tests.Parity {
                 /// <exception cref="PythonException">Thrown when the copy fails.</exception>
                 internal static PyObject array3d(PyObject surface) {
                     using PyObject function = PythonRuntime.Import("pygame.surfarray").GetAttr("array3d");
+                    return function.Invoke(surface);
+                }
+
+                /// <summary><c>pygame.surfarray.array_alpha(surface)</c>: a <c>(W, H)</c> uint8 copy of the per-pixel alpha (255 everywhere without it).</summary>
+                /// <param name="surface">The surface.</param>
+                /// <returns>A new owned reference.</returns>
+                /// <exception cref="PythonException">Thrown when the copy fails.</exception>
+                internal static PyObject array_alpha(PyObject surface) {
+                    using PyObject function = PythonRuntime.Import("pygame.surfarray").GetAttr("array_alpha");
                     return function.Invoke(surface);
                 }
             }

@@ -36,6 +36,14 @@
     <ProjectReference Include="..\Gym\Gym.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- ImageSharp decodes the PNG assets Image.Load reads (pygame.image.load). Same line as src/Gym: the last Apache-2.0
+         release (2.1.x); newer majors ship under the Six Labors Split License and fail Release builds without a key. Its
+         advisories are suppressed in Directory.Build.props (D18). Declared here, not only inherited through Gym, because
+         this assembly calls it directly. -->
+    <PackageReference Include="SixLabors.ImageSharp" Version="2.1.13" />
+  </ItemGroup>
+
   <!-- The package's icon and readme, packed at its root (NuGet's PackageIcon / PackageReadmeFile). They replace the
        deprecated PackageIconUrl / PackageLicenseUrl, which fail packing as NU5048 / NU5125 where warnings are errors. -->
   <ItemGroup>

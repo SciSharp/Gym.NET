@@ -419,6 +419,29 @@ Specs: the port plan's §5.5 and Appendix E. pygame-ce calls at v1.4.0:
 - Each primitive is proven the way gfxdraw was: 150+ random shapes per primitive, with clipping, translucency, widths
   and Sint16 wrap-around, compared pixel for pixel with live pygame-ce 2.5.8. A primitive that won't converge is
   reported back to the maintainer before any other route is taken (D4).
+- *Done 2026-11-09 for what this run's envs need (P4 classic_control, P5 toy_text); every behaviour was derived
+  black-box from live pygame-ce 2.5.8 with probe scripts, no pygame source read (D4):*
+  - *`draw.line` width 1 (Acrobot): an error term starting at half the major extent, ties toward the start, floats
+    truncated; exact on 5,000 random lines.*
+  - *`draw.rect` widths 0/1/-1 (FrozenLake): the original rectangle's edges clipped, except a clipped sliver at most 2
+    pixels across is filled; exact on 8,000 random rectangles.*
+  - *`image.load` (8-bit RGB/RGBA PNG through ImageSharp, D18) and `image.frombytes`: per-pixel-alpha surfaces;
+    every env asset equals pygame's, alpha included.*
+  - *Alpha blit onto a frame: `d + (((s - d) * a + s) >> 8)`, exact on all 2^24 (source, alpha, destination) triples.*
+  - *`transform.scale`: 16.16 steps sampled at the half step; exact on 2,011 size pairs.*
+  - *`transform.smoothscale` shrinking (Pendulum): a 2.14 fixed-point area filter, horizontal pass first; exact on 800
+    random rows and 300 random images. Growing is refused (`NotSupportedException`) until an env needs it (P8).*
+  - *`transform.flip` keeps per-pixel alpha.*
+  - ***Not converged (reported to the maintainer per D4): `draw.aaline`/`draw.aalines` (MountainCar's hill).*** *The
+    single-segment model (float32 coordinates, major-axis stepping with float32 accumulation, `1 - frac`/`frac`
+    coverage, `trunc(b * c + (1 - b) * old)` blending, first column weighted `1 - frac(x0)`, last `frac(x1)`) reproduces
+    all but 21 pixels of 2,500 random segments, each off by one from a 1-3 ulp difference in y that a dozen arithmetic
+    variants did not explain; the joint rule of `aalines` (which endpoint columns are drawn where segments meet) is not
+    settled either. Both ship as the best model, documented as not pixel-exact, with `[OpenBugs("P7")]` cells; MountainCar's
+    frames inherit the gap. The maintainer's options: allow consulting pygame-ce's `draw.c` for these two functions only,
+    accept a documented tolerance for MountainCar's frames, or continue black-box probing.*
+  - *Deferred to P8 (box2d only): `polygon`, `circle`, `lines`, `aaline` beyond MountainCar, `smoothscale` growing, rect
+    widths above 1; `font`.*
 - **Exit:** every primitive above is pixel-exact on its random corpus.
 
 ### P4 classic_control
