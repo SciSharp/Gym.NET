@@ -9,6 +9,8 @@ using Gym.Envs;
 using Gym.Exceptions;
 using Gym.Observations;
 using Gym.Spaces;
+// The legacy info type, not the Dict space: both are named Dict until the legacy API's Dict is retired (port plan §4.4).
+using Dict = Gym.Collections.Dict;
 using Gym.Utils;
 using NumSharp;
 using SixLabors.ImageSharp;

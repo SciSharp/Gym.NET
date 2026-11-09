@@ -57,12 +57,12 @@ namespace Gym.Spaces {
         /// <summary>The wrapped space's JSON conversion.</summary>
         /// <param name="samples">Samples of the wrapped space.</param>
         /// <returns>Their JSON-friendly values.</returns>
-        public override IList<object?> ToJsonable(IEnumerable<object?> samples) => Inner.ToJsonable(samples);
+        public override object ToJsonable(IEnumerable<object?> samples) => Inner.ToJsonable(samples);
 
         /// <summary>The wrapped space's conversion back from JSON-friendly values.</summary>
         /// <param name="jsonable">The values.</param>
         /// <returns>The samples.</returns>
-        public override IList<object?> FromJsonable(IList<object?> jsonable) => Inner.FromJsonable(jsonable);
+        public override IList<object?> FromJsonable(object jsonable) => Inner.FromJsonable(jsonable);
 
         /// <summary>Seeds the wrapped space.</summary>
         /// <param name="seed">The seed, or <see langword="null"/> for entropy.</param>

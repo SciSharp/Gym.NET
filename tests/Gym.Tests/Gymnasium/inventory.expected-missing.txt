@@ -120,17 +120,6 @@ gymnasium.envs.toy_text.frozen_lake.is_valid                                    
 gymnasium.envs.toy_text.taxi.TaxiEnv                                                     P5 toy_text
 gymnasium.envs.toy_text.utils.categorical_sample                                         P5 toy_text
 gymnasium.experimental.functional.FuncEnv                                                P6 FuncEnv (DR-36)
-gymnasium.spaces.box.array_short_repr                                                    P2 spaces
-gymnasium.spaces.box.is_float_integer                                                    P2 spaces
-gymnasium.spaces.dict.Dict                                                               P2 spaces
-gymnasium.spaces.graph.Graph                                                             P2 spaces
-gymnasium.spaces.graph.GraphInstance                                                     P2 spaces
-gymnasium.spaces.multi_binary.MultiBinary                                                P2 spaces
-gymnasium.spaces.multi_discrete.MultiDiscrete                                            P2 spaces
-gymnasium.spaces.oneof.OneOf                                                             P2 spaces
-gymnasium.spaces.sequence.Sequence                                                       P2 spaces
-gymnasium.spaces.text.Text                                                               P2 spaces
-gymnasium.spaces.tuple.Tuple                                                             P2 spaces
 gymnasium.spaces.utils.flatdim                                                           P2 spaces
 gymnasium.spaces.utils.flatten                                                           P2 spaces
 gymnasium.spaces.utils.flatten_space                                                     P2 spaces
@@ -173,11 +162,6 @@ gymnasium.vector.utils.misc.clear_mpi_env_vars                                  
 gymnasium.vector.utils.shared_memory.create_shared_memory                                P6 vector
 gymnasium.vector.utils.shared_memory.read_from_shared_memory                             P6 vector
 gymnasium.vector.utils.shared_memory.write_to_shared_memory                              P6 vector
-gymnasium.vector.utils.space_utils.batch_differing_spaces                                P6 vector
-gymnasium.vector.utils.space_utils.batch_space                                           P6 vector
-gymnasium.vector.utils.space_utils.concatenate                                           P6 vector
-gymnasium.vector.utils.space_utils.create_empty_array                                    P6 vector
-gymnasium.vector.utils.space_utils.iterate                                               P6 vector
 gymnasium.vector.vector_env.ArrayType                                                    P6 vector
 gymnasium.vector.vector_env.AutoresetMode                                                P6 vector
 gymnasium.vector.vector_env.VectorActionWrapper                                          P6 vector

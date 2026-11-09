@@ -231,6 +231,24 @@ namespace Gym.Tests.Parity {
                 using PyObject function = PythonRuntime.Builtins.GetAttr("max");
                 return function.Invoke(a, b);
             }
+
+            /// <summary><c>list(x)</c>: drains an iterable (Gymnasium's <c>iterate</c> returns an iterator) into a list.</summary>
+            /// <param name="x">The iterable; stays owned by the caller.</param>
+            /// <returns>A new owned reference to the list.</returns>
+            /// <exception cref="PythonException">Thrown when iterating raises.</exception>
+            internal static PyObject list(PyObject x) {
+                using PyObject function = PythonRuntime.Builtins.GetAttr("list");
+                return function.Invoke(x);
+            }
+
+            /// <summary><c>len(x)</c>.</summary>
+            /// <param name="x">The sized object; stays owned by the caller.</param>
+            /// <returns>A new owned reference to the int.</returns>
+            /// <exception cref="PythonException">Thrown when the object has no length.</exception>
+            internal static PyObject len(PyObject x) {
+                using PyObject function = PythonRuntime.Builtins.GetAttr("len");
+                return function.Invoke(x);
+            }
         }
 
         /// <summary><c>import operator</c>: Python's operators as functions, so <c>a // b</c> and <c>a % b</c> are facade rows.</summary>
@@ -255,6 +273,26 @@ namespace Gym.Tests.Parity {
             /// <exception cref="PythonException">Thrown for a zero divisor (<c>ZeroDivisionError</c>).</exception>
             internal static PyObject mod(PyObject a, PyObject b) {
                 using PyObject function = Module.GetAttr("mod");
+                return function.Invoke(a, b);
+            }
+
+            /// <summary><c>operator.eq(a, b)</c>, Python's <c>a == b</c> (a space's <c>__eq__</c>).</summary>
+            /// <param name="a">The left operand; stays owned by the caller.</param>
+            /// <param name="b">The right operand; stays owned by the caller.</param>
+            /// <returns>A new owned reference to the result.</returns>
+            /// <exception cref="PythonException">Thrown when the comparison raises.</exception>
+            internal static PyObject eq(PyObject a, PyObject b) {
+                using PyObject function = Module.GetAttr("eq");
+                return function.Invoke(a, b);
+            }
+
+            /// <summary><c>operator.getitem(a, b)</c>, Python's <c>a[b]</c> (a composite space's subspace, a tuple's item).</summary>
+            /// <param name="a">The container; stays owned by the caller.</param>
+            /// <param name="b">The index or key; stays owned by the caller.</param>
+            /// <returns>A new owned reference to the item.</returns>
+            /// <exception cref="PythonException">Thrown when indexing raises (<c>IndexError</c>, <c>KeyError</c>).</exception>
+            internal static PyObject getitem(PyObject a, PyObject b) {
+                using PyObject function = Module.GetAttr("getitem");
                 return function.Invoke(a, b);
             }
         }
@@ -833,23 +871,280 @@ namespace Gym.Tests.Parity {
                     return constructor.Invoke(positional, arguments);
                 }
 
+                /// <summary><c>spaces.MultiBinary(n, seed=seed)</c>.</summary>
+                /// <param name="n">The shape: a Python <c>int</c> or a list/tuple of ints; stays owned by the caller.</param>
+                /// <param name="seed">The space's seed, or <see langword="null"/>.</param>
+                /// <returns>A new owned reference.</returns>
+                /// <exception cref="PythonException">Thrown when the constructor raises.</exception>
+                internal static PyObject MultiBinary(PyObject n, long? seed = null) {
+                    using PyObject constructor = Module.GetAttr("MultiBinary");
+                    using var arguments = new PyDict();
+                    using PyObject seedValue = Oracle.PyConvert.ToPython(seed);
+                    arguments["seed"] = seedValue;
+                    return constructor.Invoke(new[] { n }, arguments);
+                }
+
+                /// <summary><c>spaces.MultiDiscrete(nvec, dtype=dtype, seed=seed, start=start)</c>.</summary>
+                /// <param name="nvec">The counts: an array or a (nested) list; stays owned by the caller.</param>
+                /// <param name="dtype">The dtype, or <see langword="null"/> for Gymnasium's default <c>np.int64</c>; stays owned by the caller.</param>
+                /// <param name="seed">The space's seed, or <see langword="null"/>.</param>
+                /// <param name="start">The starts, or <see langword="null"/>; stays owned by the caller.</param>
+                /// <returns>A new owned reference.</returns>
+                /// <exception cref="PythonException">Thrown when the constructor raises.</exception>
+                internal static PyObject MultiDiscrete(PyObject nvec, PyObject? dtype = null, long? seed = null, PyObject? start = null) {
+                    using PyObject constructor = Module.GetAttr("MultiDiscrete");
+                    using var arguments = new PyDict();
+                    using PyObject seedValue = Oracle.PyConvert.ToPython(seed);
+                    arguments["seed"] = seedValue;
+                    if (dtype != null)
+                        arguments["dtype"] = dtype;
+                    if (start != null)
+                        arguments["start"] = start;
+                    return constructor.Invoke(new[] { nvec }, arguments);
+                }
+
+                /// <summary><c>spaces.Tuple(spaces, seed=seed)</c>.</summary>
+                /// <param name="spaces">The subspaces, a Python tuple or list; stays owned by the caller.</param>
+                /// <param name="seed">The space's seed, or <see langword="null"/>.</param>
+                /// <returns>A new owned reference.</returns>
+                /// <exception cref="PythonException">Thrown when the constructor raises.</exception>
+                internal static PyObject Tuple(PyObject spaces, long? seed = null) {
+                    using PyObject constructor = Module.GetAttr("Tuple");
+                    using var arguments = new PyDict();
+                    using PyObject seedValue = Oracle.PyConvert.ToPython(seed);
+                    arguments["seed"] = seedValue;
+                    return constructor.Invoke(new[] { spaces }, arguments);
+                }
+
+                /// <summary><c>spaces.Dict(spaces, seed=seed, sort_keys=sort_keys)</c>.</summary>
+                /// <param name="spaces">The subspaces: a <c>dict</c> or a list of <c>(key, space)</c> pairs; stays owned by the caller.</param>
+                /// <param name="seed">The space's seed, or <see langword="null"/>.</param>
+                /// <param name="sortKeys">Gymnasium's <c>sort_keys</c>.</param>
+                /// <returns>A new owned reference.</returns>
+                /// <exception cref="PythonException">Thrown when the constructor raises.</exception>
+                internal static PyObject Dict(PyObject spaces, long? seed = null, bool sortKeys = true) {
+                    using PyObject constructor = Module.GetAttr("Dict");
+                    using var arguments = new PyDict();
+                    using PyObject seedValue = Oracle.PyConvert.ToPython(seed);
+                    using PyObject sort = sortKeys.ToPython();
+                    arguments["seed"] = seedValue;
+                    arguments["sort_keys"] = sort;
+                    return constructor.Invoke(new[] { spaces }, arguments);
+                }
+
+                /// <summary><c>spaces.Text(max_length, min_length=min_length, charset=charset, seed=seed)</c>.</summary>
+                /// <param name="maxLength">The longest text.</param>
+                /// <param name="minLength">The shortest text.</param>
+                /// <param name="charset">The characters (a <c>str</c> or a <c>set</c>), or <see langword="null"/> for Gymnasium's alphanumeric default; stays owned by the caller.</param>
+                /// <param name="seed">The space's seed, or <see langword="null"/>.</param>
+                /// <returns>A new owned reference.</returns>
+                /// <exception cref="PythonException">Thrown when the constructor raises.</exception>
+                internal static PyObject Text(long maxLength, long minLength = 1, PyObject? charset = null, long? seed = null) {
+                    using PyObject constructor = Module.GetAttr("Text");
+                    using var maximum = new PyInt(maxLength);
+                    using var arguments = new PyDict();
+                    using var minimum = new PyInt(minLength);
+                    using PyObject seedValue = Oracle.PyConvert.ToPython(seed);
+                    arguments["min_length"] = minimum;
+                    arguments["seed"] = seedValue;
+                    if (charset != null)
+                        arguments["charset"] = charset;
+                    return constructor.Invoke(new PyObject[] { maximum }, arguments);
+                }
+
+                /// <summary><c>spaces.Sequence(space, seed=seed, stack=stack)</c>.</summary>
+                /// <param name="space">The feature space; stays owned by the caller.</param>
+                /// <param name="seed">The space's seed, or <see langword="null"/>.</param>
+                /// <param name="stack">Gymnasium's <c>stack</c>.</param>
+                /// <returns>A new owned reference.</returns>
+                /// <exception cref="PythonException">Thrown when the constructor raises.</exception>
+                internal static PyObject Sequence(PyObject space, long? seed = null, bool stack = false) {
+                    using PyObject constructor = Module.GetAttr("Sequence");
+                    using var arguments = new PyDict();
+                    using PyObject seedValue = Oracle.PyConvert.ToPython(seed);
+                    using PyObject stacked = stack.ToPython();
+                    arguments["seed"] = seedValue;
+                    arguments["stack"] = stacked;
+                    return constructor.Invoke(new[] { space }, arguments);
+                }
+
+                /// <summary><c>spaces.Graph(node_space, edge_space, seed=seed)</c>.</summary>
+                /// <param name="nodeSpace">The node feature space; stays owned by the caller.</param>
+                /// <param name="edgeSpace">The edge feature space, or Python's <c>None</c>; stays owned by the caller.</param>
+                /// <param name="seed">The space's seed, or <see langword="null"/>.</param>
+                /// <returns>A new owned reference.</returns>
+                /// <exception cref="PythonException">Thrown when the constructor raises.</exception>
+                internal static PyObject Graph(PyObject nodeSpace, PyObject edgeSpace, long? seed = null) {
+                    using PyObject constructor = Module.GetAttr("Graph");
+                    using var arguments = new PyDict();
+                    using PyObject seedValue = Oracle.PyConvert.ToPython(seed);
+                    arguments["seed"] = seedValue;
+                    return constructor.Invoke(new[] { nodeSpace, edgeSpace }, arguments);
+                }
+
+                /// <summary><c>spaces.GraphInstance(nodes, edges, edge_links)</c>, a graph to test membership with.</summary>
+                /// <param name="nodes">The node features; stays owned by the caller.</param>
+                /// <param name="edges">The edge features or <c>None</c>; stays owned by the caller.</param>
+                /// <param name="edgeLinks">The links or <c>None</c>; stays owned by the caller.</param>
+                /// <returns>A new owned reference.</returns>
+                /// <exception cref="PythonException">Thrown when the constructor raises.</exception>
+                internal static PyObject GraphInstance(PyObject nodes, PyObject edges, PyObject edgeLinks) {
+                    using PyObject constructor = Module.GetAttr("GraphInstance");
+                    return constructor.Invoke(nodes, edges, edgeLinks);
+                }
+
+                /// <summary><c>spaces.OneOf(spaces, seed=seed)</c>.</summary>
+                /// <param name="spaces">The subspaces, a Python tuple or list; stays owned by the caller.</param>
+                /// <param name="seed">The space's seed, or <see langword="null"/>.</param>
+                /// <returns>A new owned reference.</returns>
+                /// <exception cref="PythonException">Thrown when the constructor raises.</exception>
+                internal static PyObject OneOf(PyObject spaces, long? seed = null) {
+                    using PyObject constructor = Module.GetAttr("OneOf");
+                    using var arguments = new PyDict();
+                    using PyObject seedValue = Oracle.PyConvert.ToPython(seed);
+                    arguments["seed"] = seedValue;
+                    return constructor.Invoke(new[] { spaces }, arguments);
+                }
+
+                /// <summary><c>gymnasium.spaces.utils</c>: flattening spaces and their elements.</summary>
+                internal static class utils {
+                    /// <summary>The cached module; never dispose it.</summary>
+                    private static PyObject Module => PythonRuntime.Import("gymnasium.spaces.utils");
+
+                    /// <summary><c>flatdim(space)</c>.</summary>
+                    /// <param name="space">The space; stays owned by the caller.</param>
+                    /// <returns>A new owned reference to the int.</returns>
+                    /// <exception cref="PythonException">Thrown for a space that cannot be flattened.</exception>
+                    internal static PyObject flatdim(PyObject space) {
+                        using PyObject function = Module.GetAttr("flatdim");
+                        return function.Invoke(space);
+                    }
+
+                    /// <summary><c>flatten(space, x)</c>.</summary>
+                    /// <param name="space">The space; stays owned by the caller.</param>
+                    /// <param name="x">The element; stays owned by the caller.</param>
+                    /// <returns>A new owned reference.</returns>
+                    /// <exception cref="PythonException">Thrown when flattening raises.</exception>
+                    internal static PyObject flatten(PyObject space, PyObject x) {
+                        using PyObject function = Module.GetAttr("flatten");
+                        return function.Invoke(space, x);
+                    }
+
+                    /// <summary><c>unflatten(space, x)</c>.</summary>
+                    /// <param name="space">The space; stays owned by the caller.</param>
+                    /// <param name="x">The flattened element; stays owned by the caller.</param>
+                    /// <returns>A new owned reference.</returns>
+                    /// <exception cref="PythonException">Thrown when unflattening raises.</exception>
+                    internal static PyObject unflatten(PyObject space, PyObject x) {
+                        using PyObject function = Module.GetAttr("unflatten");
+                        return function.Invoke(space, x);
+                    }
+
+                    /// <summary><c>flatten_space(space)</c>.</summary>
+                    /// <param name="space">The space; stays owned by the caller.</param>
+                    /// <returns>A new owned reference to the flattened space.</returns>
+                    /// <exception cref="PythonException">Thrown for a space that cannot be flattened.</exception>
+                    internal static PyObject flatten_space(PyObject space) {
+                        using PyObject function = Module.GetAttr("flatten_space");
+                        return function.Invoke(space);
+                    }
+
+                    /// <summary><c>is_space_dtype_shape_equiv(space_1, space_2)</c>.</summary>
+                    /// <param name="space1">The first space; stays owned by the caller.</param>
+                    /// <param name="space2">The second space; stays owned by the caller.</param>
+                    /// <returns>A new owned reference to the boolean.</returns>
+                    /// <exception cref="PythonException">Thrown when the check raises.</exception>
+                    internal static PyObject is_space_dtype_shape_equiv(PyObject space1, PyObject space2) {
+                        using PyObject function = Module.GetAttr("is_space_dtype_shape_equiv");
+                        return function.Invoke(space1, space2);
+                    }
+                }
+
+                /// <summary><c>gymnasium.spaces.graph</c>, where <c>Graph</c> is defined.</summary>
+                internal static class graph {
+                    /// <summary><c>Graph</c> members.</summary>
+                    internal static class Graph {
+                        /// <summary><c>space.sample(mask=mask, probability=probability, num_nodes=num_nodes, num_edges=num_edges)</c>.</summary>
+                        /// <param name="space">The graph space.</param>
+                        /// <param name="mask">The mask pair, or <see langword="null"/>; stays owned by the caller.</param>
+                        /// <param name="probability">The probability pair, or <see langword="null"/>; stays owned by the caller.</param>
+                        /// <param name="numNodes">The number of nodes.</param>
+                        /// <param name="numEdges">The number of edges, or <see langword="null"/> to draw it.</param>
+                        /// <returns>A new owned reference to the <c>GraphInstance</c>.</returns>
+                        /// <exception cref="PythonException">Thrown when sampling raises.</exception>
+                        internal static PyObject sample(PyObject space, PyObject? mask, PyObject? probability, long numNodes, long? numEdges) {
+                            using PyObject method = space.GetAttr("sample");
+                            using var arguments = new PyDict();
+                            using var nodes = new PyInt(numNodes);
+                            using PyObject edges = Oracle.PyConvert.ToPython(numEdges);
+                            if (mask != null)
+                                arguments["mask"] = mask;
+                            if (probability != null)
+                                arguments["probability"] = probability;
+                            arguments["num_nodes"] = nodes;
+                            arguments["num_edges"] = edges;
+                            return method.Invoke(Array.Empty<PyObject>(), arguments);
+                        }
+                    }
+                }
+
                 /// <summary><c>gymnasium.spaces.space</c>, where the <c>Space</c> base class is defined.</summary>
                 internal static class space {
                     /// <summary><c>Space</c> protocol members, called on any space (Python dispatches them to the subclass).</summary>
                     internal static class Space {
-                        /// <summary><c>space.sample()</c>, or <c>space.sample(mask=mask)</c>.</summary>
+                        /// <summary><c>space.sample()</c>, <c>space.sample(mask=mask)</c>, <c>space.sample(probability=probability)</c>, or both keywords.</summary>
                         /// <param name="space">The space.</param>
                         /// <param name="mask">The mask, or <see langword="null"/>; stays owned by the caller.</param>
+                        /// <param name="probability">The probability mask, or <see langword="null"/>; stays owned by the caller.</param>
                         /// <returns>A new owned reference.</returns>
                         /// <exception cref="PythonException">Thrown when sampling raises.</exception>
-                        internal static PyObject sample(PyObject space, PyObject? mask = null) {
+                        internal static PyObject sample(PyObject space, PyObject? mask = null, PyObject? probability = null) {
                             using PyObject method = space.GetAttr("sample");
-                            if (mask is null)
+                            if (mask is null && probability is null)
                                 return method.Invoke();
                             using var arguments = new PyDict();
-                            arguments["mask"] = mask;
+                            if (mask != null)
+                                arguments["mask"] = mask;
+                            if (probability != null)
+                                arguments["probability"] = probability;
                             return method.Invoke(Array.Empty<PyObject>(), arguments);
                         }
+
+                        /// <summary><c>space.seed(seed)</c> with a seed of any form (<c>None</c>, an int, a list, a dict).</summary>
+                        /// <param name="space">The space.</param>
+                        /// <param name="seed">The seed; stays owned by the caller.</param>
+                        /// <returns>A new owned reference to the seeds used.</returns>
+                        /// <exception cref="PythonException">Thrown when seeding raises.</exception>
+                        internal static PyObject seed(PyObject space, PyObject seed) {
+                            using PyObject method = space.GetAttr("seed");
+                            return method.Invoke(seed);
+                        }
+
+                        /// <summary><c>space.to_jsonable(sample_n)</c>.</summary>
+                        /// <param name="space">The space.</param>
+                        /// <param name="samples">A list of samples; stays owned by the caller.</param>
+                        /// <returns>A new owned reference to the JSON data.</returns>
+                        /// <exception cref="PythonException">Thrown when the conversion raises.</exception>
+                        internal static PyObject to_jsonable(PyObject space, PyObject samples) {
+                            using PyObject method = space.GetAttr("to_jsonable");
+                            return method.Invoke(samples);
+                        }
+
+                        /// <summary><c>space.from_jsonable(sample_n)</c>.</summary>
+                        /// <param name="space">The space.</param>
+                        /// <param name="json">The JSON data; stays owned by the caller.</param>
+                        /// <returns>A new owned reference to the list of samples.</returns>
+                        /// <exception cref="PythonException">Thrown when the conversion raises.</exception>
+                        internal static PyObject from_jsonable(PyObject space, PyObject json) {
+                            using PyObject method = space.GetAttr("from_jsonable");
+                            return method.Invoke(json);
+                        }
+
+                        /// <summary><c>space.is_np_flattenable</c>.</summary>
+                        /// <param name="space">The space.</param>
+                        /// <returns>A new owned reference to the boolean.</returns>
+                        /// <exception cref="PythonException">Thrown when the property raises.</exception>
+                        internal static PyObject is_np_flattenable(PyObject space) => space.GetAttr("is_np_flattenable");
 
                         /// <summary><c>space.contains(x)</c>.</summary>
                         /// <param name="space">The space.</param>
@@ -952,6 +1247,67 @@ namespace Gym.Tests.Parity {
                             using var text = new PyString(manner);
                             return method.Invoke(text);
                         }
+                    }
+                }
+            }
+
+            /// <summary><c>gymnasium.vector</c>.</summary>
+            internal static class vector {
+                /// <summary><c>gymnasium.vector.utils</c>: batching spaces and their samples.</summary>
+                internal static class utils {
+                    /// <summary>The cached module; never dispose it.</summary>
+                    private static PyObject Module => PythonRuntime.Import("gymnasium.vector.utils");
+
+                    /// <summary><c>batch_space(space, n)</c>.</summary>
+                    /// <param name="space">The space; stays owned by the caller.</param>
+                    /// <param name="n">The number of copies.</param>
+                    /// <returns>A new owned reference to the batched space.</returns>
+                    /// <exception cref="PythonException">Thrown when batching raises.</exception>
+                    internal static PyObject batch_space(PyObject space, long n) {
+                        using PyObject function = Module.GetAttr("batch_space");
+                        using var count = new PyInt(n);
+                        return function.Invoke(space, count);
+                    }
+
+                    /// <summary><c>batch_differing_spaces(spaces)</c>.</summary>
+                    /// <param name="spaces">A list of spaces; stays owned by the caller.</param>
+                    /// <returns>A new owned reference to the batched space.</returns>
+                    /// <exception cref="PythonException">Thrown when batching raises.</exception>
+                    internal static PyObject batch_differing_spaces(PyObject spaces) {
+                        using PyObject function = Module.GetAttr("batch_differing_spaces");
+                        return function.Invoke(spaces);
+                    }
+
+                    /// <summary><c>iterate(space, items)</c>, an iterator; drain it with <see cref="builtins.list"/>.</summary>
+                    /// <param name="space">The batched space; stays owned by the caller.</param>
+                    /// <param name="items">The batched sample; stays owned by the caller.</param>
+                    /// <returns>A new owned reference to the iterator.</returns>
+                    /// <exception cref="PythonException">Thrown when the space cannot iterate.</exception>
+                    internal static PyObject iterate(PyObject space, PyObject items) {
+                        using PyObject function = Module.GetAttr("iterate");
+                        return function.Invoke(space, items);
+                    }
+
+                    /// <summary><c>concatenate(space, items, out)</c>.</summary>
+                    /// <param name="space">The single space; stays owned by the caller.</param>
+                    /// <param name="items">The samples, a list or tuple; stays owned by the caller.</param>
+                    /// <param name="out">The destination from <see cref="create_empty_array"/>; stays owned by the caller.</param>
+                    /// <returns>A new owned reference to the batch.</returns>
+                    /// <exception cref="PythonException">Thrown when concatenating raises.</exception>
+                    internal static PyObject concatenate(PyObject space, PyObject items, PyObject @out) {
+                        using PyObject function = Module.GetAttr("concatenate");
+                        return function.Invoke(space, items, @out);
+                    }
+
+                    /// <summary><c>create_empty_array(space, n)</c> with Gymnasium's default <c>np.zeros</c>.</summary>
+                    /// <param name="space">The single space; stays owned by the caller.</param>
+                    /// <param name="n">The number of envs.</param>
+                    /// <returns>A new owned reference to the empty batch.</returns>
+                    /// <exception cref="PythonException">Thrown when the space has no empty form.</exception>
+                    internal static PyObject create_empty_array(PyObject space, long n) {
+                        using PyObject function = Module.GetAttr("create_empty_array");
+                        using var count = new PyInt(n);
+                        return function.Invoke(space, count);
                     }
                 }
             }

@@ -11,7 +11,8 @@ namespace Gym.Utils {
     ///     Python's <c>==</c> between the Python counterparts of .NET values (see <see cref="PyBuiltins"/> for the mapping),
     ///     which is how Gymnasium compares <c>info</c> dicts, metadata, spec kwargs and the values inside them: numbers of any
     ///     width compare by value (<c>1 == 1.0 == True</c>), dicts ignore insertion order, lists and tuples compare element by
-    ///     element and never equal each other.
+    ///     element and never equal each other. A tuple is an <see cref="ITuple"/> or an exact <see langword="object"/>?[]
+    ///     (Gym.NET's generic tuple, DR-13); a typed array or a list is a list.
     /// </summary>
     /// <remarks>
     ///     <para>
@@ -60,11 +61,12 @@ namespace Gym.Utils {
                 return TryEntries(right, out List<KeyValuePair<object?, object?>>? rightEntries) && DictsEqual(leftEntries!, rightEntries!);
             }
 
-            if (left is ITuple leftTuple) {
-                if (right is not ITuple rightTuple || leftTuple.Length != rightTuple.Length)
+            if (TupleItems(left) is { } leftItems) {
+                // An ITuple or Gym.NET's generic tuple (an object[], DR-13) equals only another tuple of equal items.
+                if (TupleItems(right) is not { } rightItems || leftItems.Count != rightItems.Count)
                     return false;
-                for (int i = 0; i < leftTuple.Length; i++) {
-                    if (!AreEqual(leftTuple[i], rightTuple[i]))
+                for (int i = 0; i < leftItems.Count; i++) {
+                    if (!AreEqual(leftItems[i], rightItems[i]))
                         return false;
                 }
 
@@ -73,7 +75,7 @@ namespace Gym.Utils {
 
             if (left is IList leftList) {
                 // A tuple never equals a list in Python, and a string is not a list of characters here.
-                if (right is not IList rightList || right is ITuple || leftList.Count != rightList.Count)
+                if (right is not IList rightList || TupleItems(right) is not null || leftList.Count != rightList.Count)
                     return false;
                 for (int i = 0; i < leftList.Count; i++) {
                     if (!AreEqual(leftList[i], rightList[i]))
@@ -84,6 +86,24 @@ namespace Gym.Utils {
             }
 
             return left.Equals(right);
+        }
+
+        /// <summary>The items of a Python tuple's counterpart: an <see cref="ITuple"/> or an exact <see langword="object"/>[] (DR-13).</summary>
+        /// <param name="value">The value.</param>
+        /// <returns>The items, or <see langword="null"/> for anything that is not a tuple.</returns>
+        private static IReadOnlyList<object?>? TupleItems(object value) {
+            switch (value) {
+                case ITuple tuple: {
+                    var items = new object?[tuple.Length];
+                    for (int i = 0; i < items.Length; i++)
+                        items[i] = tuple[i];
+                    return items;
+                }
+                case object?[] array when PyBuiltins.IsTupleArray(array):
+                    return array;
+                default:
+                    return null;
+            }
         }
 
         /// <summary>

@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Numerics;
 using Gym.Exceptions;
 using Gym.Utils;
 using NumSharp;
@@ -300,13 +301,13 @@ namespace Gym.Spaces {
         /// <summary>Converts samples to nested lists (Gymnasium's <c>to_jsonable</c>, <c>sample.tolist()</c>).</summary>
         /// <param name="samples">Samples of this box.</param>
         /// <returns>One nested list per sample.</returns>
-        public override IList<object?> ToJsonable(IEnumerable<NDArray> samples) => samples.Select(s => s.tolist()).ToList();
+        public override object ToJsonable(IEnumerable<NDArray> samples) => samples.Select(s => PythonList(s)).ToList();
 
         /// <summary>Converts nested lists back to arrays of the box's dtype (Gymnasium's <c>from_jsonable</c>, <c>np.asarray(sample, dtype)</c>).</summary>
         /// <param name="jsonable">Values <see cref="ToJsonable(IEnumerable{NDArray})"/> produced, or numbers.</param>
         /// <returns>New arrays, owned by the caller.</returns>
         /// <exception cref="ArgumentException">Thrown for a value that cannot become an array.</exception>
-        public override IList<NDArray> FromJsonable(IList<object?> jsonable) => jsonable.Select(v => AsArray(v, DType)).ToList();
+        public override IList<NDArray> FromJsonable(object jsonable) => JsonList(jsonable).Select(v => AsArray(v, DType)).ToList();
 
         /// <summary>
         ///     Gymnasium's <c>repr</c>: <c>Box(low, high, shape, dtype)</c>, each bound shortened to its value when it is the
@@ -571,10 +572,19 @@ namespace Gym.Spaces {
             return ((long)value).ToString(CultureInfo.InvariantCulture);
         }
 
-        /// <summary>Gymnasium's <c>array_short_repr</c>: the scalar when every entry is the same, else <c>str(arr)</c>.</summary>
-        /// <param name="array">The bounds.</param>
+        /// <summary>
+        ///     A short text for an array (Gymnasium's <c>array_short_repr</c>), what a box's <c>repr</c> prints for each bound:
+        ///     the single value when every entry is the same (<c>-1.0</c>), else the whole array (<c>[-1. -2.]</c>).
+        /// </summary>
+        /// <param name="array">The array; an empty one prints as <c>[]</c>.</param>
         /// <returns>The text.</returns>
-        private static string ArrayShortRepr(NDArray array) {
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="array"/> is <see langword="null"/>.</exception>
+        /// <remarks>
+        ///     Reads every element twice (a min and a max), so it costs two passes over a large array. Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/spaces/box.py#L40">gymnasium/spaces/box.py (array_short_repr)</see>.
+        /// </remarks>
+        public static string ArrayShortRepr(NDArray array) {
+            if (array is null)
+                throw new ArgumentNullException(nameof(array));
             if (array.size != 0) {
                 using NDArray min = np.min(array);
                 using NDArray max = np.max(array);
@@ -586,12 +596,35 @@ namespace Gym.Spaces {
             return PyBuiltins.Str(array);
         }
 
-        /// <summary>Converts a candidate or JSON value to an array of <paramref name="dtype"/>, NumPy's <c>np.asarray(x, dtype)</c>.</summary>
+        /// <summary>
+        ///     Whether a value is a number Gymnasium takes as a scalar bound (its <c>is_float_integer</c>): a Python <c>int</c>
+        ///     or <c>float</c> (any .NET integer, an enum, a <see cref="BigInteger"/>, <see langword="double"/>), a NumPy
+        ///     integer or floating scalar (<see langword="float"/>, <see cref="Half"/>, a 0-d integer or float array), but never
+        ///     a <see langword="bool"/>, which Python counts as an <c>int</c> and Gymnasium excludes by hand.
+        /// </summary>
+        /// <param name="var">The value.</param>
+        /// <returns><see langword="true"/> for an integer or floating scalar that is not a boolean.</returns>
+        /// <remarks>
+        ///     <see langword="decimal"/> has no Python or NumPy counterpart Gymnasium accepts and is refused. Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/spaces/box.py#L57">gymnasium/spaces/box.py (is_float_integer)</see>.
+        /// </remarks>
+        public static bool IsFloatInteger(object? var) => var switch {
+            bool => false,
+            NDArray { ndim: 0 } scalar => scalar.dtype.kind is 'i' or 'u' or 'f',
+            NDArray => false,
+            sbyte or byte or short or ushort or int or uint or long or ulong or BigInteger or Enum => true,
+            double or float or Half => true,
+            _ => false,
+        };
+
+        /// <summary>
+        ///     Converts a candidate or JSON value to an array of <paramref name="dtype"/>, NumPy's <c>np.asarray(x, dtype)</c>;
+        ///     <see cref="Graph"/> reads JSON edge links through it too.
+        /// </summary>
         /// <param name="value">An array, a .NET array or list (nested for more dimensions), or a number.</param>
         /// <param name="dtype">The dtype.</param>
-        /// <returns>A new array.</returns>
+        /// <returns>A new array, owned by the caller (a copy even when <paramref name="value"/> already is an array of that dtype).</returns>
         /// <exception cref="ArgumentException">Thrown for <see langword="null"/> or a value no array can be made from.</exception>
-        private static NDArray AsArray(object? value, DType dtype) {
+        internal static NDArray AsArray(object? value, DType dtype) {
             switch (value) {
                 case null:
                     throw new ArgumentException("None cannot become a numeric array.", nameof(value));

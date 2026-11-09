@@ -237,13 +237,13 @@ namespace Gym.Spaces {
         /// <param name="samples">Samples of this space.</param>
         /// <returns>One integer per sample.</returns>
         /// <exception cref="ArgumentException">Thrown for a sample that is not a 0-d integer array.</exception>
-        public override IList<object?> ToJsonable(IEnumerable<NDArray> samples) => samples.Select(s => (object?)ToInt64(s)).ToList();
+        public override object ToJsonable(IEnumerable<NDArray> samples) => samples.Select(s => (object?)ToInt64(s)).ToList();
 
         /// <summary>Converts integers back to 0-d arrays of the space's dtype (Gymnasium's <c>from_jsonable</c>).</summary>
         /// <param name="jsonable">Integers, as <see cref="ToJsonable(IEnumerable{NDArray})"/> made them.</param>
         /// <returns>New 0-d arrays, owned by the caller.</returns>
         /// <exception cref="ArgumentException">Thrown for a value that is not an integer.</exception>
-        public override IList<NDArray> FromJsonable(IList<object?> jsonable) => jsonable.Select(v => Scalar(ToInt64(v!))).ToList();
+        public override IList<NDArray> FromJsonable(object jsonable) => JsonList(jsonable).Select(v => Scalar(ToInt64(v!))).ToList();
 
         /// <summary>
         ///     Gymnasium's <c>repr</c>: <c>Discrete(2)</c>, with <c>start=…</c> when it is not 0 and <c>dtype=…</c> when it is

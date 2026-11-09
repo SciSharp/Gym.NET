@@ -82,7 +82,8 @@ namespace Gym.Tests.Envs {
 
         /// <summary>
         ///     Python's dict <c>==</c>: order does not matter, numbers compare by value across types (<c>1 == 1.0 == True</c>),
-        ///     lists and tuples compare element-wise and never equal each other, and arrays compare by value.
+        ///     lists and tuples compare element-wise and never equal each other (an <see langword="object"/>?[] is Gym.NET's
+        ///     tuple, DR-13; a typed array or a <see cref="List{T}"/> is a list), and arrays compare by value.
         /// </summary>
         [TestMethod]
         public void Equality_IsPythons() {
@@ -90,8 +91,11 @@ namespace Gym.Tests.Envs {
             Assert.AreEqual(new Info { ["t"] = true }, new Info { ["t"] = 1 });
             Assert.AreNotEqual(new Info { ["a"] = 1 }, new Info { ["a"] = 1, ["b"] = 2 });
             Assert.AreNotEqual(new Info { ["a"] = 1 }, new Info { ["a"] = "1" });
-            Assert.AreEqual(new Info { ["l"] = new List<object?> { 1, "x" } }, new Info { ["l"] = new object?[] { 1.0, "x" } });
+            Assert.AreEqual(new Info { ["l"] = new List<object?> { 1, "x" } }, new Info { ["l"] = new List<object?> { 1.0, "x" } });
+            Assert.AreEqual(new Info { ["l"] = new List<object?> { 1, 2 } }, new Info { ["l"] = new long[] { 1, 2 } }, "A typed array is a list.");
             Assert.AreNotEqual(new Info { ["l"] = new List<object?> { 1 } }, new Info { ["l"] = ValueTuple.Create(1) });
+            Assert.AreNotEqual(new Info { ["l"] = new List<object?> { 1.0, "x" } }, new Info { ["l"] = new object?[] { 1.0, "x" } }, "An object?[] is a tuple (DR-13).");
+            Assert.AreEqual(new Info { ["t"] = new object?[] { 1, "x" } }, new Info { ["t"] = (1L, "x") }, "Both are tuples.");
             Assert.AreEqual(new Info { ["n"] = new Info { ["x"] = 1 } }, new Info { ["n"] = new Dictionary<string, object?> { ["x"] = 1 } });
             Assert.IsTrue(new Info { ["a"] = 1 }.Equals(new Dictionary<string, int> { ["a"] = 1 }), "Any .NET dictionary is a dict.");
 
@@ -127,14 +131,17 @@ namespace Gym.Tests.Envs {
         public void Repr_IsPythons() {
             var info = new Info {
                 ["int"] = 1, ["float"] = 0.5, ["none"] = null, ["str"] = "x", ["bool"] = true, ["list"] = new List<string> { "human", "rgb_array" },
-                ["tuple"] = ValueTuple.Create(1), ["pair"] = (1, "a"), ["nested"] = new Info { ["k"] = new object?[0] }
+                ["tuple"] = ValueTuple.Create(1), ["pair"] = (1, "a"), ["nested"] = new Info { ["k"] = new List<object?>(), ["t"] = new object?[] { 2 } }
             };
 
-            Assert.AreEqual("{'int': 1, 'float': 0.5, 'none': None, 'str': 'x', 'bool': True, 'list': ['human', 'rgb_array'], 'tuple': (1,), 'pair': (1, 'a'), 'nested': {'k': []}}", info.ToString());
+            // An object?[] is Gym.NET's tuple (DR-13: a Tuple space's sample), printed as one; an empty list is a List.
+            Assert.AreEqual("{'int': 1, 'float': 0.5, 'none': None, 'str': 'x', 'bool': True, 'list': ['human', 'rgb_array'], 'tuple': (1,), 'pair': (1, 'a'), 'nested': {'k': [], 't': (2,)}}", info.ToString());
             Assert.AreEqual("{}", new Info().ToString());
             Assert.AreEqual("<class 'dict'>", PyBuiltins.TypeRepr(info));
             Assert.AreEqual("<class 'list'>", PyBuiltins.TypeRepr(new int[0]));
             Assert.AreEqual("<class 'tuple'>", PyBuiltins.TypeRepr((1, 2)));
+            Assert.AreEqual("<class 'tuple'>", PyBuiltins.TypeRepr(new object?[] { 1, 2 }));
+            Assert.AreEqual("<class 'list'>", PyBuiltins.TypeRepr(new string[] { "a" }), "A typed array is a list, even though it is an object[] by covariance.");
         }
 
         /// <summary><see cref="Metadata"/>'s typed accessors read and write Gymnasium's keys.</summary>

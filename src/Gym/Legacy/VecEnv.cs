@@ -4,6 +4,8 @@ using System.Linq;
 using System.Threading.Tasks;
 using Gym.Collections;
 using Gym.Spaces;
+// The legacy info type, not the Dict space: both are named Dict until the legacy API's Dict is retired (port plan §4.4).
+using Dict = Gym.Collections.Dict;
 using NumSharp;
 
 namespace Gym.Legacy {

@@ -54,8 +54,9 @@ namespace Gym.Tests.Parity.Oracle {
         public static Outcome Threw(RaisedError error) => new(null, error);
 
         /// <summary>
-        ///     Runs a Gym.NET call and describes what it did. The returned value is described and then disposed when it is
-        ///     <see cref="IDisposable"/> and <paramref name="disposeResult"/> is set, since the caller only keeps the facts.
+        ///     Runs a Gym.NET call and describes what it did. When <paramref name="disposeResult"/> is set, the returned value
+        ///     is disposed after it is described, since the caller only keeps the facts: an <see cref="IDisposable"/> itself,
+        ///     and the arrays inside a composite sample (a tuple's <see langword="object"/>?[], a dict's <c>Info</c>, nested).
         /// </summary>
         /// <param name="call">The call; its exceptions are caught and described.</param>
         /// <param name="disposeResult">
@@ -75,8 +76,53 @@ namespace Gym.Tests.Parity.Oracle {
             try {
                 return Returned(ValueFacts.Of(result));
             } finally {
-                if (disposeResult && result is IDisposable disposable)
+                if (disposeResult)
+                    DisposeOwned(result, depth: 0);
+            }
+        }
+
+        /// <summary>
+        ///     Releases a Gym.NET value a cell owns (a composite sample, a list of samples) the way <see cref="Capture"/> releases
+        ///     a result: its arrays and other disposables, nested ones included.
+        /// </summary>
+        /// <param name="value">The value; <see langword="null"/> is ignored.</param>
+        internal static void Release(object? value) => DisposeOwned(value, depth: 0);
+
+        /// <summary>
+        ///     Disposes a described result: an <see cref="IDisposable"/> (an array, a <c>GraphInstance</c>) itself, and the
+        ///     items of materialized containers (arrays, lists, tuples, dictionaries) recursively.
+        /// </summary>
+        /// <param name="value">The result or one of its items.</param>
+        /// <param name="depth">How deep the walk is; containers below 16 levels are left to the finalizer, so a self-containing value cannot recurse forever.</param>
+        /// <remarks>
+        ///     Lazy sequences are not walked: enumerating one again would run its query a second time (creating new arrays
+        ///     only to dispose them) rather than reach the items <see cref="ValueFacts.Of"/> described.
+        /// </remarks>
+        private static void DisposeOwned(object? value, int depth) {
+            if (depth > 16)
+                return;
+            switch (value) {
+                case IDisposable disposable:
                     disposable.Dispose();
+                    break;
+                case string:
+                    break;
+                case System.Collections.IDictionary dictionary:
+                    foreach (System.Collections.DictionaryEntry entry in dictionary)
+                        DisposeOwned(entry.Value, depth + 1);
+                    break;
+                case ICollection<KeyValuePair<string, object?>> entries:
+                    foreach (KeyValuePair<string, object?> entry in entries)
+                        DisposeOwned(entry.Value, depth + 1);
+                    break;
+                case System.Runtime.CompilerServices.ITuple tuple:
+                    for (int i = 0; i < tuple.Length; i++)
+                        DisposeOwned(tuple[i], depth + 1);
+                    break;
+                case System.Collections.ICollection items:
+                    foreach (object? item in items)
+                        DisposeOwned(item, depth + 1);
+                    break;
             }
         }
 

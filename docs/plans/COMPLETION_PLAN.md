@@ -289,16 +289,30 @@ Specs: the port plan's §7; sources `gymnasium/spaces` (3,816 lines at v1.4.0); 
   defect), sampling per bound category, `contains` with `np.can_cast` and lists, `repr`.
 - **P2.3 `Discrete`**: *Done 2026-11-09 (with P2.1).* shape `()`, int64 0-d samples (DR-08), `start`, masks and probabilities, `repr`, `n > 0`
   validation (B-03, and B-10 as `Discrete`'s cell tags it).
-- **P2.4 `MultiBinary`, `MultiDiscrete`.**
+- **P2.4 `MultiBinary`, `MultiDiscrete`.** *Done 2026-11-09 with P2.5 and P2.6 (the spaces themselves), one commit.*
 - **P2.5 `Tuple`, `Dict`, `Sequence`**: the generic forms (`object?[]`, an insertion-ordered map) with
   source-generated typed records over them (DR-09, DR-13); subseeds through `integers(int32.MaxValue, size: n)`,
-  `geometric(0.25)` for `Sequence`, which NumSharp 0.80.0 now provides.
-- **P2.6 `Text`, `Graph`, `OneOf`.**
+  `geometric(0.25)` for `Sequence`, which NumSharp 0.80.0 now provides. *Spaces done 2026-11-09: `Tuple`
+  (`object?[]` samples), `Dict` (`Info` samples, `sort_keys` kept for batching), `Sequence` (tuple or stacked samples),
+  seeding by int, list, dict or `None` with each space's own refusal (`Space.SeedTypeError`), and
+  `gymnasium.vector.utils`' space functions (`VectorUtils`: `batch_space`, `batch_differing_spaces`, `iterate`,
+  `concatenate`, `create_empty_array`), which `Sequence(stack=True)` and `Graph` sample through. An `object?[]` is now
+  Python's tuple in `PyBuiltins` and `PyEquality` too (DR-13). The source generator is still to come (P2.9).*
+- **P2.6 `Text`, `Graph`, `OneOf`.** *Done 2026-11-09 (with P2.4): `Text` (code points, `charset` as a string or set),
+  `Graph` and `GraphInstance` (an `ITuple` that owns its arrays), `OneOf` (`(np.int64 index, value)` pairs). Live
+  cells: 24 spaces × repr, seeded samples with every generator state, `seed(int)`, own samples as members,
+  `is_np_flattenable`, JSON round trip, equality and `batch_space` (`SpaceSpecLiveParityTests`); masks, probabilities,
+  list/dict/refused seeds, membership matrices, `Graph.sample` with node and edge counts, constructor errors and
+  `MultiDiscrete` indexing (`SpaceDetailsLiveParityTests`); `create_empty_array`, `concatenate`, `iterate` and
+  `batch_differing_spaces` (`VectorUtilsLiveParityTests`). 393 new cells, all gated.*
 - **P2.7 `spaces.utils`**: `flatdim`, `flatten`, `unflatten`, `flatten_space`, `is_space_dtype_shape_equiv`, with
   v1.4.0's `OneOf` and `Tuple` fixes.
 - **P2.8 Tests**: port `tests/spaces` (109 functions, 13 files) under `tests/Gym.Tests/Gymnasium/Spaces`. Add live
   cells for every space (samples with generator state, `contains`, `repr`, `flatten`, JSON) and remove the `[OpenBugs]`
   attribute from the six space cells (tagged B-03, B-10 and P2) as they turn green.
+- **P2.9 The source generator (DR-13, DR-34)**: `[GymTuple]`/dict records over the generic forms, with implicit casts,
+  Python `==` and `repr`; the same project later emits DR-34's options records (P3). Split out of P2.1/P2.5, which
+  shipped the generic forms the records convert to.
 - **Exit:** `tests/spaces` green on both frameworks; every space has live cells; no space `[OpenBugs]` left; the
   inventory list loses every `gymnasium.spaces` name.
 

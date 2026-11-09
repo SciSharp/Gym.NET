@@ -114,6 +114,9 @@ namespace Gym.Utils {
                     return StrRepr(text);
                 case NDArray array:
                     return array.ndim == 0 ? NumpyScalarRepr(array) : np.array_repr(array);
+                case Gym.Spaces.GraphInstance graph:
+                    // A NamedTuple prints with its field names, not as the plain tuple ContainerRepr would make of it.
+                    return graph.ToString();
                 default:
                     return IntegerText(value) ?? ContainerRepr(value) ?? value.ToString() ?? "";
             }
@@ -121,8 +124,9 @@ namespace Gym.Utils {
 
         /// <summary>
         ///     Python's <c>repr</c> of a container's counterpart: a dictionary (<see cref="IDictionary"/>, or any sequence of
-        ///     string-keyed pairs such as <see cref="Gym.Envs.Info"/>) as a <c>dict</c>, <c>{'render_fps': 50}</c>; a
-        ///     <see cref="ITuple"/> as a <c>tuple</c>, <c>(1, 2)</c> or <c>(1,)</c>; an <see cref="IList"/> (a .NET array or
+        ///     string-keyed pairs such as <see cref="Gym.Envs.Info"/>) as a <c>dict</c>, <c>{'render_fps': 50}</c>; an
+        ///     <see cref="ITuple"/> or an exact <see langword="object"/>?[] (Gym.NET's generic tuple, DR-13: a <c>Tuple</c>
+        ///     space's sample) as a <c>tuple</c>, <c>(1, 2)</c> or <c>(1,)</c>; any other <see cref="IList"/> (a typed array, a
         ///     list) as a <c>list</c>, <c>['human', 'rgb_array']</c>. Items print through <see cref="Repr"/>, recursively.
         /// </summary>
         /// <param name="value">A value that is not a string, a number or an array (those are handled before).</param>
@@ -169,6 +173,19 @@ namespace Gym.Utils {
 
                     // A one-element tuple keeps its trailing comma, as Python prints (1,).
                     if (tuple.Length == 1)
+                        text.Append(',');
+                    return text.Append(')').ToString();
+                }
+                case object?[] items when IsTupleArray(items): {
+                    // DR-13: an object?[] is Gym.NET's generic tuple (a Tuple or OneOf sample, a mask pair), printed as one.
+                    var text = new StringBuilder("(");
+                    for (int i = 0; i < items.Length; i++) {
+                        if (i > 0)
+                            text.Append(", ");
+                        text.Append(Repr(items[i]));
+                    }
+
+                    if (items.Length == 1)
                         text.Append(',');
                     return text.Append(')').ToString();
                 }
@@ -323,10 +340,13 @@ namespace Gym.Utils {
             return $"{sign}{digits.Substring(0, decpt)}.{digits.Substring(decpt)}";
         }
 
-        /// <summary>The Python type name of a value's counterpart: <c>int</c>, <c>float</c>, <c>numpy.float32</c>, <c>numpy.ndarray</c>.</summary>
+        /// <summary>
+        ///     The Python type name of a value's counterpart: <c>int</c>, <c>float</c>, <c>numpy.float32</c>, <c>numpy.ndarray</c>.
+        ///     Messages that quote the bare name (Python's <c>'int' object is not subscriptable</c>) use it directly.
+        /// </summary>
         /// <param name="value">The value.</param>
         /// <returns>The qualified name Python prints inside <c>&lt;class '...'&gt;</c>.</returns>
-        private static string TypeName(object? value) {
+        internal static string TypeName(object? value) {
             switch (value) {
                 case null:
                     return "NoneType";
@@ -345,14 +365,60 @@ namespace Gym.Utils {
                 case IDictionary or IEnumerable<KeyValuePair<string, object?>>:
                     // The containers ContainerRepr prints as Python's built-ins are named like them.
                     return "dict";
+                case Gym.Spaces.GraphInstance:
+                    // A tuple to Python, but of its own NamedTuple class, which type() names.
+                    return ClassName(value.GetType());
                 case ITuple:
+                    return "tuple";
+                case object?[] items when IsTupleArray(items):
                     return "tuple";
                 case IList:
                     return "list";
                 default:
-                    return IntegerText(value) != null ? "int" : value.GetType().FullName ?? value.GetType().Name;
+                    return IntegerText(value) != null ? "int" : ClassName(value.GetType());
             }
         }
+
+        /// <summary>
+        ///     Whether an array is Gym.NET's generic tuple (DR-13): exactly <see langword="object"/>[], not a typed array
+        ///     (<c>string[]</c>, <c>long[]</c>) nor an array covariantly typed as <see langword="object"/>[], which stay lists.
+        /// </summary>
+        /// <param name="items">The array.</param>
+        /// <returns><see langword="true"/> for a tuple.</returns>
+        internal static bool IsTupleArray(object?[] items) => items.GetType() == typeof(object[]);
+
+        /// <summary>
+        ///     The Python class name of a .NET type, as <c>str(type(x))</c> shows it inside <c>&lt;class '...'&gt;</c>: Gym.NET's
+        ///     own spaces under Gymnasium's module paths (<c>gymnasium.spaces.box.Box</c>), so messages that print a space's
+        ///     type read as Gymnasium's; any other type by its .NET full name.
+        /// </summary>
+        /// <param name="type">The type.</param>
+        /// <returns>The qualified name.</returns>
+        /// <remarks>
+        ///     Only the exact Gym.NET classes map: a user's subclass of <c>Box</c> prints its own .NET name, as a Python
+        ///     subclass prints its own module.
+        /// </remarks>
+        internal static string ClassName(Type type) {
+            if (type.Assembly == typeof(PyBuiltins).Assembly && type.Namespace == "Gym.Spaces" && SpaceModules.TryGetValue(type.Name, out string? module))
+                return $"gymnasium.spaces.{module}.{type.Name}";
+            return type.FullName ?? type.Name;
+        }
+
+        /// <summary>The Gymnasium module of each Gym.NET space class (and <c>GraphInstance</c>), by class name.</summary>
+        private static readonly Dictionary<string, string> SpaceModules = new Dictionary<string, string>(StringComparer.Ordinal) {
+            ["Space"] = "space",
+            ["Box"] = "box",
+            ["Discrete"] = "discrete",
+            ["MultiBinary"] = "multi_binary",
+            ["MultiDiscrete"] = "multi_discrete",
+            ["Tuple"] = "tuple",
+            ["Dict"] = "dict",
+            ["Text"] = "text",
+            ["Sequence"] = "sequence",
+            ["Graph"] = "graph",
+            ["GraphInstance"] = "graph",
+            ["OneOf"] = "oneof",
+        };
 
         /// <summary>The decimal text of a .NET integer or enum (an <c>int</c> in Python), or <see langword="null"/> for anything else.</summary>
         /// <param name="value">The value.</param>
