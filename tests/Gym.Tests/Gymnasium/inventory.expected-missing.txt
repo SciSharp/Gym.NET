@@ -129,7 +129,6 @@ gymnasium.utils.env_checker.check_returned_data_not_reused                      
 gymnasium.utils.env_checker.check_seed_deprecation                                       P3 checkers
 gymnasium.utils.env_checker.check_space_limit                                            P3 checkers
 gymnasium.utils.env_checker.check_step_determinism                                       P3 checkers
-gymnasium.utils.env_checker.data_equivalence                                             P3 checkers
 gymnasium.utils.env_match.check_environments_match                                       P3 checkers
 gymnasium.utils.ezpickle.EzPickle                                                        n/a: Python pickling
 gymnasium.utils.passive_env_checker.check_action_space                                   P3 checkers

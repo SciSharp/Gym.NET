@@ -192,26 +192,16 @@ namespace Gym.Spaces {
         /// <returns><see langword="true"/> when equal.</returns>
         private bool SameShape(Shape shape) => (shape.dimensions ?? Array.Empty<long>()).SequenceEqual(N);
 
-        /// <summary>A (possibly nested) .NET list as an array, Python's <c>np.array(list)</c>.</summary>
+        /// <summary>
+        ///     A (possibly nested) .NET list as an array, Python's <c>np.array(list)</c>: NumPy's dtype discovery over the
+        ///     Python values the items stand for (ints of any size, a <see cref="System.Numerics.BigInteger"/> included, floats,
+        ///     booleans), through NumSharp's own coercion of a Python list.
+        /// </summary>
         /// <param name="list">The list.</param>
         /// <returns>A new array.</returns>
-        /// <exception cref="ArgumentException">Thrown for a list np.array cannot read.</exception>
-        internal static NDArray SequenceToArray(System.Collections.IList list) {
-            object?[] items = list.Cast<object?>().ToArray();
-            if (items.Length > 0 && items[0] is System.Collections.IList) {
-                NDArray[] rows = items.Select(r => SequenceToArray((System.Collections.IList)r!)).ToArray();
-                try {
-                    return np.stack(rows);
-                } finally {
-                    foreach (NDArray row in rows)
-                        row.Dispose();
-                }
-            }
-
-            if (items.All(i => i is long or int or short or sbyte or byte or bool))
-                return np.array(items.Select(i => Convert.ToInt64(i, CultureInfo.InvariantCulture)).ToArray());
-            return np.array(items.Select(i => Convert.ToDouble(i, CultureInfo.InvariantCulture)).ToArray());
-        }
+        /// <exception cref="ArgumentException">Thrown for a list NumPy cannot read (ragged nesting, or an item no numeric array holds).</exception>
+        /// <exception cref="NotSupportedException">Thrown for a list NumPy would make an object array of (a <c>None</c>, an int past 64 bits).</exception>
+        internal static NDArray SequenceToArray(System.Collections.IList list) => np.asanyarray(Box.NestedPythonList(list));
 
         /// <summary>A JSON value as an int8 array.</summary>
         /// <param name="value">A nested list, an array or an NDArray.</param>

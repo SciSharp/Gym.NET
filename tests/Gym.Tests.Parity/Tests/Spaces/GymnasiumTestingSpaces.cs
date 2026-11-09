@@ -8,7 +8,9 @@ namespace Gym.Tests.Parity.Tests.Spaces {
     /// </summary>
     /// <remarks>
     ///     Keyword-built dicts (<c>Dict(position=..., velocity=...)</c>) are given as lists of pairs: both keep the order
-    ///     written and are never sorted. Integer literals (<c>Box(-1, 1, shape=(2,))</c>) stay Python ints.
+    ///     written and are never sorted. Integer literals (<c>Box(-1, 1, shape=(2,))</c>) stay Python ints. A box written
+    ///     without a shape (<c>Box(low=0.0, high=1.0)</c>) has shape <c>(1,)</c>, so it is given as one; only an explicit
+    ///     <c>shape=()</c> makes a 0-d box.
     ///     Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/tests/spaces/utils.py">tests/spaces/utils.py</see>.
     /// </remarks>
     internal static class GymnasiumTestingSpaces {
@@ -17,7 +19,7 @@ namespace Gym.Tests.Parity.Tests.Spaces {
             new DiscreteSpec(3),
             new DiscreteSpec(3, start: -1),
             new DiscreteSpec(4, start: 1, dtype: "int32"),
-            new BoxSpec(0.0, 1.0, new long[0]),
+            new BoxSpec(0.0, 1.0, new long[] { 1 }),
             new BoxSpec(0.0, double.PositiveInfinity, new long[] { 2, 2 }),
             new BoxArraySpec("Box(low=np.array([-10.0, 0.0]), high=np.array([10.0, 10.0]), dtype=np.float64)",
                 () => np.array(new[] { -10.0, 0.0 }), () => np.array(new[] { 10.0, 10.0 }), "float64"),
@@ -48,8 +50,8 @@ namespace Gym.Tests.Parity.Tests.Spaces {
             new TupleSpec(new DiscreteSpec(5), new DiscreteSpec(4)),
             new TupleSpec(new DiscreteSpec(5), VelocityBox()),
             new TupleSpec(new DiscreteSpec(5), new TupleSpec(new BoxSpec(0.0, 1.0, new long[] { 3 }), new DiscreteSpec(2))),
-            new TupleSpec(new DiscreteSpec(3), new DictSpec(new[] { ("position", (SpaceSpec)new BoxSpec(0.0, 1.0, new long[0])), ("velocity", new DiscreteSpec(2)) }, mapping: false)),
-            new TupleSpec(new OneOfSpec(IntBox(-1, 1, 2), IntBox(-1, 1, 3)), new BoxSpec(0.0, 1.0, new long[0])),
+            new TupleSpec(new DiscreteSpec(3), new DictSpec(new[] { ("position", (SpaceSpec)new BoxSpec(0.0, 1.0, new long[] { 1 })), ("velocity", new DiscreteSpec(2)) }, mapping: false)),
+            new TupleSpec(new OneOfSpec(IntBox(-1, 1, 2), IntBox(-1, 1, 3)), new BoxSpec(0.0, 1.0, new long[] { 1 })),
             new TupleSpec(new GraphSpec(IntBox(-1, 1, 2, 1), null), new DiscreteSpec(2)),
             // Dict spaces
             new DictSpec(new[] { ("position", (SpaceSpec)new DiscreteSpec(5)), ("velocity", VelocityBox()) }),
@@ -68,7 +70,7 @@ namespace Gym.Tests.Parity.Tests.Spaces {
             new GraphSpec(IntBox(-100, 100, 3, 4), new DiscreteSpec(5)),
             new GraphSpec(new DiscreteSpec(5), IntBox(-100, 100, 3, 4)),
             new GraphSpec(new DiscreteSpec(3), new DiscreteSpec(4)),
-            new GraphSpec(new DictSpec(new[] { ("node_feature_1", (SpaceSpec)new DiscreteSpec(5)), ("node_feature_2", new MultiBinarySpec(5)) }), IntBox(1, 4)),
+            new GraphSpec(new DictSpec(new[] { ("node_feature_1", (SpaceSpec)new DiscreteSpec(5)), ("node_feature_2", new MultiBinarySpec(5)) }), IntBox(1, 4, 1)),
             // Graph spaces with arbitrary node/edge spaces
             new GraphSpec(new MultiBinarySpec(4), null),
             new GraphSpec(new MultiDiscreteSpec(new long[] { 3, 4, 2 }), new DiscreteSpec(3)),
@@ -85,10 +87,10 @@ namespace Gym.Tests.Parity.Tests.Spaces {
             new SequenceSpec(new DiscreteSpec(4)),
             new SequenceSpec(new DictSpec(new[] { ("feature", (SpaceSpec)IntBox(0, 1, 3)) })),
             new SequenceSpec(new GraphSpec(IntBox(-100, 100, 2, 2), new DiscreteSpec(4))),
-            new SequenceSpec(new BoxSpec(0.0, 1.0, new long[0]), stack: true),
+            new SequenceSpec(new BoxSpec(0.0, 1.0, new long[] { 1 }), stack: true),
             new SequenceSpec(new DictSpec(new[] { ("a", (SpaceSpec)IntBox(0, 1, 3)), ("b", new DiscreteSpec(5)) }), stack: true),
             // OneOf spaces
-            new OneOfSpec(new DiscreteSpec(3), new BoxSpec(0.0, 1.0, new long[0])),
+            new OneOfSpec(new DiscreteSpec(3), new BoxSpec(0.0, 1.0, new long[] { 1 })),
             new OneOfSpec(new MultiBinarySpec(2), new MultiDiscreteSpec(new long[] { 2, 2 })),
             new OneOfSpec(IntBox(-1, 1, 2), IntBox(-1, 1, 3)),
             new OneOfSpec(new TextSpec(5), new DiscreteSpec(3)),

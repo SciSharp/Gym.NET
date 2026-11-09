@@ -660,10 +660,11 @@ namespace Gym.Spaces {
         /// <summary>
         ///     A .NET array or list as the Python list it stands for, nested lists included: a <see cref="List{T}"/> of the items,
         ///     which NumSharp reads as Python values (a typed array would otherwise be read as an ndarray and cast).
+        ///     <see cref="MultiBinary"/> and <see cref="MultiDiscrete"/> read their list candidates and JSON through it too.
         /// </summary>
         /// <param name="value">The array or list.</param>
         /// <returns>The nested lists, or the value itself when it is a leaf.</returns>
-        private static object? NestedPythonList(object? value) {
+        internal static object? NestedPythonList(object? value) {
             switch (value) {
                 case string or NDArray:
                     return value;

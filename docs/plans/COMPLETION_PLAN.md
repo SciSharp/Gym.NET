@@ -314,10 +314,20 @@ Specs: the port plan's §7; sources `gymnasium/spaces` (3,816 lines at v1.4.0); 
   `contains` answers `False` instead of wrapping to 44; int64 stays exact).*
 - **P2.8 Tests**: port `tests/spaces` (109 functions, 13 files) under `tests/Gym.Tests/Gymnasium/Spaces`. Add live
   cells for every space (samples with generator state, `contains`, `repr`, `flatten`, JSON) and remove the `[OpenBugs]`
-  attribute from the six space cells (tagged B-03, B-10 and P2) as they turn green.
+  attribute from the six space cells (tagged B-03, B-10 and P2) as they turn green. *Done 2026-11-09: the 13 files
+  ported (900 test cases over Gymnasium's own space catalog, `TestingSpaces`), chi-square critical values recorded from
+  scipy 1.16.3, `EnvChecker.DataEquivalence` (`gymnasium.utils.env_checker.data_equivalence`) ported for them. Python-only
+  parametrizations (dtypes that are not dtypes, shapes of the wrong type, strings where spaces belong, pickling,
+  hash-seed independence) are listed in each class's remarks; `test_all_space_pairs_for_is_space_dtype_shape_equiv`
+  needs the vector shared memory and moves to P6. Found on the way: `MultiBinary`/`MultiDiscrete` read JSON and list
+  candidates through NumSharp's Python-list coercion (a `BigInteger` or an exact int64 no longer breaks them);
+  `MultiDiscrete` takes NumPy slices (`space["0:2, :"]`); `Tuple` gains Python's `count`/`index` (`CountOf`,
+  `IndexOf`). Two Gymnasium test quirks are documented where ported: an `is not` identity check that cannot fail, and an
+  int64 case that passes only because an earlier case mutated the shared bounds.*
 - **P2.9 The source generator (DR-13, DR-34)**: `[GymTuple]`/dict records over the generic forms, with implicit casts,
   Python `==` and `repr`; the same project later emits DR-34's options records (P3). Split out of P2.1/P2.5, which
-  shipped the generic forms the records convert to.
+  shipped the generic forms the records convert to. *Moved next to P3's options records (2026-11-09): nothing in P2
+  needs it (every space works on its generic form), and building it once for both record kinds avoids a second pass.*
 - **Exit:** `tests/spaces` green on both frameworks; every space has live cells; no space `[OpenBugs]` left; the
   inventory list loses every `gymnasium.spaces` name.
 

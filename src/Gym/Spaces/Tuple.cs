@@ -75,6 +75,36 @@ namespace Gym.Spaces {
             }
         }
 
+        /// <summary>
+        ///     How many subspaces equal <paramref name="value"/> (Gymnasium's <c>count</c>, from Python's <c>Sequence</c>
+        ///     mixin; named <c>CountOf</c> because <see cref="Count"/> is the length).
+        /// </summary>
+        /// <param name="value">The space to look for; compared with <see cref="object.Equals(object)"/>, Python's <c>==</c>.</param>
+        /// <returns>The number of equal subspaces.</returns>
+        public int CountOf(Space value) => _spaces.Count(space => ReferenceEquals(space, value) || space.Equals(value));
+
+        /// <summary>
+        ///     The position of the first subspace equal to <paramref name="value"/> within
+        ///     [<paramref name="start"/>, <paramref name="stop"/>) (Gymnasium's <c>index</c>, from Python's <c>Sequence</c>
+        ///     mixin); negative bounds count from the end, as in Python.
+        /// </summary>
+        /// <param name="value">The space to look for.</param>
+        /// <param name="start">The first position searched.</param>
+        /// <param name="stop">One past the last position searched, or <see langword="null"/> for the end.</param>
+        /// <returns>The position.</returns>
+        /// <exception cref="ValueError">Thrown when no subspace in the range equals <paramref name="value"/> (Python's bare <c>ValueError</c>).</exception>
+        public int IndexOf(Space value, int start = 0, int? stop = null) {
+            // Sequence.index: a negative start clamps at 0 after wrapping, a negative stop wraps.
+            int first = start < 0 ? Math.Max(_spaces.Length + start, 0) : start;
+            int end = stop is null ? _spaces.Length : stop.Value < 0 ? stop.Value + _spaces.Length : Math.Min(stop.Value, _spaces.Length);
+            for (int i = first; i < end; i++) {
+                if (ReferenceEquals(_spaces[i], value) || _spaces[i].Equals(value))
+                    return i;
+            }
+
+            throw new ValueError("");
+        }
+
         /// <summary>Whether every subspace flattens to a box.</summary>
         public override bool IsNpFlattenable => _spaces.All(s => s.IsNpFlattenable);
 

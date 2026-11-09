@@ -121,6 +121,17 @@ namespace Gym.Spaces {
         public Space<NDArray> this[params int[] index] => Subspace(string.Join(",", index.Select(i => i.ToString(CultureInfo.InvariantCulture))));
 
         /// <summary>
+        ///     The subspace at a NumPy index written as NumSharp's index string (Gymnasium's <c>space[0:2, :]</c> is
+        ///     <c>space["0:2, :"]</c>): an index that selects one entry gives a <see cref="Discrete"/>, any other a
+        ///     <see cref="MultiDiscrete"/> of the selected counts and starts.
+        /// </summary>
+        /// <param name="index">The index: integers, slices (<c>"1:3"</c>, <c>":"</c>, <c>"::2"</c>), commas between axes.</param>
+        /// <returns>A new space (never this one, even for <c>":"</c>), owned by the caller, starting from a copy of this space's generator state.</returns>
+        /// <exception cref="NumSharp.IndexError">Thrown for an index outside its axis.</exception>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="index"/> is <see langword="null"/>.</exception>
+        public Space<NDArray> this[string index] => Subspace(index ?? throw new ArgumentNullException(nameof(index)));
+
+        /// <summary>
         ///     Draws one element (Gymnasium's <c>sample</c>): each entry uniformly, or under a per-entry mask or probability
         ///     mask given as nested tuples (<see langword="object"/>?[]) of 1-D arrays matching <see cref="Nvec"/>'s structure.
         /// </summary>
