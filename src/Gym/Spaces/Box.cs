@@ -371,11 +371,21 @@ namespace Gym.Spaces {
             /// <returns>The bound.</returns>
             public static Bound Of(double value) => new(value, null);
 
-            /// <summary>An array bound.</summary>
+            /// <summary>
+            ///     An array bound, or a scalar one for a 0-d integer or float array: that is a NumPy scalar (DR-08), which
+            ///     Gymnasium's <c>is_float_integer</c> takes as a number, so <c>Box(np.zeros(1)[0], np.ones(1)[0])</c> has shape
+            ///     <c>(1,)</c>, not <c>()</c>. Pass the shape <c>()</c> explicitly for a 0-d box.
+            /// </summary>
             /// <param name="value">The array.</param>
             /// <returns>The bound.</returns>
             /// <exception cref="ArgumentNullException">Thrown for <see langword="null"/>: Gymnasium's <c>None</c> bound is no bound shape can come from.</exception>
-            public static Bound Of(NDArray value) => new(0, value ?? throw new ArgumentNullException(nameof(value)));
+            public static Bound Of(NDArray value) {
+                if (value is null)
+                    throw new ArgumentNullException(nameof(value));
+                if (value.ndim == 0 && value.dtype.kind is 'i' or 'u' or 'f')
+                    return new(Convert.ToDouble(value.GetAtIndex(0), CultureInfo.InvariantCulture), null);
+                return new(0, value);
+            }
         }
 
         /// <summary>Gymnasium's shape inference: the given shape, else the arrays' (which must agree), else <c>(1,)</c> for scalars.</summary>
@@ -617,69 +627,79 @@ namespace Gym.Spaces {
         };
 
         /// <summary>
-        ///     Converts a candidate or JSON value to an array of <paramref name="dtype"/>, NumPy's <c>np.asarray(x, dtype)</c>;
-        ///     <see cref="Graph"/> reads JSON edge links through it too.
+        ///     Converts a candidate or JSON value to an array of <paramref name="dtype"/>, NumPy's <c>np.asarray(x, dtype)</c>:
+        ///     an array is cast, and a list (any .NET array or list, nested for more dimensions), a number or a string is read
+        ///     as the Python value it stands for, each item stored by the dtype as NumPy stores it. <see cref="Graph"/> reads
+        ///     JSON edge links and <see cref="SpaceUtils"/> flattens through it too.
         /// </summary>
-        /// <param name="value">An array, a .NET array or list (nested for more dimensions), or a number.</param>
+        /// <param name="value">An array, a .NET array or list, a number, or a string.</param>
         /// <param name="dtype">The dtype.</param>
         /// <returns>A new array, owned by the caller (a copy even when <paramref name="value"/> already is an array of that dtype).</returns>
-        /// <exception cref="ArgumentException">Thrown for <see langword="null"/> or a value no array can be made from.</exception>
+        /// <exception cref="ArgumentException">Thrown for <see langword="null"/>, ragged nesting, or a value no array can be made from.</exception>
+        /// <exception cref="OverflowException">Thrown for a Python int outside an integer dtype's range, NumPy's <c>OverflowError</c> (it never wraps, unlike a cast).</exception>
+        /// <exception cref="NumSharp.ValueError">Thrown for a string that is not a number, or a NaN into an integer dtype.</exception>
+        /// <exception cref="NumSharp.TypeError">Thrown for an item NumPy cannot store in the dtype.</exception>
+        /// <remarks>
+        ///     A list is packed item by item (NumPy's <c>PyArray_Pack</c>, which NumSharp's <c>np.asanyarray</c> implements):
+        ///     <c>np.asarray([300, 0], dtype=np.int8)</c> raises where a cast would wrap 300 to 44, and int64 values beyond
+        ///     2^53 stay exact.
+        /// </remarks>
         internal static NDArray AsArray(object? value, DType dtype) {
             switch (value) {
                 case null:
                     throw new ArgumentException("None cannot become a numeric array.", nameof(value));
                 case NDArray array:
                     return array.astype(dtype);
-                case Array array:
-                    using (NDArray made = np.array(array))
-                        return made.astype(dtype);
-                case System.Collections.IList list:
-                    using (NDArray made = np.array(ListToArray(list)))
-                        return made.astype(dtype);
+                case Array or System.Collections.IList:
+                    return np.asanyarray(NestedPythonList(value), dtype);
                 default:
-                    using (NDArray made = NDArray.Scalar(Convert.ToDouble(value, CultureInfo.InvariantCulture)))
-                        return made.astype(dtype);
+                    return np.asanyarray(value, dtype);
             }
         }
 
-        /// <summary>A (possibly nested) list as a .NET array np.array can read: rectangular nesting becomes a multidimensional double array.</summary>
-        /// <param name="list">The list.</param>
-        /// <returns>The array.</returns>
-        /// <exception cref="ArgumentException">Thrown for ragged nesting, which NumPy also refuses for a numeric dtype.</exception>
-        private static Array ListToArray(System.Collections.IList list) {
-            if (list.Count > 0 && list[0] is System.Collections.IList) {
-                Array[] rows = list.Cast<object>().Select(r => ListToArray((System.Collections.IList)r)).ToArray();
-                int[] inner = Enumerable.Range(0, rows[0].Rank).Select(rows[0].GetLength).ToArray();
-                if (rows.Any(r => r.Rank != inner.Length || !Enumerable.Range(0, inner.Length).All(d => r.GetLength(d) == inner[d])))
-                    throw new ArgumentException("setting an array element with a sequence. The requested array has an inhomogeneous shape.");
-                var lengths = new[] { rows.Length }.Concat(inner).ToArray();
-                var result = Array.CreateInstance(typeof(double), lengths);
-                for (int r = 0; r < rows.Length; r++) {
-                    foreach ((int[] index, object? item) in Enumerate(rows[r]))
-                        result.SetValue(item, new[] { r }.Concat(index).ToArray());
+        /// <summary>
+        ///     A .NET array or list as the Python list it stands for, nested lists included: a <see cref="List{T}"/> of the items,
+        ///     which NumSharp reads as Python values (a typed array would otherwise be read as an ndarray and cast).
+        /// </summary>
+        /// <param name="value">The array or list.</param>
+        /// <returns>The nested lists, or the value itself when it is a leaf.</returns>
+        private static object? NestedPythonList(object? value) {
+            switch (value) {
+                case string or NDArray:
+                    return value;
+                case Array { Rank: > 1 } grid: {
+                    // A rectangular .NET array (int[,]) as rows of rows, as NumPy reads nested lists.
+                    var flat = new List<object?>();
+                    foreach (object? item in grid)
+                        flat.Add(item);
+                    return Rows(flat, Enumerable.Range(0, grid.Rank).Select(grid.GetLength).ToArray(), 0, 0);
                 }
-
-                return result;
+                case System.Collections.IList list: {
+                    // Before IList would see it, a multidimensional array is folded above: its IList view is flat.
+                    var items = new List<object?>(list.Count);
+                    foreach (object? item in list)
+                        items.Add(NestedPythonList(item));
+                    return items;
+                }
+                default:
+                    return value;
             }
-
-            return list.Cast<object?>().Select(v => Convert.ToDouble(v, CultureInfo.InvariantCulture)).ToArray();
         }
 
-        /// <summary>Every element of a multidimensional array with its index, in C order.</summary>
-        /// <param name="array">The array.</param>
-        /// <returns>The elements.</returns>
-        private static IEnumerable<(int[] Index, object? Item)> Enumerate(Array array) {
-            int[] index = new int[array.Rank];
-            for (long flat = 0; flat < array.Length; flat++) {
-                long rest = flat;
-                for (int d = array.Rank - 1; d >= 0; d--) {
-                    int length = array.GetLength(d);
-                    index[d] = (int)(rest % length);
-                    rest /= length;
-                }
-
-                yield return ((int[])index.Clone(), array.GetValue(index));
-            }
+        /// <summary>Folds C-ordered items into nested lists of the given lengths.</summary>
+        /// <param name="flat">The items in C order.</param>
+        /// <param name="lengths">The length of each axis.</param>
+        /// <param name="axis">The axis this list walks.</param>
+        /// <param name="start">The first item's position in <paramref name="flat"/>.</param>
+        /// <returns>The nested list.</returns>
+        private static List<object?> Rows(List<object?> flat, int[] lengths, int axis, int start) {
+            int stride = 1;
+            for (int d = axis + 1; d < lengths.Length; d++)
+                stride *= lengths[d];
+            var rows = new List<object?>(lengths[axis]);
+            for (int i = 0; i < lengths[axis]; i++)
+                rows.Add(axis == lengths.Length - 1 ? flat[start + i] : Rows(flat, lengths, axis + 1, start + i * stride));
+            return rows;
         }
 
         /// <summary>An array's entries as doubles in C order, exact for every dtype but 64-bit integers beyond 2^53.</summary>

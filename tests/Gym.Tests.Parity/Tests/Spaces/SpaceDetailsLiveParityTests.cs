@@ -228,6 +228,17 @@ namespace Gym.Tests.Parity.Tests.Spaces {
 
         /// <summary>Membership candidates per space: the Python spelling, Gymnasium's candidate, and Gym.NET's.</summary>
         private static readonly Dictionary<string, (SpaceSpec Spec, (string Python, Func<PyObject> Gymnasium, Func<object?> DotNet)[] Candidates)> ContainsCases = new() {
+            ["Box(0, 50, (2,), np.int8)"] = (new BoxSpec(0, 50, new long[] { 2 }, "int8", intBounds: true), new (string, Func<PyObject>, Func<object?>)[] {
+                ("[300, 0]", () => SpaceParity.ToPython(new List<object?> { 300L, 0L }), () => new List<object?> { 300L, 0L }),
+                ("[-300, 0]", () => SpaceParity.ToPython(new List<object?> { -300L, 0L }), () => new List<object?> { -300L, 0L }),
+                ("[5, 0]", () => SpaceParity.ToPython(new List<object?> { 5L, 0L }), () => new List<object?> { 5L, 0L }),
+                ("[5, 0.5]", () => SpaceParity.ToPython(new List<object?> { 5L, 0.5 }), () => new List<object?> { 5L, 0.5 }),
+                ("[10**20, 0]", () => SpaceParity.ToPython(new List<object?> { System.Numerics.BigInteger.Pow(10, 20), 0L }), () => new List<object?> { System.Numerics.BigInteger.Pow(10, 20), 0L }),
+                ("['a', 0]", () => SpaceParity.ToPython(new List<object?> { "a", 0L }), () => new List<object?> { "a", 0L }),
+                ("np.array([5, 0], int8)", () => Numpy(Int8(5, 0)), () => Int8(5, 0)),
+                ("np.array([5, 0])", () => Numpy(Int64(5, 0)), () => Int64(5, 0)),
+                ("5", () => PyConvert.ToPython(5L), () => 5L),
+            }),
             ["MultiBinary(3)"] = (new MultiBinarySpec(3), new (string, Func<PyObject>, Func<object?>)[] {
                 ("np.array([0, 1, 1], int8)", () => Numpy(Int8(0, 1, 1)), () => Int8(0, 1, 1)),
                 ("np.array([0, 1, 1])", () => Numpy(Int64(0, 1, 1)), () => Int64(0, 1, 1)),
@@ -422,6 +433,31 @@ namespace Gym.Tests.Parity.Tests.Spaces {
                         return dotnetSpace.Contains(graph);
                     }));
             }
+        }
+
+        /// <summary>
+        ///     NumPy scalars as bounds are numbers to Gymnasium's <c>Box</c> (<c>is_float_integer</c>): the shape defaults to
+        ///     <c>(1,)</c>, as with Python numbers; Gym.NET's 0-d arrays are its NumPy scalars (DR-08) and do the same.
+        /// </summary>
+        /// <param name="integerHigh">Whether the upper bound is an <c>np.int32</c> rather than an <c>np.float64</c>.</param>
+        [TestMethod]
+        [DataRow(false)]
+        [DataRow(true)]
+        public void BoxNumpyScalarBounds_MatchGymnasium(bool integerHigh) {
+            string label = integerHigh ? "Box(np.float64(0.0), np.int32(1), dtype=np.float32)" : "Box(np.float64(0.0), np.float64(1.0), dtype=np.float32)";
+            using PyRef python = PyRef.Of(() => {
+                using PyObject low = Python.numpy.float64(0.0);
+                using PyObject high = integerHigh ? Python.numpy.int32(1) : Python.numpy.float64(1.0);
+                using PyObject float32 = Python.numpy.dtype("float32");
+                return Python.gymnasium.spaces.Box(low, high, float32, 3);
+            });
+            using NDArray lowScalar = NDArray.Scalar(0.0);
+            using NDArray highScalar = integerHigh ? NDArray.Scalar(1) : NDArray.Scalar(1.0);
+            using var dotnet = new Box(lowScalar, highScalar, dtype: np.float32, seed: 3);
+            ByteContract.AssertSame($"repr({label})", Outcome.CapturePython(() => Python.builtins.repr(python.Object)), Outcome.Capture(() => dotnet.ToString()));
+            ByteContract.AssertSame($"{label}.shape", Outcome.CapturePython(() => Python.gymnasium.spaces.space.Space.shape(python.Object)), Outcome.Capture(() => dotnet.Shape.dimensions, disposeResult: false));
+            for (int i = 1; i <= 3; i++)
+                ByteContract.AssertSame($"{label}.sample() #{i}", Outcome.CapturePython(() => Python.gymnasium.spaces.space.Space.sample(python.Object)), Outcome.Capture(() => dotnet.Sample()));
         }
 
         /// <summary>Constructor errors: Gymnasium's exception type and message for each refused argument.</summary>

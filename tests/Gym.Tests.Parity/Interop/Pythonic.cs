@@ -824,6 +824,25 @@ namespace Gym.Tests.Parity {
                     return constructor.Invoke(new PyObject[] { count }, arguments);
                 }
 
+                /// <summary><c>spaces.Discrete(n, seed=seed, start=start, dtype=dtype)</c>.</summary>
+                /// <param name="n">The number of elements.</param>
+                /// <param name="seed">The space's seed, or <see langword="null"/>.</param>
+                /// <param name="start">The smallest element.</param>
+                /// <param name="dtype">The integer dtype; stays owned by the caller.</param>
+                /// <returns>A new owned reference.</returns>
+                /// <exception cref="PythonException">Thrown when the constructor raises.</exception>
+                internal static PyObject Discrete(long n, long? seed, long start, PyObject dtype) {
+                    using PyObject constructor = Module.GetAttr("Discrete");
+                    using var count = new PyInt(n);
+                    using var arguments = new PyDict();
+                    using PyObject seedValue = Oracle.PyConvert.ToPython(seed);
+                    using var startValue = new PyInt(start);
+                    arguments["seed"] = seedValue;
+                    arguments["start"] = startValue;
+                    arguments["dtype"] = dtype;
+                    return constructor.Invoke(new PyObject[] { count }, arguments);
+                }
+
                 /// <summary><c>spaces.Box(low, high, shape, dtype, seed=seed)</c> with scalar bounds.</summary>
                 /// <param name="low">
                 ///     The lower bound of every element, converted by <see cref="Oracle.PyConvert.ToPython"/>: a

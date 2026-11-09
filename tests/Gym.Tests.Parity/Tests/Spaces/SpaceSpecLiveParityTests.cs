@@ -23,7 +23,10 @@ namespace Gym.Tests.Parity.Tests.Spaces {
     /// </remarks>
     [TestClass]
     public sealed class SpaceSpecLiveParityTests : ParityTestBase {
-        /// <summary>The spaces every cell runs over, by their Python spelling; the vector-utils cells reuse it.</summary>
+        /// <summary>
+        ///     The spaces every cell runs over, by their Python spelling: this suite's own 24 and Gymnasium's test catalog
+        ///     (<see cref="GymnasiumTestingSpaces"/>); the vector-utils and spaces.utils cells reuse it.
+        /// </summary>
         internal static readonly Dictionary<string, SpaceSpec> Catalog = new SpaceSpec[] {
             new MultiBinarySpec(5),
             new MultiBinarySpec(new long[] { 2, 3 }),
@@ -49,7 +52,10 @@ namespace Gym.Tests.Parity.Tests.Spaces {
             new GraphSpec(new BoxSpec(0.0, 1.0, new long[] { 2 }), new BoxSpec(0.0, 1.0, new long[] { 1 })),
             new OneOfSpec(new DiscreteSpec(2), new BoxSpec(-1.0, 1.0, new long[] { 2 })),
             new OneOfSpec(new DiscreteSpec(3), new TextSpec(4), new MultiBinarySpec(2)),
-        }.ToDictionary(spec => spec.PythonText, StringComparer.Ordinal);
+        }.Concat(GymnasiumTestingSpaces.Fundamental).Concat(GymnasiumTestingSpaces.Composite)
+         // Gymnasium's catalog repeats a few of the spaces above; one cell per spelling is enough.
+         .GroupBy(spec => spec.PythonText, StringComparer.Ordinal)
+         .ToDictionary(group => group.Key, group => group.First(), StringComparer.Ordinal);
 
         /// <summary>Every space of the catalog, by name.</summary>
         public static IEnumerable<object[]> Spaces => Catalog.Keys.Select(name => new object[] { name });

@@ -306,7 +306,12 @@ Specs: the port plan's §7; sources `gymnasium/spaces` (3,816 lines at v1.4.0); 
   `MultiDiscrete` indexing (`SpaceDetailsLiveParityTests`); `create_empty_array`, `concatenate`, `iterate` and
   `batch_differing_spaces` (`VectorUtilsLiveParityTests`). 393 new cells, all gated.*
 - **P2.7 `spaces.utils`**: `flatdim`, `flatten`, `unflatten`, `flatten_space`, `is_space_dtype_shape_equiv`, with
-  v1.4.0's `OneOf` and `Tuple` fixes.
+  v1.4.0's `OneOf` and `Tuple` fixes. *Done 2026-11-09: `SpaceUtils` (the shared flat dtype that must hold a `OneOf`
+  index, Graph and Sequence flattening through `VectorUtils`, Gymnasium's errors, including its own `TypeError` when a
+  text flattened inside a float tuple is unflattened). The live space cells now also run over Gymnasium's own test
+  catalog (`tests/spaces/utils.py`, 60 spaces), 1415 space cells in all. Two `Box` fixes found on the way: a 0-d bound
+  is a NumPy scalar (shape `(1,)` by default), and lists are packed as NumPy packs them (`[300]` into int8 raises, so
+  `contains` answers `False` instead of wrapping to 44; int64 stays exact).*
 - **P2.8 Tests**: port `tests/spaces` (109 functions, 13 files) under `tests/Gym.Tests/Gymnasium/Spaces`. Add live
   cells for every space (samples with generator state, `contains`, `repr`, `flatten`, JSON) and remove the `[OpenBugs]`
   attribute from the six space cells (tagged B-03, B-10 and P2) as they turn green.

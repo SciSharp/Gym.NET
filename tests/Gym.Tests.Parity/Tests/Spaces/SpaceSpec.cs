@@ -87,7 +87,7 @@ namespace Gym.Tests.Parity.Tests.Spaces {
     /// <param name="DotNet">From the root's Gym.NET space to the subspace, which the root still owns.</param>
     internal sealed record SubspaceAccess(string Path, SpaceSpec Spec, Func<PyObject, PyObject> Python, Func<Space, Space> DotNet);
 
-    /// <summary><c>Discrete(n, start=start)</c>.</summary>
+    /// <summary><c>Discrete(n, start=start)</c>, optionally with a dtype.</summary>
     internal sealed class DiscreteSpec : SpaceSpec {
         /// <summary>The number of elements.</summary>
         private readonly long _n;
@@ -95,19 +95,30 @@ namespace Gym.Tests.Parity.Tests.Spaces {
         /// <summary>The smallest element.</summary>
         private readonly long _start;
 
+        /// <summary>The dtype's NumPy name, or <see langword="null"/> for Gymnasium's <c>np.int64</c>.</summary>
+        private readonly string? _dtype;
+
         /// <summary>Describes the space.</summary>
         /// <param name="n">The number of elements.</param>
         /// <param name="start">The smallest element.</param>
-        public DiscreteSpec(long n, long start = 0) : base(start == 0 ? $"Discrete({n})" : $"Discrete({n}, start={start})") {
+        /// <param name="dtype">The dtype's NumPy name (<c>int32</c>), or <see langword="null"/> for the default.</param>
+        public DiscreteSpec(long n, long start = 0, string? dtype = null)
+            : base((start == 0 ? $"Discrete({n}" : $"Discrete({n}, start={start}") + (dtype is null ? ")" : $", dtype=np.{dtype})")) {
             _n = n;
             _start = start;
+            _dtype = dtype;
         }
 
         /// <inheritdoc />
-        public override PyObject BuildPython(long? seed) => Python.gymnasium.spaces.Discrete(_n, seed, _start);
+        public override PyObject BuildPython(long? seed) {
+            if (_dtype is null)
+                return Python.gymnasium.spaces.Discrete(_n, seed, _start);
+            using PyObject dtype = Python.numpy.dtype(_dtype);
+            return Python.gymnasium.spaces.Discrete(_n, seed, _start, dtype);
+        }
 
         /// <inheritdoc />
-        public override Space BuildDotNet(long? seed) => new Discrete(_n, seed: seed, start: _start);
+        public override Space BuildDotNet(long? seed) => new Discrete(_n, seed: seed, start: _start, dtype: _dtype is null ? null : np.dtype(_dtype));
     }
 
     /// <summary><c>Box(low, high, shape, dtype)</c> with scalar bounds given as Python floats.</summary>
@@ -124,27 +135,81 @@ namespace Gym.Tests.Parity.Tests.Spaces {
         /// <summary>The dtype's NumPy name.</summary>
         private readonly string _dtype;
 
+        /// <summary>Whether the bounds are Python ints (<c>Box(0, 255, ...)</c>) rather than floats.</summary>
+        private readonly bool _intBounds;
+
         /// <summary>Describes the space.</summary>
         /// <param name="low">The lower bound of every entry.</param>
         /// <param name="high">The upper bound of every entry.</param>
         /// <param name="shape">The shape.</param>
         /// <param name="dtype">The dtype's NumPy name (<c>float32</c>).</param>
-        public BoxSpec(double low, double high, long[] shape, string dtype = "float32")
-            : base($"Box({Gym.Utils.PyBuiltins.FloatRepr(low)}, {Gym.Utils.PyBuiltins.FloatRepr(high)}, ({string.Join(", ", shape)}{(shape.Length == 1 ? "," : "")}), np.{dtype})") {
+        /// <param name="intBounds">Whether Gymnasium receives the bounds as Python ints, as <c>Box(-1, 1, shape=(2,))</c> writes them.</param>
+        public BoxSpec(double low, double high, long[] shape, string dtype = "float32", bool intBounds = false)
+            : base($"Box({Literal(low, intBounds)}, {Literal(high, intBounds)}, ({string.Join(", ", shape)}{(shape.Length == 1 ? "," : "")}), np.{dtype})") {
             _low = low;
             _high = high;
             _shape = shape;
             _dtype = dtype;
+            _intBounds = intBounds;
         }
 
         /// <inheritdoc />
         public override PyObject BuildPython(long? seed) {
             using PyObject dtype = Python.numpy.dtype(_dtype);
+            if (_intBounds)
+                return Python.gymnasium.spaces.Box((long)_low, (long)_high, _shape, dtype, seed);
             return Python.gymnasium.spaces.Box(_low, _high, _shape, dtype, seed);
         }
 
+        /// <summary>A bound as the spec's Python spelling writes it.</summary>
+        /// <param name="value">The bound.</param>
+        /// <param name="intBounds">Whether it is a Python int.</param>
+        /// <returns>The text.</returns>
+        private static string Literal(double value, bool intBounds) =>
+            intBounds ? ((long)value).ToString(System.Globalization.CultureInfo.InvariantCulture) : Gym.Utils.PyBuiltins.FloatRepr(value);
+
         /// <inheritdoc />
         public override Space BuildDotNet(long? seed) => new Box(_low, _high, new Shape(_shape), np.dtype(_dtype), seed: seed);
+    }
+
+    /// <summary><c>Box(low=np.array([...]), high=np.array([...]), dtype=dtype)</c>: array bounds of their own dtypes.</summary>
+    internal sealed class BoxArraySpec : SpaceSpec {
+        /// <summary>Builds the lower bounds.</summary>
+        private readonly Func<NDArray> _low;
+
+        /// <summary>Builds the upper bounds.</summary>
+        private readonly Func<NDArray> _high;
+
+        /// <summary>The dtype's NumPy name.</summary>
+        private readonly string _dtype;
+
+        /// <summary>Describes the space.</summary>
+        /// <param name="python">The Python spelling.</param>
+        /// <param name="low">Builds the lower bounds (a new array each call, in the dtype NumPy's literal has).</param>
+        /// <param name="high">Builds the upper bounds.</param>
+        /// <param name="dtype">The space's dtype.</param>
+        public BoxArraySpec(string python, Func<NDArray> low, Func<NDArray> high, string dtype) : base(python) {
+            _low = low;
+            _high = high;
+            _dtype = dtype;
+        }
+
+        /// <inheritdoc />
+        public override PyObject BuildPython(long? seed) {
+            using NDArray low = _low();
+            using NDArray high = _high();
+            using PyObject pythonLow = low.ToNumpyCopy();
+            using PyObject pythonHigh = high.ToNumpyCopy();
+            using PyObject dtype = Python.numpy.dtype(_dtype);
+            return Python.gymnasium.spaces.Box(pythonLow, pythonHigh, dtype, seed);
+        }
+
+        /// <inheritdoc />
+        public override Space BuildDotNet(long? seed) {
+            using NDArray low = _low();
+            using NDArray high = _high();
+            return new Box(low, high, dtype: np.dtype(_dtype), seed: seed);
+        }
     }
 
     /// <summary><c>MultiBinary(n)</c>, with <c>n</c> an int or a shape.</summary>

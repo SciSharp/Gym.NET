@@ -120,11 +120,6 @@ gymnasium.envs.toy_text.frozen_lake.is_valid                                    
 gymnasium.envs.toy_text.taxi.TaxiEnv                                                     P5 toy_text
 gymnasium.envs.toy_text.utils.categorical_sample                                         P5 toy_text
 gymnasium.experimental.functional.FuncEnv                                                P6 FuncEnv (DR-36)
-gymnasium.spaces.utils.flatdim                                                           P2 spaces
-gymnasium.spaces.utils.flatten                                                           P2 spaces
-gymnasium.spaces.utils.flatten_space                                                     P2 spaces
-gymnasium.spaces.utils.is_space_dtype_shape_equiv                                        P2 spaces
-gymnasium.spaces.utils.unflatten                                                         P2 spaces
 gymnasium.utils.env_checker.check_env                                                    P3 checkers
 gymnasium.utils.env_checker.check_reset_options                                          P3 checkers
 gymnasium.utils.env_checker.check_reset_return_info_deprecation                          P3 checkers
