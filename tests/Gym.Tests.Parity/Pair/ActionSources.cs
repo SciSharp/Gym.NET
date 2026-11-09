@@ -44,8 +44,9 @@ namespace Gym.Tests.Parity.Pair {
         /// </summary>
         /// <param name="policy">
         ///     A policy <see cref="PyGymEnv.Policy"/> knows: <c>cartpole_balance</c> (a proportional-derivative controller
-        ///     computed with Python's float64 arithmetic) or <c>lunar_lander_heuristic</c> (Gymnasium's own
-        ///     <c>lunar_lander.heuristic</c>).
+        ///     computed with Python's float64 arithmetic), <c>lunar_lander_heuristic</c> (Gymnasium's own
+        ///     <c>lunar_lander.heuristic</c>), <c>mountaincar_momentum</c>, <c>mountaincar_continuous_momentum</c> or
+        ///     <c>acrobot_pump</c>.
         /// </param>
         /// <returns>The source.</returns>
         public static IActionSource Policy(string policy) => new PolicySource(policy);

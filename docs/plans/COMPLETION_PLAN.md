@@ -440,6 +440,13 @@ Specs: the port plan's §5.5 and Appendix E. pygame-ce calls at v1.4.0:
     settled either. Both ship as the best model, documented as not pixel-exact, with `[OpenBugs("P7")]` cells; MountainCar's
     frames inherit the gap. The maintainer's options: allow consulting pygame-ce's `draw.c` for these two functions only,
     accept a documented tolerance for MountainCar's frames, or continue black-box probing.*
+    *Probing continued during P4 (2026-11-09, still black-box): MountainCar's hill differed in 196 pixels per frame, every
+    one within 2 pixels of a joint, each an extra partial-weight sample; leaving out the partial column of both segments
+    at a joint (instead of one) brings it to 16 pixels and is exact along smooth runs (24 of 150 random smooth curves
+    exact, against 0). Two further measurements for the maintainer: pygame's `aalines` is not `aaline` segment by
+    segment (a 2-point open `aalines` blends the segment's interior twice and its end columns once, 251 of 300 cases
+    exact under that model), and joints between segments drawn against their major axis, or turning sharply, follow
+    another rule still.*
   - *Deferred to P8 (box2d only): `polygon`, `circle`, `lines`, `aaline` beyond MountainCar, `smoothscale` growing, rect
     widths above 1; `font`.*
 - **Exit:** every primitive above is pixel-exact on its random corpus.
@@ -459,6 +466,32 @@ Specs: the port plan's §11.1; sources 2,028 lines.
 - Each env: live cells for whole episodes (policy and random actions), reset options, invalid actions with Python's
   messages, frames along episodes and at extreme states; goldens recorded; registration.
 - **Exit:** L3 and L4 for all six ids, live and golden.
+- *Done 2026-11-09 for P4.1–P4.3; P4.4 (`CartPoleVectorEnv`) moves to P6, where `VectorEnv` lands:*
+  - *`MountainCarEnv(continuous)`, `PendulumEnv` and `AcrobotEnv` in `Gym.Environments.Envs.Classic`, registered as
+    `MountainCar-v0`, `MountainCarContinuous-v0` (kwargs `continuous=True`, DR-32), `Pendulum-v1` and `Acrobot-v1` with
+    Gymnasium's limits and thresholds. Shared support: `NpScalar` (NumPy 2's NEP 50 scalar rules for the continuous
+    MountainCar, whose state is float64 after a reset and float32 after a step, and Pendulum's float32 torque),
+    `HumanWindow` (DR-20's window, sized at the first human render), `EnvAssets` (DR-19: `clockwise.png` embedded,
+    byte-identical to Gymnasium's), `RenderMath` (Python's `int()` and pygame's C `(int)` of a float size).*
+  - *Byte-exact details the ports carry: NumPy's float32 `sin`/`cos` (through NumSharp, bit for bit) wherever a float32
+    scalar meets them (Acrobot's reset observation and frame, the continuous car's height); the C runtime's `pow` for
+    every `x ** 2`; an unsigned discrete action 0 wrapping in MountainCar's `action - 1` (it pushes right);
+    `math.pow`'s `OverflowError`; Acrobot's action indexing a Python list (negative indices valid, Python's
+    `TypeError`/`IndexError` texts); Python's `AttributeError`, `TypeError`, `ValueError` and NumPy's `IndexError` for
+    missing, `None`, short and long states. Refused rather than approximated (`NotSupportedException`): continuous
+    actions of more than one dimension or of float16, which NumPy would carry into a state of another shape or precision.*
+  - *State: each env's `State` is `double[]` (CartPole's form) holding exactly Python's values, though Python's
+    container changes between calls; the parity harness compares the state's float64 values
+    (`PyGymEnv.GetStateValues`).*
+  - *Parity: 41 MountainCar cells (both modes), 19 Pendulum, 22 Acrobot, 8 reverse-bridge cells (Gymnasium's
+    `check_env` and `check_environments_match` on all four ids), 5 registration cells, and 4 goldens (with frames for
+    Pendulum and Acrobot), all passing; inventory ratchet −7 names. MountainCar's whole frames are `[OpenBugs("P7")]`
+    (16 hill pixels per frame); gated cells compare every pixel outside the hill's measured gap, so the car, wheels and
+    flag are pixel-exact. The bridge returns Pendulum's reward as the `np.float64` Gymnasium's does
+    (`BridgeReward`), since `check_environments_match` compares types.*
+  - *Deferred: `MountainCarEnv.get_keys_to_action` arrives with `utils.play` (DR-36); Gymnasium's construction-time
+    `low`/`high` (`low_state`/`high_state`) attributes are read from the observation space instead; RLPy's unused
+    `action_arrow`/`domain_fig`/`actions_num` on Acrobot are not carried.*
 
 ### P5 toy_text
 

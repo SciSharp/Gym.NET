@@ -12,8 +12,8 @@ namespace Gym.Tests.Gymnasium.Wrappers {
     ///     finished episode adds <c>{r, l, t}</c> to the info, and the queues keep the last <c>deque_size</c> episodes.
     /// </summary>
     /// <remarks>
-    ///     Gymnasium runs it on CartPole-v1 and Pendulum-v1; the Pendulum cases are the <c>[OpenBugs("P4")]</c> method, which
-    ///     passes once Pendulum registers. Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/tests/wrappers/test_record_episode_statistics.py">tests/wrappers/test_record_episode_statistics.py</see>.
+    ///     Gymnasium runs it on CartPole-v1 and Pendulum-v1, and so does this class: the Pendulum cases have been a gate
+    ///     since P4 registered Pendulum-v1. Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/tests/wrappers/test_record_episode_statistics.py">tests/wrappers/test_record_episode_statistics.py</see>.
     /// </remarks>
     [TestClass]
     public class TestRecordEpisodeStatistics {
@@ -25,10 +25,9 @@ namespace Gym.Tests.Gymnasium.Wrappers {
                 RunEpisodes("CartPole-v1", dequeSize);
         }
 
-        /// <summary>The Pendulum cases (P4).</summary>
+        /// <summary>The Pendulum cases, five episodes with queues of 2 and of 5 (a gate since P4).</summary>
         /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/tests/wrappers/test_record_episode_statistics.py#L9">test_record_episode_statistics</see>.</remarks>
         [TestMethod]
-        [OpenBugs("P4")]
         public void TestRecordEpisodeStatisticsPendulum() {
             foreach (int dequeSize in new[] { 2, 5 })
                 RunEpisodes("Pendulum-v1", dequeSize);

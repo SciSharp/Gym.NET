@@ -54,6 +54,55 @@ namespace Gym.Tests.Parity.Tests.Registration {
         }
 
         /// <summary>
+        ///     The classic-control ids of P4: <c>str(make(id))</c> (the merged MountainCar prints as <c>Continuous_MountainCarEnv</c>
+        ///     in continuous mode) and the printed specs of the stack and of the unwrapped env, which leave out the kwargs that
+        ///     differ for <c>MountainCarContinuous-v0</c> (see <see cref="Spec_MountainCarContinuousKwargs_CarryContinuous_AsDr32Accepts"/>).
+        /// </summary>
+        /// <param name="id">The id.</param>
+        [TestMethod]
+        [DataRow("MountainCar-v0")]
+        [DataRow("MountainCarContinuous-v0")]
+        [DataRow("Pendulum-v1")]
+        [DataRow("Acrobot-v1")]
+        public void Make_ClassicControl_StackAndSpecs_MatchGymnasium(string id) {
+            using PyRef python = PyRef.Of(() => Python.gymnasium.make(id));
+            using IEnv dotnet = Gymnasium.Make(id);
+
+            ByteContract.AssertSame($"str(make('{id}'))", Outcome.CapturePython(() => Python.builtins.str(python.Object)), Outcome.Returned(ValueFacts.FromText(dotnet.ToString()!)));
+            ByteContract.AssertSame($"{id}: env.spec.pprint()", Outcome.CapturePython(() => {
+                using PyObject spec = Python.gymnasium.Env.spec(python.Object);
+                return Python.gymnasium.envs.registration.EnvSpec.pprint(spec);
+            }), Outcome.Returned(ValueFacts.FromText(dotnet.Spec!.Pprint(disablePrint: true)!)));
+            ByteContract.AssertSame($"{id}: env.unwrapped.spec.pprint()", Outcome.CapturePython(() => {
+                using PyObject unwrapped = Python.gymnasium.Env.unwrapped(python.Object);
+                using PyObject spec = Python.gymnasium.Env.spec(unwrapped);
+                return Python.gymnasium.envs.registration.EnvSpec.pprint(spec);
+            }), Outcome.Returned(ValueFacts.FromText(dotnet.Unwrapped.Spec!.Pprint(disablePrint: true)!)));
+        }
+
+        /// <summary>
+        ///     DR-32's accepted deviation, pinned so it cannot drift: <c>MountainCarContinuous-v0</c>'s <c>EnvSpec.kwargs</c> is
+        ///     empty in Gymnasium (its entry point is a class of its own) and <c>{'continuous': True}</c> in Gym.NET (one class
+        ///     for both MountainCars); <c>MountainCar-v0</c>'s are equal (empty).
+        /// </summary>
+        [TestMethod]
+        public void Spec_MountainCarContinuousKwargs_CarryContinuous_AsDr32Accepts() {
+            ByteContract.AssertSame("spec('MountainCar-v0').kwargs", Outcome.CapturePython(() => {
+                using PyObject spec = Python.gymnasium.spec("MountainCar-v0");
+                return Python.gymnasium.envs.registration.EnvSpec.kwargs(spec);
+            }), Outcome.Returned(ValueFacts.Of(Gymnasium.Spec("MountainCar-v0").Kwargs)));
+
+            ValueFacts python = Outcome.CapturePython(() => {
+                using PyObject spec = Python.gymnasium.spec("MountainCarContinuous-v0");
+                return Python.gymnasium.envs.registration.EnvSpec.kwargs(spec);
+            }).Expect("spec('MountainCarContinuous-v0').kwargs");
+            Assert.AreEqual("{}", python.Render(), "Gymnasium's MountainCarContinuous-v0 has no kwargs.");
+            Info kwargs = Gymnasium.Spec("MountainCarContinuous-v0").Kwargs;
+            Assert.AreEqual(1, kwargs.Count, "Gym.NET's carries exactly one kwarg.");
+            Assert.AreEqual(true, kwargs["continuous"], "...and it is continuous=True (DR-32).");
+        }
+
+        /// <summary>
         ///     <c>make</c>'s errors with Gymnasium's types and messages: a mistyped name (with its suggestion), a missing version,
         ///     a lower-case name, an unknown namespace, and malformed ids.
         /// </summary>

@@ -48,6 +48,13 @@
     <ProjectReference Include="..\Gym.SourceGenerators\Gym.SourceGenerators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" PrivateAssets="all" />
   </ItemGroup>
 
+  <!-- The envs' images (DR-19): copied once from the pinned Gymnasium (Assets/README.md lists sources and hashes) and
+       embedded, so the package carries them. Each is named assets/<path> with forward slashes on every OS (RecursiveDir
+       uses the OS separator), which is the name EnvAssets.Load asks for. -->
+  <ItemGroup>
+    <EmbeddedResource Include="Assets\**\*.png" LogicalName="assets/$([System.String]::Copy('%(RecursiveDir)').Replace('\','/'))%(Filename)%(Extension)" />
+  </ItemGroup>
+
   <!-- The package's icon and readme, packed at its root (NuGet's PackageIcon / PackageReadmeFile). They replace the
        deprecated PackageIconUrl / PackageLicenseUrl, which fail packing as NU5048 / NU5125 where warnings are errors. -->
   <ItemGroup>

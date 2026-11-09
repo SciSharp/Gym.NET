@@ -237,6 +237,77 @@ namespace Gym.Tests.Parity.Tests.Bridge {
         }
 
         /// <summary>
+        ///     Gymnasium's <c>check_env</c> on <c>make(id).unwrapped</c> for the classic-control envs of P4: Gym.NET's env built
+        ///     through the bridge passes exactly as Gymnasium's own (no error, the same warnings, such as Pendulum's advice on
+        ///     its unnormalised action space), every declared render mode made and checked; and Gym.NET's own
+        ///     <c>EnvChecker.CheckEnv</c> gives the same verdict.
+        /// </summary>
+        /// <param name="id">The id.</param>
+        [TestMethod]
+        [DataRow("MountainCar-v0")]
+        [DataRow("MountainCarContinuous-v0")]
+        [DataRow("Pendulum-v1")]
+        [DataRow("Acrobot-v1")]
+        public void CheckEnv_PassesGymNetsClassicEnvs_AsGymnasiumsOwn(string id) {
+            SkipOffReferencePlatform("the classic envs' cos/sin");
+            IEnvironmentViewerFactoryDelegate? previous = Gymnasium.HumanViewerFactory;
+            // check_env makes the env in human mode too; Gym.NET's renders into a headless viewer, as pygame does under SDL's dummy driver.
+            Gymnasium.HumanViewerFactory = NullEnvViewer.Factory;
+            try {
+                using var bridge = new ReverseBridge();
+                using PyRef python = PyRef.Of(() => MadeUnwrapped(Python.gymnasium.make(id)));
+                using PyRef shim = PyRef.Of(() => {
+                    using PyObject spec = bridge.Spec(Gymnasium.Spec(id));
+                    return MadeUnwrapped(Python.gymnasium.make(spec));
+                });
+                using IEnv dotnet = Gymnasium.Make(id);
+                string label = $"check_env(make({PyBuiltins.Repr(id)}).unwrapped)";
+                Outcome expected = ExpectPassed(label, GymnasiumCheckEnv(python.Object));
+                ByteContract.AssertSame($"{label}: Gymnasium's tool on Gym.NET's env", expected, ReverseBridge.AsBridgedSide(GymnasiumCheckEnv(shim.Object)));
+                ByteContract.AssertSame($"{label}: Gym.NET's tool", expected, GymNetCheckEnv(dotnet.Unwrapped));
+            } finally {
+                Gymnasium.HumanViewerFactory = previous;
+            }
+        }
+
+        /// <summary>
+        ///     Gymnasium's <c>check_environments_match</c> finds Gym.NET's classic-control envs of P4 equal to its own over two
+        ///     seeds of 200 sampled steps, in both orders. Pendulum's and Acrobot's frames are compared too; MountainCar's are
+        ///     not (its hill's joints are the open P7 gap), so both MountainCars run without a render mode, where both sides
+        ///     render <c>None</c>. The tool compares reward types, so the bridge returns Pendulum's as the <c>np.float64</c>
+        ///     Gymnasium's does (<see cref="BridgeReward"/>).
+        /// </summary>
+        /// <param name="id">The id.</param>
+        [TestMethod]
+        [DataRow("MountainCar-v0")]
+        [DataRow("MountainCarContinuous-v0")]
+        [DataRow("Pendulum-v1")]
+        [DataRow("Acrobot-v1")]
+        public void CheckEnvironmentsMatch_GymNetsClassicEnvs_AsGymnasiumsOwn(string id) {
+            SkipOffReferencePlatform("the classic envs' cos/sin");
+            string? renderMode = id.StartsWith("MountainCar", StringComparison.Ordinal) ? null : "rgb_array";
+            // Pendulum's reward is an np.float64 (-costs of NumPy scalars); the others' are Python floats.
+            BridgeReward reward = id == "Pendulum-v1" ? BridgeReward.NumpyFloat64 : BridgeReward.Float;
+            using var bridge = new ReverseBridge();
+            foreach (long seed in new long[] { 0, 123 }) {
+                using PyRef python = PyRef.Of(() => Python.gymnasium.make(id, render_mode: renderMode));
+                using PyRef twin = PyRef.Of(() => Python.gymnasium.make(id, render_mode: renderMode));
+                using PyRef shim = PyRef.Of(() => {
+                    using PyObject spec = bridge.Spec(Gymnasium.Spec(id), reward: reward);
+                    return Python.gymnasium.make(spec, render_mode: renderMode);
+                });
+                Outcome expected = Outcome.CapturePython(() => Python.gymnasium.utils.env_match.check_environments_match(python.Object, twin.Object, 200, seed));
+                // The reference must pass, or two equal failures would pass the comparison.
+                expected.Expect($"check_environments_match({id}: gymnasium, gymnasium, 200, seed={seed})");
+                ByteContract.AssertSame($"check_environments_match({id}: gymnasium, gym.net, 200, seed={seed})", expected,
+                    ReverseBridge.AsBridgedSide(Outcome.CapturePython(() => Python.gymnasium.utils.env_match.check_environments_match(python.Object, shim.Object, 200, seed))));
+                // Gymnasium samples from env_a's action space, so the other order samples from the bridge's mirror.
+                ByteContract.AssertSame($"check_environments_match({id}: gym.net, gymnasium, 200, seed={seed})", expected,
+                    ReverseBridge.AsBridgedSide(Outcome.CapturePython(() => Python.gymnasium.utils.env_match.check_environments_match(shim.Object, python.Object, 200, seed))));
+            }
+        }
+
+        /// <summary>
         ///     What a Gym.NET env raises reaches Gymnasium as the Python type it stands for: <c>make</c> with a keyword the
         ///     constructor does not take wraps the creator's <c>TypeError</c> in the same text for both envs.
         /// </summary>

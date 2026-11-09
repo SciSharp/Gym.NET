@@ -9,7 +9,7 @@ using SixLabors.ImageSharp.PixelFormats;
 namespace Gym.Rendering {
     /// <summary>
     ///     <c>pygame.image</c>, named <c>ImageIO</c> so it does not clash with ImageSharp's <c>Image</c> in code that uses
-    ///     both. The part Gymnasium's envs use: <see cref="Load"/>, for the PNG sprites and tiles of the
+    ///     both. The part Gymnasium's envs use: <see cref="Load(string)"/>, for the PNG sprites and tiles of the
     ///     toy_text envs and Pendulum's torque arrow, and <see cref="FromBytes"/>, which builds the same kind of surface from
     ///     raw pixels.
     /// </summary>
@@ -39,15 +39,43 @@ namespace Gym.Rendering {
                 throw new FileNotFoundException($"No file '{path}' found.", path);
 
             using SixLabors.ImageSharp.Image<Rgba32> image = SixLabors.ImageSharp.Image.Load<Rgba32>(path, out IImageFormat format);
+            return ToSurface(image, format, $"'{path}'");
+        }
+
+        /// <summary>
+        ///     <c>pygame.image.load(file_object)</c> for an 8-bit PNG read from a stream: what Gym.NET's envs use for the
+        ///     assets they embed (DR-19), with the same pixels and the same refusals as <see cref="Load(string)"/>.
+        /// </summary>
+        /// <param name="stream">The PNG bytes, read from the current position; the stream stays open and the caller's.</param>
+        /// <param name="name">What to call the image in error messages (the asset's name).</param>
+        /// <returns>The surface; the caller owns it.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="stream"/> is <see langword="null"/>.</exception>
+        /// <exception cref="NotSupportedException">Thrown for an image that is not an 8-bit RGB, RGBA or grey PNG.</exception>
+        /// <exception cref="SixLabors.ImageSharp.InvalidImageContentException">Thrown for corrupt bytes.</exception>
+        /// <exception cref="SixLabors.ImageSharp.UnknownImageFormatException">Thrown for bytes that are no image format ImageSharp knows.</exception>
+        public static Surface Load(Stream stream, string name = "stream") {
+            if (stream is null)
+                throw new ArgumentNullException(nameof(stream));
+            using SixLabors.ImageSharp.Image<Rgba32> image = SixLabors.ImageSharp.Image.Load<Rgba32>(stream, out IImageFormat format);
+            return ToSurface(image, format, name);
+        }
+
+        /// <summary>A decoded image as a surface, after refusing what is not an 8-bit RGB, RGBA or grey PNG.</summary>
+        /// <param name="image">The decoded pixels.</param>
+        /// <param name="format">The format the decoder recognised.</param>
+        /// <param name="name">The image's name for error messages.</param>
+        /// <returns>The surface: with per-pixel alpha when the PNG has an alpha channel.</returns>
+        /// <exception cref="NotSupportedException">Thrown for another format, a palette PNG or a bit depth other than 8.</exception>
+        private static Surface ToSurface(SixLabors.ImageSharp.Image<Rgba32> image, IImageFormat format, string name) {
             if (!string.Equals(format.Name, "PNG", StringComparison.OrdinalIgnoreCase))
-                throw new NotSupportedException($"Only PNG images are loaded; '{path}' is {format.Name}.");
+                throw new NotSupportedException($"Only PNG images are loaded; {name} is {format.Name}.");
             PngMetadata png = image.Metadata.GetPngMetadata();
             if (png.BitDepth is not PngBitDepth.Bit8)
-                throw new NotSupportedException($"Only 8-bit PNGs are loaded; '{path}' has bit depth {png.BitDepth}.");
+                throw new NotSupportedException($"Only 8-bit PNGs are loaded; {name} has bit depth {png.BitDepth}.");
             bool hasAlpha = png.ColorType switch {
                 PngColorType.RgbWithAlpha or PngColorType.GrayscaleWithAlpha => true,
                 PngColorType.Rgb or PngColorType.Grayscale => false,
-                _ => throw new NotSupportedException($"Only RGB and grey PNGs are loaded; '{path}' is {png.ColorType}."),
+                _ => throw new NotSupportedException($"Only RGB and grey PNGs are loaded; {name} is {png.ColorType}."),
             };
 
             var surface = new Surface(image.Width, image.Height, hasAlpha);

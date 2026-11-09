@@ -437,6 +437,24 @@ namespace Gym.Tests.Parity {
                 return function.Invoke(x);
             }
 
+            /// <summary>
+            ///     <c>np.asarray(x, dtype=np.dtype(dtype))</c>: the value as an array of that dtype, converted by NumPy itself (a
+            ///     tuple of NumPy scalars and Python numbers, or an array of another dtype, becomes a new array; an array of that
+            ///     dtype comes back as it is).
+            /// </summary>
+            /// <param name="x">The value; stays owned by the caller.</param>
+            /// <param name="dtype">A NumPy dtype name, for example <c>float64</c>.</param>
+            /// <returns>A new owned reference to the array.</returns>
+            /// <exception cref="PythonException">Thrown when the value has no array form of that dtype (a ragged or non-numeric sequence).</exception>
+            internal static PyObject asarray(PyObject x, string dtype) {
+                using PyObject function = Module.GetAttr("asarray");
+                using PyObject type = numpy.dtype(dtype);
+                using var positional = new PyTuple(new[] { x });
+                using var keywords = new PyDict();
+                keywords["dtype"] = type;
+                return function.Invoke(positional, keywords);
+            }
+
             /// <summary><c>np.clip(a, a_min, a_max)</c>.</summary>
             /// <param name="a">The value; stays owned by the caller.</param>
             /// <param name="a_min">The lower bound; stays owned by the caller.</param>
@@ -478,6 +496,18 @@ namespace Gym.Tests.Parity {
                 /// <returns>A new owned reference to the <c>numpy.dtype</c>.</returns>
                 /// <exception cref="PythonException">Thrown when the attribute lookup fails.</exception>
                 internal static PyObject dtype(PyObject a) => a.GetAttr("dtype");
+
+                /// <summary>
+                ///     <c>a[()]</c>: the NumPy scalar a 0-d array holds (<c>np.uint16(0)</c>), which is the Python counterpart of a 0-d
+                ///     NumSharp array (NumSharp has no scalar types); for an array of more dimensions, the array itself.
+                /// </summary>
+                /// <param name="a">The array; stays owned by the caller.</param>
+                /// <returns>A new owned reference.</returns>
+                /// <exception cref="PythonException">Thrown when the indexing fails.</exception>
+                internal static PyObject item_scalar(PyObject a) {
+                    using var empty = new PyTuple();
+                    return a.GetItem(empty);
+                }
 
                 /// <summary><c>a.shape</c>.</summary>
                 /// <param name="a">The array.</param>
@@ -1575,6 +1605,12 @@ namespace Gym.Tests.Parity {
                     ///     (<see cref="evalStmts"/>) in the cells that build specs.
                     /// </summary>
                     internal static class EnvSpec {
+                        /// <summary><c>spec.kwargs</c>: the constructor arguments <c>make</c> passes (a dict).</summary>
+                        /// <param name="spec">The spec.</param>
+                        /// <returns>A new owned reference to the dict.</returns>
+                        /// <exception cref="PythonException">Thrown when the attribute lookup fails.</exception>
+                        internal static PyObject kwargs(PyObject spec) => spec.GetAttr("kwargs");
+
                         /// <summary><c>spec.pprint(disable_print=True, include_entry_points=..., print_all=...)</c>.</summary>
                         /// <param name="spec">The spec.</param>
                         /// <param name="include_entry_points">Also print the entry points.</param>
@@ -1691,6 +1727,102 @@ namespace Gym.Tests.Parity {
                             internal static void tau(PyObject env, double value) {
                                 using var number = new PyFloat(value);
                                 env.SetAttr("tau", number);
+                            }
+                        }
+                    }
+
+                    /// <summary><c>gymnasium.envs.classic_control.mountain_car</c>.</summary>
+                    internal static class mountain_car {
+                        /// <summary><c>MountainCarEnv</c> instance attributes (on the unwrapped env).</summary>
+                        internal static class MountainCarEnv {
+                            /// <summary><c>env.state</c>: the state as Gymnasium holds it (its container varies between calls; see <see cref="Oracle.PyGymEnv.GetStateValues"/>).</summary>
+                            /// <param name="env">The unwrapped env.</param>
+                            /// <returns>A new owned reference.</returns>
+                            /// <exception cref="PythonException">Thrown when the attribute is missing (before the first reset, where the source never sets it).</exception>
+                            internal static PyObject state(PyObject env) => env.GetAttr("state");
+
+                            /// <summary><c>env.state = value</c>: any value, <c>None</c> included, which the next step then trips on.</summary>
+                            /// <param name="env">The unwrapped env.</param>
+                            /// <param name="value">The new state; stays owned by the caller (the env keeps its own reference).</param>
+                            /// <exception cref="PythonException">Thrown when the assignment fails.</exception>
+                            internal static void state(PyObject env, PyObject value) => env.SetAttr("state", value);
+                        }
+                    }
+
+                    /// <summary><c>gymnasium.envs.classic_control.continuous_mountain_car</c>.</summary>
+                    internal static class continuous_mountain_car {
+                        /// <summary><c>Continuous_MountainCarEnv</c> instance attributes (on the unwrapped env).</summary>
+                        internal static class Continuous_MountainCarEnv {
+                            /// <summary><c>env.state</c>: the state as Gymnasium holds it (its container varies between calls; see <see cref="Oracle.PyGymEnv.GetStateValues"/>).</summary>
+                            /// <param name="env">The unwrapped env.</param>
+                            /// <returns>A new owned reference.</returns>
+                            /// <exception cref="PythonException">Thrown when the attribute is missing (before the first reset, where the source never sets it).</exception>
+                            internal static PyObject state(PyObject env) => env.GetAttr("state");
+
+                            /// <summary><c>env.state = value</c>: any value, <c>None</c> included, which the next step then trips on.</summary>
+                            /// <param name="env">The unwrapped env.</param>
+                            /// <param name="value">The new state; stays owned by the caller (the env keeps its own reference).</param>
+                            /// <exception cref="PythonException">Thrown when the assignment fails.</exception>
+                            internal static void state(PyObject env, PyObject value) => env.SetAttr("state", value);
+                        }
+                    }
+
+                    /// <summary><c>gymnasium.envs.classic_control.pendulum</c>.</summary>
+                    internal static class pendulum {
+                        /// <summary><c>PendulumEnv</c> instance attributes (on the unwrapped env).</summary>
+                        internal static class PendulumEnv {
+                            /// <summary><c>env.state</c>: the state as Gymnasium holds it (its container varies between calls; see <see cref="Oracle.PyGymEnv.GetStateValues"/>).</summary>
+                            /// <param name="env">The unwrapped env.</param>
+                            /// <returns>A new owned reference.</returns>
+                            /// <exception cref="PythonException">Thrown when the attribute is missing (before the first reset, where the source never sets it).</exception>
+                            internal static PyObject state(PyObject env) => env.GetAttr("state");
+
+                            /// <summary><c>env.state = value</c>: any value, <c>None</c> included, which the next step then trips on.</summary>
+                            /// <param name="env">The unwrapped env.</param>
+                            /// <param name="value">The new state; stays owned by the caller (the env keeps its own reference).</param>
+                            /// <exception cref="PythonException">Thrown when the assignment fails.</exception>
+                            internal static void state(PyObject env, PyObject value) => env.SetAttr("state", value);
+
+                            /// <summary><c>env.last_u</c>: the last clipped torque (a NumPy scalar), <c>None</c> after a reset, missing before.</summary>
+                            /// <param name="env">The unwrapped env.</param>
+                            /// <returns>A new owned reference.</returns>
+                            /// <exception cref="PythonException">Thrown when the attribute is missing (<c>AttributeError</c>).</exception>
+                            internal static PyObject last_u(PyObject env) => env.GetAttr("last_u");
+                        }
+                    }
+
+                    /// <summary><c>gymnasium.envs.classic_control.acrobot</c>.</summary>
+                    internal static class acrobot {
+                        /// <summary><c>AcrobotEnv</c> attributes (class attributes, shadowed per instance by these assignments).</summary>
+                        internal static class AcrobotEnv {
+                            /// <summary><c>env.state</c>: the state as Gymnasium holds it (its container varies between calls; see <see cref="Oracle.PyGymEnv.GetStateValues"/>).</summary>
+                            /// <param name="env">The unwrapped env.</param>
+                            /// <returns>A new owned reference.</returns>
+                            /// <exception cref="PythonException">Thrown when the attribute is missing (before the first reset, where the source never sets it).</exception>
+                            internal static PyObject state(PyObject env) => env.GetAttr("state");
+
+                            /// <summary><c>env.state = value</c>: any value, <c>None</c> included.</summary>
+                            /// <param name="env">The unwrapped env.</param>
+                            /// <param name="value">The new state; stays owned by the caller (the env keeps its own reference).</param>
+                            /// <exception cref="PythonException">Thrown when the assignment fails.</exception>
+                            internal static void state(PyObject env, PyObject value) => env.SetAttr("state", value);
+
+                            /// <summary><c>env.book_or_nips = value</c>: <c>"nips"</c> selects the paper's equation for the second joint.</summary>
+                            /// <param name="env">The unwrapped env.</param>
+                            /// <param name="value">The variant's name.</param>
+                            /// <exception cref="PythonException">Thrown when the assignment fails.</exception>
+                            internal static void book_or_nips(PyObject env, string value) {
+                                using var text = new PyString(value);
+                                env.SetAttr("book_or_nips", text);
+                            }
+
+                            /// <summary><c>env.torque_noise_max = value</c>: when positive, each step draws uniform torque noise from <c>np_random</c>.</summary>
+                            /// <param name="env">The unwrapped env.</param>
+                            /// <param name="value">The noise bound.</param>
+                            /// <exception cref="PythonException">Thrown when the assignment fails.</exception>
+                            internal static void torque_noise_max(PyObject env, double value) {
+                                using var number = new PyFloat(value);
+                                env.SetAttr("torque_noise_max", number);
                             }
                         }
                     }

@@ -5,7 +5,7 @@ namespace Gym.Rendering {
     ///     A drawing surface as Gymnasium's envs create one with <c>pygame.Surface((width, height))</c>: 32 bits per pixel
     ///     without per-pixel alpha (SDL's XRGB8888, masks <c>0xff0000</c>, <c>0xff00</c>, <c>0xff</c>, alpha mask 0), black
     ///     when created, with pygame's <c>(x, y)</c> addressing and its whole area as the clip rectangle. A surface with
-    ///     per-pixel alpha (<see cref="HasAlpha"/>) is what <see cref="ImageIO.Load"/> gives for a PNG with an alpha channel,
+    ///     per-pixel alpha (<see cref="HasAlpha"/>) is what <see cref="ImageIO.Load(string)"/> gives for a PNG with an alpha channel,
     ///     and what <c>transform.scale</c>/<c>smoothscale</c>/<c>flip</c> give for one.
     /// </summary>
     /// <remarks>

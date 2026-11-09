@@ -373,7 +373,7 @@ namespace Gym.Utils {
         /// </summary>
         /// <param name="value">The value.</param>
         /// <returns>The qualified name Python prints inside <c>&lt;class '...'&gt;</c>.</returns>
-        internal static string TypeName(object? value) {
+        public static string TypeName(object? value) {
             switch (value) {
                 case null:
                     return "NoneType";

@@ -168,13 +168,14 @@ namespace Gym.Tests.Parity.Bridge {
         ///     with them by Python name (<see cref="PyKwargs.Construct"/>), as Gym.NET's <c>make</c> does. A test plants a defect
         ///     through it.
         /// </param>
+        /// <param name="reward">The Python type the envs return their reward as: Gymnasium's env of that class's (<see cref="BridgeReward"/>).</param>
         /// <returns>A new owned reference to the class; a new class per call, with its own factory.</returns>
         /// <exception cref="ObjectDisposedException">Thrown after <see cref="Dispose"/>.</exception>
         /// <exception cref="PythonException">Thrown when the class cannot be created.</exception>
-        internal PyObject ShimClass(Type envType, Func<Info, IEnv>? create = null) {
+        internal PyObject ShimClass(Type envType, Func<Info, IEnv>? create = null, BridgeReward reward = BridgeReward.Float) {
             if (_disposed)
                 throw new ObjectDisposedException(nameof(ReverseBridge));
-            var factory = new BridgedEnvFactory(envType, create ?? (kwargs => (IEnv)PyKwargs.Construct(envType, kwargs)), Register);
+            var factory = new BridgedEnvFactory(envType, create ?? (kwargs => (IEnv)PyKwargs.Construct(envType, kwargs)), Register, reward);
             using var bases = new PyTuple(new[] { ShimBase });
             using var body = new PyDict();
             using PyObject factoryObject = factory.ToPython();
@@ -212,11 +213,12 @@ namespace Gym.Tests.Parity.Bridge {
         /// </summary>
         /// <param name="spec">The Gym.NET spec; its entry point is a class or a <c>"Namespace:Class"</c> string.</param>
         /// <param name="create">How to build the env, as for <see cref="ShimClass"/>.</param>
+        /// <param name="reward">The Python type the envs return their reward as, as for <see cref="ShimClass"/>.</param>
         /// <returns>A new owned reference to the Gymnasium spec.</returns>
         /// <exception cref="ObjectDisposedException">Thrown after <see cref="Dispose"/>.</exception>
         /// <exception cref="NotSupportedException">Thrown for an entry point that is a creator delegate (no class to name) or a spec with additional wrappers.</exception>
         /// <exception cref="PythonException">Thrown when Gymnasium refuses the mirrored fields.</exception>
-        internal PyObject Spec(EnvSpec spec, Func<Info, IEnv>? create = null) {
+        internal PyObject Spec(EnvSpec spec, Func<Info, IEnv>? create = null, BridgeReward reward = BridgeReward.Float) {
             Type envType = spec.EntryPoint switch {
                 Type type => type,
                 string name => EnvRegistry.LoadEnvCreator(name),
@@ -225,7 +227,7 @@ namespace Gym.Tests.Parity.Bridge {
             if (spec.AdditionalWrappers.Count > 0)
                 throw new NotSupportedException($"The bridge mirrors specs without additional wrappers; {spec.Id} has {spec.AdditionalWrappers.Count}.");
 
-            using PyObject entryPoint = ShimClass(envType, create);
+            using PyObject entryPoint = ShimClass(envType, create, reward);
             using var id = new PyString(spec.Id);
             using PyObject rewardThreshold = PyConvert.ToPython(spec.RewardThreshold);
             using PyObject nondeterministic = spec.Nondeterministic.ToPython();

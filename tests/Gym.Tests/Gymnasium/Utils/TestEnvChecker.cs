@@ -57,10 +57,9 @@ namespace Gym.Tests.Gymnasium.Utils {
             }
         }
 
-        /// <summary>MountainCar-v0's case (P4).</summary>
+        /// <summary>MountainCar-v0's case: <c>check_env</c> passes it with no warnings but the ignored ones (a gate since P4).</summary>
         /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/tests/utils/test_env_checker.py#L49">test_no_error_warnings</see>.</remarks>
         [TestMethod]
-        [OpenBugs("P4")]
         public void TestNoErrorWarnings_MountainCar() {
             using var headless = new HeadlessHumanMode();
             using IEnv env = Make("MountainCar-v0", disableEnvChecker: true).Unwrapped;

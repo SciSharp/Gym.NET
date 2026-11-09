@@ -20,15 +20,8 @@ gymnasium.envs.box2d.lunar_lander.LunarLander                                   
 gymnasium.envs.box2d.lunar_lander.LunarLanderContinuous                                  P8 box2d
 gymnasium.envs.box2d.lunar_lander.demo_heuristic_lander                                  P8 box2d
 gymnasium.envs.box2d.lunar_lander.heuristic                                              P8 box2d
-gymnasium.envs.classic_control.acrobot.AcrobotEnv                                        P4 classic_control
-gymnasium.envs.classic_control.acrobot.bound                                             P4 classic_control
-gymnasium.envs.classic_control.acrobot.rk4                                               P4 classic_control
-gymnasium.envs.classic_control.acrobot.wrap                                              P4 classic_control
 gymnasium.envs.classic_control.cartpole.CartPoleVectorEnv                                P4 classic_control
 gymnasium.envs.classic_control.continuous_mountain_car.Continuous_MountainCarEnv         by design: merged into MountainCarEnv(continuous) (DR-32)
-gymnasium.envs.classic_control.mountain_car.MountainCarEnv                               P4 classic_control
-gymnasium.envs.classic_control.pendulum.PendulumEnv                                      P4 classic_control
-gymnasium.envs.classic_control.pendulum.angle_normalize                                  P4 classic_control
 gymnasium.envs.functional_jax_env.FunctionalJaxEnv                                       n/a: JAX functional envs
 gymnasium.envs.functional_jax_env.FunctionalJaxVectorEnv                                 n/a: JAX functional envs
 gymnasium.envs.mujoco.ant_v4.AntEnv                                                      P9 mujoco (postponed, DR-35)

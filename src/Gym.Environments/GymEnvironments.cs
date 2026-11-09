@@ -24,8 +24,9 @@ namespace Gym.Environments {
     ///     <see cref="Register"/> still registers when called.
     ///     </para>
     ///     <para>
-    ///     Ids register in Gymnasium's order as their phases port them: classic_control's CartPole now. The vectorized
-    ///     entry points (<c>CartPoleVectorEnv</c>) come with the vector envs.
+    ///     Ids register in Gymnasium's order as their phases port them: classic_control's five now (CartPole-v0/v1,
+    ///     MountainCar-v0, MountainCarContinuous-v0, Pendulum-v1, Acrobot-v1). The vectorized entry points
+    ///     (<c>CartPoleVectorEnv</c>) come with the vector envs.
     ///     </para>
     ///     <para>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/envs/__init__.py">gymnasium/envs/__init__.py</see>.</para>
     /// </remarks>
@@ -61,6 +62,13 @@ namespace Gym.Environments {
             // ----------------------------------------
             EnvRegistry.Register("CartPole-v0", typeof(CartPoleEnv), maxEpisodeSteps: 200, rewardThreshold: 195.0);
             EnvRegistry.Register("CartPole-v1", typeof(CartPoleEnv), maxEpisodeSteps: 500, rewardThreshold: 475.0);
+            EnvRegistry.Register("MountainCar-v0", typeof(MountainCarEnv), maxEpisodeSteps: 200, rewardThreshold: -110.0);
+            // One class for both MountainCars (DR-32): the continuous id carries continuous=True in its kwargs, where
+            // Gymnasium's entry point is a class of its own and its kwargs are empty.
+            EnvRegistry.Register("MountainCarContinuous-v0", typeof(MountainCarEnv), maxEpisodeSteps: 999, rewardThreshold: 90.0,
+                kwargs: new MountainCarEnvOptions { Continuous = true });
+            EnvRegistry.Register("Pendulum-v1", typeof(PendulumEnv), maxEpisodeSteps: 200);
+            EnvRegistry.Register("Acrobot-v1", typeof(AcrobotEnv), rewardThreshold: -100.0, maxEpisodeSteps: 500);
         }
 
         /// <summary>

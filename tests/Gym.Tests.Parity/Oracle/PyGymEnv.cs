@@ -98,7 +98,9 @@ namespace Gym.Tests.Parity.Oracle {
 
         /// <summary>
         ///     The action a named policy picks for Gymnasium's last observation: <c>cartpole_balance</c> (a proportional-derivative
-        ///     controller) or <c>lunar_lander_heuristic</c> (Gymnasium's own <c>lunar_lander.heuristic</c>).
+        ///     controller), <c>lunar_lander_heuristic</c> (Gymnasium's own <c>lunar_lander.heuristic</c>),
+        ///     <c>mountaincar_momentum</c> and <c>mountaincar_continuous_momentum</c> (push the way the car moves, which reaches
+        ///     the flag), or <c>acrobot_pump</c> (torque the way the second link swings, which pumps energy into the chain).
         /// </summary>
         /// <param name="policy">The policy's name.</param>
         /// <returns>The action; the caller disposes it.</returns>
@@ -118,6 +120,23 @@ namespace Gym.Tests.Parity.Oracle {
                     }
                     case "lunar_lander_heuristic":
                         return ParityAction.FromPython(Python.gymnasium.envs.box2d.lunar_lander.heuristic(Unwrapped, observation));
+                    case "mountaincar_momentum": {
+                        using NDArray values = observation.ToNDArray();
+                        using NDArray widened = values.astype(np.float64);
+                        return ParityAction.Discrete(MountainCarMomentum(widened));
+                    }
+                    case "mountaincar_continuous_momentum": {
+                        using NDArray values = observation.ToNDArray();
+                        using NDArray widened = values.astype(np.float64);
+                        // The full force in the direction of travel, as the float32 array the action space samples.
+                        float[] force = { MountainCarMomentum(widened) == 2 ? 1.0f : -1.0f };
+                        return ParityAction.Continuous(np.array(force));
+                    }
+                    case "acrobot_pump": {
+                        using NDArray values = observation.ToNDArray();
+                        using NDArray widened = values.astype(np.float64);
+                        return ParityAction.Discrete(AcrobotPump(widened));
+                    }
                     default:
                         throw new ArgumentException($"Unknown policy '{policy}'.", nameof(policy));
                 }
@@ -197,6 +216,28 @@ namespace Gym.Tests.Parity.Oracle {
         /// <returns>The outcome; an <c>AttributeError</c> when the env has no such attribute.</returns>
         public Outcome GetAttribute(string name) => Outcome.CapturePython(() => Unwrapped.GetAttr(name));
 
+        /// <summary>
+        ///     Reads a state attribute as the float64 values <see cref="GymPair"/> compares: a tuple, list or floating-point
+        ///     array becomes <c>np.asarray(value, dtype=np.float64)</c>, which holds exactly its values; anything else
+        ///     (<c>None</c>, an int, or the <c>AttributeError</c> of a missing attribute) is described as it is.
+        /// </summary>
+        /// <param name="name">The attribute, for example <c>state</c>.</param>
+        /// <returns>The outcome.</returns>
+        /// <remarks>
+        ///     Gymnasium's envs change their state's container between calls: MountainCar holds a float64 array after a reset,
+        ///     a tuple after a discrete step and a float32 array after a continuous step; Acrobot a float32 array after a reset
+        ///     and a float64 one after a step. Gym.NET's envs hold the same values in one form (<c>double[]</c>), so what is
+        ///     compared is the values, every bit of them, not the container. CartPole's float64 array comes back as it is.
+        /// </remarks>
+        public Outcome GetStateValues(string name) => Outcome.CapturePython(() => {
+            PyObject value = Unwrapped.GetAttr(name);
+            if (!PyConvert.IsFloatContainer(value))
+                return value;
+            // The raw attribute is released once NumPy made its float64 form.
+            using (value)
+                return Python.numpy.asarray(value, "float64");
+        });
+
         /// <summary>Seeds the action space: <c>env.action_space.seed(seed)</c>.</summary>
         /// <param name="seed">The seed.</param>
         /// <exception cref="PythonException">Thrown when seeding raises.</exception>
@@ -253,6 +294,23 @@ namespace Gym.Tests.Parity.Oracle {
             double x = observation.GetDouble(0), xDot = observation.GetDouble(1), theta = observation.GetDouble(2), thetaDot = observation.GetDouble(3);
             return 0.1 * x + 0.5 * xDot + 10.0 * theta + 2.0 * thetaDot > 0.0 ? 1 : 0;
         }
+
+        /// <summary>
+        ///     The <c>mountaincar_momentum</c> policy: push right (2) while the car moves right or stands, left (0) while it
+        ///     moves left, which builds the swing that carries the car to the flag within about 120 steps.
+        /// </summary>
+        /// <param name="observation">Gymnasium's float32 observation <c>[position, velocity]</c>, widened to float64.</param>
+        /// <returns>2 or 0.</returns>
+        private static long MountainCarMomentum(NDArray observation) => observation.GetDouble(1) >= 0.0 ? 2 : 0;
+
+        /// <summary>
+        ///     The <c>acrobot_pump</c> policy: torque +1 (action 2) while the second link swings one way (<c>θ̇2 &gt; 0</c>), -1
+        ///     (action 0) otherwise, which adds energy every swing until the free end clears the line (67 to 122 steps on seeds
+        ///     0, 3, 5 and 42, measured against Gymnasium on 2026-11-09; the first link's velocity alone never gets there).
+        /// </summary>
+        /// <param name="observation">Gymnasium's float32 observation <c>[cos θ1, sin θ1, cos θ2, sin θ2, θ̇1, θ̇2]</c>, widened to float64.</param>
+        /// <returns>2 or 0.</returns>
+        private static long AcrobotPump(NDArray observation) => observation.GetDouble(5) > 0.0 ? 2 : 0;
 
         /// <summary>
         ///     Runs a reset or step call, keeps the observation for policies, and describes the result. Must run under the GIL.

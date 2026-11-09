@@ -354,5 +354,27 @@ namespace Gym.Tests.Parity.Oracle {
             using PyObject type = module.GetAttr(name);
             return value.IsInstance(type);
         }
+
+        /// <summary>
+        ///     Whether a value is a container of numbers whose float64 form is exactly its values: a <c>tuple</c> or <c>list</c>
+        ///     (MountainCar's state after a discrete step is a tuple of NumPy scalars and Python numbers), or an array of a
+        ///     floating dtype (float32 widens to float64 exactly). Must run under the GIL.
+        /// </summary>
+        /// <param name="value">The value; stays owned by the caller.</param>
+        /// <returns><see langword="true"/> for such a container; <see langword="false"/> for <c>None</c>, a scalar, or an array of another kind.</returns>
+        /// <exception cref="PythonException">Thrown when reading an array's dtype raises.</exception>
+        internal static bool IsFloatContainer(PyObject value) {
+            // The cached modules: never disposed here.
+            PyObject builtins = PythonRuntime.Builtins;
+            PyObject numpy = PythonRuntime.Import("numpy");
+            if (IsInstance(value, builtins, "tuple") || IsInstance(value, builtins, "list"))
+                return true;
+            if (!IsInstance(value, numpy, "ndarray"))
+                return false;
+            // Type reflection on a run-time value, like FromPython's: the array's dtype kind, 'f' for floating.
+            using PyObject dtype = value.GetAttr("dtype");
+            using PyObject kind = dtype.GetAttr("kind");
+            return kind.As<string>() == "f";
+        }
     }
 }

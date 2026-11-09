@@ -49,7 +49,8 @@ namespace Gym.Tests.Parity.Pair {
         /// <param name="python">The live Gymnasium env.</param>
         /// <param name="dotnet">The .NET env.</param>
         /// <param name="stateAttribute">
-        ///     An attribute both sides expose (<c>state</c> for the classic-control envs), compared exactly after every call and
+        ///     An attribute both sides expose (<c>state</c> for the classic-control envs), compared exactly after every call as
+        ///     float64 values (a float32 array or a tuple of numbers on Gymnasium's side is read as its float64 array) and
         ///     dumped before and after a divergence; <see langword="null"/> when there is none.
         /// </param>
         public GymPair(PyGymEnv python, IDotNetEnv dotnet, string? stateAttribute = null) {
@@ -291,11 +292,15 @@ namespace Gym.Tests.Parity.Pair {
             return ByteContract.Compare("rng", python, dotnet);
         }
 
-        /// <summary>Reads both sides' state attribute, when one is configured, into the "after" slots.</summary>
+        /// <summary>
+        ///     Reads both sides' state attribute, when one is configured, into the "after" slots: Gymnasium's as its float64
+        ///     values (<see cref="PyGymEnv.GetStateValues"/>, since its envs change the state's container between calls),
+        ///     Gym.NET's as the float64 array its <c>double[]</c> holds.
+        /// </summary>
         private void ReadStates() {
             if (_stateAttribute is null)
                 return;
-            _pythonState = Python.GetAttribute(_stateAttribute).Value;
+            _pythonState = Python.GetStateValues(_stateAttribute).Value;
             _dotnetState = DotNet.GetAttribute(_stateAttribute);
         }
     }

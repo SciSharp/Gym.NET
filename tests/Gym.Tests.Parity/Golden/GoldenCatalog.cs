@@ -46,6 +46,60 @@ namespace Gym.Tests.Parity.Golden {
                 PlatformDependence = "CartPole's cos/sin",
                 CreateDotNet = renderMode => new GymNetEnv(new CartPoleEnv(renderMode: renderMode)),
             },
+            // MountainCar-v0 driven to the flag by the momentum policy: the float64 state through the wall rule and
+            // termination. No frames: the hill's joints are the open P7 gap.
+            new GoldenCase {
+                Suite = "classic_control",
+                Name = "MountainCar-v0.momentum.seed0",
+                EnvId = "MountainCar-v0",
+                Seed = 0,
+                Actions = new GoldenActions.Policy("mountaincar_momentum"),
+                MaxSteps = 200,
+                StateAttribute = "state",
+                PlatformDependence = "MountainCar's cos",
+                CreateDotNet = renderMode => new GymNetEnv(new MountainCarEnv(renderMode: renderMode)),
+            },
+            // MountainCarContinuous-v0 under seeded float32 forces: the NEP 50 float32 arithmetic of every step, checked
+            // without Python, and Box sampling in the replay. No frames (P7).
+            new GoldenCase {
+                Suite = "classic_control",
+                Name = "MountainCarContinuous-v0.sampled.seed42",
+                EnvId = "MountainCarContinuous-v0",
+                Seed = 42,
+                Actions = new GoldenActions.Sampled(42),
+                MaxSteps = 300,
+                StateAttribute = "state",
+                PlatformDependence = "MountainCar's cos",
+                CreateDotNet = renderMode => new GymNetEnv(new MountainCarEnv(renderMode: renderMode, continuous: true)),
+            },
+            // Pendulum-v1 under seeded float32 torques for a whole episode, with a frame every 20 steps: the rod and the
+            // torque arrow (smoothscale, flip, alpha blit) at the sizes the episode takes.
+            new GoldenCase {
+                Suite = "classic_control",
+                Name = "Pendulum-v1.sampled.seed42",
+                EnvId = "Pendulum-v1",
+                Seed = 42,
+                Actions = new GoldenActions.Sampled(42),
+                MaxSteps = 200,
+                FrameEvery = 20,
+                StateAttribute = "state",
+                PlatformDependence = "Pendulum's sin/cos/pow",
+                CreateDotNet = renderMode => new GymNetEnv(new PendulumEnv(renderMode: renderMode)),
+            },
+            // Acrobot-v1 swung up by the pumping policy through termination, a frame every 10 steps: the float32 reset state,
+            // the Runge-Kutta dynamics in float64, and the links' drawing.
+            new GoldenCase {
+                Suite = "classic_control",
+                Name = "Acrobot-v1.pump.seed0",
+                EnvId = "Acrobot-v1",
+                Seed = 0,
+                Actions = new GoldenActions.Policy("acrobot_pump"),
+                MaxSteps = 500,
+                FrameEvery = 10,
+                StateAttribute = "state",
+                PlatformDependence = "Acrobot's sin/cos/pow",
+                CreateDotNet = renderMode => new GymNetEnv(new AcrobotEnv(renderMode: renderMode)),
+            },
         }.ToDictionary(c => c.Key, StringComparer.Ordinal);
 
         /// <summary>Every case's key, as MSTest data rows: one row per case, named by its key in test results.</summary>

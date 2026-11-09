@@ -58,6 +58,24 @@ namespace Gym.Tests.Parity.Pair {
         public static ParityAction Continuous(NDArray values) => new(null, values, true, ValueFacts.Of(values));
 
         /// <summary>
+        ///     A NumPy scalar action: a 0-d <see cref="NDArray"/> on the .NET side (NumSharp's form of a NumPy scalar) and the
+        ///     NumPy scalar it stands for on the Python side (<c>np.uint16(0)</c>, not the 0-d array <c>array(0,
+        ///     dtype=uint16)</c>, whose <c>repr</c> and type differ), so both sides receive the same typed number.
+        /// </summary>
+        /// <param name="value">The 0-d array; ownership passes to the action.</param>
+        /// <returns>The action.</returns>
+        /// <exception cref="ArgumentException">Thrown when <paramref name="value"/> is not 0-d.</exception>
+        public static ParityAction Scalar(NDArray value) {
+            if (value.ndim != 0)
+                throw new ArgumentException($"A scalar action is a 0-d array, not a {value.ndim}-d one.", nameof(value));
+            PyObject python = PythonRuntime.Run(() => {
+                using PyObject array = value.ToNumpyCopy();
+                return Python.numpy.ndarray.item_scalar(array);
+            });
+            return new ParityAction(python, value, true, ValueFacts.Of(value));
+        }
+
+        /// <summary>
         ///     An action a Python policy picked. The Python side keeps the policy's own object; the .NET side gets a
         ///     <see langword="long"/> for an integer and a NumSharp copy (<c>ToNDArray</c>) for an array. Must run under the GIL.
         /// </summary>

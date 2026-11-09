@@ -178,9 +178,19 @@ namespace Gym.Rendering {
         /// <exception cref="ValueError">Thrown for fewer than 2 points, with pygame's message, or a NaN or infinite coordinate.</exception>
         /// <exception cref="NotSupportedException">Thrown for a surface with per-pixel alpha (not modelled).</exception>
         /// <remarks>
-        ///     Each segment is drawn as <see cref="Aaline"/> draws it, except that a segment ending at a joint leaves out its
-        ///     column at its larger major coordinate, so a joint is not blended twice: the closest rule found, not pygame's
-        ///     exact one.
+        ///     <para>
+        ///     Each segment is drawn as <see cref="Aaline"/> draws it, except that both segments meeting at a joint leave out
+        ///     their partial column there (the column at the joint's major coordinate weighted by its fraction), so a joint is
+        ///     covered once by the two segments' full-weight columns. Measured against pygame-ce 2.5.8 this is exact along
+        ///     smooth polylines whose segments run the same way (MountainCar's hill: 16 differing pixels per frame, against 196
+        ///     when only one segment left its column out), but it is still not pygame's rule.
+        ///     </para>
+        ///     <para>
+        ///     What the measurements show of the rest (P7, reported to the maintainer): pygame's <c>aalines</c> is not
+        ///     <c>aaline</c> segment by segment; a 2-point open <c>aalines</c> blends the segment's interior twice (its end
+        ///     columns once), and joints between segments drawn against their major axis, or turning sharply, follow another
+        ///     rule.
+        ///     </para>
         /// </remarks>
         public static void Aalines(Surface surface, Color color, bool closed, IReadOnlyList<(double X, double Y)> points) {
             RequireOpaque(surface);
@@ -192,14 +202,17 @@ namespace Gym.Rendering {
             for (int i = 0; i < segments; i++) {
                 (double ax, double ay) = points[i];
                 (double bx, double by) = points[(i + 1) % points.Count];
-                bool joint = i < points.Count - 2 || closed;
-                AalineSegment(surface, color, ax, ay, bx, by, skipStartColumn: false, skipEndColumn: joint);
+                // Every point but an open polyline's two ends is a joint, and both segments meeting there leave out their
+                // partial column at it.
+                bool startJoint = i > 0 || closed;
+                bool endJoint = i < points.Count - 2 || closed;
+                AalineSegment(surface, color, ax, ay, bx, by, skipStartColumn: startJoint, skipEndColumn: endJoint);
             }
         }
 
         /// <summary>
-        ///     One anti-aliased segment (the model in <see cref="Aaline"/>'s remarks), optionally without its column at the
-        ///     smaller or the larger major coordinate (the columns are ordered after the segment is put in increasing order).
+        ///     One anti-aliased segment (the model in <see cref="Aaline"/>'s remarks), optionally without its partial column at
+        ///     the start point or at the end point (the points as given, before the segment is put in increasing order).
         /// </summary>
         /// <param name="surface">The surface, without per-pixel alpha.</param>
         /// <param name="color">The colour.</param>
@@ -207,8 +220,8 @@ namespace Gym.Rendering {
         /// <param name="y0">The start row.</param>
         /// <param name="x1">The end column.</param>
         /// <param name="y1">The end row.</param>
-        /// <param name="skipStartColumn">Leave out the column at the smaller major coordinate.</param>
-        /// <param name="skipEndColumn">Leave out the column at the larger major coordinate.</param>
+        /// <param name="skipStartColumn">Leave out the partial column at (<paramref name="x0"/>, <paramref name="y0"/>).</param>
+        /// <param name="skipEndColumn">Leave out the partial column at (<paramref name="x1"/>, <paramref name="y1"/>).</param>
         /// <exception cref="ValueError">Thrown for a coordinate that is NaN or infinite.</exception>
         private static void AalineSegment(Surface surface, Color color, double x0, double y0, double x1, double y1, bool skipStartColumn, bool skipEndColumn) {
             RequireFinite(x0);
@@ -235,6 +248,8 @@ namespace Gym.Rendering {
                 (fy0, fy1) = (fy1, fy0);
                 dx = -dx;
                 dy = -dy;
+                // The skips belong to the points, which have just changed places.
+                (skipStartColumn, skipEndColumn) = (skipEndColumn, skipStartColumn);
             }
 
             float slope = dy / dx;

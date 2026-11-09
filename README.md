@@ -69,10 +69,10 @@ now through `Gym.Legacy.LegacyEnvAdapter`.
      - [X] CartPole-v1 
        - [ ] Compare visually against python's version
      - [ ] walker2d_v3
-     - [ ] acrobot				
-     - [ ] continuous_mountain_car
-     - [ ] mountain_car		
-     - [ ] pendulum			
+     - [X] acrobot (Acrobot-v1)
+     - [X] continuous_mountain_car (MountainCarContinuous-v0, `MountainCarEnv(continuous: true)`)
+     - [X] mountain_car (MountainCar-v0)
+     - [X] pendulum (Pendulum-v1)
      - [ ] rendering
    - [ ] Mujco
      - [ ] ant_v3						
