@@ -81,6 +81,56 @@ namespace Gym.Tests.Parity.Tests.Registration {
         }
 
         /// <summary>
+        ///     The toy_text ids of P5: <c>str(make(id))</c> and the printed specs of the stack and of the unwrapped env (Blackjack's
+        ///     kwargs in Gymnasium's order, <c>sab</c> then <c>natural</c>; FrozenLake's map names and thresholds; CliffWalking's
+        ///     missing limit). Taxi-v4's printed threshold differs by type (see <see cref="Spec_TaxiRewardThreshold_IsFloat64"/>).
+        /// </summary>
+        /// <param name="id">The id.</param>
+        [TestMethod]
+        [DataRow("Blackjack-v1")]
+        [DataRow("FrozenLake-v1")]
+        [DataRow("FrozenLake8x8-v1")]
+        [DataRow("CliffWalking-v1")]
+        [DataRow("CliffWalkingSlippery-v1")]
+        public void Make_ToyText_StackAndSpecs_MatchGymnasium(string id) {
+            using PyRef python = PyRef.Of(() => Python.gymnasium.make(id));
+            using IEnv dotnet = Gymnasium.Make(id);
+
+            ByteContract.AssertSame($"str(make('{id}'))", Outcome.CapturePython(() => Python.builtins.str(python.Object)), Outcome.Returned(ValueFacts.FromText(dotnet.ToString()!)));
+            ByteContract.AssertSame($"{id}: env.spec.pprint()", Outcome.CapturePython(() => {
+                using PyObject spec = Python.gymnasium.Env.spec(python.Object);
+                return Python.gymnasium.envs.registration.EnvSpec.pprint(spec);
+            }), Outcome.Returned(ValueFacts.FromText(dotnet.Spec!.Pprint(disablePrint: true)!)));
+            ByteContract.AssertSame($"{id}: env.unwrapped.spec.pprint()", Outcome.CapturePython(() => {
+                using PyObject unwrapped = Python.gymnasium.Env.unwrapped(python.Object);
+                using PyObject spec = Python.gymnasium.Env.spec(unwrapped);
+                return Python.gymnasium.envs.registration.EnvSpec.pprint(spec);
+            }), Outcome.Returned(ValueFacts.FromText(dotnet.Unwrapped.Spec!.Pprint(disablePrint: true)!)));
+        }
+
+        /// <summary>
+        ///     Taxi-v4, pinned so it cannot drift: <c>str(make('Taxi-v4'))</c> is Gymnasium's, and so is the printed spec except
+        ///     its threshold. Gymnasium registers <c>reward_threshold=8</c>, an <c>int</c> (its annotation says <c>float</c>);
+        ///     Gym.NET's thresholds are float64, like its rewards, so the spec prints <c>reward_threshold=8.0</c>. The value is
+        ///     the same: <c>float(spec.reward_threshold) == 8.0</c>.
+        /// </summary>
+        [TestMethod]
+        public void Spec_TaxiRewardThreshold_IsFloat64() {
+            using PyRef python = PyRef.Of(() => Python.gymnasium.make("Taxi-v4"));
+            using IEnv dotnet = Gymnasium.Make("Taxi-v4");
+            ByteContract.AssertSame("str(make('Taxi-v4'))", Outcome.CapturePython(() => Python.builtins.str(python.Object)), Outcome.Returned(ValueFacts.FromText(dotnet.ToString()!)));
+
+            ValueFacts printed = Outcome.CapturePython(() => {
+                using PyObject spec = Python.gymnasium.Env.spec(python.Object);
+                return Python.gymnasium.envs.registration.EnvSpec.pprint(spec);
+            }).Expect("Taxi-v4: env.spec.pprint()");
+            StringAssert.Contains(printed.Text, "\nreward_threshold=8\n", "Gymnasium's Taxi-v4 registers an int threshold.");
+            Assert.AreEqual(printed.Text!.Replace("\nreward_threshold=8\n", "\nreward_threshold=8.0\n", StringComparison.Ordinal), dotnet.Spec!.Pprint(disablePrint: true),
+                "Gym.NET's spec prints Gymnasium's text with the threshold as a float64.");
+            Assert.AreEqual(8.0, dotnet.Spec.RewardThreshold);
+        }
+
+        /// <summary>
         ///     DR-32's accepted deviation, pinned so it cannot drift: <c>MountainCarContinuous-v0</c>'s <c>EnvSpec.kwargs</c> is
         ///     empty in Gymnasium (its entry point is a class of its own) and <c>{'continuous': True}</c> in Gym.NET (one class
         ///     for both MountainCars); <c>MountainCar-v0</c>'s are equal (empty).

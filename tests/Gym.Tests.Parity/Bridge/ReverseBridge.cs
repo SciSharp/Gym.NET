@@ -169,13 +169,15 @@ namespace Gym.Tests.Parity.Bridge {
         ///     through it.
         /// </param>
         /// <param name="reward">The Python type the envs return their reward as: Gymnasium's env of that class's (<see cref="BridgeReward"/>).</param>
+        /// <param name="observation">How the envs return their observations: as Gymnasium's env of that class does (<see cref="BridgeObservation"/>).</param>
         /// <returns>A new owned reference to the class; a new class per call, with its own factory.</returns>
         /// <exception cref="ObjectDisposedException">Thrown after <see cref="Dispose"/>.</exception>
         /// <exception cref="PythonException">Thrown when the class cannot be created.</exception>
-        internal PyObject ShimClass(Type envType, Func<Info, IEnv>? create = null, BridgeReward reward = BridgeReward.Float) {
+        internal PyObject ShimClass(Type envType, Func<Info, IEnv>? create = null, BridgeReward reward = BridgeReward.Float,
+            BridgeObservation observation = BridgeObservation.Shared) {
             if (_disposed)
                 throw new ObjectDisposedException(nameof(ReverseBridge));
-            var factory = new BridgedEnvFactory(envType, create ?? (kwargs => (IEnv)PyKwargs.Construct(envType, kwargs)), Register, reward);
+            var factory = new BridgedEnvFactory(envType, create ?? (kwargs => (IEnv)PyKwargs.Construct(envType, kwargs)), Register, reward, observation);
             using var bases = new PyTuple(new[] { ShimBase });
             using var body = new PyDict();
             using PyObject factoryObject = factory.ToPython();
@@ -214,11 +216,13 @@ namespace Gym.Tests.Parity.Bridge {
         /// <param name="spec">The Gym.NET spec; its entry point is a class or a <c>"Namespace:Class"</c> string.</param>
         /// <param name="create">How to build the env, as for <see cref="ShimClass"/>.</param>
         /// <param name="reward">The Python type the envs return their reward as, as for <see cref="ShimClass"/>.</param>
+        /// <param name="observation">How the envs return their observations, as for <see cref="ShimClass"/>.</param>
         /// <returns>A new owned reference to the Gymnasium spec.</returns>
         /// <exception cref="ObjectDisposedException">Thrown after <see cref="Dispose"/>.</exception>
         /// <exception cref="NotSupportedException">Thrown for an entry point that is a creator delegate (no class to name) or a spec with additional wrappers.</exception>
         /// <exception cref="PythonException">Thrown when Gymnasium refuses the mirrored fields.</exception>
-        internal PyObject Spec(EnvSpec spec, Func<Info, IEnv>? create = null, BridgeReward reward = BridgeReward.Float) {
+        internal PyObject Spec(EnvSpec spec, Func<Info, IEnv>? create = null, BridgeReward reward = BridgeReward.Float,
+            BridgeObservation observation = BridgeObservation.Shared) {
             Type envType = spec.EntryPoint switch {
                 Type type => type,
                 string name => EnvRegistry.LoadEnvCreator(name),
@@ -227,7 +231,7 @@ namespace Gym.Tests.Parity.Bridge {
             if (spec.AdditionalWrappers.Count > 0)
                 throw new NotSupportedException($"The bridge mirrors specs without additional wrappers; {spec.Id} has {spec.AdditionalWrappers.Count}.");
 
-            using PyObject entryPoint = ShimClass(envType, create, reward);
+            using PyObject entryPoint = ShimClass(envType, create, reward, observation);
             using var id = new PyString(spec.Id);
             using PyObject rewardThreshold = PyConvert.ToPython(spec.RewardThreshold);
             using PyObject nondeterministic = spec.Nondeterministic.ToPython();

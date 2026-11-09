@@ -89,22 +89,6 @@ gymnasium.envs.tabular.cliffwalking.CliffWalkingJaxEnv                          
 gymnasium.envs.tabular.cliffwalking.EnvState                                             n/a: JAX functional envs
 gymnasium.envs.tabular.cliffwalking.RenderStateType                                      n/a: JAX functional envs
 gymnasium.envs.tabular.cliffwalking.fell_off                                             n/a: JAX functional envs
-gymnasium.envs.toy_text.blackjack.BlackjackEnv                                           P5 toy_text
-gymnasium.envs.toy_text.blackjack.cmp                                                    P5 toy_text
-gymnasium.envs.toy_text.blackjack.draw_card                                              P5 toy_text
-gymnasium.envs.toy_text.blackjack.draw_hand                                              P5 toy_text
-gymnasium.envs.toy_text.blackjack.draw_table                                             P5 toy_text
-gymnasium.envs.toy_text.blackjack.is_bust                                                P5 toy_text
-gymnasium.envs.toy_text.blackjack.is_natural                                             P5 toy_text
-gymnasium.envs.toy_text.blackjack.score                                                  P5 toy_text
-gymnasium.envs.toy_text.blackjack.sum_hand                                               P5 toy_text
-gymnasium.envs.toy_text.blackjack.usable_ace                                             P5 toy_text
-gymnasium.envs.toy_text.cliffwalking.CliffWalkingEnv                                     P5 toy_text
-gymnasium.envs.toy_text.frozen_lake.FrozenLakeEnv                                        P5 toy_text
-gymnasium.envs.toy_text.frozen_lake.generate_random_map                                  P5 toy_text
-gymnasium.envs.toy_text.frozen_lake.is_valid                                             P5 toy_text
-gymnasium.envs.toy_text.taxi.TaxiEnv                                                     P5 toy_text
-gymnasium.envs.toy_text.utils.categorical_sample                                         P5 toy_text
 gymnasium.experimental.functional.FuncEnv                                                P6 FuncEnv (DR-36)
 gymnasium.utils.ezpickle.EzPickle                                                        n/a: Python pickling
 gymnasium.utils.performance.benchmark_init                                               P6 performance (DR-36)

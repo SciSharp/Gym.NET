@@ -86,6 +86,27 @@ namespace Gym.Tests.Utils {
             }).Message);
         }
 
+        /// <summary>
+        ///     A tuple record is an <see cref="System.Runtime.CompilerServices.ITuple"/> holding its members, so code that only
+        ///     sees an <see langword="object"/> reads it as a tuple: a <c>Tuple</c> space contains it, and Python's <c>==</c>
+        ///     equals it to the generic form.
+        /// </summary>
+        [TestMethod]
+        public void TupleRecord_IsAnITuple() {
+            using NDArray position = np.array(new[] { 0.5f, 0.25f });
+            var record = new PairObservation(position, 3);
+            System.Runtime.CompilerServices.ITuple tuple = record;
+            Assert.AreEqual(2, tuple.Length);
+            Assert.AreSame(position, tuple[0]);
+            Assert.AreEqual(3L, tuple[1]);
+            Assert.ThrowsExactly<System.IndexOutOfRangeException>(() => tuple[2]);
+
+            using var space = new Gym.Spaces.Tuple(new Gym.Spaces.Box(0.0, 1.0, new Shape(2), np.float32), new Gym.Spaces.Discrete(5));
+            Assert.IsTrue(space.Contains(record), "A Tuple space contains the record as it contains its generic form.");
+            Assert.IsFalse(space.Contains(new PairObservation(position, 7)), "...and checks its items.");
+            Assert.IsTrue(PyEquality.AreEqual(record, new object?[] { position, 3L }), "Python's == between the record and the generic form.");
+        }
+
         /// <summary>A dict record converts to and from <see cref="Info"/> by Python names, compares as dicts do, and prints as one.</summary>
         [TestMethod]
         public void DictRecord_ConvertsComparesAndPrints() {

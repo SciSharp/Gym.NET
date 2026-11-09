@@ -4,6 +4,8 @@ using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Threading;
 using Gym.Environments.Envs.Classic;
+using Gym.Environments.Envs.ToyText;
+using Gym.Envs;
 using Gym.Envs.Registration;
 
 namespace Gym.Environments {
@@ -69,6 +71,17 @@ namespace Gym.Environments {
                 kwargs: new MountainCarEnvOptions { Continuous = true });
             EnvRegistry.Register("Pendulum-v1", typeof(PendulumEnv), maxEpisodeSteps: 200);
             EnvRegistry.Register("Acrobot-v1", typeof(AcrobotEnv), rewardThreshold: -100.0, maxEpisodeSteps: 500);
+
+            // Toy Text
+            // ----------------------------------------
+            // An Info rather than the options record: the kwargs keep Gymnasium's order (sab, then natural), which the spec prints.
+            EnvRegistry.Register("Blackjack-v1", typeof(BlackjackEnv), kwargs: new Info { ["sab"] = true, ["natural"] = false });
+            EnvRegistry.Register("FrozenLake-v1", typeof(FrozenLakeEnv), maxEpisodeSteps: 100, rewardThreshold: 0.70, kwargs: new FrozenLakeEnvOptions { MapName = "4x4" });
+            EnvRegistry.Register("FrozenLake8x8-v1", typeof(FrozenLakeEnv), maxEpisodeSteps: 200, rewardThreshold: 0.85, kwargs: new FrozenLakeEnvOptions { MapName = "8x8" });
+            EnvRegistry.Register("CliffWalking-v1", typeof(CliffWalkingEnv));
+            EnvRegistry.Register("CliffWalkingSlippery-v1", typeof(CliffWalkingEnv), kwargs: new CliffWalkingEnvOptions { IsSlippery = true });
+            // Gymnasium registers reward_threshold=8, an int; Gym.NET's thresholds are float64 like its rewards, so the spec prints 8.0.
+            EnvRegistry.Register("Taxi-v4", typeof(TaxiEnv), rewardThreshold: 8, maxEpisodeSteps: 200);
         }
 
         /// <summary>

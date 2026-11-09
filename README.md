@@ -93,4 +93,9 @@ now through `Gym.Legacy.LegacyEnvAdapter`.
      - [ ] car_dynamics
      - [ ] car_racing
      - [X] lunar_lander
+   - [X] toy_text
+     - [X] blackjack (Blackjack-v1)
+     - [X] cliffwalking (CliffWalking-v1, CliffWalkingSlippery-v1)
+     - [X] frozen_lake (FrozenLake-v1, FrozenLake8x8-v1)
+     - [X] taxi (Taxi-v4)
    - [ ] atari

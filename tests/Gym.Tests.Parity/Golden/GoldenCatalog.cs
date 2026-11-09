@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Gym.Environments.Envs.Classic;
+using Gym.Environments.Envs.ToyText;
 using Gym.Tests.Parity.Pair;
 
 namespace Gym.Tests.Parity.Golden {
@@ -99,6 +100,81 @@ namespace Gym.Tests.Parity.Golden {
                 StateAttribute = "state",
                 PlatformDependence = "Acrobot's sin/cos/pow",
                 CreateDotNet = renderMode => new GymNetEnv(new AcrobotEnv(renderMode: renderMode)),
+            },
+            // The toy_text envs are table lookups and generator draws, with no libm, so their goldens are strict everywhere.
+            // FrozenLake-v1 on slippery ice under seeded actions, a frame every 2 steps: the slippery table's draws, the
+            // agent's moves and the hole or goal that ends the episode.
+            new GoldenCase {
+                Suite = "toy_text",
+                Name = "FrozenLake-v1.sampled.seed42",
+                EnvId = "FrozenLake-v1",
+                Seed = 42,
+                Actions = new GoldenActions.Sampled(42),
+                MaxSteps = 100,
+                FrameEvery = 2,
+                StateAttribute = "s",
+                CreateDotNet = renderMode => new GymNetEnv(new FrozenLakeEnv(renderMode: renderMode)),
+            },
+            // FrozenLake8x8-v1 under seeded actions, a frame every 5 steps: the 8x8 map's cell size.
+            new GoldenCase {
+                Suite = "toy_text",
+                Name = "FrozenLake8x8-v1.sampled.seed7",
+                EnvId = "FrozenLake8x8-v1",
+                Seed = 7,
+                Actions = new GoldenActions.Sampled(7),
+                MaxSteps = 200,
+                FrameEvery = 5,
+                StateAttribute = "s",
+                CreateDotNet = renderMode => new GymNetEnv(new FrozenLakeEnv(renderMode: renderMode, mapName: "8x8")),
+            },
+            // CliffWalking-v1 under seeded actions for 200 steps (it has no time limit and seldom reaches the goal), a frame
+            // every 20: falls off the cliff back to the start, with -100.
+            new GoldenCase {
+                Suite = "toy_text",
+                Name = "CliffWalking-v1.sampled.seed0",
+                EnvId = "CliffWalking-v1",
+                Seed = 0,
+                Actions = new GoldenActions.Sampled(0),
+                MaxSteps = 200,
+                FrameEvery = 20,
+                StateAttribute = "s",
+                CreateDotNet = renderMode => new GymNetEnv(new CliffWalkingEnv(renderMode: renderMode)),
+            },
+            // CliffWalkingSlippery-v1 under seeded actions: the slippery table's three-way draws, no frames.
+            new GoldenCase {
+                Suite = "toy_text",
+                Name = "CliffWalkingSlippery-v1.sampled.seed3",
+                EnvId = "CliffWalkingSlippery-v1",
+                Seed = 3,
+                Actions = new GoldenActions.Sampled(3),
+                MaxSteps = 200,
+                StateAttribute = "s",
+                CreateDotNet = renderMode => new GymNetEnv(new CliffWalkingEnv(renderMode: renderMode, isSlippery: true)),
+            },
+            // Taxi-v4 under seeded actions for 200 steps, a frame every 25: the infos' action masks, wrong pickups and
+            // dropoffs, and the taxi sprite's orientation.
+            new GoldenCase {
+                Suite = "toy_text",
+                Name = "Taxi-v4.sampled.seed11",
+                EnvId = "Taxi-v4",
+                Seed = 11,
+                Actions = new GoldenActions.Sampled(11),
+                MaxSteps = 200,
+                FrameEvery = 25,
+                StateAttribute = "s",
+                CreateDotNet = renderMode => new GymNetEnv(new TaxiEnv(renderMode: renderMode)),
+            },
+            // Blackjack-v1 (registered sab=True) for one seeded game, a frame after every call: the dealt cards, the face-up
+            // card's image and the table's digits. The observation is a tuple, so there is no state attribute.
+            new GoldenCase {
+                Suite = "toy_text",
+                Name = "Blackjack-v1.sampled.seed5",
+                EnvId = "Blackjack-v1",
+                Seed = 5,
+                Actions = new GoldenActions.Sampled(5),
+                MaxSteps = 20,
+                FrameEvery = 1,
+                CreateDotNet = renderMode => new GymNetEnv(new BlackjackEnv(renderMode: renderMode, sab: true)),
             },
         }.ToDictionary(c => c.Key, StringComparer.Ordinal);
 

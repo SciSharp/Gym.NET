@@ -205,7 +205,9 @@ namespace Gym.SourceGenerators {
         /// <summary>
         ///     The members of a <c>[GymTuple]</c> or <c>[GymDict]</c> positional record: implicit conversions to and from the
         ///     generic form (<see langword="object"/>?[] for a tuple, <c>Info</c> for a dict), Python's <c>==</c> through
-        ///     <c>PyEquality</c>, a hash consistent with it, and Python's <c>repr</c>.
+        ///     <c>PyEquality</c>, a hash consistent with it, and Python's <c>repr</c>; a tuple record also implements
+        ///     <c>ITuple</c>, so code holding it as an <see langword="object"/> (a <c>Tuple</c> space's <c>contains</c>) reads its
+        ///     items.
         /// </summary>
         /// <param name="attributeContext">The attributed record.</param>
         /// <param name="asDict">Whether the record is a dict (else a tuple).</param>
@@ -234,7 +236,27 @@ namespace Gym.SourceGenerators {
             string? ns = type.ContainingNamespace.IsGlobalNamespace ? null : type.ContainingNamespace.ToDisplayString();
             if (ns is not null)
                 source.Append("namespace ").Append(ns).AppendLine(" {");
-            source.Append("    partial record ").Append(self).AppendLine(" {");
+            // A tuple record is also an ITuple: the run-time shape every tuple reader in Gym.NET already accepts (a Tuple space's
+            // membership, PyEquality, repr, the step results' array walk), which the static conversions cannot reach through
+            // an object reference, such as an env's observation checked by the env checker.
+            source.Append("    partial record ").Append(self).AppendLine(asDict ? " {" : " : global::System.Runtime.CompilerServices.ITuple {");
+            if (!asDict) {
+                source.AppendLine("        /// <summary>The item count, for code that reads any tuple through <see cref=\"global::System.Runtime.CompilerServices.ITuple\"/>.</summary>");
+                source.Append("        int global::System.Runtime.CompilerServices.ITuple.Length => ").Append(items.Length.ToString(CultureInfo.InvariantCulture)).AppendLine(";");
+                source.AppendLine();
+                source.AppendLine("        /// <summary>The item at a position, as the generic form holds it (the member itself, not a copy).</summary>");
+                source.AppendLine("        /// <param name=\"index\">The position.</param>");
+                source.AppendLine("        /// <returns>The item.</returns>");
+                source.AppendLine("        /// <exception cref=\"global::System.IndexOutOfRangeException\">Thrown for a position outside the record.</exception>");
+                source.AppendLine("        object? global::System.Runtime.CompilerServices.ITuple.this[int index] => index switch {");
+                // Each arm cast to object?: without it the arms' best common type can be one member's (NumSharp converts a
+                // long to an NDArray implicitly), and the switch would hand back a 0-d array for a long member.
+                for (int index = 0; index < items.Length; index++)
+                    source.Append("            ").Append(index.ToString(CultureInfo.InvariantCulture)).Append(" => (object?)").Append(items[index].Name).AppendLine(",");
+                source.AppendLine("            _ => throw new global::System.IndexOutOfRangeException(),");
+                source.AppendLine("        };");
+                source.AppendLine();
+            }
 
             // To the generic form.
             source.AppendLine("        /// <summary>");

@@ -40,8 +40,10 @@ refs/Gym.NET/
 │   │                              #   Transform (flip, scale, smoothscale), ImageIO (image.load/frombytes), SurfArray, Vector2
 │   ├── Gym.Environments/          # Concrete environment implementations
 │   │   ├── Envs/Classic/          # CartPoleEnv, MountainCarEnv (MountainCar-v0 and MountainCarContinuous-v0, DR-32), PendulumEnv, AcrobotEnv, ClassicControlUtils
+│   │   ├── Envs/ToyText/          # BlackjackEnv (+ BlackjackObservation, DR-13), FrozenLakeEnv, CliffWalkingEnv, TaxiEnv; ToyTextUtils (CategoricalSample,
+│   │   │                          #   CharMap: the 'c' map, N-2's workaround), PyKeys (Python's dict/list lookups of an action), ToyTextTransition
 │   │   ├── Envs/                  # NpScalar (NEP 50 scalars), HumanWindow (DR-20), EnvAssets (DR-19), RenderMath
-│   │   ├── Assets/                # Embedded env images copied from Gymnasium (classic_control/clockwise.png; README lists sources)
+│   │   ├── Assets/                # Embedded env images copied from Gymnasium (classic_control, toy_text; README lists sources and hashes)
 │   │   ├── Envs/Aether/           # LunarLanderEnv (Aether.Physics2D 2D physics simulation)
 │   │   ├── GymEnvironments.cs     # Register(): the built-in ids, from a module initializer (DR-12; GYMNET_DISABLE_ENV_REGISTRATION disarms it, DR-14)
 │   │   └── buildTransitive/       # Gym.NET.Environments.targets: the app-side registration initializer (DR-17)

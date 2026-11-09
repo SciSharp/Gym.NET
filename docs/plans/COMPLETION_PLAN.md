@@ -507,6 +507,34 @@ Specs: the port plan's §11.2, with v1.4.0's sources (1,868 lines) and art.
 - **P5.4** Taxi-v4: action masks in `info`.
 - **P5.5** Blackjack-v1: digit images, no font.
 - **Exit:** L3 and L4 for all six ids; `ansi` output identical to Gymnasium's text, byte for byte.
+- *Done 2026-11-09:*
+  - *`FrozenLakeEnv`, `CliffWalkingEnv`, `TaxiEnv` and `BlackjackEnv` in `Gym.Environments.Envs.ToyText`, registered in
+    Gymnasium's order as `Blackjack-v1` (kwargs `sab=True, natural=False`, in that order), `FrozenLake-v1`,
+    `FrozenLake8x8-v1`, `CliffWalking-v1`, `CliffWalkingSlippery-v1` and `Taxi-v4`, with Gymnasium's limits and
+    thresholds. The module functions are statics (DR-15): `ToyTextUtils.CategoricalSample` (the draw before the empty
+    check, as NumPy's), `FrozenLakeEnv.GenerateRandomMap`/`IsValid`, and Blackjack's `Cmp`, `DrawCard`, `DrawHand`,
+    `UsableAce`, `SumHand`, `IsBust`, `Score`, `IsNatural`, `DrawTable`. 97 images embedded (DR-19, hashes in
+    `Assets/README.md`); the maps through `ToyTextUtils.CharMap`, P5.1's workaround for N-2.*
+  - *Byte-exact details the ports carry: Python's dict lookup of the action (`True`, floats and NumPy scalars equal to a
+    key are actions; `KeyError(repr)` otherwise; `unhashable type` for arrays), Python's list indexing where the source
+    indexes a list with the action (FrozenLake's and Taxi's captions, Taxi's sprite: a float action raises at render
+    time, as in Python), `int` reset infos (`{"prob": 1}`), Taxi's int8 `action_mask`, the fickle passenger's extra
+    draws, Blackjack's draws in Gymnasium's order (dealer, player, suit, face) and its `np.str_` suit, the
+    `AttributeError`s before a reset at the point Python reaches them (after the first ground tile for CliffWalking's
+    frame, after the background for Taxi's).*
+  - *Typing (DR-13): `BlackjackEnv` is `Env<object?[], NDArray>`; `BlackjackObservation` reads an observation by name
+    through the generated conversion, and every `[GymTuple]` record is now an `ITuple`, so a `Tuple` space contains it
+    (DESIGN_REVIEW, consequences). Rewards are float64 as everywhere (Gymnasium's tables return ints); Taxi-v4's
+    threshold prints `8.0` where Gymnasium registers the int `8` (pinned).*
+  - *Parity: 10 FrozenLake cells, 10 CliffWalking, 15 Taxi, 12 Blackjack (one bare-assert cell each for Taxi and
+    Blackjack is `[OpenBugs("N-1")]`), 12 reverse-bridge cells (Gymnasium's `check_env` and `check_environments_match`
+    on all six ids, the bridge returning Python ints where Gymnasium's envs do: `BridgeObservation.PythonInt`,
+    `BridgeReward.Int`), 6 registration cells, and 6 goldens with frames; all gated cells passing. Unit: `ToyTextTests`
+    (10), `TupleRecord_IsAnITuple`, the N-2 proof `[OpenBugs("N-2")]`, the two registry suggestion tests promoted from
+    `[OpenBugs("P4", "P5")]`; inventory ratchet −16 names.*
+  - *Deferred: nothing of P5. Known non-exact corners, all documented on the members: a float action's
+    `taxi_orientation` reads as its key (2) where Python stores the float; an int `rainy_probability` kwarg becomes a
+    float64 probability in the table and info.*
 
 ### P6 Vector and wrappers
 
@@ -635,7 +663,9 @@ one:
   and the tests and cells that compare such a message are `[OpenBugs("N-1")]` until the NumSharp release (R0.1).
 - **N-2.** `np.array(string[], "c")` (and `np.asarray`) should split each string into characters, as NumPy does for the
   `'c'` code: `np.asarray(["SFFF", "FHFH", "FFFH", "HFFG"], dtype="c")` is a `(4, 4)` `S1` array. P5 is stuck without
-  it, so it carries a local map builder until NumSharp has it (P5.1).
+  it, so it carries a local map builder until NumSharp has it (P5.1): `ToyTextUtils.CharMap`, which builds NumPy's shape,
+  dtype and bytes from one-character strings. Proven by `NumSharpGapTests.N2_CharCode_SplitsStringsIntoCharacters`
+  (`[OpenBugs("N-2")]`).
 - **N-3.** DR-02: NumSharp owns every Python and NumPy exception. It lacks `NotImplementedError` and `ImportError`
   today (and any other a later port needs, such as `ModuleNotFoundError`), and each needs public constructors
   `()`, `(message)` and `(message, innerException)`. `AttributeError` can't carry an inner exception today, so

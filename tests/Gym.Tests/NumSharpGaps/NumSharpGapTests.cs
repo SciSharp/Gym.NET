@@ -26,6 +26,22 @@ namespace Gym.Tests.NumSharpGaps {
         }
 
         /// <summary>
+        ///     N-2: NumPy's <c>'c'</c> code splits each string into its characters: <c>np.asarray(["SFFF", "FHFH", "FFFH",
+        ///     "HFFG"], dtype="c")</c> is a <c>(4, 4)</c> <c>|S1</c> array whose bytes are the map's letters. NumSharp 0.80.0
+        ///     keeps one element per string, so the toy_text envs build their maps through <c>ToyTextUtils.CharMap</c> until
+        ///     this passes (P5.1).
+        /// </summary>
+        [TestMethod]
+        [OpenBugs("N-2")]
+        public void N2_CharCode_SplitsStringsIntoCharacters() {
+            string[] rows = { "SFFF", "FHFH", "FFFH", "HFFG" };
+            using NDArray map = np.array(rows, np.dtype("c"));
+            CollectionAssert.AreEqual(new long[] { 4, 4 }, map.shape, "NumPy's shape is (rows, characters).");
+            Assert.AreEqual("|S1", map.dtype.str);
+            CollectionAssert.AreEqual(System.Text.Encoding.ASCII.GetBytes(string.Concat(rows)), map.tobytes(), "One byte per character, row by row.");
+        }
+
+        /// <summary>
         ///     N-3: NumSharp owns every Python built-in exception Gym.NET throws (decision DR-02). NumSharp 0.80.0 lacks
         ///     <c>NotImplementedError</c> and <c>ImportError</c>, so <c>Gym.Exceptions</c> still defines them.
         /// </summary>

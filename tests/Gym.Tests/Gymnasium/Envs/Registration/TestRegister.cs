@@ -15,8 +15,8 @@ namespace Gym.Tests.Gymnasium.Envs.Registration {
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///     The suggestion cases that name envs of later phases (Blackjack and Taxi, P5; MountainCarContinuous, P4) are the
-    ///     <c>[OpenBugs]</c> methods below, which pass once those envs register.
+    ///     The suggestion cases that name envs of later phases (Blackjack and Taxi, P5; MountainCarContinuous, P4) are
+    ///     methods of their own, which were <c>[OpenBugs]</c> until those envs registered and are gates since P5.
     ///     </para>
     ///     <para>
     ///     The entry point <c>tests.envs.registration.utils_envs:ArgumentEnv</c> is this namespace's <c>ArgumentEnv</c>:
@@ -119,10 +119,12 @@ namespace Gym.Tests.Gymnasium.Envs.Registration {
             }
         }
 
-        /// <summary>The suggestions that name envs of later phases (Blackjack and Taxi in P5, MountainCarContinuous in P4).</summary>
+        /// <summary>
+        ///     The suggestions that name the envs of later phases (Blackjack and Taxi of P5, MountainCarContinuous of P4), which
+        ///     needed those envs registered; a gate since P5.
+        /// </summary>
         /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/tests/envs/registration/test_register.py#L80">test_env_suggestions</see>.</remarks>
         [TestMethod]
-        [OpenBugs("P4", "P5")]
         public void TestEnvSuggestions_LaterPhaseEnvs() {
             (string Input, string Suggested)[] cases = {
                 ("blackjack-v1", "Blackjack"),
@@ -155,10 +157,9 @@ namespace Gym.Tests.Gymnasium.Envs.Registration {
             StringAssert.Contains(deprecated.Message, "It provides the default version");
         }
 
-        /// <summary>The version suggestions that name envs of later phases.</summary>
+        /// <summary>The version suggestions that name the envs of later phases (P4's MountainCarContinuous, P5's Blackjack and Taxi); a gate since P5.</summary>
         /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/tests/envs/registration/test_register.py#L103">test_env_version_suggestions</see>.</remarks>
         [TestMethod]
-        [OpenBugs("P4", "P5")]
         public void TestEnvVersionSuggestions_LaterPhaseEnvs() {
             (string Input, string Suggested)[] cases = {
                 ("Blackjack-v10", "`v1`"),

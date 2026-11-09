@@ -235,8 +235,13 @@ namespace Gym.Tests.Parity.Oracle {
 
             if (IsInstance(value, PythonRuntimeBuiltin("float")))
                 return FromDouble(value.As<double>(), typeName);
-            if (IsInstance(value, PythonRuntimeBuiltin("str")))
-                return FromText(value.As<string>(), typeName);
+            if (IsInstance(value, PythonRuntimeBuiltin("str"))) {
+                // A str subclass (NumPy's np.str_, which choice over a list of strings returns) is refused by pythonnet's string
+                // converter; str() of it is a plain str with the same text. Gym.NET has no NumPy string scalar, so a .NET
+                // string is its counterpart, as a 0-d array is a NumPy number's.
+                using PyObject text = Python.builtins.str(value);
+                return FromText(text.As<string>(), typeName);
+            }
             if (IsInstance(value, PythonRuntimeBuiltin("dict"))) {
                 var pairs = new List<KeyValuePair<ValueFacts, ValueFacts>>();
                 using PyObject items = value.InvokeMethod("items");

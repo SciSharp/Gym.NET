@@ -136,3 +136,20 @@ Effects of approved designs that only showed up in code. None changes a design; 
   facade, `Gym.Tests.csproj` imports it with a `global using static`, so tests call `Make("CartPole-v1")`, as Python's
   `from gymnasium import make` reads; the facade's own tests may also spell `global::Gym.Gymnasium`. Consumers'
   projects are unaffected unless they declare a `Gymnasium` namespace of their own.
+- **DR-13 with DR-08 on Blackjack** (found in P5.5, 2026-11-09): `BlackjackEnv` is `Env<object?[], NDArray>`, and
+  `BlackjackObservation` reads its observations by name through the generated conversion
+  (`BlackjackObservation obs = env.Reset().Observation;`). Typing the env by the record would need a
+  `Space<BlackjackObservation>`, a typed tuple space that every space tool (flatten, the vector utils, both checkers,
+  the reverse bridge) recognizes beside `Tuple`; no DR covers one, so the observation space stays Gymnasium's `Tuple` and
+  the observation its generic form, which every tool already reads. A maintainer who wants the env typed by the record
+  gets a design question for that space first.
+- **DR-13, the generated tuple records** (found in P5.5, 2026-11-09): a `[GymTuple]` record also implements
+  `System.Runtime.CompilerServices.ITuple`, the shape every tuple reader in Gym.NET accepts (a `Tuple` space's
+  `contains`, `PyEquality`, `repr`, the results' array walk), so a record held as an `object` is still the tuple it
+  stands for: `env.ObservationSpace.Contains(obs)` holds for a `BlackjackObservation`. The generated indexer casts each
+  member to `object?`, because NumSharp's implicit `long` → `NDArray` conversion would otherwise make the arms' common
+  type `NDArray` and return a 0-d array for a `long` member (caught by `GymRecordsTests.TupleRecord_IsAnITuple`).
+- **Float64 rewards with the registry** (found in P5.4, 2026-11-09): `EnvSpec.RewardThreshold` is a `double?`, so
+  Taxi-v4's threshold, which Gymnasium registers as the `int` 8 (its annotation says `float`), prints `8.0` in
+  `pprint` and `to_json`; the value is equal. Pinned by `RegistrationLiveParityTests.Spec_TaxiRewardThreshold_IsFloat64`,
+  as rewards are float64 everywhere in Gym.NET.

@@ -64,14 +64,19 @@ namespace Gym.Tests.Parity.Bridge {
         /// <summary>The Python type <see cref="Step"/> returns the reward as.</summary>
         private readonly BridgeReward _reward;
 
+        /// <summary>How <see cref="Reset"/> and <see cref="Step"/> return the observation.</summary>
+        private readonly BridgeObservation _observation;
+
         /// <summary>Takes ownership of <paramref name="env"/>.</summary>
         /// <param name="env">The env; disposed with this object.</param>
         /// <param name="envType">The env's class, named in the spec <see cref="SetSpec"/> mirrors.</param>
         /// <param name="reward">The Python type of the reward <see cref="Step"/> returns: the type Gymnasium's env of that class returns.</param>
-        internal BridgedEnv(IEnv env, Type envType, BridgeReward reward = BridgeReward.Float) {
+        /// <param name="observation">How the observations cross: as Gymnasium's env of that class returns them.</param>
+        internal BridgedEnv(IEnv env, Type envType, BridgeReward reward = BridgeReward.Float, BridgeObservation observation = BridgeObservation.Shared) {
             _env = env;
             _envType = envType;
             _reward = reward;
+            _observation = observation;
         }
 
         /// <summary>The Gym.NET env, for a test that inspects it after Gymnasium's tools ran.</summary>
@@ -79,7 +84,7 @@ namespace Gym.Tests.Parity.Bridge {
 
         /// <summary>
         ///     <c>env.reset(seed=seed, options=options)</c>: resets the .NET env and returns <c>(obs, info)</c>, the observation as
-        ///     a zero-copy view.
+        ///     a zero-copy view (or as Python ints, <see cref="BridgeObservation.PythonInt"/>).
         /// </summary>
         /// <param name="seed">A Python <c>int</c> or <c>None</c> (also a CLR <see langword="null"/>); disposed here.</param>
         /// <param name="options">A <c>dict</c> or <c>None</c>; disposed here.</param>
@@ -100,7 +105,7 @@ namespace Gym.Tests.Parity.Bridge {
                 ResetResult<object?> result = _env.Reset(clrSeed, clrOptions);
                 try {
                     return PythonRuntime.Run(() => {
-                        using PyObject observation = PyConvert.ToPythonShared(result.Observation);
+                        using PyObject observation = CrossObservation(result.Observation);
                         using PyObject info = PyConvert.ToPythonShared(result.Info);
                         return HandOff(new PyTuple(new[] { observation, info }));
                     });
@@ -117,8 +122,9 @@ namespace Gym.Tests.Parity.Bridge {
         /// <summary>
         ///     <c>env.step(action)</c>: converts the action (<see cref="PyConvert.FromPython"/>: a NumPy scalar becomes a 0-d
         ///     array, an <c>int</c> a <see langword="long"/>), steps the .NET env, and returns
-        ///     <c>(obs, reward, terminated, truncated, info)</c> with <c>bool</c> flags and the reward as the bridge was told
-        ///     Gymnasium's env returns it (<see cref="BridgeReward"/>: a <c>float</c>, or an <c>np.float64</c>).
+        ///     <c>(obs, reward, terminated, truncated, info)</c> with <c>bool</c> flags, and the observation and the reward as the
+        ///     bridge was told Gymnasium's env returns them (<see cref="BridgeObservation"/>; <see cref="BridgeReward"/>: a
+        ///     <c>float</c>, an <c>np.float64</c> or an <c>int</c>).
         /// </summary>
         /// <param name="action">The action; disposed here.</param>
         /// <returns>The tuple, handed to Python.</returns>
@@ -133,10 +139,15 @@ namespace Gym.Tests.Parity.Bridge {
                 StepResult<object?> result = _env.Step(clrAction);
                 try {
                     return PythonRuntime.Run(() => {
-                        using PyObject observation = PyConvert.ToPythonShared(result.Observation);
+                        using PyObject observation = CrossObservation(result.Observation);
                         // Gym.NET's reward is a float64 double; its Python type is the one Gymnasium's env of this class
-                        // returns, which data_equivalence compares (Pendulum's -costs is an np.float64, CartPole's 1.0 a float).
-                        using PyObject reward = _reward == BridgeReward.NumpyFloat64 ? Python.numpy.float64(result.Reward) : new PyFloat(result.Reward);
+                        // returns, which data_equivalence compares (Pendulum's -costs is an np.float64, CartPole's 1.0 a float,
+                        // the toy_text tables' -1 an int).
+                        using PyObject reward = _reward switch {
+                            BridgeReward.NumpyFloat64 => Python.numpy.float64(result.Reward),
+                            BridgeReward.Int => new PyInt(checked((long)result.Reward)),
+                            _ => new PyFloat(result.Reward),
+                        };
                         using PyObject terminated = result.Terminated.ToPython();
                         using PyObject truncated = result.Truncated.ToPython();
                         using PyObject info = PyConvert.ToPythonShared(result.Info);
@@ -151,6 +162,41 @@ namespace Gym.Tests.Parity.Bridge {
                 Outcome.Release(clrAction);
             }
         });
+
+        /// <summary>
+        ///     The observation as Gymnasium's env of this class returns it: a zero-copy view (<see cref="BridgeObservation.Shared"/>),
+        ///     or with every 0-d integer array, alone or in a tuple, as a Python <c>int</c> (<see cref="BridgeObservation.PythonInt"/>).
+        ///     Must run under the GIL.
+        /// </summary>
+        /// <param name="observation">The .NET observation; still owned by the caller.</param>
+        /// <returns>A new owned reference.</returns>
+        private PyObject CrossObservation(object? observation) {
+            if (_observation == BridgeObservation.Shared)
+                return PyConvert.ToPythonShared(observation);
+            return AsPythonInts(observation);
+
+            static PyObject AsPythonInts(object? value) {
+                switch (value) {
+                    case NDArray { ndim: 0 } scalar when scalar.dtype.kind is 'i' or 'u':
+                        // int(s): the toy_text envs return Python ints, which data_equivalence tells from NumPy integers.
+                        return new PyInt(Convert.ToInt64(scalar.GetAtIndex(0), System.Globalization.CultureInfo.InvariantCulture));
+                    case object?[] tuple: {
+                        var items = new PyObject[tuple.Length];
+                        try {
+                            for (int i = 0; i < items.Length; i++)
+                                items[i] = AsPythonInts(tuple[i]);
+                            return new PyTuple(items);
+                        } finally {
+                            // PyTuple takes its own references to the items.
+                            foreach (PyObject? item in items)
+                                item?.Dispose();
+                        }
+                    }
+                    default:
+                        return PyConvert.ToPythonShared(value);
+                }
+            }
+        }
 
         /// <summary>
         ///     <c>env.render()</c>: an <c>rgb_array</c> frame as a zero-copy <c>(H, W, 3)</c> uint8 view, <c>None</c> for human
@@ -432,16 +478,22 @@ namespace Gym.Tests.Parity.Bridge {
         /// <summary>The Python type of the rewards the built envs return.</summary>
         private readonly BridgeReward _reward;
 
+        /// <summary>How the built envs return their observations.</summary>
+        private readonly BridgeObservation _observation;
+
         /// <summary>A factory for <paramref name="envType"/>.</summary>
         /// <param name="envType">The env class.</param>
         /// <param name="create">How to build the env from the kwargs.</param>
         /// <param name="register">Receives every built env.</param>
         /// <param name="reward">The Python type of the rewards the built envs return.</param>
-        internal BridgedEnvFactory(Type envType, Func<Info, IEnv> create, Action<BridgedEnv> register, BridgeReward reward = BridgeReward.Float) {
+        /// <param name="observation">How the built envs return their observations.</param>
+        internal BridgedEnvFactory(Type envType, Func<Info, IEnv> create, Action<BridgedEnv> register, BridgeReward reward = BridgeReward.Float,
+            BridgeObservation observation = BridgeObservation.Shared) {
             _envType = envType;
             _create = create;
             _register = register;
             _reward = reward;
+            _observation = observation;
         }
 
         /// <summary>Builds a .NET env from the shim constructor's kwargs and wraps it for Python.</summary>
@@ -458,7 +510,7 @@ namespace Gym.Tests.Parity.Bridge {
             });
             // The env may keep its arguments (an array kwarg becomes its state), so they are not released here.
             IEnv env = _create(arguments);
-            var bridged = new BridgedEnv(env, _envType, _reward);
+            var bridged = new BridgedEnv(env, _envType, _reward, _observation);
             _register(bridged);
             return bridged;
         });
@@ -466,9 +518,10 @@ namespace Gym.Tests.Parity.Bridge {
 
     /// <summary>
     ///     The Python type a bridged env returns its reward as. Gym.NET's reward is always a float64 <see langword="double"/>;
-    ///     Gymnasium's envs return a Python <c>float</c> (CartPole, MountainCar, Acrobot) or a NumPy scalar (Pendulum's
-    ///     <c>-costs</c> is an <c>np.float64</c>), and <c>check_environments_match</c>'s <c>data_equivalence</c> compares the
-    ///     types, so the bridge returns the type Gymnasium's env of the same class does.
+    ///     Gymnasium's envs return a Python <c>float</c> (CartPole, MountainCar, Acrobot, Blackjack), a NumPy scalar
+    ///     (Pendulum's <c>-costs</c> is an <c>np.float64</c>) or a Python <c>int</c> (the toy_text tables), and
+    ///     <c>check_environments_match</c>'s <c>data_equivalence</c> compares the types, so the bridge returns the type
+    ///     Gymnasium's env of the same class does.
     /// </summary>
     public enum BridgeReward {
         /// <summary>A Python <c>float</c>.</summary>
@@ -476,6 +529,23 @@ namespace Gym.Tests.Parity.Bridge {
 
         /// <summary>A NumPy <c>np.float64</c>.</summary>
         NumpyFloat64,
+
+        /// <summary>A Python <c>int</c>: the toy_text tables' rewards (FrozenLake's schedule, CliffWalking's and Taxi's -1, -10, -100, 20).</summary>
+        Int,
+    }
+
+    /// <summary>
+    ///     How a bridged env returns its observations. Gym.NET's discrete observation is a 0-d int64 array (DR-08), where
+    ///     Gymnasium's toy_text envs return <c>int(s)</c> (Blackjack a tuple of ints), and <c>check_environments_match</c>'s
+    ///     <c>data_equivalence</c> tells a Python <c>int</c> from a NumPy integer, so the bridge returns what Gymnasium's env of
+    ///     the same class does.
+    /// </summary>
+    public enum BridgeObservation {
+        /// <summary>Zero-copy NumPy views of the arrays (<see cref="PyConvert.ToPythonShared"/>): the array envs.</summary>
+        Shared,
+
+        /// <summary>Every 0-d integer array, alone or in a tuple, as a Python <c>int</c>; anything else as <see cref="Shared"/>.</summary>
+        PythonInt,
     }
 
     /// <summary>

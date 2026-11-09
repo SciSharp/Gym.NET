@@ -1828,6 +1828,227 @@ namespace Gym.Tests.Parity {
                     }
                 }
 
+                /// <summary><c>gymnasium.envs.toy_text</c>.</summary>
+                internal static class toy_text {
+                    /// <summary><c>gymnasium.envs.toy_text.frozen_lake</c>.</summary>
+                    internal static class frozen_lake {
+                        /// <summary><c>generate_random_map(size=size, p=p, seed=seed)</c>: a random map with a path from start to goal.</summary>
+                        /// <param name="size">The map's side.</param>
+                        /// <param name="p">The probability of a frozen tile.</param>
+                        /// <param name="seed">The seed of <c>seeding.np_random</c>.</param>
+                        /// <returns>A new owned reference to the list of rows.</returns>
+                        /// <exception cref="PythonException">Thrown when the generator refuses the probabilities or the map cannot be built.</exception>
+                        internal static PyObject generate_random_map(long size, double p, long seed) {
+                            using PyObject function = PythonRuntime.Import("gymnasium.envs.toy_text.frozen_lake").GetAttr("generate_random_map");
+                            using var arguments = new PyDict();
+                            using var sizeValue = new PyInt(size);
+                            using var pValue = new PyFloat(p);
+                            using var seedValue = new PyInt(seed);
+                            arguments["size"] = sizeValue;
+                            arguments["p"] = pValue;
+                            arguments["seed"] = seedValue;
+                            return function.Invoke(Array.Empty<PyObject>(), arguments);
+                        }
+
+                        /// <summary><c>FrozenLakeEnv</c> instance attributes (on the unwrapped env).</summary>
+                        internal static class FrozenLakeEnv {
+                            /// <summary><c>env.s</c>: the agent's state (an int, or the <c>np.int64</c> a reset draws).</summary>
+                            /// <param name="env">The unwrapped env.</param>
+                            /// <returns>A new owned reference.</returns>
+                            /// <exception cref="PythonException">Thrown before the first reset, where the attribute does not exist yet.</exception>
+                            internal static PyObject s(PyObject env) => env.GetAttr("s");
+
+                            /// <summary><c>env.desc</c>: the map as an <c>S1</c> array of shape <c>(nrow, ncol)</c>.</summary>
+                            /// <param name="env">The unwrapped env.</param>
+                            /// <returns>A new owned reference.</returns>
+                            /// <exception cref="PythonException">Thrown when the attribute lookup fails.</exception>
+                            internal static PyObject desc(PyObject env) => env.GetAttr("desc");
+                        }
+                    }
+
+                    /// <summary><c>gymnasium.envs.toy_text.cliffwalking</c>.</summary>
+                    internal static class cliffwalking {
+                        /// <summary><c>CliffWalkingEnv</c> instance attributes (on the unwrapped env).</summary>
+                        internal static class CliffWalkingEnv {
+                            /// <summary><c>env.s</c>: the agent's state (the <c>np.int64</c> a reset or a table lookup gives).</summary>
+                            /// <param name="env">The unwrapped env.</param>
+                            /// <returns>A new owned reference.</returns>
+                            /// <exception cref="PythonException">Thrown before the first reset, where the attribute does not exist yet.</exception>
+                            internal static PyObject s(PyObject env) => env.GetAttr("s");
+
+                            /// <summary><c>env.s = value</c>: injects a state, which the next step looks up and the next render draws.</summary>
+                            /// <param name="env">The unwrapped env.</param>
+                            /// <param name="value">The state; stays owned by the caller (the env keeps its own reference).</param>
+                            /// <exception cref="PythonException">Thrown when the assignment fails.</exception>
+                            internal static void s(PyObject env, PyObject value) => env.SetAttr("s", value);
+                        }
+                    }
+
+                    /// <summary><c>gymnasium.envs.toy_text.taxi</c>.</summary>
+                    internal static class taxi {
+                        /// <summary><c>TaxiEnv</c> instance attributes and methods (on the unwrapped env).</summary>
+                        internal static class TaxiEnv {
+                            /// <summary><c>env.s</c>: the encoded state (an <c>np.int64</c> after a reset or a fickle step, else an int).</summary>
+                            /// <param name="env">The unwrapped env.</param>
+                            /// <returns>A new owned reference.</returns>
+                            /// <exception cref="PythonException">Thrown before the first reset, where the attribute does not exist yet.</exception>
+                            internal static PyObject s(PyObject env) => env.GetAttr("s");
+
+                            /// <summary><c>env.s = value</c>: injects a state, which the next step looks up and the next render draws.</summary>
+                            /// <param name="env">The unwrapped env.</param>
+                            /// <param name="value">The state; stays owned by the caller (the env keeps its own reference).</param>
+                            /// <exception cref="PythonException">Thrown when the assignment fails.</exception>
+                            internal static void s(PyObject env, PyObject value) => env.SetAttr("s", value);
+
+                            /// <summary><c>env.desc</c>: the map as a <c>(7, 11)</c> <c>S1</c> array.</summary>
+                            /// <param name="env">The unwrapped env.</param>
+                            /// <returns>A new owned reference.</returns>
+                            /// <exception cref="PythonException">Thrown when the attribute lookup fails.</exception>
+                            internal static PyObject desc(PyObject env) => env.GetAttr("desc");
+
+                            /// <summary><c>env.initial_state_distrib</c>: the start distribution, a float64 array of 500.</summary>
+                            /// <param name="env">The unwrapped env.</param>
+                            /// <returns>A new owned reference.</returns>
+                            /// <exception cref="PythonException">Thrown when the attribute lookup fails.</exception>
+                            internal static PyObject initial_state_distrib(PyObject env) => env.GetAttr("initial_state_distrib");
+
+                            /// <summary><c>env.taxi_orientation</c>: the sprite's orientation, which renders (not steps) update.</summary>
+                            /// <param name="env">The unwrapped env.</param>
+                            /// <returns>A new owned reference.</returns>
+                            /// <exception cref="PythonException">Thrown when the attribute lookup fails.</exception>
+                            internal static PyObject taxi_orientation(PyObject env) => env.GetAttr("taxi_orientation");
+
+                            /// <summary><c>env.fickle_step</c>: whether the passenger may still change their destination this episode.</summary>
+                            /// <param name="env">The unwrapped env.</param>
+                            /// <returns>A new owned reference (a <c>bool</c>, or the <c>np.bool</c> a fickle reset draws).</returns>
+                            /// <exception cref="PythonException">Thrown when the attribute lookup fails.</exception>
+                            internal static PyObject fickle_step(PyObject env) => env.GetAttr("fickle_step");
+
+                            /// <summary><c>env.fickle_step = value</c>: arms (or disarms) the fickle passenger for the next move with them aboard.</summary>
+                            /// <param name="env">The unwrapped env.</param>
+                            /// <param name="value">The flag; stays owned by the caller.</param>
+                            /// <exception cref="PythonException">Thrown when the assignment fails.</exception>
+                            internal static void fickle_step(PyObject env, PyObject value) => env.SetAttr("fickle_step", value);
+
+                            /// <summary><c>env.encode(taxi_row, taxi_col, pass_loc, dest_idx)</c>: the state of four parts.</summary>
+                            /// <param name="env">The unwrapped env.</param>
+                            /// <param name="taxiRow">The taxi's row.</param>
+                            /// <param name="taxiCol">The taxi's column.</param>
+                            /// <param name="passLoc">The passenger's place.</param>
+                            /// <param name="destIdx">The destination.</param>
+                            /// <returns>A new owned reference to the state.</returns>
+                            /// <exception cref="PythonException">Thrown when the call raises.</exception>
+                            internal static PyObject encode(PyObject env, long taxiRow, long taxiCol, long passLoc, long destIdx) {
+                                using var row = new PyInt(taxiRow);
+                                using var col = new PyInt(taxiCol);
+                                using var pass = new PyInt(passLoc);
+                                using var dest = new PyInt(destIdx);
+                                return env.InvokeMethod("encode", row, col, pass, dest);
+                            }
+
+                            /// <summary><c>env.decode(i)</c>: a state's four parts, as a tuple.</summary>
+                            /// <param name="env">The unwrapped env.</param>
+                            /// <param name="i">The state.</param>
+                            /// <returns>A new owned reference to the tuple.</returns>
+                            /// <exception cref="PythonException">Thrown for a state beyond the grid (the bare <c>AssertionError</c>).</exception>
+                            internal static PyObject decode(PyObject env, long i) {
+                                using var state = new PyInt(i);
+                                return env.InvokeMethod("decode", state);
+                            }
+
+                            /// <summary><c>env.action_mask(state)</c>: the int8 mask of the actions that change the state.</summary>
+                            /// <param name="env">The unwrapped env.</param>
+                            /// <param name="state">The state.</param>
+                            /// <returns>A new owned reference to the mask.</returns>
+                            /// <exception cref="PythonException">Thrown for a state beyond the grid.</exception>
+                            internal static PyObject action_mask(PyObject env, long state) {
+                                using var value = new PyInt(state);
+                                return env.InvokeMethod("action_mask", value);
+                            }
+                        }
+                    }
+
+                    /// <summary><c>gymnasium.envs.toy_text.blackjack</c>: the module's card functions.</summary>
+                    internal static class blackjack {
+                        /// <summary><c>cmp(a, b)</c>: <c>float(a &gt; b) - float(a &lt; b)</c>.</summary>
+                        /// <param name="a">The first value; stays owned by the caller.</param>
+                        /// <param name="b">The second value; stays owned by the caller.</param>
+                        /// <returns>A new owned reference to the float.</returns>
+                        /// <exception cref="PythonException">Thrown when the values do not compare.</exception>
+                        internal static PyObject cmp(PyObject a, PyObject b) {
+                            using PyObject function = PythonRuntime.Import("gymnasium.envs.toy_text.blackjack").GetAttr("cmp");
+                            return function.Invoke(a, b);
+                        }
+
+                        /// <summary><c>draw_card(np_random)</c>: one card of the deck (one <c>choice</c> draw), as an int.</summary>
+                        /// <param name="npRandom">The generator; stays owned by the caller.</param>
+                        /// <returns>A new owned reference to the card.</returns>
+                        /// <exception cref="PythonException">Thrown when the draw fails.</exception>
+                        internal static PyObject draw_card(PyObject npRandom) {
+                            using PyObject function = PythonRuntime.Import("gymnasium.envs.toy_text.blackjack").GetAttr("draw_card");
+                            return function.Invoke(npRandom);
+                        }
+
+                        /// <summary><c>draw_hand(np_random)</c>: two cards, as a list.</summary>
+                        /// <param name="npRandom">The generator; stays owned by the caller.</param>
+                        /// <returns>A new owned reference to the list.</returns>
+                        /// <exception cref="PythonException">Thrown when the draw fails.</exception>
+                        internal static PyObject draw_hand(PyObject npRandom) {
+                            using PyObject function = PythonRuntime.Import("gymnasium.envs.toy_text.blackjack").GetAttr("draw_hand");
+                            return function.Invoke(npRandom);
+                        }
+
+                        /// <summary>One of the module's hand functions by name (<c>usable_ace</c>, <c>sum_hand</c>, <c>is_bust</c>, <c>score</c>, <c>is_natural</c>), called on a hand.</summary>
+                        /// <param name="name">The function's name.</param>
+                        /// <param name="hand">The hand; stays owned by the caller.</param>
+                        /// <returns>A new owned reference to the result.</returns>
+                        /// <exception cref="PythonException">Thrown when the function raises (a hand of other than numbers).</exception>
+                        internal static PyObject hand_function(string name, PyObject hand) {
+                            using PyObject function = PythonRuntime.Import("gymnasium.envs.toy_text.blackjack").GetAttr(name);
+                            return function.Invoke(hand);
+                        }
+
+                        /// <summary><c>BlackjackEnv</c> instance attributes (on the unwrapped env).</summary>
+                        internal static class BlackjackEnv {
+                            /// <summary><c>env.player</c>: the player's cards, a list.</summary>
+                            /// <param name="env">The unwrapped env.</param>
+                            /// <returns>A new owned reference.</returns>
+                            /// <exception cref="PythonException">Thrown before the first reset, where the attribute does not exist yet.</exception>
+                            internal static PyObject player(PyObject env) => env.GetAttr("player");
+
+                            /// <summary><c>env.player = value</c>: injects the player's cards.</summary>
+                            /// <param name="env">The unwrapped env.</param>
+                            /// <param name="value">The list; stays owned by the caller (the env keeps its own reference).</param>
+                            /// <exception cref="PythonException">Thrown when the assignment fails.</exception>
+                            internal static void player(PyObject env, PyObject value) => env.SetAttr("player", value);
+
+                            /// <summary><c>env.dealer</c>: the dealer's cards, a list.</summary>
+                            /// <param name="env">The unwrapped env.</param>
+                            /// <returns>A new owned reference.</returns>
+                            /// <exception cref="PythonException">Thrown before the first reset, where the attribute does not exist yet.</exception>
+                            internal static PyObject dealer(PyObject env) => env.GetAttr("dealer");
+
+                            /// <summary><c>env.dealer = value</c>: injects the dealer's cards.</summary>
+                            /// <param name="env">The unwrapped env.</param>
+                            /// <param name="value">The list; stays owned by the caller (the env keeps its own reference).</param>
+                            /// <exception cref="PythonException">Thrown when the assignment fails.</exception>
+                            internal static void dealer(PyObject env, PyObject value) => env.SetAttr("dealer", value);
+
+                            /// <summary><c>env.dealer_top_card_suit</c>: the face-up card's suit, the <c>np.str_</c> a reset draws.</summary>
+                            /// <param name="env">The unwrapped env.</param>
+                            /// <returns>A new owned reference.</returns>
+                            /// <exception cref="PythonException">Thrown before the first reset, where the attribute does not exist yet.</exception>
+                            internal static PyObject dealer_top_card_suit(PyObject env) => env.GetAttr("dealer_top_card_suit");
+
+                            /// <summary><c>env.dealer_top_card_value_str</c>: the face-up card's face (<c>A</c>, a digit, or the drawn <c>J</c>/<c>Q</c>/<c>K</c>).</summary>
+                            /// <param name="env">The unwrapped env.</param>
+                            /// <returns>A new owned reference.</returns>
+                            /// <exception cref="PythonException">Thrown before the first reset, where the attribute does not exist yet.</exception>
+                            internal static PyObject dealer_top_card_value_str(PyObject env) => env.GetAttr("dealer_top_card_value_str");
+                        }
+                    }
+                }
+
                 /// <summary><c>gymnasium.envs.box2d</c>.</summary>
                 internal static class box2d {
                     /// <summary><c>gymnasium.envs.box2d.lunar_lander</c>.</summary>

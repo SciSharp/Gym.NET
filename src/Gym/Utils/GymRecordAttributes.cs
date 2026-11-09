@@ -25,7 +25,10 @@ namespace Gym.Utils {
     /// </summary>
     /// <remarks>
     ///     The conversions share the members' values (arrays are not copied). Equality is Python's, not the record's:
-    ///     arrays compare by value, so the hash is the member count, the only thing equal records always share.
+    ///     arrays compare by value, so the hash is the member count, the only thing equal records always share. The record
+    ///     also implements <see cref="System.Runtime.CompilerServices.ITuple"/>, so code that holds it as an
+    ///     <see langword="object"/> (a <c>Tuple</c> space's membership, the env checker, <c>PyEquality</c>) reads it as the
+    ///     tuple it stands for.
     /// </remarks>
     [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
     public sealed class GymTupleAttribute : Attribute { }
