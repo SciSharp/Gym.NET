@@ -388,9 +388,18 @@ Specs: the port plan's §8, §9 (the `make()` stack) and §12.
   `pprint_registry`, `check_obs`.*
 - **P3.5 The reverse bridge** (the interop design's §8): a Python env class over a Gym.NET env, so Gymnasium's own
   `check_env` and `check_environments_match` run against Gym.NET's envs in the live suite. Every later env phase adds
-  its ids to it.
+  its ids to it. *Done 2026-11-09: `tests/Gym.Tests.Parity/Bridge` (a `GymNetShim(gymnasium.Env)` snippet class
+  subclassed per .NET env class, a mirrored `EnvSpec` so `gymnasium.make` builds Gymnasium's stack over a Gym.NET env,
+  mirrored spaces, zero-copy observations, the PCG64 state mirrored after every call, Gym.NET's exceptions and
+  warnings raised as Python's). Cells: `check_env` on CartPole made, bare and `rgb_array` (held to Gymnasium's verdict
+  on its own env and to `EnvChecker.CheckEnv`), `check_environments_match` against Gymnasium's CartPole with frames,
+  `make`'s wrapped `TypeError`, warnings, and three negative controls (a planted tau, a reused buffer, an unseeded
+  reset). A later env phase adds a cell per id; spaces beyond `Box`/`Discrete`/`Tuple`/`Dict` get a mirror when an env
+  needs one. Gymnasium's pytest modules through the bridge (the design's third item) stay unbuilt.*
 - **Exit:** those tests green; Gymnasium's `make("CartPole-v1")` and `Gymnasium.Make("CartPole-v1")` agree for whole
-  episodes, `PassiveEnvChecker` included; both our `check_env` and Gymnasium's pass on CartPole.
+  episodes, `PassiveEnvChecker` included; both our `check_env` and Gymnasium's pass on CartPole. *Met 2026-11-09: the
+  live `MadeStack` cells (P3.4), and `CheckEnv_PassesGymNetsCartPole_AsGymnasiumsOwn`, where Gymnasium's `check_env`
+  on the bridged CartPole and Gym.NET's own both give Gymnasium's verdict on its own CartPole.*
 
 ### P7 Rasterizer, ahead of P4
 

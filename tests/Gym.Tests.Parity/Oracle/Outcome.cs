@@ -209,5 +209,39 @@ namespace Gym.Tests.Parity.Oracle {
                 return "Gym.Exceptions." + pythonType.Substring(gymnasiumErrors.Length);
             return null;
         }
+
+        /// <summary>
+        ///     The Python exception type a .NET exception stands for: the reverse of <see cref="DotNetTypeFor"/>, which the
+        ///     reverse bridge uses to raise in Python what a Gym.NET env threw, so Gymnasium's tools see an
+        ///     <c>AssertionError</c> where a Gymnasium env would fail an <c>assert</c> (<c>NumSharp.AssertionError</c>), and
+        ///     <c>gymnasium.error.ResetNeeded</c> where it would raise that (<c>Gym.Exceptions.ResetNeeded</c>).
+        /// </summary>
+        /// <param name="exception">The exception.</param>
+        /// <returns>
+        ///     The Python type's name (<c>AssertionError</c>, <c>gymnasium.error.Error</c>), taken from the exception's own type
+        ///     or else its nearest base type that maps; <see langword="null"/> when none does (an <see cref="ArgumentException"/>,
+        ///     an <see cref="ObjectDisposedException"/>), so the caller lets the CLR exception through as it is.
+        /// </returns>
+        /// <remarks>
+        ///     A <c>Gym.Exceptions</c> name maps to <c>gymnasium.error</c> by name alone, and Gym.NET keeps classes Gymnasium
+        ///     does not have (the legacy API's errors), so the caller must check that the Python type exists. Only built-in names
+        ///     reverse from <see cref="BuiltIns"/>: <c>json.decoder.JSONDecodeError</c> shares <c>NumSharp.ValueError</c> with
+        ///     <c>ValueError</c>, and <c>ValueError</c> is what a Gym.NET <c>ValueError</c> stands for.
+        /// </remarks>
+        public static string? PythonTypeFor(Exception exception) {
+            for (Type? type = exception.GetType(); type != null && type != typeof(Exception); type = type.BaseType) {
+                string fullName = type.FullName ?? type.Name;
+                foreach ((string python, string dotnet) in BuiltIns) {
+                    if (string.Equals(dotnet, fullName, StringComparison.Ordinal) && !python.Contains('.'))
+                        return python;
+                }
+
+                const string gymErrors = "Gym.Exceptions.";
+                if (fullName.StartsWith(gymErrors, StringComparison.Ordinal))
+                    return "gymnasium.error." + fullName.Substring(gymErrors.Length);
+            }
+
+            return null;
+        }
     }
 }

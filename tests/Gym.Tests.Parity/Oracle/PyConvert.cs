@@ -5,6 +5,8 @@ using System.Globalization;
 using System.Linq;
 using System.Numerics;
 using System.Runtime.CompilerServices;
+using Gym.Envs;
+using Gym.Tests.Parity.Interop;
 using NumSharp;
 using NumSharp.Interop.PythonNet;
 using Python.Runtime;
@@ -164,6 +166,193 @@ namespace Gym.Tests.Parity.Oracle {
                 foreach (PyObject? item in items)
                     item?.Dispose();
             }
+        }
+
+        /// <summary>
+        ///     Converts a Gym.NET value to Python the way <see cref="ToPython"/> does, except that arrays cross as zero-copy
+        ///     NumPy views (NumSharp's <c>ToNumpy</c>) instead of copies. This is what the reverse bridge hands Gymnasium: two
+        ///     results that share memory in Gym.NET share it in Python too, which is exactly what Gymnasium's data-reuse checks
+        ///     (<c>check_returned_data_not_reused</c>, <c>PassiveEnvChecker</c>) look for, so a copy here would hide the defect
+        ///     they exist to catch. An <see langword="object"/>?[] crosses as a <c>tuple</c> (Gym.NET's tuple, DR-13), any other
+        ///     list as a <c>list</c>, a string-keyed dictionary (<c>Info</c>) as a <c>dict</c> in its order, recursively; other
+        ///     values convert as <see cref="ToPython"/> converts them.
+        /// </summary>
+        /// <param name="value">
+        ///     The value. Its arrays stay owned by the caller, which may dispose them as soon as this returns: each view holds its
+        ///     own reference to the memory until Python lets go of the last view over it.
+        /// </param>
+        /// <returns>A new owned reference. Must be called under the GIL.</returns>
+        /// <exception cref="ArgumentException">Thrown for a value with no defined conversion.</exception>
+        /// <exception cref="NotSupportedException">Thrown for a <c>StringDType</c> array, which keeps its text outside any buffer a view could share.</exception>
+        internal static PyObject ToPythonShared(object? value) {
+            switch (value) {
+                case NDArray array:
+                    return array.ToNumpy();
+                case object?[] tuple: {
+                    var items = new PyObject[tuple.Length];
+                    try {
+                        for (int i = 0; i < items.Length; i++)
+                            items[i] = ToPythonShared(tuple[i]);
+                        return new PyTuple(items);
+                    } finally {
+                        // PyTuple takes its own references to the items.
+                        foreach (PyObject? item in items)
+                            item?.Dispose();
+                    }
+                }
+                case IEnumerable<KeyValuePair<string, object?>> entries: {
+                    var dictionary = new PyDict();
+                    try {
+                        foreach ((string key, object? item) in entries) {
+                            using PyObject converted = ToPythonShared(item);
+                            // The dict takes its own reference to the value.
+                            dictionary[key] = converted;
+                        }
+                    } catch {
+                        dictionary.Dispose();
+                        throw;
+                    }
+
+                    return dictionary;
+                }
+                case IList list: {
+                    var pythonList = new PyList();
+                    try {
+                        foreach (object? item in list) {
+                            using PyObject converted = ToPythonShared(item);
+                            pythonList.Append(converted);
+                        }
+                    } catch {
+                        pythonList.Dispose();
+                        throw;
+                    }
+
+                    return pythonList;
+                }
+                default:
+                    // Scalars, strings, None and value tuples hold no Gym.NET memory, so the copying conversion is the same thing.
+                    return ToPython(value);
+            }
+        }
+
+        /// <summary>
+        ///     Converts a Python value to the CLR value a Gym.NET user would pass for it: what the reverse bridge does to every
+        ///     argument Gymnasium hands a Gym.NET env (an action, reset options, constructor kwargs, a spec's fields).
+        /// </summary>
+        /// <param name="value">The value; stays owned by the caller (<see langword="null"/> reads as <c>None</c>).</param>
+        /// <returns>
+        ///     <see langword="null"/> for <c>None</c>; a <see langword="bool"/>, a <see langword="long"/> (a
+        ///     <see cref="BigInteger"/> past 64 bits), a <see langword="double"/> or a <see langword="string"/> for Python's
+        ///     scalars; an <see cref="NDArray"/> copied from a NumPy array, and a 0-d one for a NumPy scalar (NumSharp has no
+        ///     scalar types, so a 0-d array is how Gym.NET holds <c>np.int64(1)</c>, DR-08); an <see cref="Info"/> for a
+        ///     <c>dict</c>, an <see langword="object"/>?[] for a <c>tuple</c> (Gym.NET's tuple, DR-13), a
+        ///     <see cref="List{T}"/> for a <c>list</c>, recursively. The caller owns the arrays in it
+        ///     (<see cref="Outcome.Release"/> releases them).
+        /// </returns>
+        /// <exception cref="TypeError">
+        ///     Thrown for a value Gym.NET has no counterpart for (an arbitrary object, a <c>dict</c> key that is not a
+        ///     <c>str</c>), naming its type; the bridge raises it in Python as Python's <c>TypeError</c>.
+        /// </exception>
+        /// <exception cref="PythonException">Thrown when inspecting the value raises.</exception>
+        /// <remarks>
+        ///     Must be called under the GIL. The order of the checks matters: <c>bool</c> before <c>int</c> (Python's
+        ///     <c>bool</c> subclasses <c>int</c>), and NumPy's scalars before Python's (<c>np.float64</c> subclasses
+        ///     <c>float</c> and must stay a float64 array). Arrays cross as copies (<c>ToNDArray</c>), so nothing the env
+        ///     keeps can alias Python memory a later Python call mutates.
+        /// </remarks>
+        internal static object? FromPython(PyObject? value) {
+            if (value is null || value.IsNone())
+                return null;
+
+            // The cached modules: never disposed here.
+            PyObject builtins = PythonRuntime.Builtins;
+            PyObject numpy = PythonRuntime.Import("numpy");
+            if (IsInstance(value, builtins, "bool"))
+                return value.IsTrue();
+            if (IsInstance(value, numpy, "ndarray"))
+                return value.ToNDArray();
+            if (IsInstance(value, numpy, "generic")) {
+                using PyObject array = Python.numpy.asarray(value);
+                return array.ToNDArray();
+            }
+
+            if (IsInstance(value, builtins, "int")) {
+                using var integer = new PyInt(value);
+                BigInteger whole = integer.ToBigInteger();
+                return whole >= long.MinValue && whole <= long.MaxValue ? (long)whole : whole;
+            }
+
+            if (IsInstance(value, builtins, "float"))
+                return value.As<double>();
+            if (IsInstance(value, builtins, "str")) {
+                // str() first: pythonnet's As<string> accepts the exact str type only, not a subclass.
+                using PyObject text = Python.builtins.str(value);
+                return text.As<string>();
+            }
+
+            if (IsInstance(value, builtins, "dict"))
+                return InfoFromPython(value);
+            if (IsInstance(value, builtins, "tuple"))
+                return ItemsFromPython(value).ToArray();
+            if (IsInstance(value, builtins, "list"))
+                return ItemsFromPython(value);
+            throw new TypeError($"Gym.NET has no counterpart for a Python {ValueFacts.PythonTypeName(value)} ({value.Repr()})");
+        }
+
+        /// <summary>A <c>dict</c> as an <see cref="Info"/>, values converted by <see cref="FromPython"/>, keys in the dict's order.</summary>
+        /// <param name="value">The dict; stays owned by the caller.</param>
+        /// <returns>The info; the caller owns the arrays in it.</returns>
+        /// <exception cref="TypeError">Thrown for a key that is not a <c>str</c>, or a value <see cref="FromPython"/> refuses.</exception>
+        private static Info InfoFromPython(PyObject value) {
+            var info = new Info();
+            try {
+                using PyObject items = value.InvokeMethod("items");
+                using var iterator = PyIter.GetIter(items);
+                while (iterator.MoveNext()) {
+                    using PyObject item = iterator.Current;
+                    using PyObject key = item[0];
+                    using PyObject entry = item[1];
+                    if (!IsInstance(key, PythonRuntime.Builtins, "str"))
+                        throw new TypeError($"Gym.NET's dicts have str keys, not {ValueFacts.PythonTypeName(key)} ({key.Repr()})");
+                    info[key.As<string>()] = FromPython(entry);
+                }
+            } catch {
+                // What was converted before the failure belongs to nobody else.
+                Outcome.Release(info);
+                throw;
+            }
+
+            return info;
+        }
+
+        /// <summary>A <c>tuple</c> or <c>list</c>'s items converted by <see cref="FromPython"/>, in order.</summary>
+        /// <param name="value">The sequence; stays owned by the caller.</param>
+        /// <returns>The items; the caller owns the arrays among them.</returns>
+        /// <exception cref="TypeError">Thrown for an item <see cref="FromPython"/> refuses.</exception>
+        private static List<object?> ItemsFromPython(PyObject value) {
+            var items = new List<object?>();
+            try {
+                using var iterator = PyIter.GetIter(value);
+                while (iterator.MoveNext()) {
+                    using PyObject item = iterator.Current;
+                    items.Add(FromPython(item));
+                }
+            } catch {
+                Outcome.Release(items);
+                throw;
+            }
+
+            return items;
+        }
+
+        /// <summary><c>isinstance(value, getattr(module, name))</c>, disposing the type object. Must run under the GIL.</summary>
+        /// <param name="value">The value.</param>
+        /// <param name="module">The module that defines the type (never disposed here).</param>
+        /// <param name="name">The type's name in it.</param>
+        /// <returns><see langword="true"/> when the value is an instance.</returns>
+        private static bool IsInstance(PyObject value, PyObject module, string name) {
+            using PyObject type = module.GetAttr(name);
+            return value.IsInstance(type);
         }
     }
 }

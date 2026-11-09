@@ -86,6 +86,7 @@ where `gymnasium` and `numpy` were imported from, and whether `refs/Gymnasium` h
 | Golden catalog | `Golden/GoldenCatalog.cs`, `Golden/GoldenCase.cs` | Plan §9's one case catalog (DR-04): each `GoldenCase` (id, kwargs, seed, actions, steps, frames, state attribute, the .NET factory) drives a live cell (`GoldenLiveTests`), its recording, and its Python-free replay (`GoldenReplayTests`, category `Golden`). |
 | Recording and replay | `Golden/GoldenRecorder.cs`, `Golden/GoldenAssert.cs`, `Golden/GoldenStore.cs`, `Golden/GoldenTrajectory.cs`, `Golden/GoldenCodec.cs` | `GymPair.Recorder` receives each call and frame **after** it was verified; `GoldenStore` writes `tests/Golden/<suite>/<case>.jsonl.gz` and PNG frames only when their content changed, atomically; `GoldenAssert.Replay` drives the .NET env through the recording (recorded actions, or re-sampled and checked for a sampled case) with the same `ByteContract`, and refuses a stale golden (other case parameters, or another Gymnasium commit than the manifest pins). Format: `tests/Golden/README.md`. |
 | `[OpenBugs]` | `OpenBugsAttribute.cs` | NumSharp's category for known gaps, with the port plan's defect ids attached. |
+| `ReverseBridge`, `BridgedEnv` | `Bridge/ReverseBridge.cs`, `Bridge/BridgedEnv.cs` | The reverse bridge (plan §8, P3.5): Gym.NET envs as Gymnasium envs, so Gymnasium's own tools run on them. A `GymNetShim(gymnasium.Env)` snippet class, subclassed per .NET env class and named after it (`CartPoleEnv`), delegates every call to a `BridgedEnv`; `ReverseBridge.Spec` mirrors a Gym.NET spec with that class as its entry point, so `gymnasium.make(spec)` builds Gymnasium's stack over a Gym.NET env. Spaces mirror as the Gymnasium spaces they equal (`Box`, `Discrete`, `Tuple`, `Dict`); observations cross as zero-copy views (`PyConvert.ToPythonShared`); the PCG64 state is mirrored into a NumPy generator after every call; Gym.NET's exceptions are raised as the Python types they stand for (`ExceptionMap.PythonTypeFor`) and its warnings warned in Python (`BridgeCalls`). The bridge owns every .NET env built through it. |
 
 ---
 
@@ -145,6 +146,24 @@ new GoldenCase {
 Then record it with `GYMNET_PARITY_RECORD=1` (§1) and commit `tests/Golden/<suite>/<name>.jsonl.gz` with its frame
 directory. Changing a case's parameters, or re-pinning Gymnasium, makes its golden stale: the replay fails with the
 re-record command instead of comparing against another trajectory.
+
+### A Gymnasium tool on a Gym.NET env (the reverse bridge)
+
+```csharp
+using var bridge = new ReverseBridge();                                    // owns every .NET env built through it
+using PyRef shim = PyRef.Of(() => {
+    using PyObject spec = bridge.Spec(Gymnasium.Spec("CartPole-v1"));      // a Gymnasium EnvSpec over the Gym.NET env
+    return Python.gymnasium.make(spec, render_mode: "rgb_array");         // Gymnasium's own stack over it
+});
+Outcome verdict = Outcome.CapturePython(() =>
+    Python.gymnasium.utils.env_match.check_environments_match(python.Object, shim.Object, 200, seed));
+```
+
+`bridge.Shim(typeof(CartPoleEnv), kwargs)` builds a bare one (no spec, no wrappers); a `create` delegate plants a defect
+(`env.Tau = 0.03`). Hold the tool's verdict on the bridged env to its verdict on Gymnasium's own env, and require that
+reference to be the expected one first (two equal failures pass any comparison). Both outcomes are Python's, so wrap
+the bridged one in `ReverseBridge.AsBridgedSide` (its exception type in .NET spelling, as `ByteContract` expects on the right). Human
+mode needs `Gymnasium.HumanViewerFactory = NullEnvViewer.Factory` for the cell.
 
 ### Errors
 
@@ -206,10 +225,11 @@ for NumPy's). The built-ins NumSharp still lacks (`NotImplementedError`, `Import
 | Rendering (`Gym.Rendering` vs pygame-ce 2.5.8) | `aapolygon`, `filled_polygon`, `aacircle`, `filled_circle` (150 random shapes each, clipping and translucency), `hline`/`vline`, compositions, Sint16 wrap-around polygons, CartPole's shapes, `transform.flip`, `Vector2.rotate_rad` bit for bit (NaN payloads included), pygame's argument errors | |
 | LunarLander-v3 | Gym.NET discrete action space | continuous action space (B-20); observation space (B-19); heuristic episodes, both variants (F6, P8, B-17, B-19) |
 | Registry and checkers (P3) | `str(make("CartPole-v1"))` and the `pprint` of its stack's and unwrapped env's specs; `make`'s errors (a mistyped name with its suggestion, a missing version, an unknown namespace, malformed ids, `a:b:c`); `spec`'s version errors over ids registered on both sides (deprecated, newer, default, namespaced) and a refused versioned/unversioned mix; `EnvSpec.to_json` byte for byte and `from_json` back (every JSON value kind, wrapper specs, defaults, malformed input); `pprint_registry` over example registries (namespaces from entry points, columns, exclusions); `check_obs`'s warnings and assertions over 11 observation/space pairs | |
+| Gymnasium's tools on Gym.NET's envs (P3.5, `Tests/Bridge`) | `make(spec)` over the bridged CartPole-v1: `str` of the stack, both spaces (`repr`, `==`), metadata, the unwrapped spec; the space mirror against Gymnasium's own construction (float/int `Box`, `Discrete` with start and dtype, `Tuple`, sorted `Dict`); `check_env` on `make("CartPole-v1").unwrapped` (every render mode made through the bridge, the double close), the bare env and the bare `rgb_array` env, held to Gymnasium's verdict on its own env and to Gym.NET's `EnvChecker.CheckEnv`; `check_environments_match` against Gymnasium's CartPole, frames included, 3 seeds × 200 steps, both orders; `make`'s wrapped constructor `TypeError`; the step-past-termination warning crossing into Python's `warnings`; negative controls: a planted τ fails `env_match` at step 0, a reused observation buffer and an unseeded reset fail `check_env` with Gymnasium's messages, as Gym.NET's checker does | |
 | Core API (P1) | `make("CartPole-v1")`'s stack against `Gymnasium.Make("CartPole-v1")` through truncation at step 500 (2 seeds); `OrderEnforcing` and `TimeLimit` call by call (`ResetNeeded`/`TypeError`/`ValueError` messages, `has_reset`, `_elapsed_steps`, truncation past the limit, `str`); the attribute protocol through a stack (plain `getattr`/`setattr`, `has/get/set_wrapper_attr`, run-time attributes, read-only properties, a wrapper's `_np_random`); `np_random`/`np_random_seed` (lazy, seeded, -1 once assigned, through a wrapper); `render()` without a render mode on an env with a spec (the warning and `None`); `EnvSpec` repr and `pprint`; `parse_env_id`/`get_env_id`; the single-env step-API conversions; dict repr | `render()` without a render mode or spec: the bare `AssertionError`'s empty message (N-1, NumSharp) |
 | `PyMath` (F3) | `//`, `%`, `divmod` on ints and floats, `min`/`max`, `round` with and without digits, `np.clip` (512 triples), `np.sign`, bit for bit against CPython 3.12 and NumPy 2.4.2 | |
 
-Not built yet (plan §8–§10): the reverse bridge (`check_env` on a Gym.NET env through a Python shim, P3.5),
+Not built yet (plan §8–§10): Gymnasium's pytest modules run through the bridge (plan §8's third item),
 differential fuzzing, and the remaining wrapper and vector areas, which wait for their ports (P6).
 
 ---

@@ -250,6 +250,49 @@ namespace Gym.Tests.Parity {
                 using PyObject function = PythonRuntime.Builtins.GetAttr("len");
                 return function.Invoke(x);
             }
+
+            /// <summary>
+            ///     <c>type(name, bases, dict)</c>: creates a class at run time. The reverse bridge names each Gymnasium-side class
+            ///     after the .NET env class it stands for this way, so <c>str(env)</c> and the stack <c>make</c> prints read as
+            ///     Gymnasium's own (<c>&lt;TimeLimit&lt;...&lt;CartPoleEnv&lt;CartPole-v1&gt;&gt;&gt;&gt;</c>).
+            /// </summary>
+            /// <param name="name">The class name.</param>
+            /// <param name="bases">The base classes, a tuple; stays owned by the caller.</param>
+            /// <param name="dict">The class body's attributes (Python copies them into the class); stays owned by the caller.</param>
+            /// <returns>A new owned reference to the class.</returns>
+            /// <exception cref="PythonException">Thrown when the class cannot be created (a base that is not a class, a metaclass conflict).</exception>
+            internal static PyObject type(string name, PyObject bases, PyObject dict) {
+                using PyObject function = PythonRuntime.Builtins.GetAttr("type");
+                using var className = new PyString(name);
+                return function.Invoke(className, bases, dict);
+            }
+
+            /// <summary><c>UserWarning</c>, the category of Gymnasium's <c>logger.warn</c>.</summary>
+            /// <returns>A new owned reference to the class.</returns>
+            /// <exception cref="PythonException">Thrown when the lookup fails.</exception>
+            internal static PyObject UserWarning() => PythonRuntime.Builtins.GetAttr("UserWarning");
+
+            /// <summary><c>DeprecationWarning</c>, the category of Gymnasium's <c>logger.deprecation</c>.</summary>
+            /// <returns>A new owned reference to the class.</returns>
+            /// <exception cref="PythonException">Thrown when the lookup fails.</exception>
+            internal static PyObject DeprecationWarning() => PythonRuntime.Builtins.GetAttr("DeprecationWarning");
+        }
+
+        /// <summary><c>import warnings</c>.</summary>
+        internal static class warnings {
+            /// <summary>
+            ///     <c>warnings.warn(message, category)</c>: issues a warning in Python, subject to Python's filters and
+            ///     <c>catch_warnings</c> blocks, attributed to the innermost Python frame (for the reverse bridge, the
+            ///     Gymnasium-side env method that crossed to .NET).
+            /// </summary>
+            /// <param name="message">The text, as <c>str(w.message)</c> will read.</param>
+            /// <param name="category">The warning class (<see cref="builtins.UserWarning"/>); stays owned by the caller.</param>
+            /// <exception cref="PythonException">Thrown when a filter turns the warning into an error (<c>simplefilter('error')</c>).</exception>
+            internal static void warn(string message, PyObject category) {
+                using PyObject function = PythonRuntime.Import("warnings").GetAttr("warn");
+                using var text = new PyString(message);
+                using PyObject _ = function.Invoke(text, category);
+            }
         }
 
         /// <summary><c>import operator</c>: Python's operators as functions, so <c>a // b</c> and <c>a % b</c> are facade rows.</summary>
@@ -379,6 +422,18 @@ namespace Gym.Tests.Parity {
             /// <exception cref="PythonException">Thrown when the call fails.</exception>
             internal static PyObject atleast_1d(PyObject x) {
                 using PyObject function = Module.GetAttr("atleast_1d");
+                return function.Invoke(x);
+            }
+
+            /// <summary>
+            ///     <c>np.asarray(x)</c>: a NumPy scalar becomes a 0-d array of its dtype (<c>np.int64(1)</c> → <c>array(1)</c>),
+            ///     the form NumSharp's import takes and Gym.NET holds a scalar in (DR-08); an array comes back as it is.
+            /// </summary>
+            /// <param name="x">The value; stays owned by the caller.</param>
+            /// <returns>A new owned reference to the array.</returns>
+            /// <exception cref="PythonException">Thrown when the value has no array form (a ragged sequence).</exception>
+            internal static PyObject asarray(PyObject x) {
+                using PyObject function = Module.GetAttr("asarray");
                 return function.Invoke(x);
             }
 
@@ -616,6 +671,24 @@ namespace Gym.Tests.Parity {
                 using PyObject mode = Oracle.PyConvert.ToPython(render_mode);
                 arguments["render_mode"] = mode;
                 return function.Invoke(new PyObject[] { name }, arguments);
+            }
+
+            /// <summary>
+            ///     <c>gymnasium.make(spec, render_mode=render_mode, **kwargs)</c> with an <c>EnvSpec</c> instead of an id: the
+            ///     spec need not be registered, so the reverse bridge makes Gymnasium's stack over a Gym.NET env from a spec whose
+            ///     entry point is the Gymnasium-side class standing for the .NET env.
+            /// </summary>
+            /// <param name="spec">The <c>EnvSpec</c>; stays owned by the caller.</param>
+            /// <param name="render_mode"><c>rgb_array</c>, <c>human</c>, or <see langword="null"/>.</param>
+            /// <param name="kwargs">Constructor keyword arguments in Python spelling; values converted by <see cref="Oracle.PyConvert.ToPython"/>.</param>
+            /// <returns>A new owned reference to the made env (with its wrapper stack).</returns>
+            /// <exception cref="PythonException">Thrown when <c>make</c> raises (the env creator's errors arrive wrapped in <c>make</c>'s text).</exception>
+            internal static PyObject make(PyObject spec, string? render_mode = null, IReadOnlyDictionary<string, object?>? kwargs = null) {
+                using PyObject function = Module.GetAttr("make");
+                using var arguments = Oracle.PyConvert.ToKwargs(kwargs);
+                using PyObject mode = Oracle.PyConvert.ToPython(render_mode);
+                arguments["render_mode"] = mode;
+                return function.Invoke(new[] { spec }, arguments);
             }
 
             /// <summary><c>gymnasium.spec(env_id)</c>: the registered spec, or the registry's error for a missing id.</summary>
@@ -1385,6 +1458,37 @@ namespace Gym.Tests.Parity {
                     internal static PyObject np_random(PyObject? seed) {
                         using PyObject function = PythonRuntime.Import("gymnasium.utils.seeding").GetAttr("np_random");
                         return seed is null ? function.Invoke() : function.Invoke(seed);
+                    }
+                }
+
+                /// <summary><c>gymnasium.utils.env_match</c>: Gymnasium's own lockstep comparison of two envs.</summary>
+                internal static class env_match {
+                    /// <summary>
+                    ///     <c>check_environments_match(env_a, env_b, num_steps, seed=seed, skip_render=skip_render,
+                    ///     info_comparison=info_comparison)</c>: resets both with the seed, steps both with <c>env_a</c>'s sampled
+                    ///     actions (resetting both whenever either ends), and asserts equal observations, rewards, flags, infos and,
+                    ///     unless skipped or either render mode is <c>None</c>/<c>human</c>, frames.
+                    /// </summary>
+                    /// <param name="env_a">The env whose action space samples the actions; stays owned by the caller.</param>
+                    /// <param name="env_b">The other env; stays owned by the caller.</param>
+                    /// <param name="num_steps">How many steps to compare (0 compares the resets only).</param>
+                    /// <param name="seed">The reset seed, also the seed of <c>env_a</c>'s action space.</param>
+                    /// <param name="skip_render">Leave the frames out.</param>
+                    /// <param name="info_comparison"><c>equivalence</c>, <c>superset</c>, <c>keys-equivalence</c>, <c>keys-superset</c> or <c>skip</c>.</param>
+                    /// <returns>A new owned reference to <c>None</c>.</returns>
+                    /// <exception cref="PythonException">Thrown with the first divergence as an <c>AssertionError</c> (its message names the step and both values).</exception>
+                    internal static PyObject check_environments_match(PyObject env_a, PyObject env_b, long num_steps, long seed = 0, bool skip_render = false,
+                        string info_comparison = "equivalence") {
+                        using PyObject function = PythonRuntime.Import("gymnasium.utils.env_match").GetAttr("check_environments_match");
+                        using var steps = new PyInt(num_steps);
+                        using var arguments = new PyDict();
+                        using var seedValue = new PyInt(seed);
+                        using PyObject skipRender = skip_render.ToPython();
+                        using var comparison = new PyString(info_comparison);
+                        arguments["seed"] = seedValue;
+                        arguments["skip_render"] = skipRender;
+                        arguments["info_comparison"] = comparison;
+                        return function.Invoke(new[] { env_a, env_b, steps }, arguments);
                     }
                 }
 
