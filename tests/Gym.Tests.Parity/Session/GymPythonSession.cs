@@ -261,6 +261,13 @@ namespace Gym.Tests.Parity.Session {
                 live["box2d.version"] = Missing(error);
             }
 
+            // OpenCV is the oracle of Gym.Utils.Cv2 (DR-23); like pygame and Box2D, its absence is a reported drift.
+            try {
+                live["opencv.version"] = Python.cv2.__version__;
+            } catch (PythonException error) {
+                live["opencv.version"] = Missing(error);
+            }
+
             return live;
         }
 

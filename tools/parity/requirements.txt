@@ -15,6 +15,10 @@ numpy==2.4.2
 pygame-ce==2.5.8
 # Gymnasium's pin for Python < 3.14 (pyproject.toml, extra "box2d"); it ships wheels up to 3.13, so no swig is needed.
 box2d==2.3.10
+# The oracle of Gym.Utils.Cv2 and ResizeObservation (decision DR-23: OpenCV's area resize ported, proven byte for byte).
+# Gymnasium's extra "other" asks for opencv-python>=3.0; the headless build is the same cv2 without GUI libraries. Its
+# INTER_AREA and INTER_LINEAR results do not depend on IPP or on the CPU's SIMD (measured over 231 cases, 2026-11-10).
+opencv-python-headless==4.13.0.92
 # Gymnasium's own runtime dependencies (pyproject.toml, "dependencies"). cloudpickle and typing-extensions are the
 # versions on the reference machine. farama-notifications is not installed there (gymnasium/__init__.py imports it
 # inside try/except, and it only prints release notices), so it is pinned to its latest release, 0.0.6; it never

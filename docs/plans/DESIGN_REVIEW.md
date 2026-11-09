@@ -166,6 +166,16 @@ Effects of approved designs that only showed up in code. None changes a design; 
   would return an array reward, since rewards are float64. An untyped env's spaces are `ObjectSpace` views, so every
   space tool that dispatches on the space's class unviews it first (`ObjectSpace.Unview`). The discretizing wrappers need
   NumPy's float32 `linspace`, which NumSharp lacks (N-4, COMPLETION_PLAN §7).
+- **DR-23, the OpenCV resize** (found in P6.4, 2026-11-10): `Gym.Utils.Cv2.Resize` translates the uint8 paths of
+  OpenCV 4.13.0's `cv::resize` (the integer-factor area average, the area decimation, and the fixed-point bilinear
+  kernel, which `INTER_AREA` also takes when an axis grows), and `INTER_LINEAR` with them, which the vector
+  `HumanRendering` calls. Measured before porting: on the pinned `cv2` (IPP 2022.2, AVX2 dispatch) these results do not
+  change with IPP or the optimizations switched off, so the scalar C++ is the reference, with one exception the port
+  keeps: the 2×2 area kernel of 1, 3 and 4 channels rounds half up where the other area kernels round half to even.
+  The float32 paths DR-23 names are not translated: Gymnasium's only callers (`ResizeObservation` and its vector twin)
+  refuse every dtype but uint8. `cv2.error` has no .NET type (port plan §3.4); the one OpenCV refusal these paths
+  reach (more than 4 channels by area) is a `NotSupportedException` with OpenCV's assertion text. `ResizeObservation`
+  takes its shape as a `long[]`, as `ReshapeObservation` does.
 - **The stateful wrappers with D19** (found in P6.3, 2026-11-10): Python's wrappers keep references to the objects they
   were given, and the garbage collector decides when those die; under D19 the caller owns its actions and the
   observations it receives, and may dispose them when a call returns (the parity harness does). `StickyAction` therefore

@@ -130,7 +130,6 @@ gymnasium.wrappers.rendering.AddWhiteNoise                                      
 gymnasium.wrappers.rendering.HumanRendering                                              P6 wrappers, deferred in this run
 gymnasium.wrappers.rendering.ObstructView                                                P6 wrappers, deferred in this run
 gymnasium.wrappers.rendering.RecordVideo                                                 P6 wrappers, deferred in this run
-gymnasium.wrappers.transform_observation.ResizeObservation                               P6 wrappers, deferred in this run
 gymnasium.wrappers.vector.array_conversion.ArrayConversion                               n/a: JAX/PyTorch
 gymnasium.wrappers.vector.common.RecordEpisodeStatistics                                 P6 vector wrappers, deferred in this run
 gymnasium.wrappers.vector.dict_info_to_list.DictInfoToList                               P6 vector wrappers, deferred in this run

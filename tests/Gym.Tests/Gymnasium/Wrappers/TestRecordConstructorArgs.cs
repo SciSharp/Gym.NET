@@ -50,6 +50,8 @@ namespace Gym.Tests.Gymnasium.Wrappers {
             ["RescaleAction"] = (typeof(RescaleAction<,>), () => Make("Pendulum-v1"), new Info { ["min_action"] = -1.0, ["max_action"] = 1.0 }),
             ["RescaleObservation"] = (typeof(RescaleObservation<,>), () => Make("Pendulum-v1"), new Info { ["min_obs"] = -1.0, ["max_obs"] = 1.0 }),
             ["ReshapeObservation"] = (typeof(ReshapeObservation<,>), () => Make("CartPole-v1"), new Info { ["shape"] = new long[] { 2, 2 } }),
+            ["ResizeObservation"] = (typeof(ResizeObservation<,>), () => new AddRenderObservation<NDArray, NDArray>((Env<NDArray, NDArray>)Make("CartPole-v1", new { render_mode = "rgb_array" })),
+                new Info { ["shape"] = new long[] { 10, 10 } }),
             ["StickyAction"] = (typeof(StickyAction<,>), () => Make("CartPole-v1"), new Info { ["repeat_action_probability"] = 0.5 }),
             ["TimeAwareObservation"] = (typeof(TimeAwareObservation<,>), () => Make("CartPole-v1"), new Info()),
             ["TimeLimit"] = (typeof(TimeLimit<,>), () => new CartPoleEnv(), new Info { ["max_episode_steps"] = 10L }),

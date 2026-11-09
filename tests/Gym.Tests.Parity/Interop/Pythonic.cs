@@ -1056,6 +1056,16 @@ namespace Gym.Tests.Parity {
                     return Construct("ReshapeObservation", env, ("shape", shapeTuple));
                 }
 
+                /// <summary><c>wrappers.ResizeObservation(env, shape)</c>, the shape as a Python tuple.</summary>
+                /// <param name="env">The env; the wrapper keeps its own reference.</param>
+                /// <param name="shape">The new <c>(height, width)</c>, any length (the wrapper refuses all but two).</param>
+                /// <returns>A new owned reference to the wrapper.</returns>
+                /// <exception cref="PythonException">Thrown for a space or shape the wrapper refuses (<c>TypeError</c>, <c>ValueError</c>).</exception>
+                internal static PyObject ResizeObservation(PyObject env, long[] shape) {
+                    using PyObject tuple = TupleOf(shape);
+                    return Construct("ResizeObservation", env, ("shape", tuple));
+                }
+
                 /// <summary><c>wrappers.RescaleObservation(env, min_obs, max_obs)</c>.</summary>
                 /// <param name="env">The env; the wrapper keeps its own reference.</param>
                 /// <param name="min_obs">The lower bound: converted by <see cref="Oracle.PyConvert.ToPython"/>, or a <see cref="PyObject"/> (a NumPy scalar) passed as it is.</param>
@@ -2814,6 +2824,43 @@ namespace Gym.Tests.Parity {
                     /// <exception cref="PythonException">Thrown when the attribute lookup fails.</exception>
                     internal static PyObject y(PyObject v) => v.GetAttr("y");
                 }
+            }
+        }
+
+        /// <summary><c>cv2</c>, OpenCV's Python module: the oracle of <c>Gym.Utils.Cv2</c> and of <c>ResizeObservation</c>.</summary>
+        internal static class cv2 {
+            /// <summary>The cached module; never dispose it.</summary>
+            private static PyObject Module => PythonRuntime.Import("cv2");
+
+            /// <summary><c>cv2.INTER_LINEAR</c>.</summary>
+            internal const int INTER_LINEAR = 1;
+
+            /// <summary><c>cv2.INTER_AREA</c>.</summary>
+            internal const int INTER_AREA = 3;
+
+            /// <summary><c>cv2.__version__</c>.</summary>
+            /// <exception cref="PythonException">Thrown when the import or lookup fails.</exception>
+            internal static string __version__ {
+                get {
+                    using PyObject value = Module.GetAttr("__version__");
+                    return value.As<string>();
+                }
+            }
+
+            /// <summary><c>cv2.resize(src, dsize, interpolation=interpolation)</c>.</summary>
+            /// <param name="src">The image, a NumPy uint8 array; stays owned by the caller.</param>
+            /// <param name="width">The target width (<c>dsize[0]</c>).</param>
+            /// <param name="height">The target height (<c>dsize[1]</c>).</param>
+            /// <param name="interpolation"><see cref="INTER_AREA"/> or <see cref="INTER_LINEAR"/>.</param>
+            /// <returns>A new owned reference to the resized array.</returns>
+            /// <exception cref="PythonException">Thrown when OpenCV raises (<c>cv2.error</c>).</exception>
+            internal static PyObject resize(PyObject src, int width, int height, int interpolation) {
+                using PyObject function = Module.GetAttr("resize");
+                using PyObject dsize = Oracle.PyConvert.ToTuple(new long[] { width, height });
+                using var kwargs = new PyDict();
+                using var flag = new PyInt(interpolation);
+                kwargs["interpolation"] = flag;
+                return function.Invoke(new[] { src, dsize }, kwargs);
             }
         }
 

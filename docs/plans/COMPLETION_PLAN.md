@@ -600,6 +600,11 @@ Specs: the port plan's §9 and §10; sources `vector` 3,113 lines and `wrappers`
     `[OpenBugs("P8")]`). `test_import_wrappers` is Python's module protocol: the inventory test covers its names.*
   - *Consequences recorded in DESIGN_REVIEW: typed delegates for `func`, subspace copies, `StickyAction`'s copy of the
     last action (D19), dropped observations left to the finalizer, `ObjectSpace.Unview` in the space and vector utils.*
+- *Done 2026-11-10, P6.4 (F8, DR-23):* `Gym.Utils.Cv2.Resize`, the uint8 `INTER_AREA` and `INTER_LINEAR` paths of
+  OpenCV 4.13.0's `cv::resize` in C#, byte for byte against live `cv2` (1,250 random images and Gymnasium-sized frames;
+  OpenCV pinned in the parity stack as `opencv-python-headless==4.13.0.92`, `opencv.version` in the manifest, and in
+  THIRD-PARTY-NOTICES); `ResizeObservation` on it, with its parity cells and `test_resize_observation.py` mirrored
+  (CarRacing's cases `[OpenBugs("P8")]`). The float32 paths are not translated (no Gymnasium caller; DESIGN_REVIEW).
 
 ### P8 Box2D
 

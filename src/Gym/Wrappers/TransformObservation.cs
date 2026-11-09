@@ -328,6 +328,84 @@ namespace Gym.Wrappers {
     }
 
     /// <summary>
+    ///     Resizes every image observation to <c>(height, width)</c> by OpenCV's area interpolation, as Gymnasium's
+    ///     <c>ResizeObservation</c> does with <c>cv2.resize(obs, (width, height), interpolation=cv2.INTER_AREA)</c>; the
+    ///     channels, if any, are kept. Use it to shrink frames for a learner.
+    /// </summary>
+    /// <typeparam name="TObs">The env's observation type: uint8 images (<see cref="NDArray"/>, or <see langword="object"/> holding them).</typeparam>
+    /// <typeparam name="TAct">The action type, passed through.</typeparam>
+    /// <remarks>
+    ///     <para>
+    ///     The env's space must be a uint8 <c>Box</c> from 0 to 255 of two or three dimensions. The resize is
+    ///     <see cref="Cv2.Resize"/>, Gym.NET's translation of OpenCV's kernels, byte for byte equal to the pinned
+    ///     <c>cv2</c>'s (decision DR-23), so no native OpenCV is needed; growing an image takes OpenCV's bilinear emulation
+    ///     of area interpolation, as <c>cv2</c> does. Each observation is a new array.
+    ///     </para>
+    ///     <para>
+    ///     Gymnasium refuses a <c>shape</c> that is not a tuple of integers with <c>TypeError</c>; here it is a
+    ///     <see cref="long"/>[], so only its length and signs are checked, with Gymnasium's messages.
+    ///     </para>
+    ///     <para>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/wrappers/transform_observation.py#L354">gymnasium/wrappers/transform_observation.py</see>.</para>
+    /// </remarks>
+    [GymOptions]
+    public partial class ResizeObservation<TObs, TAct> : TransformObservation<NDArray, TObs, TAct> {
+        /// <summary>Wraps <paramref name="env"/>.</summary>
+        /// <param name="env">The env; its observation space must be a uint8 <c>Box</c> from 0 to 255 of shape <c>(H, W)</c> or <c>(H, W, C)</c>.</param>
+        /// <param name="shape">The new <c>(height, width)</c>, both positive.</param>
+        /// <exception cref="TypeError">Thrown when the space is no <c>Box</c> (Gymnasium's message), or <paramref name="env"/> is <see langword="null"/>.</exception>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="shape"/> is <see langword="null"/>.</exception>
+        /// <exception cref="NumSharp.ValueError">
+        ///     Thrown, with Gymnasium's messages, for a space that is not 2-D or 3-D, not bounded by 0 and 255, or not uint8, and
+        ///     for a shape whose length is not 2 or whose elements are not positive.
+        /// </exception>
+        public ResizeObservation(Env<TObs, TAct> env, long[] shape) : base(env) {
+            Space envSpace = ObjectSpace.Unview(env.ObservationSpace)!;
+            if (envSpace is not Box box)
+                throw new TypeError($"ResizeObservation requires a Box observation space, got {PyBuiltins.TypeRepr(envSpace)}");
+            object?[] envShape = WrapperFunctions.ShapeTuple(box.Shape);
+            if (envShape.Length is not (2 or 3))
+                throw new ValueError($"ResizeObservation requires a 2D or 3D image, got shape {PyBuiltins.Repr(envShape)}");
+            using (NDArray lowZero = box.Low == 0)
+            using (NDArray highFull = box.High == 255) {
+                if (!(np.all(lowZero) && np.all(highFull)))
+                    throw new ValueError("ResizeObservation requires observation bounds 0 to 255");
+            }
+
+            if (box.DType != np.uint8)
+                throw new ValueError($"ResizeObservation requires observation dtype uint8, got {box.DType!.name}");
+            if (shape is null)
+                throw new ArgumentNullException(nameof(shape));
+            object?[] shapeTuple = shape.Select(d => (object?)d).ToArray();
+            if (shape.Length != 2)
+                throw new ValueError($"ResizeObservation requires shape tuple of length 2, got {PyBuiltins.Repr(shapeTuple)}");
+            if (!shape.All(x => x > 0))
+                throw new ValueError($"ResizeObservation requires shape elements to be greater than 0, got {PyBuiltins.Repr(shapeTuple)}");
+
+            Shape = (long[])shape.Clone();
+            // For some reason, cv2.resize takes the shape in reverse: (width, height).
+            Cv2Shape = (checked((int)shape[1]), checked((int)shape[0]));
+            // shape + env.observation_space.shape[2:]: the channels, if the image has them, are kept.
+            var newShape = new Shape(shape.Concat(box.Shape.dimensions.Skip(2)).ToArray());
+            ObservationSpace = new Box(0, 255, newShape, np.uint8);
+            SavedKwargs = RecordConstructorArgs.Record(new Info { ["shape"] = shapeTuple });
+            Func = observation => {
+                NDArray resized = Cv2.Resize(ObservationWrapperFunctions.AsArray(observation), Cv2Shape, Cv2.InterArea);
+                if (resized.ndim == newShape.NDim)
+                    return resized;
+                // OpenCV drops the channel dimension for single-channel images: (h, w) back to (h, w, 1).
+                using (resized)
+                    return resized.reshape(newShape).copy();
+            };
+        }
+
+        /// <summary>The new <c>(height, width)</c> (<c>shape</c>).</summary>
+        public long[] Shape { get; }
+
+        /// <summary>The size OpenCV is given, <c>(width, height)</c> (<c>cv2_shape</c>).</summary>
+        public (int Width, int Height) Cv2Shape { get; }
+    }
+
+    /// <summary>
     ///     Rescales a <c>Box</c> observation affinely onto <c>[min_obs, max_obs]</c>, as Gymnasium's
     ///     <c>RescaleObservation</c> does; unbounded components must stay unbounded and are only shifted.
     /// </summary>

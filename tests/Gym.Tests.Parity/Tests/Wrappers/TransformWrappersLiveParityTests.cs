@@ -215,6 +215,74 @@ namespace Gym.Tests.Parity.Tests.Wrappers {
         }
 
         /// <summary>
+        ///     <c>ResizeObservation(AddRenderObservation(make("CartPole-v1", render_mode="rgb_array")), shape)</c>: CartPole's
+        ///     600 × 400 frames through OpenCV's area kernels (shrunk by fractional factors, by an integer factor, grown on one
+        ///     axis), and the grayscale frame with and without its channel axis.
+        /// </summary>
+        /// <param name="height">The new height.</param>
+        /// <param name="width">The new width.</param>
+        /// <param name="grayscale"><c>none</c>, <c>keep_dim</c> or <c>drop_dim</c>: whether a <c>GrayscaleObservation</c> comes first, and how.</param>
+        [TestMethod]
+        [DataRow(84L, 84L, "none")]
+        [DataRow(200L, 300L, "none")]
+        [DataRow(64L, 700L, "none")]
+        [DataRow(84L, 84L, "keep_dim")]
+        [DataRow(25L, 50L, "drop_dim")]
+        public void ResizeObservation_Episodes_MatchGymnasium(long height, long width, string grayscale) {
+            long[] shape = { height, width };
+            using var pair = new GymPair(PyGymEnv.Wrap($"ResizeObservation({grayscale} frames of CartPole, ({height}, {width}))", () => {
+                using PyObject made = Python.gymnasium.make("CartPole-v1", render_mode: "rgb_array");
+                using PyObject frames = Python.gymnasium.wrappers.AddRenderObservation(made);
+                if (grayscale == "none")
+                    return Python.gymnasium.wrappers.ResizeObservation(frames, shape);
+                using PyObject gray = Python.gymnasium.wrappers.GrayscaleObservation(frames, grayscale == "keep_dim");
+                return Python.gymnasium.wrappers.ResizeObservation(gray, shape);
+            }), new GymNetEnv(grayscale == "none"
+                ? new ResizeObservation<object?, NDArray>(new AddRenderObservation<NDArray, NDArray>(WrapperParity.Make("CartPole-v1", "rgb_array")), shape)
+                : new ResizeObservation<NDArray, NDArray>(new GrayscaleObservation<object?, NDArray>(
+                    new AddRenderObservation<NDArray, NDArray>(WrapperParity.Make("CartPole-v1", "rgb_array")), grayscale == "keep_dim"), shape)));
+            WrapperParity.RunEpisodes(pair, 25, TestContext);
+            WrapperParity.AssertAttribute(pair, "observation_space", "result = repr(env.observation_space)", env => env.ObservationSpace.ToString());
+            WrapperParity.AssertAttribute(pair, "cv2_shape", "result = env.cv2_shape", env => Gym.Utils.PyAttributes.GetAttr(env, "cv2_shape"));
+        }
+
+        /// <summary>
+        ///     <c>ResizeObservation</c>'s refusals: a <c>Tuple</c> space (<c>TypeError</c>), CartPole's 1-D box, a float32 image
+        ///     box, a 2-D box not bounded by 0 and 255, and shapes of the wrong length or with a non-positive element.
+        /// </summary>
+        [TestMethod]
+        public void ResizeObservation_Refusals_MatchGymnasium() {
+            AssertRefusal("ResizeObservation(make('Blackjack-v1'), (1, 1))", () => {
+                using PyObject made = Python.gymnasium.make("Blackjack-v1");
+                return Python.gymnasium.wrappers.ResizeObservation(made, new[] { 1L, 1L });
+            }, () => new ResizeObservation<object?[], NDArray>((Env<object?[], NDArray>)Gymnasium.Make("Blackjack-v1"), new[] { 1L, 1L }));
+            AssertRefusal("ResizeObservation(make('CartPole-v1'), (1, 1))", () => {
+                using PyObject made = Python.gymnasium.make("CartPole-v1");
+                return Python.gymnasium.wrappers.ResizeObservation(made, new[] { 1L, 1L });
+            }, () => new ResizeObservation<NDArray, NDArray>(WrapperParity.Make("CartPole-v1"), new[] { 1L, 1L }));
+            AssertRefusal("ResizeObservation(DtypeObservation(frames, float32), (1, 1))", () => {
+                using PyObject made = Python.gymnasium.make("CartPole-v1", render_mode: "rgb_array");
+                using PyObject frames = Python.gymnasium.wrappers.AddRenderObservation(made);
+                using PyObject floats = Python.gymnasium.wrappers.DtypeObservation(frames, "float32");
+                return Python.gymnasium.wrappers.ResizeObservation(floats, new[] { 1L, 1L });
+            }, () => new ResizeObservation<NDArray, NDArray>(new DtypeObservation<object?, NDArray>(
+                new AddRenderObservation<NDArray, NDArray>(WrapperParity.Make("CartPole-v1", "rgb_array")), "float32"), new[] { 1L, 1L }));
+            AssertRefusal("ResizeObservation(ReshapeObservation(make('Pendulum-v1'), (1, 3)), (1, 1))", () => {
+                using PyObject made = Python.gymnasium.make("Pendulum-v1");
+                using PyObject reshaped = Python.gymnasium.wrappers.ReshapeObservation(made, new[] { 1L, 3L });
+                return Python.gymnasium.wrappers.ResizeObservation(reshaped, new[] { 1L, 1L });
+            }, () => new ResizeObservation<NDArray, NDArray>(new ReshapeObservation<NDArray, NDArray>(WrapperParity.Make("Pendulum-v1"), new[] { 1L, 3L }), new[] { 1L, 1L }));
+            foreach (long[] shape in new[] { Array.Empty<long>(), new[] { 1L }, new[] { 1L, 1L, 1L, 1L }, new[] { -1L, 1L }, new[] { 4L, 0L } }) {
+                string text = "(" + string.Join(", ", shape) + (shape.Length == 1 ? ",)" : ")");
+                AssertRefusal($"ResizeObservation(frames, {text})", () => {
+                    using PyObject made = Python.gymnasium.make("CartPole-v1", render_mode: "rgb_array");
+                    using PyObject frames = Python.gymnasium.wrappers.AddRenderObservation(made);
+                    return Python.gymnasium.wrappers.ResizeObservation(frames, shape);
+                }, () => new ResizeObservation<object?, NDArray>(new AddRenderObservation<NDArray, NDArray>(WrapperParity.Make("CartPole-v1", "rgb_array")), shape));
+            }
+        }
+
+        /// <summary>
         ///     <c>RescaleObservation</c> over Pendulum (float32 array bounds), MountainCar (Python int bounds, so int64 arrays
         ///     promote the arithmetic to float64) and CartPole (infinite components kept infinite).
         /// </summary>

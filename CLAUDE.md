@@ -36,7 +36,8 @@ refs/Gym.NET/
 │   │   ├── Legacy/                # [Obsolete] pre-0.26 API: Step, ILegacyEnv, LegacyEnvAdapter, VecEnv family
 │   │   ├── Internal/              # Dict (legacy info type), CircularQueue, Dynamic/Merging/Reflection helpers
 │   │   ├── Utils/                 # Seeding (PCG64), PyBuiltins, PyMath (F3), PyAttributes, PyEquality, PyCopy, PyKwargs (Python kwargs binding), PyJson, Deque,
-│   │   │                          # PassiveChecker, EnvChecker (check_env, data_equivalence), EnvMatch, StepApiCompatibility, RecordConstructorArgs, Warnings
+│   │   │                          # PassiveChecker, EnvChecker (check_env, data_equivalence), EnvMatch, StepApiCompatibility, RecordConstructorArgs, Warnings,
+│   │   │                          # Cv2 (OpenCV's 8-bit cv2.resize, INTER_AREA and INTER_LINEAR, byte for byte; DR-23)
 │   │   ├── Gymnasium.cs           # The `gymnasium` facade: Make, MakeVec, Spec, Register, Registry, PprintRegistry, HumanViewerFactory (DR-20)
 │   │   ├── Logger.cs              # Warnings as gymnasium.logger issues them (colourised, Python's default filters)
 │   │   └── Exceptions/            # Every gymnasium.error class (Error, ResetNeeded, ...), AssertionError, NotImplementedError, ImportError; legacy InvalidActionError etc.
@@ -156,7 +157,7 @@ dotnet test tests/Gym.Tests/Gym.Tests.csproj --filter "FullyQualifiedName~LunarL
 
 `tests/Gym.Tests.Parity` embeds CPython (pythonnet) and compares Gym.NET with `refs/Gymnasium` byte for byte and pixel for
 pixel, on the reference stack pinned in `tools/parity/manifest.json` (Python 3.12, NumPy 2.4.2, pygame-ce 2.5.8, Box2D
-2.3.10). Cells Gym.NET does not pass yet are `[OpenBugs("B-xx")]` (NumSharp's convention): gated runs exclude them. Full
+2.3.10, OpenCV 4.13.0). Cells Gym.NET does not pass yet are `[OpenBugs("B-xx")]` (NumSharp's convention): gated runs exclude them. Full
 guide: `tests/Gym.Tests.Parity/CLAUDE.md`; design: `docs/plans/GYM_PARITY_INTEROP_TESTING.md`.
 
 ```powershell
