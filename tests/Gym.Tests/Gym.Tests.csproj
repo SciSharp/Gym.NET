@@ -25,6 +25,9 @@
     <ProjectReference Include="..\..\src\Gym.Rendering.Avalonia\Gym.Rendering.Avalonia.csproj" />
     <ProjectReference Include="..\..\src\Gym.Rendering.WinForm\Gym.Rendering.WinForm.csproj" />
     <ProjectReference Include="..\..\src\Gym\Gym.csproj" />
+    <!-- An assembly the tests never touch, so it stays unloaded until make("Gym.Tests.Plugin:RegisterDuringMake-v0") loads it
+         and its module initializer registers the id (TestMake.TestImportModuleDuringMake). -->
+    <ProjectReference Include="..\Gym.Tests.Plugin\Gym.Tests.Plugin.csproj" />
   </ItemGroup>
 
   <!-- Gymnasium (NumPy 2.4.2) golden of seeded space samples and CartPole resets, recorded by
@@ -43,6 +46,18 @@
     <EmbeddedResource Include="..\..\tools\parity\manifest.json" LogicalName="Gym.Tests.parity_manifest.json" Link="Gymnasium\parity_manifest.json" />
     <EmbeddedResource Include="Gymnasium\inventory.expected-missing.txt" LogicalName="Gym.Tests.inventory.expected-missing.txt" />
   </ItemGroup>
+
+  <!-- The Gymnasium facade (Make, Spec, Register, Registry, ...) imported statically (DESIGN_REVIEW.md, "Consequences found
+       while implementing", DR-06 with DR-10/DR-20): the namespace Gym.Tests.Gymnasium hides the class Gym.Gymnasium in every
+       Gym.Tests.* namespace, so the tests call Make("CartPole-v1") as `from gymnasium import make` reads. -->
+  <ItemGroup>
+    <Using Include="Gym.Gymnasium" Static="true" />
+  </ItemGroup>
+
+  <!-- DR-17: the registration initializer Gym.NET.Environments' package compiles into a consuming app. A project reference
+       gets no buildTransitive targets, so the tests import them by path and register the built-in ids before any test runs,
+       as an app would. -->
+  <Import Project="..\..\src\Gym.Environments\buildTransitive\Gym.NET.Environments.targets" />
 
   <!-- NumSharp: the regular NuGet reference, declared here as well so the ownership analyzer also covers the tests (a
        package's analyzer does not flow to projects that reference it only through another project). Used as it stands by

@@ -34,7 +34,9 @@ namespace Gym.Environments.Envs.Classic {
     ///     The render mode is fixed at construction, as in Gymnasium: <c>"rgb_array"</c> makes <see cref="Render"/> return
     ///     the frame; <c>"human"</c> renders into a viewer after every <see cref="Reset"/> and <see cref="Step"/>, paced at
     ///     <c>metadata["render_fps"]</c> (50) by a <see cref="Clock"/>, and returns nothing. The viewer comes from the
-    ///     factory given to the constructor, <see cref="NullEnvViewer"/> (headless) when none is.
+    ///     factory given to the constructor (<c>viewer_factory</c>), else from <c>Gymnasium.HumanViewerFactory</c>; with
+    ///     neither, the first human render raises <see cref="DependencyNotInstalled"/>, where Gymnasium raises it for a
+    ///     missing pygame (DR-20). Pass <see cref="NullEnvViewer.Factory"/> for human mode without a window.
     ///     </para>
     ///     <para>
     ///     The unwrapped env never truncates: <c>TimeLimit</c> adds the 500-step limit of CartPole-v1, as <c>make</c> does.
@@ -49,7 +51,10 @@ namespace Gym.Environments.Envs.Classic {
         /// </summary>
         private const string SteppedAfterTerminationWarning = "You are calling 'step()' even though this environment has already returned terminated = True. You should always call 'reset()' once you receive 'terminated = True' -- any further steps are undefined behavior.";
 
-        /// <summary>Creates the human-mode viewer on the first human render; <see langword="null"/> means <see cref="NullEnvViewer"/>.</summary>
+        /// <summary>
+        ///     Creates the human-mode viewer on the first human render; <see langword="null"/> defers to
+        ///     <c>Gymnasium.HumanViewerFactory</c> at that render (DR-20).
+        /// </summary>
         private IEnvironmentViewerFactoryDelegate? _viewerFactory;
 
         /// <summary>The human-mode viewer, Gymnasium's display window, created on the first human render.</summary>
@@ -72,13 +77,12 @@ namespace Gym.Environments.Envs.Classic {
         ///     Not validated, as in Gymnasium (<c>make</c> checks it against <c>metadata["render_modes"]</c>): another mode draws
         ///     each frame off-screen and <see cref="Render"/> returns nothing, as Python's does.
         /// </param>
-        /// <param name="viewerFactory">Creates the human-mode window on the first human render; <see langword="null"/> means <see cref="NullEnvViewer"/>.</param>
+        /// <param name="viewerFactory">
+        ///     Gym.NET's <c>viewer_factory</c> (DR-20): creates the human-mode window on the first human render;
+        ///     <see langword="null"/> uses <c>Gymnasium.HumanViewerFactory</c>, read at that render.
+        /// </param>
         public CartPoleEnv(bool suttonBartoReward = false, string? renderMode = null, IEnvironmentViewerFactoryDelegate? viewerFactory = null) {
-            // Gymnasium's class attribute: {"render_modes": ["human", "rgb_array"], "render_fps": 50}, keys in that order.
-            Metadata = new Metadata {
-                [Metadata.RenderModesKey] = new List<string> { "human", "rgb_array" },
-                [Metadata.RenderFpsKey] = 50L
-            };
+            Metadata = ClassMetadata;
 
             SuttonBartoReward = suttonBartoReward;
             // The derived attributes are computed once from the defaults, as __init__ does.
@@ -106,6 +110,17 @@ namespace Gym.Environments.Envs.Classic {
         public CartPoleEnv(IEnvViewer viewer, bool suttonBartoReward = false) : this(suttonBartoReward, "human") {
             _viewer = viewer ?? throw new ArgumentNullException(nameof(viewer));
         }
+
+        /// <summary>
+        ///     Gymnasium's class attribute <c>metadata</c>, which <c>make</c> reads before building the env:
+        ///     <c>{"render_modes": ["human", "rgb_array"], "render_fps": 50}</c>, keys in that order. Every env starts with a
+        ///     copy of it as its instance <see cref="Env{TObs, TAct}.Metadata"/>.
+        /// </summary>
+        /// <remarks>A new dict on every read, so editing one env's metadata never reaches another (Python's is one shared dict).</remarks>
+        public static new Metadata ClassMetadata => new() {
+            [Metadata.RenderModesKey] = new List<string> { "human", "rgb_array" },
+            [Metadata.RenderFpsKey] = 50L
+        };
 
         /// <summary>Gymnasium's <c>gravity</c>, 9.8 m/s².</summary>
         public double Gravity { get; set; } = 9.8;
@@ -478,14 +493,18 @@ namespace Gym.Environments.Envs.Classic {
             return (long)integer;
         }
 
-        /// <summary>Creates the human-mode viewer from the factory once, under a lock (a factory may start a UI thread).</summary>
+        /// <summary>
+        ///     Creates the human-mode viewer once, under a lock (a factory may start a UI thread), from the env's factory or the
+        ///     app-wide <c>Gymnasium.HumanViewerFactory</c> (DR-20).
+        /// </summary>
+        /// <exception cref="DependencyNotInstalled">Thrown when neither factory is set, where Gymnasium raises it for a missing pygame.</exception>
         private void EnsureViewer() {
             if (_viewer != null)
                 return;
             lock (_viewerGate) {
                 if (_viewer != null)
                     return;
-                _viewerFactory ??= NullEnvViewer.Factory;
+                _viewerFactory = global::Gym.Gymnasium.ResolveHumanViewerFactory(_viewerFactory);
                 _viewer = _viewerFactory(ScreenWidth, ScreenHeight, "cartpole-v1").GetAwaiter().GetResult();
             }
         }

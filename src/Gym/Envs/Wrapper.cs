@@ -62,6 +62,13 @@ namespace Gym.Envs {
         /// <summary>The wrapped env (<c>env</c>).</summary>
         public Env<TObs, TAct> Env { get; }
 
+        /// <summary>
+        ///     No class-level metadata: a wrapper's metadata exists only per instance (the env's, or its own once assigned), as
+        ///     Python's <c>Wrapper.metadata</c> is an instance property. <c>make</c> reads <see langword="null"/> here as "none",
+        ///     so a wrapper class used as an entry point skips the render-mode adjustments, as Gymnasium's fix #1672 does.
+        /// </summary>
+        public static new Metadata? ClassMetadata => null;
+
         /// <inheritdoc />
         IEnv IWrapper.Env => Env;
 

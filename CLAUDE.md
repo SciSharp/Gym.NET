@@ -22,13 +22,16 @@ refs/Gym.NET/
 ├── src/
 │   ├── Gym/                       # Core API (env contract, wrappers, results, errors), spaces, utilities, legacy shim
 │   │   ├── Envs/                  # IEnv, Env<TObs, TAct> (Step, ValueTask StepAsync), Wrapper family (+ IWrapper), Info, Metadata, RenderResult
-│   │   │   └── Registration/      # EnvSpec, WrapperSpec, EnvCreator, EnvRegistry (parse_env_id/get_env_id; make & registry in P3)
+│   │   │   ├── Registration/      # EnvSpec (Make, ToJson/FromJson), WrapperSpec, EnvCreator, EnvSpecRegistry, EnvRegistry (register, spec, make, pprint_registry)
+│   │   │   └── Viewers/           # IEnvViewer, IEnvironmentViewerFactoryDelegate, NullEnvViewer (namespace Gym.Environments; DR-20)
 │   │   ├── Spaces/                # Space (base), Box (bounded/continuous), Discrete
 │   │   ├── Observations/          # StepResult<TObs> (5-tuple), ResetResult<TObs>, DoneStepResult<TObs> (pre-0.26 4-tuple)
-│   │   ├── Wrappers/              # Common.cs: TimeLimit, OrderEnforcing (reference: gymnasium/wrappers/common.py)
+│   │   ├── Wrappers/              # Common.cs: TimeLimit, OrderEnforcing, PassiveEnvChecker, Autoreset, RecordEpisodeStatistics; Rendering.cs: RenderCollection
 │   │   ├── Legacy/                # [Obsolete] pre-0.26 API: Step, ILegacyEnv, LegacyEnvAdapter, VecEnv family
 │   │   ├── Internal/              # Dict (legacy info type), CircularQueue, Dynamic/Merging/Reflection helpers
-│   │   ├── Utils/                 # Seeding (PCG64), PyBuiltins, PyMath (F3), PyAttributes, PyEquality, PyCopy, StepApiCompatibility, RecordConstructorArgs, Warnings
+│   │   ├── Utils/                 # Seeding (PCG64), PyBuiltins, PyMath (F3), PyAttributes, PyEquality, PyCopy, PyKwargs (Python kwargs binding), PyJson, Deque,
+│   │   │                          # PassiveChecker, EnvChecker (check_env, data_equivalence), EnvMatch, StepApiCompatibility, RecordConstructorArgs, Warnings
+│   │   ├── Gymnasium.cs           # The `gymnasium` facade: Make, Spec, Register, Registry, PprintRegistry, HumanViewerFactory (DR-20)
 │   │   ├── Logger.cs              # Warnings as gymnasium.logger issues them (colourised, Python's default filters)
 │   │   └── Exceptions/            # Every gymnasium.error class (Error, ResetNeeded, ...), AssertionError, NotImplementedError, ImportError; legacy InvalidActionError etc.
 │   │
@@ -36,7 +39,8 @@ refs/Gym.NET/
 │   ├── Gym.Environments/          # Concrete environment implementations
 │   │   ├── Envs/Classic/          # CartPoleEnv (CartPole-v1, byte-for-byte port), ClassicControlUtils
 │   │   ├── Envs/Aether/           # LunarLanderEnv (Aether.Physics2D 2D physics simulation)
-│   │   └── Rendering/             # IEnvViewer, IEnvironmentViewerFactoryDelegate, NullEnvViewer
+│   │   ├── GymEnvironments.cs     # Register(): the built-in ids, from a module initializer (DR-12; GYMNET_DISABLE_ENV_REGISTRATION disarms it, DR-14)
+│   │   └── buildTransitive/       # Gym.NET.Environments.targets: the app-side registration initializer (DR-17)
 │   │
 │   ├── Gym.Rendering.Avalonia/    # Cross-platform GUI rendering (AvaloniaEnvViewer, StaticAvaloniaApp)
 │   └── Gym.Rendering.WinForm/     # Windows Forms GUI rendering (WinFormEnvViewer)
@@ -44,7 +48,8 @@ refs/Gym.NET/
 ├── tests/
 │   ├── Gym.Tests/                 # MSTest test suite for environments, spaces, and multi-instance concurrency
 │   │   └── Gymnasium/             # refs/Gymnasium/tests mirrored one to one (test_core.py → TestCore.cs), namespace Gym.Tests.Gymnasium.* (DR-06)
-│   └── Gym.Tests.Parity/          # Live parity gate: embedded CPython runs refs/Gymnasium, compared byte/pixel-exact (see its CLAUDE.md)
+│   ├── Gym.Tests.Parity/          # Live parity gate: embedded CPython runs refs/Gymnasium, compared byte/pixel-exact (see its CLAUDE.md)
+│   └── Gym.Tests.Plugin/          # A module that registers an id when loaded, for make("Gym.Tests.Plugin:RegisterDuringMake-v0")
 │
 ├── tools/parity/                  # Parity stack: manifest.json (pins), requirements.txt, setup_venv.{ps1,sh}; audit probes
 │
@@ -64,8 +69,9 @@ refs/Gym.NET/
   - `RenderResult Render()`: per the `render_mode` fixed at construction (`RenderResult.Rgb` for `rgb_array`; `human` renders inside reset/step and returns `None`).
   - `NpRandom` (lazy, entropy-seeded on first use) / `NpRandomSeed` (-1 once a generator is assigned), `Metadata`, `Spec`, `Unwrapped`, `Close()` / `Dispose()`.
   - Python attributes by Python name: `HasWrapperAttr`/`GetWrapperAttr`/`SetWrapperAttr` and `Gym.Utils.PyAttributes` (`[PyName("_x")]` or snake_case of the property).
-- **Wrappers:** `Wrapper<TWObs, TWAct, TObs, TAct>` (and `Wrapper<TObs, TAct>`) forward to `Env`; `ObservationWrapper`, `RewardWrapper`, `ActionWrapper` add the hooks; `TimeLimit` and `OrderEnforcing` live in `Gym.Wrappers`. Until `make` lands (P3), build its stack by hand: `new TimeLimit<NDArray, NDArray>(new OrderEnforcing<NDArray, NDArray>(new CartPoleEnv()), 500)`.
-- **Pluggable Viewer Architecture:** Environments accept an `IEnvironmentViewerFactoryDelegate` used for `render_mode="human"` (`NullEnvViewer.Factory` headless, `AvaloniaEnvViewer.Factory`, `WinFormEnvViewer.Factory`); human frames are paced by `Gym.Rendering.Clock` at `metadata["render_fps"]`.
+- **Wrappers:** `Wrapper<TWObs, TWAct, TObs, TAct>` (and `Wrapper<TObs, TAct>`) forward to `Env`; `ObservationWrapper`, `RewardWrapper`, `ActionWrapper` add the hooks; `TimeLimit`, `OrderEnforcing`, `PassiveEnvChecker`, `Autoreset` and `RecordEpisodeStatistics` live in `Gym.Wrappers`.
+- **Registry and `make` (P3):** `Gymnasium.Make("CartPole-v1")` (or typed, `Make<NDArray, NDArray>(...)`, DR-10) builds Gymnasium's stack, `TimeLimit<OrderEnforcing<PassiveEnvChecker<CartPoleEnv>>>`; kwargs go as a dictionary or an anonymous object, by Python name (`new { render_mode = "rgb_array" }`, DR-11), bound to constructor parameters by `PyKwargs`. Entry points are a class (`typeof(CartPoleEnv)`), an `EnvCreator`, or a `"Namespace:Class"` string. The built-in ids register before `Main` (DR-12/14/17); the unit tests import the facade with `global using static Gym.Gymnasium` (DR-06's shadowing).
+- **Pluggable Viewer Architecture (DR-20):** `render_mode="human"` renders into the env's `viewer_factory`, else the app-wide `Gymnasium.HumanViewerFactory` (`AvaloniaEnvViewer.Factory`, `WinFormEnvViewer.Factory`, or `NullEnvViewer.Factory` headless), else raises `DependencyNotInstalled` at the first human render, as Gymnasium does without pygame; nothing falls back to a headless viewer silently. Human frames are paced by `Gym.Rendering.Clock` at `metadata["render_fps"]`.
 - **Legacy API (`Gym.Legacy`, `[Obsolete]`):** `LegacyEnvAdapter` exposes any env through the pre-0.26 4-tuple API (`Seed(s)` + `Reset()` is `Reset(seed: s)`; the reward stays float64, as everywhere in Gym.NET); the baselines-style `IVecEnv` / `VecEnv` / `DummyVecEnv` work over `ILegacyEnv` until `gymnasium.vector` (P6).
 - **Observation & Action Spaces:** Strongly-typed bounds checking and random sampling via `Box` (multi-dimensional continuous floats/bounds) and `Discrete` (categorical integer actions); `Seed(BigInteger)`.
 - **Documentation voice:** XML docs describe Gym.NET's own members (what they do, what they cost, their footguns) and never say "Port of ...". A member based on Gymnasium carries its source as a pinned GitHub permalink in `<remarks>`, e.g. `Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/core.py#L28">gymnasium/core.py</see>.`; pygame-ce, CPython and NumPy sources are referenced the same way at their pinned tags (port plan §3.1 rule 2).

@@ -1,12 +1,15 @@
 #nullable enable
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Numerics;
 using System.Text;
 using System.Text.RegularExpressions;
 using Gym.Exceptions;
 using Gym.Utils;
+using NumSharp;
 
 namespace Gym.Envs.Registration {
     /// <summary>
@@ -89,7 +92,8 @@ namespace Gym.Envs.Registration {
     ///     </para>
     ///     <para>
     ///     Equality is the dataclass's, over every field in declaration order, <see cref="Kwargs"/> compared as Python dicts.
-    ///     <c>to_json</c>, <c>from_json</c> and <c>make</c> come with the registry (P3).
+    ///     An entry point given as a class equals the <c>"Namespace:Class"</c> string that names it, the form
+    ///     <see cref="ToJson"/> writes, so a spec read back with <see cref="FromJson"/> equals the original.
     ///     </para>
     ///     <para>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/envs/registration.py#L72">gymnasium/envs/registration.py</see>.</para>
     /// </remarks>
@@ -168,6 +172,117 @@ namespace Gym.Envs.Registration {
         /// <summary>The location of a vectorized implementation (a string or a creator), or <see langword="null"/>.</summary>
         public object? VectorEntryPoint { get; set; }
 
+        /// <summary>Builds the env this spec describes with <c>make</c>'s wrappers (Python's <c>spec.make(**kwargs)</c>).</summary>
+        /// <param name="kwargs">The env's constructor arguments by Python name, over the spec's.</param>
+        /// <param name="maxEpisodeSteps">The step limit instead of the spec's; <c>-1</c> adds no <c>TimeLimit</c>.</param>
+        /// <param name="disableEnvChecker">Whether to leave out <c>PassiveEnvChecker</c>; <see langword="null"/> follows the spec.</param>
+        /// <returns>The env; the caller owns it.</returns>
+        /// <exception cref="TypeError">Thrown when the env cannot be built from the kwargs.</exception>
+        /// <exception cref="Error">Thrown when the spec has no entry point.</exception>
+        /// <exception cref="ModuleNotFoundError">Thrown when a string entry point names a module that does not exist.</exception>
+        /// <exception cref="AttributeError">Thrown when a string entry point's namespace has no such class.</exception>
+        /// <exception cref="InvalidMetadata">Thrown when the env class's <c>ClassMetadata</c> is not a dict.</exception>
+        /// <exception cref="ValueError">Thrown when a recorded wrapper cannot be re-created.</exception>
+        /// <exception cref="NotImplementedError">Thrown when <c>HumanRendering</c> would be needed.</exception>
+        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/envs/registration.py#L127">gymnasium/envs/registration.py</see>.</remarks>
+        public IEnv Make(object? kwargs = null, long? maxEpisodeSteps = null, bool? disableEnvChecker = null) =>
+            EnvRegistry.Make(this, kwargs, maxEpisodeSteps, disableEnvChecker);
+
+        /// <summary>Builds the env this spec describes as an <c>Env&lt;TObs, TAct&gt;</c> (DR-10); see <see cref="Make(object, long?, bool?)"/>.</summary>
+        /// <typeparam name="TObs">The observation type the env must have.</typeparam>
+        /// <typeparam name="TAct">The action type the env must have.</typeparam>
+        /// <param name="kwargs">The env's constructor arguments by Python name, over the spec's.</param>
+        /// <param name="maxEpisodeSteps">The step limit instead of the spec's; <c>-1</c> adds no <c>TimeLimit</c>.</param>
+        /// <param name="disableEnvChecker">Whether to leave out <c>PassiveEnvChecker</c>; <see langword="null"/> follows the spec.</param>
+        /// <returns>The env; the caller owns it.</returns>
+        /// <exception cref="TypeError">Thrown when the env is not an <c>Env&lt;TObs, TAct&gt;</c> or cannot be built from the kwargs.</exception>
+        /// <exception cref="Error">Thrown when the spec has no entry point.</exception>
+        /// <exception cref="ModuleNotFoundError">Thrown when a string entry point names a module that does not exist.</exception>
+        /// <exception cref="AttributeError">Thrown when a string entry point's namespace has no such class.</exception>
+        /// <exception cref="InvalidMetadata">Thrown when the env class's <c>ClassMetadata</c> is not a dict.</exception>
+        /// <exception cref="ValueError">Thrown when a recorded wrapper cannot be re-created.</exception>
+        /// <exception cref="NotImplementedError">Thrown when <c>HumanRendering</c> would be needed.</exception>
+        public Env<TObs, TAct> Make<TObs, TAct>(object? kwargs = null, long? maxEpisodeSteps = null, bool? disableEnvChecker = null) =>
+            EnvRegistry.Make<TObs, TAct>(this, kwargs, maxEpisodeSteps, disableEnvChecker);
+
+        /// <summary>
+        ///     The spec as JSON (Python's <c>to_json</c>): <c>dataclasses.asdict</c> without the fields parsed from the id,
+        ///     written by Python's <c>json.dumps</c>, so the text is Gymnasium's byte for byte where the fields agree.
+        /// </summary>
+        /// <returns>The JSON text.</returns>
+        /// <exception cref="ValueError">
+        ///     Thrown when an entry point is a function (an <see cref="EnvCreator"/>), which JSON cannot carry: <c>Callable found
+        ///     in CartPole-v1 for entry_point attribute with value=... Currently, Gymnasium does not support serialising
+        ///     callables.</c>
+        /// </exception>
+        /// <exception cref="TypeError">Thrown when a kwarg cannot be serialized (<c>Object of type ndarray is not JSON serializable</c>).</exception>
+        /// <remarks>
+        ///     An entry point given as a class is written as its <c>"Namespace:Class"</c> string (Python would refuse a class
+        ///     as a callable), the one field where Gym.NET's JSON differs from Gymnasium's by design: it names a .NET class.
+        ///     Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/envs/registration.py#L131">gymnasium/envs/registration.py</see>.
+        /// </remarks>
+        public string ToJson() {
+            // dataclasses.asdict(self) without namespace, name and version, which __post_init__ derives from the id.
+            var envSpecDict = new Info {
+                ["id"] = Id,
+                ["entry_point"] = JsonEntryPoint(EntryPoint),
+                ["reward_threshold"] = RewardThreshold,
+                ["nondeterministic"] = Nondeterministic,
+                ["max_episode_steps"] = MaxEpisodeSteps,
+                ["order_enforce"] = OrderEnforce,
+                ["disable_env_checker"] = DisableEnvChecker,
+                ["kwargs"] = Kwargs.DeepCopy(),
+                // asdict keeps the tuple, whose dataclasses become dicts.
+                ["additional_wrappers"] = AdditionalWrappers.Select(wrapper => (object?)new Info {
+                    ["name"] = wrapper.Name,
+                    ["entry_point"] = wrapper.EntryPoint,
+                    ["kwargs"] = wrapper.Kwargs?.DeepCopy()
+                }).ToArray(),
+                ["vector_entry_point"] = JsonEntryPoint(VectorEntryPoint)
+            };
+
+            // Check that the environment spec can be transformed to a json compatible type.
+            CheckCanJsonify(envSpecDict);
+            return PyJson.Dumps(envSpecDict);
+        }
+
+        /// <summary>
+        ///     Reads a spec back from <see cref="ToJson"/>'s text (Python's <c>from_json</c>): the wrapper specs first, then the
+        ///     spec from the remaining fields by name, as <c>EnvSpec(**fields)</c>.
+        /// </summary>
+        /// <param name="jsonEnvSpec">The JSON text.</param>
+        /// <returns>The spec; its entry points are the strings the JSON holds.</returns>
+        /// <exception cref="ValueError">
+        ///     Thrown for malformed JSON, or fields that do not make a spec: <c>An issue occurred when trying to make {...} an
+        ///     EnvSpec</c> (or <c>a WrapperSpec</c>), with the cause as the inner exception.
+        /// </exception>
+        /// <exception cref="KeyError">Thrown when the JSON has no <c>additional_wrappers</c> field.</exception>
+        /// <exception cref="AttributeError">Thrown when the JSON is not an object.</exception>
+        /// <exception cref="TypeError">Thrown when <c>additional_wrappers</c> is not a list.</exception>
+        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/envs/registration.py#L165">gymnasium/envs/registration.py</see>.</remarks>
+        public static EnvSpec FromJson(string jsonEnvSpec) {
+            object? parsed = PyJson.Loads(jsonEnvSpec);
+            Info parsedEnvSpec = parsed as Info ?? throw new AttributeError($"'{PyBuiltins.TypeName(parsed)}' object has no attribute 'pop'");
+
+            object? wrappers = parsedEnvSpec.Pop("additional_wrappers");
+            var appliedWrapperSpecs = new List<WrapperSpec>();
+            foreach (object? wrapperSpecJson in wrappers as IEnumerable ?? throw new TypeError($"'{PyBuiltins.TypeName(wrappers)}' object is not iterable")) {
+                try {
+                    appliedWrapperSpecs.Add((WrapperSpec)PyKwargs.Construct(typeof(WrapperSpec), PyKwargs.From(wrapperSpecJson)));
+                } catch (Exception e) {
+                    throw new ValueError($"An issue occurred when trying to make {PyBuiltins.Str(wrapperSpecJson)} a WrapperSpec", e);
+                }
+            }
+
+            try {
+                var envSpec = (EnvSpec)PyKwargs.Construct(typeof(EnvSpec), parsedEnvSpec);
+                envSpec.AdditionalWrappers = appliedWrapperSpecs.ToArray();
+                return envSpec;
+            } catch (Exception e) {
+                throw new ValueError($"An issue occurred when trying to make {PyBuiltins.Str(parsedEnvSpec)} an EnvSpec", e);
+            }
+        }
+
         /// <summary>
         ///     <c>copy.deepcopy(spec)</c>: a spec with the same fields whose kwargs and wrapper specs are copies, so a wrapper
         ///     can edit the copy (<c>TimeLimit</c> sets <see cref="MaxEpisodeSteps"/>) without touching the original.
@@ -236,11 +351,11 @@ namespace Gym.Envs.Registration {
                 return false;
             if (ReferenceEquals(this, other))
                 return true;
-            if (!string.Equals(Id, other.Id, StringComparison.Ordinal) || !PyEquality.AreEqual(EntryPoint, other.EntryPoint) || RewardThreshold != other.RewardThreshold
+            if (!string.Equals(Id, other.Id, StringComparison.Ordinal) || !EntryPointsEqual(EntryPoint, other.EntryPoint) || RewardThreshold != other.RewardThreshold
                 || Nondeterministic != other.Nondeterministic || MaxEpisodeSteps != other.MaxEpisodeSteps || OrderEnforce != other.OrderEnforce
                 || DisableEnvChecker != other.DisableEnvChecker || !Kwargs.Equals(other.Kwargs) || !string.Equals(Namespace, other.Namespace, StringComparison.Ordinal)
                 || !string.Equals(Name, other.Name, StringComparison.Ordinal) || Version != other.Version || AdditionalWrappers.Count != other.AdditionalWrappers.Count
-                || !PyEquality.AreEqual(VectorEntryPoint, other.VectorEntryPoint))
+                || !EntryPointsEqual(VectorEntryPoint, other.VectorEntryPoint))
                 return false;
             for (int i = 0; i < AdditionalWrappers.Count; i++) {
                 if (!AdditionalWrappers[i].Equals(other.AdditionalWrappers[i]))
@@ -253,6 +368,34 @@ namespace Gym.Envs.Registration {
         /// <summary>A hash consistent with <see cref="Equals(EnvSpec)"/>: the id and the counts of kwargs and wrappers.</summary>
         /// <returns>The hash.</returns>
         public override int GetHashCode() => HashCode.Combine(StringComparer.Ordinal.GetHashCode(Id), Kwargs.Count, AdditionalWrappers.Count);
+
+        /// <summary>
+        ///     Entry-point equality: Python's <c>==</c>, with a class standing for the <c>"Namespace:Class"</c> string that
+        ///     names it, so <c>typeof(CartPoleEnv)</c> equals <c>"Gym.Environments.Envs.Classic:CartPoleEnv"</c>.
+        /// </summary>
+        /// <param name="left">The first entry point.</param>
+        /// <param name="right">The second entry point.</param>
+        /// <returns><see langword="true"/> when they name the same thing.</returns>
+        private static bool EntryPointsEqual(object? left, object? right) => PyEquality.AreEqual(JsonEntryPoint(left), JsonEntryPoint(right));
+
+        /// <summary>An entry point as JSON holds it: a class as its <c>"Namespace:Class"</c> string, anything else as it is.</summary>
+        /// <param name="entryPoint">The entry point.</param>
+        /// <returns>The JSON form.</returns>
+        private static object? JsonEntryPoint(object? entryPoint) => entryPoint is Type type ? EnvRegistry.EntryPointName(type) : entryPoint;
+
+        /// <summary>
+        ///     Python's <c>_check_can_jsonify</c>: a function among the spec's top-level fields cannot be serialized; Python
+        ///     names the spec by its <c>name</c> field when it has one, else its <c>id</c>.
+        /// </summary>
+        /// <param name="envSpec">The spec's fields.</param>
+        /// <exception cref="ValueError">Thrown for a function value: <c>Callable found in X for entry_point attribute with value=... Currently, Gymnasium does not support serialising callables.</c></exception>
+        private static void CheckCanJsonify(Info envSpec) {
+            object? specName = envSpec.ContainsKey("name") ? envSpec["name"] : envSpec["id"];
+            foreach (KeyValuePair<string, object?> entry in envSpec) {
+                if (entry.Value is Delegate)
+                    throw new ValueError($"Callable found in {PyBuiltins.Str(specName)} for {entry.Key} attribute with value={PyBuiltins.Str(entry.Value)}. Currently, Gymnasium does not support serialising callables.");
+            }
+        }
 
         /// <summary>
         ///     The dataclass repr, fields in declaration order: <c>EnvSpec(id='CartPole-v1', entry_point=..., ...,
@@ -281,12 +424,13 @@ namespace Gym.Envs.Registration {
     }
 
     /// <summary>
-    ///     The env registry's functions. P1 brought the id grammar <see cref="EnvSpec"/> needs; the registry itself
-    ///     (<c>register</c>, <c>make</c>, <c>spec</c>, ...) joins it in P3 and is re-exported by the top-level
-    ///     <c>Gymnasium</c> class.
+    ///     Gymnasium's <c>gymnasium.envs.registration</c> module: the id grammar, the process-wide <see cref="Registry"/>,
+    ///     <see cref="Register"/>, <see cref="Spec"/>, <see cref="Make(string, object, long?, bool?)"/> and
+    ///     <see cref="PprintRegistry"/>. The top-level <see cref="Gym.Gymnasium"/> class re-exports them, as
+    ///     <c>gymnasium.make</c> re-exports <c>gymnasium.envs.registration.make</c>.
     /// </summary>
     /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/envs/registration.py">gymnasium/envs/registration.py</see>.</remarks>
-    public static class EnvRegistry {
+    public static partial class EnvRegistry {
         /// <summary>
         ///     The id grammar, <c>[namespace/](env-name)[-v(version)]</c>, matched against the whole id (Python's
         ///     <c>fullmatch</c>, hence <c>\A</c>/<c>\z</c> rather than <c>$</c>, which would also match before a final newline).

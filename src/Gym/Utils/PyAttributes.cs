@@ -11,9 +11,10 @@ namespace Gym.Utils {
     /// <summary>
     ///     Names a property or field by the Python attribute it stands for, where the default mapping (the snake_case form
     ///     of the C# name) would not give it: <c>[PyName("_disable_render_order_enforcing")]</c>. A non-public member takes
-    ///     part in Python attribute access only when it carries this attribute.
+    ///     part in Python attribute access only when it carries this attribute. On a constructor parameter it is the keyword
+    ///     <c>make</c> binds to it (<see cref="PyKwargs.Construct"/>), for the rare kwarg snake_case cannot spell.
     /// </summary>
-    [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field, AllowMultiple = false, Inherited = true)]
+    [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field | AttributeTargets.Parameter, AllowMultiple = false, Inherited = true)]
     public sealed class PyNameAttribute : Attribute {
         /// <summary>Maps the member to <paramref name="name"/>.</summary>
         /// <param name="name">The Python attribute name, spelled exactly as in the Gymnasium source.</param>

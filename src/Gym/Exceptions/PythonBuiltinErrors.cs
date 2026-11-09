@@ -53,4 +53,29 @@ namespace Gym.Exceptions {
         /// <param name="innerException">The underlying cause.</param>
         public ImportError(string message, Exception innerException) : base(message, innerException) { }
     }
+
+    /// <summary>
+    ///     Python's <c>ModuleNotFoundError</c>: what <c>make</c> and <c>load_env_creator</c> raise when an entry point or a
+    ///     <c>"module:Env-v0"</c> id names a module that does not exist. To Gym.NET a module is a namespace (or the assembly
+    ///     named after it), so the message names the first part of the dotted name no loaded assembly declares:
+    ///     <c>No module named 'Gym.Nope'</c>.
+    /// </summary>
+    /// <remarks>
+    ///     A subclass of <see cref="ImportError"/>, as in Python. The same stuck-case workaround as <see cref="ImportError"/>
+    ///     (DR-01, open item N-3): it moves to NumSharp with it.
+    ///     Reference: <see href="https://docs.python.org/3.12/library/exceptions.html#ModuleNotFoundError">ModuleNotFoundError</see>.
+    /// </remarks>
+    public class ModuleNotFoundError : ImportError {
+        /// <summary>An error without a message; its <see cref="Exception.Message"/> is empty, as Python's <c>str(error)</c> is.</summary>
+        public ModuleNotFoundError() : base("") { }
+
+        /// <summary>An error with a message; Gym raises it where Gymnasium does, with Gymnasium's text.</summary>
+        /// <param name="message">The message: <c>No module named 'x'</c>.</param>
+        public ModuleNotFoundError(string message) : base(message) { }
+
+        /// <summary>An error with a message and the exception that caused it.</summary>
+        /// <param name="message">The message.</param>
+        /// <param name="innerException">The underlying cause.</param>
+        public ModuleNotFoundError(string message, Exception innerException) : base(message, innerException) { }
+    }
 }

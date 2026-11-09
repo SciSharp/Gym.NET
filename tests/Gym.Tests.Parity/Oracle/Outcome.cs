@@ -190,6 +190,9 @@ namespace Gym.Tests.Parity.Oracle {
             // open item N-3); this row then moves to NumSharp's type names.
             ["NotImplementedError"] = "Gym.Exceptions.NotImplementedError",
             ["ImportError"] = "Gym.Exceptions.ImportError",
+            ["ModuleNotFoundError"] = "Gym.Exceptions.ModuleNotFoundError",
+            // json.loads' error is a ValueError subclass; EnvSpec.FromJson raises its base, as NumSharp has no JSONDecodeError.
+            ["json.decoder.JSONDecodeError"] = "NumSharp.ValueError",
         };
 
         /// <summary>The .NET type a Python exception type must correspond to.</summary>

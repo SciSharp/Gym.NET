@@ -85,7 +85,7 @@ namespace Gym.Tests.Gymnasium {
         /// <param name="renderFunc">The render function; the default is <see cref="TestingEnv.BasicRenderFunc"/>.</param>
         /// <param name="metadata">The metadata; <see langword="null"/> is <c>{"render_modes": []}</c>.</param>
         /// <param name="renderMode">The render mode.</param>
-        /// <param name="spec">The spec; <see langword="null"/> is <c>EnvSpec("TestingEnv-v0", "tests.testing_env:GenericTestEnv", max_episode_steps=100)</c>.</param>
+        /// <param name="spec">The spec; <see langword="null"/> is <c>EnvSpec("TestingEnv-v0", "Gym.Tests.Gymnasium:GenericTestEnv", max_episode_steps=100)</c>, Gymnasium's <c>tests.testing_env:GenericTestEnv</c> named as this namespace's class, so <c>spec.make()</c> builds it.</param>
         /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/tests/testing_env.py#L63">tests/testing_env.py (GenericTestEnv.__init__)</see>.</remarks>
         public GenericTestEnv(Space? actionSpace = null, Space? observationSpace = null,
             Func<GenericTestEnv, BigInteger?, IReadOnlyDictionary<string, object?>?, ResetResult<object?>>? resetFunc = null,
@@ -125,7 +125,7 @@ namespace Gym.Tests.Gymnasium {
 
             Metadata = metadata ?? new Metadata { [Metadata.RenderModesKey] = new List<string>() };
             RenderMode = renderMode;
-            Spec = spec ?? new EnvSpec("TestingEnv-v0", "tests.testing_env:GenericTestEnv", maxEpisodeSteps: 100);
+            Spec = spec ?? new EnvSpec("TestingEnv-v0", "Gym.Tests.Gymnasium:GenericTestEnv", maxEpisodeSteps: 100);
         }
 
         /// <summary><c>super(GenericTestEnv, self).reset(seed=seed)</c>: <c>Env.reset</c>'s seeding, for the reset functions.</summary>

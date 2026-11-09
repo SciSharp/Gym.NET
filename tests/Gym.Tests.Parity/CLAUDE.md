@@ -126,7 +126,7 @@ State injection (one step of dynamics, isolated from reset and the generator): `
 0.03, 0.04)` then `pair.Step(ParityAction.Discrete(1))`. Frames: `PyGymEnv.Make(..., renderMode: "rgb_array")`, a Gym.NET env
 built with `renderMode: "rgb_array"` (the render mode is fixed at construction, as in Gymnasium), and
 `pair.CompareFrame("label")`. A wrapper stack: `PyGymEnv.Make(id, viaMake: true)` keeps `make`'s stack, compared with
-Gym.NET's `TimeLimit(OrderEnforcing(env))` until Gym.NET's own `make` (P3).
+Gym.NET's `Gymnasium.Make(id)` (`new GymNetEnv(Gymnasium.Make("CartPole-v1"))`), `PassiveEnvChecker` included.
 
 ### A golden case (a trajectory that also replays without Python)
 
@@ -205,12 +205,12 @@ for NumPy's). The built-ins NumSharp still lacks (`NotImplementedError`, `Import
 | CartPole-v1 | reference transcription: 4 seeds × 500 steps, and through termination. **The port, byte for byte:** reset; 4 × 500-step episodes of the balancing policy and 5 random-action episodes, each past termination; `sutton_barto_reward`; semi-implicit Euler; `tau = 0.05`; 51 steps from an injected state; 17 reset-option cases (seeded and unseeded, `ValueError`/`OverflowError` messages, state and generator after a failed reset); 13 invalid actions and 3 pre-reset steps (`AssertionError` messages); the post-termination warning (text, category, count); frames at A.9's states, along 4 episodes, at 20 extreme states (clipped, Sint16-wrapped, quarter-turn snapped, and pygame's NaN/overflow errors) and before reset (`None`); observation and action spaces; metadata | |
 | Rendering (`Gym.Rendering` vs pygame-ce 2.5.8) | `aapolygon`, `filled_polygon`, `aacircle`, `filled_circle` (150 random shapes each, clipping and translucency), `hline`/`vline`, compositions, Sint16 wrap-around polygons, CartPole's shapes, `transform.flip`, `Vector2.rotate_rad` bit for bit (NaN payloads included), pygame's argument errors | |
 | LunarLander-v3 | Gym.NET discrete action space | continuous action space (B-20); observation space (B-19); heuristic episodes, both variants (F6, P8, B-17, B-19) |
-| Core API (P1) | `make("CartPole-v1")`'s stack against `TimeLimit(OrderEnforcing(CartPoleEnv))` through truncation at step 500 (2 seeds); `OrderEnforcing` and `TimeLimit` call by call (`ResetNeeded`/`TypeError`/`ValueError` messages, `has_reset`, `_elapsed_steps`, truncation past the limit, `str`); the attribute protocol through a stack (plain `getattr`/`setattr`, `has/get/set_wrapper_attr`, run-time attributes, read-only properties, a wrapper's `_np_random`); `np_random`/`np_random_seed` (lazy, seeded, -1 once assigned, through a wrapper); `render()` without a render mode on an env with a spec (the warning and `None`); `EnvSpec` repr and `pprint`; `parse_env_id`/`get_env_id`; the single-env step-API conversions; dict repr | `render()` without a render mode or spec: the bare `AssertionError`'s empty message (N-1, NumSharp) |
+| Registry and checkers (P3) | `str(make("CartPole-v1"))` and the `pprint` of its stack's and unwrapped env's specs; `make`'s errors (a mistyped name with its suggestion, a missing version, an unknown namespace, malformed ids, `a:b:c`); `spec`'s version errors over ids registered on both sides (deprecated, newer, default, namespaced) and a refused versioned/unversioned mix; `EnvSpec.to_json` byte for byte and `from_json` back (every JSON value kind, wrapper specs, defaults, malformed input); `pprint_registry` over example registries (namespaces from entry points, columns, exclusions); `check_obs`'s warnings and assertions over 11 observation/space pairs | |
+| Core API (P1) | `make("CartPole-v1")`'s stack against `Gymnasium.Make("CartPole-v1")` through truncation at step 500 (2 seeds); `OrderEnforcing` and `TimeLimit` call by call (`ResetNeeded`/`TypeError`/`ValueError` messages, `has_reset`, `_elapsed_steps`, truncation past the limit, `str`); the attribute protocol through a stack (plain `getattr`/`setattr`, `has/get/set_wrapper_attr`, run-time attributes, read-only properties, a wrapper's `_np_random`); `np_random`/`np_random_seed` (lazy, seeded, -1 once assigned, through a wrapper); `render()` without a render mode on an env with a spec (the warning and `None`); `EnvSpec` repr and `pprint`; `parse_env_id`/`get_env_id`; the single-env step-API conversions; dict repr | `render()` without a render mode or spec: the bare `AssertionError`'s empty message (N-1, NumSharp) |
 | `PyMath` (F3) | `//`, `%`, `divmod` on ints and floats, `min`/`max`, `round` with and without digits, `np.clip` (512 triples), `np.sign`, bit for bit against CPython 3.12 and NumPy 2.4.2 | |
 
-Not built yet (plan §8–§10): the reverse bridge (`check_env` on a Gym.NET env through a Python shim), the golden
-record/replay modes sharing these cases, differential fuzzing, and the remaining wrapper, vector and registry areas, which
-wait for their ports (P3–P6).
+Not built yet (plan §8–§10): the reverse bridge (`check_env` on a Gym.NET env through a Python shim, P3.5),
+differential fuzzing, and the remaining wrapper and vector areas, which wait for their ports (P6).
 
 ---
 

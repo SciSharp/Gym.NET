@@ -398,7 +398,10 @@ namespace Gym.Environments.Envs.Aether
         ///     generator (the wind and turbulence phases), even when wind is disabled (B-18), so it changes the stream every
         ///     later <see cref="Reset"/> and <see cref="Step"/> sees.
         /// </summary>
-        /// <param name="viewerFactory">Creates the human-mode viewer on the first human render; <see langword="null"/> means <see cref="NullEnvViewer"/>.</param>
+        /// <param name="viewerFactory">
+        ///     Creates the human-mode viewer on the first human render; <see langword="null"/> uses
+        ///     <c>Gymnasium.HumanViewerFactory</c>, and without one a human render raises <c>DependencyNotInstalled</c> (DR-20).
+        /// </param>
         /// <param name="continuous">Selects the continuous action space (two throttles) instead of four discrete actions.</param>
         /// <param name="gravity">The world's vertical gravity, within [-12, 0].</param>
         /// <param name="enable_wind">Applies wind and turbulence while the lander is airborne.</param>
@@ -923,6 +926,7 @@ namespace Gym.Environments.Envs.Aether
         /// </summary>
         /// <returns>The frame in <c>rgb_array</c> mode; <see cref="RenderResult.None"/> otherwise.</returns>
         /// <exception cref="NumSharp.AssertionError">Thrown without a render mode when the env has no spec (<c>assert self.spec is not None</c>).</exception>
+        /// <exception cref="Gym.Exceptions.DependencyNotInstalled">Thrown on the first human render when no viewer factory is set (DR-20).</exception>
         public override RenderResult Render()
         {
             if (RenderMode == null)
@@ -937,8 +941,8 @@ namespace Gym.Environments.Envs.Aether
                 lock (this) {
                     //to prevent double initalization.
                     if (_viewer == null) {
-                        if (_viewerFactory == null)
-                            _viewerFactory = NullEnvViewer.Factory;
+                        // DR-20: the env's own factory, else the app-wide one, else Gymnasium's missing-dependency error.
+                        _viewerFactory = global::Gym.Gymnasium.ResolveHumanViewerFactory(_viewerFactory);
                         _viewer = _viewerFactory(VIEWPORT_W, VIEWPORT_H, "lunarlander-v2").GetAwaiter().GetResult();
                     }
                 }

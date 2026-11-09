@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- A test plugin: the counterpart of Gymnasium's tests/envs/registration/utils_unregistered_env.py, a module that registers
+       an env id when it is imported. Gym.Tests references it but never touches its types, so the assembly stays unloaded
+       until make("Gym.Tests.Plugin:RegisterDuringMake-v0") loads it, which runs its module initializer and registers the id
+       (TestMake.TestImportModuleDuringMake). -->
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Gym\Gym.csproj" />
+  </ItemGroup>
+
+  <!-- NumSharp: the env's spaces and observations are NumSharp arrays, so the plugin declares the regular NuGet reference
+       itself, immediately followed by the shared import, as every project compiling against NumSharp does. -->
+  <ItemGroup>
+    <PackageReference Include="NumSharp" Version="0.80.0" />
+  </ItemGroup>
+  <Import Project="..\..\eng\NumSharp.props" />
+
+</Project>

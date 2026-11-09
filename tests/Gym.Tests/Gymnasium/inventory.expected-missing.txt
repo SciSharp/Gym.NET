@@ -72,15 +72,8 @@ gymnasium.envs.phys2d.pendulum.PendulumFunctional                               
 gymnasium.envs.phys2d.pendulum.PendulumJaxEnv                                            n/a: JAX functional envs
 gymnasium.envs.phys2d.pendulum.PendulumJaxVectorEnv                                      n/a: JAX functional envs
 gymnasium.envs.phys2d.pendulum.PendulumParams                                            n/a: JAX functional envs
-gymnasium.envs.registration.VectorizeMode                                                P3 registry
-gymnasium.envs.registration.current_namespace                                            P3 registry
-gymnasium.envs.registration.make                                                         P3 registry
-gymnasium.envs.registration.make_vec                                                     P3 registry
-gymnasium.envs.registration.pprint_registry                                              P3 registry
-gymnasium.envs.registration.register                                                     P3 registry
-gymnasium.envs.registration.register_envs                                                P3 registry
-gymnasium.envs.registration.registry                                                     P3 registry
-gymnasium.envs.registration.spec                                                         P3 registry
+gymnasium.envs.registration.VectorizeMode                                                P6 vector
+gymnasium.envs.registration.make_vec                                                     P6 vector
 gymnasium.envs.tabular.blackjack.BlackJackJaxEnv                                         n/a: JAX functional envs
 gymnasium.envs.tabular.blackjack.BlackJackParams                                         n/a: JAX functional envs
 gymnasium.envs.tabular.blackjack.BlackjackFunctional                                     n/a: JAX functional envs
@@ -120,22 +113,7 @@ gymnasium.envs.toy_text.frozen_lake.is_valid                                    
 gymnasium.envs.toy_text.taxi.TaxiEnv                                                     P5 toy_text
 gymnasium.envs.toy_text.utils.categorical_sample                                         P5 toy_text
 gymnasium.experimental.functional.FuncEnv                                                P6 FuncEnv (DR-36)
-gymnasium.utils.env_checker.check_env                                                    P3 checkers
-gymnasium.utils.env_checker.check_reset_options                                          P3 checkers
-gymnasium.utils.env_checker.check_reset_return_info_deprecation                          P3 checkers
-gymnasium.utils.env_checker.check_reset_return_type                                      P3 checkers
-gymnasium.utils.env_checker.check_reset_seed_determinism                                 P3 checkers
-gymnasium.utils.env_checker.check_returned_data_not_reused                               P3 checkers
-gymnasium.utils.env_checker.check_seed_deprecation                                       P3 checkers
-gymnasium.utils.env_checker.check_space_limit                                            P3 checkers
-gymnasium.utils.env_checker.check_step_determinism                                       P3 checkers
-gymnasium.utils.env_match.check_environments_match                                       P3 checkers
 gymnasium.utils.ezpickle.EzPickle                                                        n/a: Python pickling
-gymnasium.utils.passive_env_checker.check_action_space                                   P3 checkers
-gymnasium.utils.passive_env_checker.check_observation_space                              P3 checkers
-gymnasium.utils.passive_env_checker.env_render_passive_checker                           P3 checkers
-gymnasium.utils.passive_env_checker.env_reset_passive_checker                            P3 checkers
-gymnasium.utils.passive_env_checker.env_step_passive_checker                             P3 checkers
 gymnasium.utils.performance.benchmark_init                                               P6 performance (DR-36)
 gymnasium.utils.performance.benchmark_render                                             P6 performance (DR-36)
 gymnasium.utils.performance.benchmark_step                                               P6 performance (DR-36)
@@ -170,9 +148,6 @@ gymnasium.wrappers.NumpyToTorch                                                 
 gymnasium.wrappers.array_conversion.ArrayConversion                                      n/a: JAX/PyTorch
 gymnasium.wrappers.array_conversion.array_conversion                                     n/a: JAX/PyTorch
 gymnasium.wrappers.atari_preprocessing.AtariPreprocessing                                out of scope: Atari (DR-36)
-gymnasium.wrappers.common.Autoreset                                                      P3 wrappers.common
-gymnasium.wrappers.common.PassiveEnvChecker                                              P3 wrappers.common
-gymnasium.wrappers.common.RecordEpisodeStatistics                                        P3 wrappers.common
 gymnasium.wrappers.jax_to_numpy.JaxToNumpy                                               n/a: JAX/PyTorch
 gymnasium.wrappers.jax_to_numpy.jax_to_numpy                                             n/a: JAX/PyTorch
 gymnasium.wrappers.jax_to_numpy.numpy_to_jax                                             n/a: JAX/PyTorch
@@ -188,7 +163,6 @@ gymnasium.wrappers.rendering.AddWhiteNoise                                      
 gymnasium.wrappers.rendering.HumanRendering                                              P6 wrappers
 gymnasium.wrappers.rendering.ObstructView                                                P6 wrappers
 gymnasium.wrappers.rendering.RecordVideo                                                 P6 wrappers
-gymnasium.wrappers.rendering.RenderCollection                                            P6 wrappers
 gymnasium.wrappers.stateful_action.RepeatAction                                          P6 wrappers
 gymnasium.wrappers.stateful_action.StickyAction                                          P6 wrappers
 gymnasium.wrappers.stateful_observation.DelayObservation                                 P6 wrappers

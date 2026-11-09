@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Gym.Tests.Parity.Interop;
 using NumSharp;
 using NumSharp.Interop.PythonNet;
@@ -615,6 +616,48 @@ namespace Gym.Tests.Parity {
                 using PyObject mode = Oracle.PyConvert.ToPython(render_mode);
                 arguments["render_mode"] = mode;
                 return function.Invoke(new PyObject[] { name }, arguments);
+            }
+
+            /// <summary><c>gymnasium.spec(env_id)</c>: the registered spec, or the registry's error for a missing id.</summary>
+            /// <param name="env_id">The id.</param>
+            /// <returns>A new owned reference to the spec.</returns>
+            /// <exception cref="PythonException">Thrown with Gymnasium's error for a malformed or unregistered id.</exception>
+            internal static PyObject spec(string env_id) {
+                using PyObject function = Module.GetAttr("spec");
+                using var id = new PyString(env_id);
+                return function.Invoke(id);
+            }
+
+            /// <summary><c>gymnasium.register(id, entry_point, **options)</c>: registers an id in the live registry.</summary>
+            /// <param name="id">The id.</param>
+            /// <param name="entry_point">The entry-point string.</param>
+            /// <param name="options">
+            ///     <c>register</c>'s other keyword arguments in Python spelling (<c>max_episode_steps</c>, <c>kwargs</c>, ...), or
+            ///     <see langword="null"/>; values converted by <see cref="Oracle.PyConvert.ToPython"/>.
+            /// </param>
+            /// <returns>A new owned reference to <c>None</c>.</returns>
+            /// <exception cref="PythonException">Thrown with Gymnasium's error for a malformed id or a registration conflict.</exception>
+            internal static PyObject register(string id, string entry_point, IReadOnlyDictionary<string, object?>? options = null) {
+                using PyObject function = Module.GetAttr("register");
+                using var idValue = new PyString(id);
+                using var entryPoint = new PyString(entry_point);
+                using var arguments = Oracle.PyConvert.ToKwargs(options);
+                return function.Invoke(new PyObject[] { idValue, entryPoint }, arguments);
+            }
+
+            /// <summary><c>gymnasium.registry</c>, the live registry dict.</summary>
+            internal static class registry {
+                /// <summary><c>gymnasium.registry.pop(env_id, None)</c>: unregisters an id, as the tests' cleanups do.</summary>
+                /// <param name="env_id">The id.</param>
+                /// <returns>A new owned reference to the removed spec, or <c>None</c>.</returns>
+                /// <exception cref="PythonException">Thrown when the call fails.</exception>
+                internal static PyObject pop(string env_id) {
+                    using PyObject registryDict = Module.GetAttr("registry");
+                    using PyObject method = registryDict.GetAttr("pop");
+                    using var id = new PyString(env_id);
+                    using PyObject none = Oracle.PyConvert.ToPython(null);
+                    return method.Invoke(id, none);
+                }
             }
 
             /// <summary><c>gymnasium.Env</c> instance members (unbound: they take the env).</summary>
@@ -1436,6 +1479,44 @@ namespace Gym.Tests.Parity {
                             arguments["print_all"] = all;
                             return method.Invoke(Array.Empty<PyObject>(), arguments);
                         }
+
+                        /// <summary><c>spec.to_json()</c>.</summary>
+                        /// <param name="spec">The spec.</param>
+                        /// <returns>A new owned reference to the JSON text.</returns>
+                        /// <exception cref="PythonException">Thrown when serializing fails (a callable field, an unserializable kwarg).</exception>
+                        internal static PyObject to_json(PyObject spec) {
+                            using PyObject method = spec.GetAttr("to_json");
+                            return method.Invoke();
+                        }
+
+                        /// <summary><c>EnvSpec.from_json(json_env_spec)</c>.</summary>
+                        /// <param name="json_env_spec">The JSON text.</param>
+                        /// <returns>A new owned reference to the spec.</returns>
+                        /// <exception cref="PythonException">Thrown for malformed JSON or fields that do not make a spec.</exception>
+                        internal static PyObject from_json(string json_env_spec) {
+                            using PyObject type = Module.GetAttr("EnvSpec");
+                            using PyObject method = type.GetAttr("from_json");
+                            using var text = new PyString(json_env_spec);
+                            return method.Invoke(text);
+                        }
+                    }
+
+                    /// <summary><c>pprint_registry(print_registry, num_cols=..., exclude_namespaces=..., disable_print=True)</c>.</summary>
+                    /// <param name="print_registry">The registry dict to print (stays owned by the caller).</param>
+                    /// <param name="num_cols">Ids per line.</param>
+                    /// <param name="exclude_namespaces">Namespaces to leave out, or <see langword="null"/>.</param>
+                    /// <returns>A new owned reference to the text.</returns>
+                    /// <exception cref="PythonException">Thrown when printing fails.</exception>
+                    internal static PyObject pprint_registry(PyObject print_registry, long num_cols = 3, IReadOnlyList<string>? exclude_namespaces = null) {
+                        using PyObject function = Module.GetAttr("pprint_registry");
+                        using var arguments = new PyDict();
+                        using PyObject columns = Oracle.PyConvert.ToPython(num_cols);
+                        using PyObject excluded = Oracle.PyConvert.ToPython(exclude_namespaces?.Select(ns => (object?)ns).ToList());
+                        using PyObject disable = true.ToPython();
+                        arguments["num_cols"] = columns;
+                        arguments["exclude_namespaces"] = excluded;
+                        arguments["disable_print"] = disable;
+                        return function.Invoke(new[] { print_registry }, arguments);
                     }
                 }
 

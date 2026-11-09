@@ -60,6 +60,18 @@ namespace Gym.Envs {
         private Info? _dynamicAttributes;
 
         /// <summary>
+        ///     The class-level metadata, Python's class attribute <c>metadata</c> that <c>make</c> reads before the env exists
+        ///     to decide on <c>HumanRendering</c> or <c>RenderCollection</c>: <c>{"render_modes": []}</c> here, as on
+        ///     <c>gymnasium.Env</c>. An env class that renders declares its own with <c>new</c>
+        ///     (<c>public new static Metadata ClassMetadata =&gt; ...</c>) and sets its instance <see cref="Metadata"/> from it.
+        /// </summary>
+        /// <remarks>
+        ///     A new dict on every read: Python shares one dict between the class and its instances, so editing it there edits
+        ///     every env; here each reader gets its own.
+        /// </remarks>
+        public static Metadata ClassMetadata => new() { [Metadata.RenderModesKey] = new List<string>() };
+
+        /// <summary>
         ///     The metadata (<c>metadata</c>), with Python key spelling: <c>{"render_modes": ["human", "rgb_array"],
         ///     "render_fps": 50}</c>. Defaults to <c>{"render_modes": []}</c>, as <c>Env.metadata</c> does.
         /// </summary>

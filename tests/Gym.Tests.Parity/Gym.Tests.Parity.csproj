@@ -38,6 +38,10 @@
     <ProjectReference Include="..\..\src\Gym.Rendering\Gym.Rendering.csproj" />
   </ItemGroup>
 
+  <!-- DR-17: the registration initializer Gym.NET.Environments' package compiles into a consuming app, imported by path (a
+       project reference gets no buildTransitive targets), so Gymnasium.Make("CartPole-v1") works here as in an app. -->
+  <Import Project="..\..\src\Gym.Environments\buildTransitive\Gym.NET.Environments.targets" />
+
   <!-- NumSharp and its pythonnet bridge: the regular NuGet references, co-versioned, used as they stand by default
        (NumSharpSource=Package). -p:NumSharpSource=Submodule makes eng/NumSharp.props replace both with refs/NumSharp's
        source builds. The import stays last: an item Remove only sees the items declared before it. -->

@@ -346,12 +346,38 @@ Specs: the port plan's §8, §9 (the `make()` stack) and §12.
     all bound by Python name (DR-11).
   - `render_mode="human"`: `Gymnasium.HumanViewerFactory`, a `viewer_factory` override, and `DependencyNotInstalled`
     when neither is set (DR-20).
+  - *Done 2026-11-09 except the options records:* `EnvRegistry` (`gymnasium.envs.registration`: `Registry`, an ordered,
+    synchronized `EnvSpecRegistry`; `Register`, `Spec`, `Make` untyped and typed, `PprintRegistry`, `RegisterEnvs`,
+    `Namespace`, `CurrentNamespace`, `FindHighestVersion`, `LoadEnvCreator`, every `_check_*` with Gymnasium's texts and
+    CPython's `difflib.get_close_matches` for the suggestions) re-exported by the `Gym.Gymnasium` facade. Entry points
+    are a class (`typeof(CartPoleEnv)`), an `EnvCreator`, or a `"Namespace:Class"` string resolved over the loaded
+    assemblies (loading the one named after the namespace when needed); an `"Assembly:Id"` id loads the assembly and runs
+    its module initializer, Python's import. kwargs bind by Python name through `PyKwargs.Construct` (dictionary and
+    anonymous-object forms; the generated options records are P2.9 with DR-34), which also closes the generic wrappers
+    over the env's types. `EnvSpec.Make`/`ToJson`/`FromJson` (Python's `json` text through `PyJson`; a class entry point
+    is written as its `"Namespace:Class"` string and equals it). `GymEnvironments.Register()` registers CartPole-v0/v1
+    from a module initializer, `GYMNET_DISABLE_ENV_REGISTRATION` disarms it, and `buildTransitive/Gym.NET.Environments.targets`
+    compiles the app-side initializer (imported by path in the test projects; the examples, still on netcoreapp3.0, are
+    refreshed in P10). DR-20: the viewer contract moved into `Gym` (namespace `Gym.Environments` kept), envs resolve
+    their factory with `Gymnasium.ResolveHumanViewerFactory`. `RenderCollection` came early for `make`'s `*_list` modes;
+    `HumanRendering` stays in P6 (`make` raises `NotImplementedError` where it would apply), and so do `make_vec` and
+    `VectorizeMode`, which need `VectorEnv`. LunarLander stays unregistered until P8 replaces the Aether port.*
 - **P3.2 Checkers**: `utils/passive_env_checker.py` and the `PassiveEnvChecker` wrapper, `utils/env_checker.py`
-  (`check_env`, including v1.4.0's distinct-object and RNG-state checks), `utils/env_match.py`.
+  (`check_env`, including v1.4.0's distinct-object and RNG-state checks), `utils/env_match.py`. *Done 2026-11-09:
+  `PassiveChecker` (every check, plus untyped `IEnv` overloads; data reuse compares retained views, which keep the
+  memory alive so a disposed and re-pooled buffer cannot pass for sharing), `PassiveEnvChecker`, `EnvChecker.CheckEnv`
+  and its checks (the checks of Python signatures that C# rules out are documented, not ported), `EnvMatch`.*
 - **P3.3 Common wrappers**: `Autoreset`, `RecordEpisodeStatistics` (its time entry excluded from goldens), vector
-  `step_api_compatibility`.
+  `step_api_compatibility`. *Done 2026-11-09 for `Autoreset` and `RecordEpisodeStatistics` (with `Deque<T>`, Python's
+  `deque(maxlen)`); the vector form of `step_api_compatibility` moves to P6 with the vector info layout.*
 - **P3.4 Tests**: port `tests/envs/registration`, the checker tests in `tests/utils`, and the common-wrapper tests.
-  Parity cells switch from the hand-built `TimeLimit(OrderEnforcing(env))` to `Gymnasium.Make`.
+  Parity cells switch from the hand-built `TimeLimit(OrderEnforcing(env))` to `Gymnasium.Make`. *Done 2026-11-09: 83
+  ported tests (registration, `spec`, `make`, `EnvSpec`, `pprint_registry`, both `PassiveEnvChecker` files,
+  `env_checker`, `env_match`, `Autoreset`, `RecordEpisodeStatistics`), a `Gym.Tests.Plugin` assembly standing for the
+  module a `"module:id"` make imports, and `[OpenBugs]` cells for what later phases bring (Blackjack/Taxi P5,
+  MountainCar/Pendulum P4, the P6 wrappers, CarRacing P8); Humanoid's case is out with MuJoCo (DR-35). Live cells:
+  `make`'s stack through truncation, its `str` and specs, the registry's errors, `EnvSpec` JSON both ways,
+  `pprint_registry`, `check_obs`.*
 - **P3.5 The reverse bridge** (the interop design's §8): a Python env class over a Gym.NET env, so Gymnasium's own
   `check_env` and `check_environments_match` run against Gym.NET's envs in the live suite. Every later env phase adds
   its ids to it.

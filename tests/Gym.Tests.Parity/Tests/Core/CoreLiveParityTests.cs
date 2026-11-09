@@ -24,9 +24,8 @@ namespace Gym.Tests.Parity.Tests.Core {
     ///     repr and pprint and the id grammar, the step-API conversions, and dict repr.
     /// </summary>
     /// <remarks>
-    ///     Gym.NET has no <c>make</c> or <c>PassiveEnvChecker</c> until P3, so its side of a <c>make</c>-built stack is built by
-    ///     hand, <c>TimeLimit(OrderEnforcing(CartPoleEnv))</c>, with the spec <c>make</c> gives the unwrapped env; the checker only
-    ///     validates, so every compared value is unaffected. Entry points name modules, which differ by design
+    ///     Since P3 both sides of a <c>make</c>-built stack come from <c>make</c>: Gymnasium's <c>gymnasium.make</c> and
+    ///     Gym.NET's <c>Gymnasium.Make</c>, <c>PassiveEnvChecker</c> included. Entry points name modules, which differ by design
     ///     (<c>gymnasium.core:Wrapper</c> against <c>Gym.Envs:Wrapper</c>), so spec cells use stacks whose wrappers edit the spec
     ///     rather than append a <c>WrapperSpec</c>, or build <c>WrapperSpec</c>s with the same strings on both sides.
     ///     Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/core.py">gymnasium/core.py</see>, <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/wrappers/common.py">gymnasium/wrappers/common.py</see>,
@@ -35,8 +34,9 @@ namespace Gym.Tests.Parity.Tests.Core {
     [TestClass]
     public sealed class CoreLiveParityTests : ParityTestBase {
         /// <summary>
-        ///     Gymnasium's <c>make("CartPole-v1")</c> stack against Gym.NET's hand-built one for a whole episode of the balancing
-        ///     policy: every transition identical, and both truncate at step 500, where <c>TimeLimit</c> ends the episode.
+        ///     Gymnasium's <c>make("CartPole-v1")</c> stack against Gym.NET's <c>Gymnasium.Make("CartPole-v1")</c> for a whole
+        ///     episode of the balancing policy: every transition identical, and both truncate at step 500, where <c>TimeLimit</c>
+        ///     ends the episode.
         /// </summary>
         /// <param name="seed">The reset seed.</param>
         [TestMethod]
@@ -44,7 +44,7 @@ namespace Gym.Tests.Parity.Tests.Core {
         [DataRow(42L)]
         public void MadeStack_MatchesGymnasiumsMake_ThroughTruncation(long seed) {
             SkipOffReferencePlatform("CartPole's cos/sin");
-            using var pair = new GymPair(PyGymEnv.Make("CartPole-v1", viaMake: true), new GymNetEnv(MadeCartPole()), stateAttribute: "state");
+            using var pair = new GymPair(PyGymEnv.Make("CartPole-v1", viaMake: true), new GymNetEnv(Gymnasium.Make("CartPole-v1")), stateAttribute: "state");
             PairRun run = pair.Run(seed, ActionSources.Policy("cartpole_balance"), maxSteps: 600);
             TestContext.WriteLine(run.ToString());
             Assert.AreEqual(500, run.Steps, "Both sides must truncate at max_episode_steps.");
@@ -494,19 +494,6 @@ namespace Gym.Tests.Parity.Tests.Core {
                     return Python.builtins.repr(dictionary);
                 }), Outcome.Returned(ValueFacts.FromText(info.ToString())));
             }
-        }
-
-        /// <summary>
-        ///     Gym.NET's counterpart of <c>gym.make("CartPole-v1")</c> until P3: <c>TimeLimit(OrderEnforcing(CartPoleEnv), 500)</c>
-        ///     with the spec <c>make</c> gives the unwrapped env (the wrappers' settings cleared, so each puts its own back).
-        /// </summary>
-        /// <returns>The stack.</returns>
-        private static TimeLimit<NDArray, NDArray> MadeCartPole() {
-            var cartPole = new CartPoleEnv {
-                Spec = new EnvSpec("CartPole-v1", "gymnasium.envs.classic_control.cartpole:CartPoleEnv", rewardThreshold: 475.0, orderEnforce: false, disableEnvChecker: true,
-                    vectorEntryPoint: "gymnasium.envs.classic_control.cartpole:CartPoleVectorEnv")
-            };
-            return new TimeLimit<NDArray, NDArray>(new OrderEnforcing<NDArray, NDArray>(cartPole), 500);
         }
 
         /// <summary>Gymnasium's <c>env.step(action)</c> with an int action, captured.</summary>

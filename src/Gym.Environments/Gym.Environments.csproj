@@ -52,6 +52,16 @@
     <None Include="..\..\eng\icon.png" Pack="true" PackagePath="\" Visible="false" />
     <None Include="..\..\README.md" Pack="true" PackagePath="\" Visible="false" />
   </ItemGroup>
+
+  <!-- DR-17's app-side registration: buildTransitive/Gym.NET.Environments.targets compiles GymNetEnvironmentsRegistration.cs
+       into every C# project consuming the package, so the built-in ids register before Main. The .cs file is the consumer's,
+       not this library's: it is removed from this project's own compile (the SDK would glob it in) and packed beside the
+       targets. -->
+  <ItemGroup>
+    <Compile Remove="buildTransitive\**" />
+    <None Include="buildTransitive\Gym.NET.Environments.targets" Pack="true" PackagePath="buildTransitive\" />
+    <None Include="buildTransitive\GymNetEnvironmentsRegistration.cs" Pack="true" PackagePath="buildTransitive\" />
+  </ItemGroup>
   <!-- NumSharp.Build, the [NDScoped] IL weaver of decision D19: after compile it wraps each [NDScoped] method's body in an
        NDScope, so a method's temporary arrays are reclaimed while its results (and the INDArrayCarrier results,
        StepResult/ResetResult) survive. A development dependency: PrivateAssets="all" keeps it out of the package's

@@ -1,0 +1,16 @@
+<Project>
+  <!--
+    Gym.NET.Environments' app-side registration (DR-17): compiles a one-line [ModuleInitializer] into the consuming C# project
+    that calls GymEnvironments.RegisterUnlessDisabled(), so the built-in env ids are registered before Main and
+    Gymnasium.Make("CartPole-v1") works with no set-up call. NuGet imports this file into every project that references the
+    package, directly or transitively; Gym.NET's own tests and examples import it by path.
+
+    - F# and Visual Basic projects get nothing (the file is C#): they call GymEnvironments.Register() themselves.
+    - The environment variable GYMNET_DISABLE_ENV_REGISTRATION disarms the registration at run time (DR-14).
+    - GymNetDisableEnvRegistrationInitializer=true leaves the file out of a project's build altogether.
+    - MSBuild imports a file once per project (a second import is skipped with MSB4011), so the initializer is never doubled.
+  -->
+  <ItemGroup Condition="'$(Language)' == 'C#' and '$(GymNetDisableEnvRegistrationInitializer)' != 'true'">
+    <Compile Include="$(MSBuildThisFileDirectory)GymNetEnvironmentsRegistration.cs" Link="Properties\GymNetEnvironmentsRegistration.cs" Visible="false" />
+  </ItemGroup>
+</Project>

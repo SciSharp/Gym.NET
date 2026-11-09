@@ -117,8 +117,35 @@ namespace Gym.Utils {
                 case Gym.Spaces.GraphInstance graph:
                     // A NamedTuple prints with its field names, not as the plain tuple ContainerRepr would make of it.
                     return graph.ToString();
+                case Type type:
+                    // A class object, an EnvSpec's entry point among others: <class 'Gym.Environments.Envs.Classic.CartPoleEnv'>.
+                    return $"<class '{ClassName(type)}'>";
+                case Delegate function:
+                    // A function, an EnvCreator entry point: <function make_env at 0x...>. Python prints the object's address,
+                    // which no two runs share; the identity hash stands in for it.
+                    return $"<function {function.Method.Name} at 0x{RuntimeHelpers.GetHashCode(function).ToString("X16", CultureInfo.InvariantCulture)}>";
                 default:
                     return IntegerText(value) ?? ContainerRepr(value) ?? value.ToString() ?? "";
+            }
+        }
+
+        /// <summary>
+        ///     Python's string order, which <c>sorted</c> and <c>&lt;</c> use: code point by code point, a prefix before its
+        ///     extensions. It differs from <see cref="string.CompareOrdinal(string, string)"/> only for characters beyond the
+        ///     BMP, which UTF-16 stores as surrogates that sort below <c>U+E000</c>.
+        /// </summary>
+        /// <param name="left">The first string.</param>
+        /// <param name="right">The second string.</param>
+        /// <returns>Negative, zero or positive, as <paramref name="left"/> sorts before, with or after <paramref name="right"/>.</returns>
+        internal static int CompareStrings(string left, string right) {
+            StringRuneEnumerator a = left.EnumerateRunes(), b = right.EnumerateRunes();
+            while (true) {
+                bool hasA = a.MoveNext(), hasB = b.MoveNext();
+                if (!hasA || !hasB)
+                    return hasA ? 1 : hasB ? -1 : 0;
+                int order = a.Current.Value.CompareTo(b.Current.Value);
+                if (order != 0)
+                    return order;
             }
         }
 
@@ -374,9 +401,24 @@ namespace Gym.Utils {
                     return "tuple";
                 case IList:
                     return "list";
+                case not null when IsSet(value.GetType()):
+                    // HashSet<T> and any other ISet<T>/IReadOnlySet<T>: Python's set, which messages name by type.
+                    return "set";
                 default:
                     return IntegerText(value) != null ? "int" : ClassName(value.GetType());
             }
+        }
+
+        /// <summary>Whether a type is a set, Python's <c>set</c>: it implements <see cref="ISet{T}"/> or <see cref="IReadOnlySet{T}"/>.</summary>
+        /// <param name="type">The type.</param>
+        /// <returns><see langword="true"/> for a set.</returns>
+        private static bool IsSet(Type type) {
+            foreach (Type implemented in type.GetInterfaces()) {
+                if (implemented.IsGenericType && (implemented.GetGenericTypeDefinition() == typeof(ISet<>) || implemented.GetGenericTypeDefinition() == typeof(IReadOnlySet<>)))
+                    return true;
+            }
+
+            return false;
         }
 
         /// <summary>
