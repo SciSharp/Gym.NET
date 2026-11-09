@@ -28,6 +28,9 @@
     <!-- An assembly the tests never touch, so it stays unloaded until make("Gym.Tests.Plugin:RegisterDuringMake-v0") loads it
          and its module initializer registers the id (TestMake.TestImportModuleDuringMake). -->
     <ProjectReference Include="..\Gym.Tests.Plugin\Gym.Tests.Plugin.csproj" />
+    <!-- The source generator, for the records the tests declare ([GymOptions] envs, [GymTuple]/[GymDict] records), as a
+         consumer of the package gets it. -->
+    <ProjectReference Include="..\..\src\Gym.SourceGenerators\Gym.SourceGenerators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" PrivateAssets="all" />
   </ItemGroup>
 
   <!-- Gymnasium (NumPy 2.4.2) golden of seeded space samples and CartPole resets, recorded by

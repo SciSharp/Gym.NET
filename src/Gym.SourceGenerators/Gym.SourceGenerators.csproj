@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Gym.NET's Roslyn source generator (DR-13, DR-34): it writes the options record of every [GymOptions] env and wrapper,
+       and the conversions, Python equality and repr of every [GymTuple]/[GymDict] record. A generator runs inside the
+       compiler, so it targets netstandard2.0 and references Roslyn only for compiling; Gym and Gym.Environments load it as
+       an analyzer (ProjectReference with OutputItemType="Analyzer"), and the Gym package ships it under analyzers/ so the
+       records of a consumer's own envs are generated too. -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <IsRoslynComponent>true</IsRoslynComponent>
+    <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+    <IsPackable>false</IsPackable>
+    <!-- The generator is loaded by the compiler of every SDK version that builds Gym.NET; 4.8 is the C# 12 compiler of .NET 8. -->
+    <RoslynVersion>4.8.0</RoslynVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="$(RoslynVersion)" PrivateAssets="all" />
+  </ItemGroup>
+
+</Project>

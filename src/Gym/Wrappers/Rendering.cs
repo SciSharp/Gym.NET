@@ -29,7 +29,8 @@ namespace Gym.Wrappers {
     ///     </para>
     ///     <para>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/wrappers/rendering.py#L34">gymnasium/wrappers/rendering.py</see>.</para>
     /// </remarks>
-    public class RenderCollection<TObs, TAct> : Wrapper<TObs, TAct>, IRecordConstructorArgs {
+    [GymOptions]
+    public partial class RenderCollection<TObs, TAct> : Wrapper<TObs, TAct>, IRecordConstructorArgs {
         /// <summary>Wraps <paramref name="env"/>, whose render mode must be a single-frame one.</summary>
         /// <param name="env">The env to collect frames of.</param>
         /// <param name="popFrames">Clear the collection whenever <see cref="Render"/> returns it.</param>

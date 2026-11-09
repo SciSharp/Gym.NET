@@ -44,7 +44,8 @@ namespace Gym.Environments.Envs.Classic {
     ///     </para>
     ///     <para>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/envs/classic_control/cartpole.py#L21">gymnasium/envs/classic_control/cartpole.py</see>.</para>
     /// </remarks>
-    public class CartPoleEnv : Env<NDArray, NDArray> {
+    [GymOptions]
+    public partial class CartPoleEnv : Env<NDArray, NDArray> {
         /// <summary>
         ///     Gymnasium's warning for a step after termination, issued once (then Python's filter suppresses repeats from the
         ///     same line).

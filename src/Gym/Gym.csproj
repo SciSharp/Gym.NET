@@ -37,6 +37,14 @@
     <None Include="..\..\README.md" Pack="true" PackagePath="\" Visible="false" />
   </ItemGroup>
 
+  <!-- Gym.NET's source generator (DR-13, DR-34): the options records of [GymOptions] wrappers and the members of
+       [GymTuple]/[GymDict] records. It runs in the compiler only (ReferenceOutputAssembly="false"), and the package carries it
+       under analyzers/dotnet/cs so a consumer's own envs and records get it too. -->
+  <ItemGroup>
+    <ProjectReference Include="..\Gym.SourceGenerators\Gym.SourceGenerators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" PrivateAssets="all" />
+    <None Include="..\Gym.SourceGenerators\bin\$(Configuration)\netstandard2.0\Gym.SourceGenerators.dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
+  </ItemGroup>
+
   <!-- NumSharp.Build, the [NDScoped] IL weaver of decision D19: after compile it wraps each [NDScoped] method's body in an
        NDScope, so a method's temporary arrays are reclaimed while its results (and the INDArrayCarrier results,
        StepResult/ResetResult) survive. A development dependency: PrivateAssets="all" keeps it out of the package's

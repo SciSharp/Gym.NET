@@ -44,6 +44,8 @@
     <ProjectReference Include="..\Gym\Gym.csproj" />
     <!-- The pygame-compatible rasterizer the classic-control envs render rgb_array frames with, pixel for pixel. -->
     <ProjectReference Include="..\Gym.Rendering\Gym.Rendering.csproj" />
+    <!-- The source generator, for the envs' [GymOptions] records (DR-34): compiler-only, not a runtime dependency. -->
+    <ProjectReference Include="..\Gym.SourceGenerators\Gym.SourceGenerators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" PrivateAssets="all" />
   </ItemGroup>
 
   <!-- The package's icon and readme, packed at its root (NuGet's PackageIcon / PackageReadmeFile). They replace the

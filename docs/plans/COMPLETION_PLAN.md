@@ -327,7 +327,14 @@ Specs: the port plan's §7; sources `gymnasium/spaces` (3,816 lines at v1.4.0); 
 - **P2.9 The source generator (DR-13, DR-34)**: `[GymTuple]`/dict records over the generic forms, with implicit casts,
   Python `==` and `repr`; the same project later emits DR-34's options records (P3). Split out of P2.1/P2.5, which
   shipped the generic forms the records convert to. *Moved next to P3's options records (2026-11-09): nothing in P2
-  needs it (every space works on its generic form), and building it once for both record kinds avoids a second pass.*
+  needs it (every space works on its generic form), and building it once for both record kinds avoids a second pass.
+  Done 2026-11-09 (with P3): `src/Gym.SourceGenerators` (an incremental generator, netstandard2.0, Roslyn 4.8) writes,
+  for `[GymOptions]` classes, a `<Class>Options` record (properties from the constructor make binds, documented with its
+  `<param>` texts, each remembering whether it was set; `ToKwargs()`; a constructor of the class taking the record that
+  refuses unset required arguments with Python's text), and for `[GymTuple]`/`[GymDict]` positional records the implicit
+  conversions to and from `object?[]`/`Info`, Python's `==` through `PyEquality`, a consistent hash and Python's `repr`.
+  CartPole and the wrappers with parameters (`TimeLimit`, `OrderEnforcing`, `RecordEpisodeStatistics`,
+  `RenderCollection`) carry `[GymOptions]`; the Gym package ships the generator under `analyzers/dotnet/cs`.*
 - **Exit:** `tests/spaces` green on both frameworks; every space has live cells; no space `[OpenBugs]` left; the
   inventory list loses every `gymnasium.spaces` name.
 
@@ -343,7 +350,8 @@ Specs: the port plan's §8, §9 (the `make()` stack) and §12.
     initializer into consuming C# apps so registration runs before `Main` (DR-17). CartPole-v0/v1 register now; each
     later phase registers its ids.
   - kwargs: generated `<Class>Options` records (`[GymOptions]`, DR-34), plus dictionary and anonymous-object overloads,
-    all bound by Python name (DR-11).
+    all bound by Python name (DR-11). *Options records done 2026-11-09 with P2.9: `Make("CartPole-v1", new
+    CartPoleEnvOptions { RenderMode = "rgb_array" })`.*
   - `render_mode="human"`: `Gymnasium.HumanViewerFactory`, a `viewer_factory` override, and `DependencyNotInstalled`
     when neither is set (DR-20).
   - *Done 2026-11-09 except the options records:* `EnvRegistry` (`gymnasium.envs.registration`: `Registry`, an ordered,
