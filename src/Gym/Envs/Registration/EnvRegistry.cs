@@ -191,7 +191,6 @@ namespace Gym.Envs.Registration {
         /// <exception cref="AttributeError">Thrown when a string entry point's namespace has no such class.</exception>
         /// <exception cref="InvalidMetadata">Thrown when the env class's <c>ClassMetadata</c> is not a dict.</exception>
         /// <exception cref="ValueError">Thrown when a recorded wrapper cannot be re-created, or a pre-applied wrapper disagrees with the spec.</exception>
-        /// <exception cref="NotImplementedError">Thrown when <c>HumanRendering</c> would be needed (an env without native human rendering asked for <c>human</c>); it arrives with the rendering wrappers.</exception>
         /// <remarks>
         ///     <para>
         ///     The env and every wrapper are built through <see cref="PyKwargs.Construct"/>, which binds keywords by Python name
@@ -222,7 +221,6 @@ namespace Gym.Envs.Registration {
         /// <exception cref="AttributeError">Thrown when a string entry point's namespace has no such class.</exception>
         /// <exception cref="InvalidMetadata">Thrown when the env class's <c>ClassMetadata</c> is not a dict.</exception>
         /// <exception cref="ValueError">Thrown when a recorded wrapper cannot be re-created.</exception>
-        /// <exception cref="NotImplementedError">Thrown when <c>HumanRendering</c> would be needed.</exception>
         public static IEnv Make(EnvSpec spec, object? kwargs = null, long? maxEpisodeSteps = null, bool? disableEnvChecker = null) {
             if (spec is null)
                 throw new TypeError($"Expected id to be a string or EnvSpec, got {PyBuiltins.TypeRepr(null)}");
@@ -251,7 +249,6 @@ namespace Gym.Envs.Registration {
         /// <exception cref="AttributeError">Thrown when a string entry point's namespace has no such class.</exception>
         /// <exception cref="InvalidMetadata">Thrown when the env class's <c>ClassMetadata</c> is not a dict.</exception>
         /// <exception cref="ValueError">Thrown when a recorded wrapper cannot be re-created.</exception>
-        /// <exception cref="NotImplementedError">Thrown when <c>HumanRendering</c> would be needed.</exception>
         public static Env<TObs, TAct> Make<TObs, TAct>(string id, object? kwargs = null, long? maxEpisodeSteps = null, bool? disableEnvChecker = null) {
             if (id is null)
                 throw new TypeError($"Expected id to be a string or EnvSpec, got {PyBuiltins.TypeRepr(null)}");
@@ -272,7 +269,6 @@ namespace Gym.Envs.Registration {
         /// <exception cref="AttributeError">Thrown when a string entry point's namespace has no such class.</exception>
         /// <exception cref="InvalidMetadata">Thrown when the env class's <c>ClassMetadata</c> is not a dict.</exception>
         /// <exception cref="ValueError">Thrown when a recorded wrapper cannot be re-created.</exception>
-        /// <exception cref="NotImplementedError">Thrown when <c>HumanRendering</c> would be needed.</exception>
         public static Env<TObs, TAct> Make<TObs, TAct>(EnvSpec spec, object? kwargs = null, long? maxEpisodeSteps = null, bool? disableEnvChecker = null) {
             if (spec is null)
                 throw new TypeError($"Expected id to be a string or EnvSpec, got {PyBuiltins.TypeRepr(null)}");
@@ -431,7 +427,6 @@ namespace Gym.Envs.Registration {
         /// <exception cref="TypeError">Thrown when the env cannot be built from the kwargs, or is not of the expected types.</exception>
         /// <exception cref="InvalidMetadata">Thrown when the env class's metadata is not a dict.</exception>
         /// <exception cref="ValueError">Thrown when a recorded wrapper cannot be re-created.</exception>
-        /// <exception cref="NotImplementedError">Thrown when <c>HumanRendering</c> would be needed.</exception>
         private static IEnv MakeCore(EnvSpec envSpec, object? kwargs, long? maxEpisodeSteps, bool? disableEnvChecker, (Type Obs, Type Act)? expected) {
             // Update the env spec kwargs with the make kwargs.
             Info envSpecKwargs = envSpec.Kwargs.DeepCopy();
@@ -531,7 +526,7 @@ namespace Gym.Envs.Registration {
 
                 // Add the human rendering wrapper.
                 if (applyHumanRendering)
-                    throw new NotImplementedError($"{envSpec.Id} does not render 'human' itself and Gym.NET does not provide the HumanRendering wrapper yet; render 'rgb_array' and show the frames instead.");
+                    env = Wrap(typeof(HumanRendering<,>), env, null);
                 if (applyRenderCollection)
                     env = Wrap(typeof(RenderCollection<,>), env, null);
 

@@ -25,19 +25,23 @@ refs/Gym.NET/
 │   │   ├── Envs/                  # IEnv, Env<TObs, TAct> (Step, ValueTask StepAsync), Wrapper family (+ IWrapper), Info, Metadata, RenderResult
 │   │   │   ├── Registration/      # EnvSpec (Make, ToJson/FromJson), WrapperSpec, EnvCreator, EnvSpecRegistry, EnvRegistry (register, spec, make, pprint_registry),
 │   │   │   │                      #   EnvRegistry.MakeVec.cs (make_vec: sync and vector entry point; async is P6.2, deferred), VectorizeMode
-│   │   │   └── Viewers/           # IEnvViewer, IEnvironmentViewerFactoryDelegate, NullEnvViewer (namespace Gym.Environments; DR-20)
+│   │   │   └── Viewers/           # IEnvViewer, IEnvironmentViewerFactoryDelegate, NullEnvViewer (namespace Gym.Environments; DR-20); Clock (Gym.Rendering)
 │   │   ├── Spaces/                # Space (base), Box (bounded/continuous), Discrete
 │   │   ├── Observations/          # StepResult<TObs> (5-tuple), ResetResult<TObs>, DoneStepResult<TObs> (pre-0.26 4-tuple)
 │   │   ├── Vector/                # IVectorEnv, VectorEnv<TObs, TAct> (batched types, DR-21; _add_info), VectorStepResult/VectorResetResult, AutoresetMode,
 │   │   │                          #   SyncVectorEnv (typed, and untyped as SyncVectorEnv), VectorWrapper family, VectorUtils (batch_space, concatenate, iterate)
-│   │   ├── Wrappers/              # Common.cs: TimeLimit, OrderEnforcing, PassiveEnvChecker, Autoreset, RecordEpisodeStatistics; Rendering.cs: RenderCollection;
-│   │   │                          #   StatefulObservation.cs: TimeAwareObservation, NormalizeObservation; StatefulReward.cs: NormalizeReward;
-│   │   │                          #   TransformObservation.cs: FlattenObservation; WrapperFunctions.cs: RunningMeanStd, update_mean_var_count_from_moments
+│   │   ├── Wrappers/              # Common.cs: TimeLimit, OrderEnforcing, PassiveEnvChecker, Autoreset, RecordEpisodeStatistics;
+│   │   │                          #   Rendering.cs: RenderCollection, RecordVideo (IVideoWriter, DR-25), HumanRendering, AddWhiteNoise, ObstructView;
+│   │   │                          #   StatefulObservation.cs: TimeAwareObservation, NormalizeObservation, DelayObservation, FrameStackObservation,
+│   │   │                          #   MaxAndSkipObservation; StatefulAction.cs: StickyAction, RepeatAction; StatefulReward.cs: NormalizeReward;
+│   │   │                          #   TransformObservation.cs: TransformObservation and its 9 subclasses (Filter, Flatten, Grayscale, Resize, Reshape,
+│   │   │                          #   Rescale, Dtype, AddRender, Discretize); TransformAction.cs, TransformReward.cs; WrapperFunctions(.Spaces).cs:
+│   │   │                          #   RunningMeanStd, update_mean_var_count_from_moments, create_zero_array, rescale_box
 │   │   ├── Legacy/                # [Obsolete] pre-0.26 API: Step, ILegacyEnv, LegacyEnvAdapter, VecEnv family
 │   │   ├── Internal/              # Dict (legacy info type), CircularQueue, Dynamic/Merging/Reflection helpers
 │   │   ├── Utils/                 # Seeding (PCG64), PyBuiltins, PyMath (F3), PyAttributes, PyEquality, PyCopy, PyKwargs (Python kwargs binding), PyJson, Deque,
 │   │   │                          # PassiveChecker, EnvChecker (check_env, data_equivalence), EnvMatch, StepApiCompatibility, RecordConstructorArgs, Warnings,
-│   │   │                          # Cv2 (OpenCV's 8-bit cv2.resize, INTER_AREA and INTER_LINEAR, byte for byte; DR-23)
+│   │   │                          # Cv2 (OpenCV's 8-bit cv2.resize, INTER_AREA and INTER_LINEAR, byte for byte; DR-23), Video (save_video; PNG/ffmpeg writers)
 │   │   ├── Gymnasium.cs           # The `gymnasium` facade: Make, MakeVec, Spec, Register, Registry, PprintRegistry, HumanViewerFactory (DR-20)
 │   │   ├── Logger.cs              # Warnings as gymnasium.logger issues them (colourised, Python's default filters)
 │   │   └── Exceptions/            # Every gymnasium.error class (Error, ResetNeeded, ...), AssertionError, NotImplementedError, ImportError; legacy InvalidActionError etc.

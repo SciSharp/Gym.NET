@@ -75,7 +75,6 @@ namespace Gym {
         /// <exception cref="AttributeError">Thrown when a string entry point's namespace has no such class.</exception>
         /// <exception cref="InvalidMetadata">Thrown when the env class's <c>ClassMetadata</c> is not a dict.</exception>
         /// <exception cref="ValueError">Thrown when a recorded wrapper cannot be re-created.</exception>
-        /// <exception cref="NotImplementedError">Thrown when <c>HumanRendering</c> would be needed.</exception>
         public static IEnv Make(string id, object? kwargs = null, long? maxEpisodeSteps = null, bool? disableEnvChecker = null) =>
             EnvRegistry.Make(id, kwargs, maxEpisodeSteps, disableEnvChecker);
 
@@ -91,7 +90,6 @@ namespace Gym {
         /// <exception cref="AttributeError">Thrown when a string entry point's namespace has no such class.</exception>
         /// <exception cref="InvalidMetadata">Thrown when the env class's <c>ClassMetadata</c> is not a dict.</exception>
         /// <exception cref="ValueError">Thrown when a recorded wrapper cannot be re-created.</exception>
-        /// <exception cref="NotImplementedError">Thrown when <c>HumanRendering</c> would be needed.</exception>
         public static IEnv Make(EnvSpec spec, object? kwargs = null, long? maxEpisodeSteps = null, bool? disableEnvChecker = null) =>
             EnvRegistry.Make(spec, kwargs, maxEpisodeSteps, disableEnvChecker);
 
@@ -113,7 +111,6 @@ namespace Gym {
         /// <exception cref="AttributeError">Thrown when a string entry point's namespace has no such class.</exception>
         /// <exception cref="InvalidMetadata">Thrown when the env class's <c>ClassMetadata</c> is not a dict.</exception>
         /// <exception cref="ValueError">Thrown when a recorded wrapper cannot be re-created.</exception>
-        /// <exception cref="NotImplementedError">Thrown when <c>HumanRendering</c> would be needed.</exception>
         public static Env<TObs, TAct> Make<TObs, TAct>(string id, object? kwargs = null, long? maxEpisodeSteps = null, bool? disableEnvChecker = null) =>
             EnvRegistry.Make<TObs, TAct>(id, kwargs, maxEpisodeSteps, disableEnvChecker);
 
@@ -131,7 +128,6 @@ namespace Gym {
         /// <exception cref="AttributeError">Thrown when a string entry point's namespace has no such class.</exception>
         /// <exception cref="InvalidMetadata">Thrown when the env class's <c>ClassMetadata</c> is not a dict.</exception>
         /// <exception cref="ValueError">Thrown when a recorded wrapper cannot be re-created.</exception>
-        /// <exception cref="NotImplementedError">Thrown when <c>HumanRendering</c> would be needed.</exception>
         public static Env<TObs, TAct> Make<TObs, TAct>(EnvSpec spec, object? kwargs = null, long? maxEpisodeSteps = null, bool? disableEnvChecker = null) =>
             EnvRegistry.Make<TObs, TAct>(spec, kwargs, maxEpisodeSteps, disableEnvChecker);
 

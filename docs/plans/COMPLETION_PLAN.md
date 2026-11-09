@@ -605,6 +605,12 @@ Specs: the port plan's §9 and §10; sources `vector` 3,113 lines and `wrappers`
   OpenCV pinned in the parity stack as `opencv-python-headless==4.13.0.92`, `opencv.version` in the manifest, and in
   THIRD-PARTY-NOTICES); `ResizeObservation` on it, with its parity cells and `test_resize_observation.py` mirrored
   (CarRacing's cases `[OpenBugs("P8")]`). The float32 paths are not translated (no Gymnasium caller; DESIGN_REVIEW).
+- *Done 2026-11-10, P6.5 (F9, DR-25, DR-20):* `RecordVideo` over `IVideoWriter` (`PngVideoWriter` by default,
+  `FfmpegVideoWriter` for mp4), `HumanRendering` (on the viewers; `make`'s human-rendering path now applies it, so
+  `TestMakeHumanRendering_LaterPhases` waits only for CarRacing), `AddWhiteNoise`, `ObstructView`, and
+  `gymnasium.utils.save_video` as `Video.SaveVideo`/`Video.CappedCubicVideoSchedule`; 21 parity cells (frames, videos,
+  clips, schedule) and `test_record_video.py`, `test_human_rendering.py`, `test_white_noise_rendering.py` and
+  `tests/utils/test_save_video.py` mirrored.
 
 ### P8 Box2D
 

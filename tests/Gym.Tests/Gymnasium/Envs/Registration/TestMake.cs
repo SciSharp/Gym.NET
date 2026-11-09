@@ -226,10 +226,10 @@ namespace Gym.Tests.Gymnasium.Envs.Registration {
             }
         }
 
-        /// <summary>The <c>HumanRendering</c> wrapper for an env without native human rendering (P6), and CarRacing's kwargs error (P8).</summary>
+        /// <summary>The <c>HumanRendering</c> wrapper for an env without native human rendering, and CarRacing's kwargs error (P8, still open).</summary>
         /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/tests/envs/registration/test_make.py#L200">test_make_human_rendering</see>.</remarks>
         [TestMethod]
-        [OpenBugs("P6", "P8")]
+        [OpenBugs("P8")]
         public void TestMakeHumanRendering_LaterPhases() {
             using IDisposable fixture = RegisterRenderingTestingEnvs();
             using (WarningCatcher caught = Warnings.Catch()) {

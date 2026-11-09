@@ -1150,6 +1150,44 @@ namespace Gym.Tests.Parity {
                 internal static PyObject ClipReward(PyObject env, object? min_reward, object? max_reward) =>
                     Construct("ClipReward", env, ("min_reward", min_reward), ("max_reward", max_reward));
 
+                /// <summary><c>wrappers.AddWhiteNoise(env, probability_of_noise_per_pixel, is_noise_grayscale=...)</c>.</summary>
+                /// <param name="env">The env; the wrapper keeps its own reference.</param>
+                /// <param name="probability_of_noise_per_pixel">The probability that a pixel is noise.</param>
+                /// <param name="is_noise_grayscale">Whether the noise is gray.</param>
+                /// <returns>A new owned reference to the wrapper.</returns>
+                /// <exception cref="PythonException">Thrown for a probability outside [0, 1) (<c>InvalidProbability</c>).</exception>
+                internal static PyObject AddWhiteNoise(PyObject env, double probability_of_noise_per_pixel, bool is_noise_grayscale = false) =>
+                    Construct("AddWhiteNoise", env, ("probability_of_noise_per_pixel", probability_of_noise_per_pixel), ("is_noise_grayscale", is_noise_grayscale));
+
+                /// <summary><c>wrappers.ObstructView(env, obstructed_pixels_ratio, obstruction_width, is_noise_grayscale=...)</c>.</summary>
+                /// <param name="env">The env; the wrapper keeps its own reference.</param>
+                /// <param name="obstructed_pixels_ratio">The share of pixels to cover.</param>
+                /// <param name="obstruction_width">The patch side.</param>
+                /// <param name="is_noise_grayscale">Whether the noise is gray.</param>
+                /// <returns>A new owned reference to the wrapper.</returns>
+                /// <exception cref="PythonException">Thrown for a ratio outside [0, 1) or a width below 1 (<c>ValueError</c>).</exception>
+                internal static PyObject ObstructView(PyObject env, double obstructed_pixels_ratio, long obstruction_width, bool is_noise_grayscale = false) =>
+                    Construct("ObstructView", env, ("obstructed_pixels_ratio", obstructed_pixels_ratio), ("obstruction_width", obstruction_width), ("is_noise_grayscale", is_noise_grayscale));
+
+                /// <summary><c>wrappers.HumanRendering(env)</c>.</summary>
+                /// <param name="env">The env; the wrapper keeps its own reference.</param>
+                /// <returns>A new owned reference to the wrapper.</returns>
+                /// <exception cref="PythonException">Thrown for a render mode it cannot show or metadata without <c>render_fps</c> (<c>ValueError</c>).</exception>
+                internal static PyObject HumanRendering(PyObject env) => Construct("HumanRendering", env);
+
+                /// <summary><c>wrappers.RecordVideo(env, video_folder, episode_trigger=..., step_trigger=..., video_length=..., name_prefix=...)</c>.</summary>
+                /// <param name="env">The env; the wrapper keeps its own reference.</param>
+                /// <param name="video_folder">The folder.</param>
+                /// <param name="episode_trigger">A Python function, or <see langword="null"/> (<c>None</c>); stays owned by the caller.</param>
+                /// <param name="step_trigger">A Python function, or <see langword="null"/>; stays owned by the caller.</param>
+                /// <param name="video_length">The frames per video, 0 for whole episodes.</param>
+                /// <param name="name_prefix">The name prefix.</param>
+                /// <returns>A new owned reference to the wrapper.</returns>
+                /// <exception cref="PythonException">Thrown for a render mode without images (<c>ValueError</c>) or without moviepy (<c>DependencyNotInstalled</c>).</exception>
+                internal static PyObject RecordVideo(PyObject env, string video_folder, PyObject? episode_trigger, PyObject? step_trigger, long video_length = 0, string name_prefix = "rl-video") =>
+                    Construct("RecordVideo", env, ("video_folder", video_folder), ("episode_trigger", episode_trigger), ("step_trigger", step_trigger),
+                        ("video_length", video_length), ("name_prefix", name_prefix));
+
                 /// <summary><c>wrappers.DelayObservation(env, delay=delay)</c>.</summary>
                 /// <param name="env">The env; the wrapper keeps its own reference.</param>
                 /// <param name="delay">The delay in steps.</param>
@@ -1883,6 +1921,65 @@ namespace Gym.Tests.Parity {
 
             /// <summary><c>gymnasium.utils</c>.</summary>
             internal static class utils {
+                /// <summary><c>gymnasium.utils.save_video</c>; importing it needs moviepy (or the test stub of <c>RenderingWrappersLiveParityTests</c>).</summary>
+                internal static class save_video {
+                    /// <summary>The module, imported on first use; never dispose it.</summary>
+                    private static PyObject Module => PythonRuntime.Import("gymnasium.utils.save_video");
+
+                    /// <summary><c>save_video.capped_cubic_video_schedule(episode_id)</c>.</summary>
+                    /// <param name="episode_id">The episode number.</param>
+                    /// <returns>Whether that episode is recorded.</returns>
+                    /// <exception cref="PythonException">Thrown when the call raises (a negative id's <c>TypeError</c>).</exception>
+                    internal static bool capped_cubic_video_schedule(long episode_id) {
+                        using PyObject function = Module.GetAttr("capped_cubic_video_schedule");
+                        using var id = new PyInt(episode_id);
+                        using PyObject result = function.Invoke(id);
+                        return result.IsTrue();
+                    }
+
+                    /// <summary><c>save_video.save_video(frames, video_folder, ..., fps=fps)</c>.</summary>
+                    /// <param name="frames">A Python list of frames; stays owned by the caller.</param>
+                    /// <param name="video_folder">The folder.</param>
+                    /// <param name="episode_trigger">A Python function, or <see langword="null"/>; stays owned by the caller.</param>
+                    /// <param name="step_trigger">A Python function, or <see langword="null"/>; stays owned by the caller.</param>
+                    /// <param name="video_length">The frames per clip, or <see langword="null"/> for all.</param>
+                    /// <param name="episode_index">The episode's number.</param>
+                    /// <param name="step_starting_index">The step number of the first frame after the reset's.</param>
+                    /// <param name="fps">The frame rate.</param>
+                    /// <returns>A new owned reference to the result (<c>None</c>).</returns>
+                    /// <exception cref="PythonException">Thrown when the call raises.</exception>
+                    internal static PyObject save_video_(PyObject frames, string video_folder, PyObject? episode_trigger, PyObject? step_trigger, long? video_length,
+                        long episode_index, long step_starting_index, double fps) {
+                        using PyObject function = Module.GetAttr("save_video");
+                        using var arguments = new PyDict();
+                        var converted = new List<PyObject>();
+                        try {
+                            void Set(string key, object? value) {
+                                if (value is PyObject given) {
+                                    arguments[key] = given;
+                                    return;
+                                }
+
+                                PyObject owned = Oracle.PyConvert.ToPython(value);
+                                converted.Add(owned);
+                                arguments[key] = owned;
+                            }
+
+                            Set("video_folder", video_folder);
+                            Set("episode_trigger", episode_trigger);
+                            Set("step_trigger", step_trigger);
+                            Set("video_length", video_length);
+                            Set("episode_index", episode_index);
+                            Set("step_starting_index", step_starting_index);
+                            Set("fps", fps);
+                            return function.Invoke(new[] { frames }, arguments);
+                        } finally {
+                            foreach (PyObject owned in converted)
+                                owned.Dispose();
+                        }
+                    }
+                }
+
                 /// <summary><c>gymnasium.utils.seeding</c>.</summary>
                 internal static class seeding {
                     /// <summary><c>seeding.np_random(seed)</c>.</summary>

@@ -15,6 +15,10 @@ namespace Gym.Rendering {
     ///     including its float32 frame-time computation and whole-millisecond sleeps, so the pacing matches.
     ///     </para>
     ///     <para>Not thread-safe: tick a clock from the thread that renders.</para>
+    ///     <para>
+    ///     It lives in the Gym assembly, beside the viewers it paces (namespace <c>Gym.Rendering</c> unchanged), so the
+    ///     <c>HumanRendering</c> wrapper paces its frames with it as the built-in envs do.
+    ///     </para>
     ///     <para>Reference: <see href="https://github.com/pygame-community/pygame-ce/blob/2.5.8/src_c/time.c#L691">src_c/time.c</see> (pygame-ce 2.5.8).</para>
     /// </remarks>
     public sealed class Clock {

@@ -166,6 +166,18 @@ Effects of approved designs that only showed up in code. None changes a design; 
   would return an array reward, since rewards are float64. An untyped env's spaces are `ObjectSpace` views, so every
   space tool that dispatches on the space's class unviews it first (`ObjectSpace.Unview`). The discretizing wrappers need
   NumPy's float32 `linspace`, which NumSharp lacks (N-4, COMPLETION_PLAN §7).
+- **DR-25 and DR-20, the rendering wrappers** (found in P6.5, 2026-11-10): `IVideoWriter` (`Gym.Utils`) takes a path
+  without extension and adds its own; `PngVideoWriter`, the default, writes each video as a folder of that name holding
+  `000000.png`, ... and `fps.txt`, so a folder of videos counts and names its videos as Gymnasium's folder of mp4 files
+  does; `FfmpegVideoWriter` pipes raw frames to `ffmpeg` with moviepy's codec choices. `RecordVideo` takes the writer as
+  an extra `video_writer` argument (recorded with the others, so a spec rebuild keeps it); `gc_trigger` left `null` is
+  Gymnasium's default, every video, and Python's `None` is `_ => false`; in a `*_list` mode the video keeps copies of the
+  frames the caller also receives (D19); closing writes a pending video, so Python's `__del__` warning has no
+  counterpart. `HumanRendering` lives in the core assembly beside `RenderCollection`, so `make` applies it directly:
+  `Gym.Rendering.Clock`, the frame pacer it shares with the envs, moved from the Gym.Rendering assembly into Gym
+  (namespace unchanged); its window comes from `Gymnasium.HumanViewerFactory` (DR-20). The parity cells replace the
+  absent moviepy with a stand-in `ImageSequenceClip` that records what it would encode, Gymnasium's own wrapper logic
+  running unchanged.
 - **DR-23, the OpenCV resize** (found in P6.4, 2026-11-10): `Gym.Utils.Cv2.Resize` translates the uint8 paths of
   OpenCV 4.13.0's `cv::resize` (the integer-factor area average, the area decimation, and the fixed-point bilinear
   kernel, which `INTER_AREA` also takes when an axis grows), and `INTER_LINEAR` with them, which the vector

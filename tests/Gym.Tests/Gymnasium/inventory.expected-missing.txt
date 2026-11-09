@@ -97,8 +97,6 @@ gymnasium.utils.play.PlayPlot                                                   
 gymnasium.utils.play.PlayableGame                                                        P6 play (DR-36), deferred in this run
 gymnasium.utils.play.display_arr                                                         P6 play (DR-36), deferred in this run
 gymnasium.utils.play.play                                                                P6 play (DR-36), deferred in this run
-gymnasium.utils.save_video.capped_cubic_video_schedule                                   P6 video (DR-25), deferred in this run
-gymnasium.utils.save_video.save_video                                                    P6 video (DR-25), deferred in this run
 gymnasium.utils.step_api_compatibility.step_api_compatibility                            P6 utils, deferred in this run
 gymnasium.vector.async_vector_env.AsyncState                                             P6.2 vector, deferred in this run (DR-22 stays approved)
 gymnasium.vector.async_vector_env.AsyncVectorEnv                                         P6.2 vector, deferred in this run (DR-22 stays approved)
@@ -126,10 +124,6 @@ gymnasium.wrappers.numpy_to_torch.Device                                        
 gymnasium.wrappers.numpy_to_torch.NumpyToTorch                                           n/a: JAX/PyTorch
 gymnasium.wrappers.numpy_to_torch.numpy_to_torch                                         n/a: JAX/PyTorch
 gymnasium.wrappers.numpy_to_torch.torch_to_numpy                                         n/a: JAX/PyTorch
-gymnasium.wrappers.rendering.AddWhiteNoise                                               P6 wrappers, deferred in this run
-gymnasium.wrappers.rendering.HumanRendering                                              P6 wrappers, deferred in this run
-gymnasium.wrappers.rendering.ObstructView                                                P6 wrappers, deferred in this run
-gymnasium.wrappers.rendering.RecordVideo                                                 P6 wrappers, deferred in this run
 gymnasium.wrappers.vector.array_conversion.ArrayConversion                               n/a: JAX/PyTorch
 gymnasium.wrappers.vector.common.RecordEpisodeStatistics                                 P6 vector wrappers, deferred in this run
 gymnasium.wrappers.vector.dict_info_to_list.DictInfoToList                               P6 vector wrappers, deferred in this run
