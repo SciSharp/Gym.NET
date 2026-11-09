@@ -33,6 +33,15 @@ namespace Gym.Spaces {
         /// <summary>The wrapped space.</summary>
         public Space Inner { get; }
 
+        /// <summary>
+        ///     The space a value of an env's space really is: the wrapped space for a view, the space itself otherwise. Code
+        ///     that dispatches on the space's class (<c>isinstance(env.observation_space, spaces.Box)</c>) must look through
+        ///     the view, or an untyped env's <c>Box</c> would read as no <c>Box</c> at all.
+        /// </summary>
+        /// <param name="space">A space, a view of one, or <see langword="null"/>.</param>
+        /// <returns><see cref="Inner"/> for a view, else <paramref name="space"/> unchanged (<see langword="null"/> stays <see langword="null"/>).</returns>
+        public static Space? Unview(Space? space) => space is ObjectSpace view ? view.Inner : space;
+
         /// <summary>The wrapped space's generator, never one of the view's own.</summary>
         public override Generator NpRandom {
             get => Inner.NpRandom;

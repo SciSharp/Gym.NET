@@ -52,6 +52,8 @@ namespace Gym.Spaces {
         /// <exception cref="Gym.Exceptions.NotImplementedError">Thrown for a custom space flattenable but unknown to this function.</exception>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="space"/> is <see langword="null"/>.</exception>
         public static long Flatdim(Space space) {
+            // An untyped env's space is a view (ObjectSpace): dispatch on the space it shows, as Python sees only that one.
+            space = ObjectSpace.Unview(space)!;
             switch (space) {
                 case null:
                     throw new ArgumentNullException(nameof(space));
@@ -105,6 +107,8 @@ namespace Gym.Spaces {
         /// <exception cref="Gym.Exceptions.NotImplementedError">Thrown for a custom space.</exception>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="space"/> is <see langword="null"/>.</exception>
         public static object? Flatten(Space space, object? x) {
+            // An untyped env's space is a view (ObjectSpace): dispatch on the space it shows, as Python sees only that one.
+            space = ObjectSpace.Unview(space)!;
             switch (space) {
                 case null:
                     throw new ArgumentNullException(nameof(space));
@@ -170,6 +174,8 @@ namespace Gym.Spaces {
         ///     Not every array of the flattened space unflattens: a one-hot block with no 1 has no element, as in Gymnasium.
         /// </remarks>
         public static object? Unflatten(Space space, object? x) {
+            // An untyped env's space is a view (ObjectSpace): dispatch on the space it shows, as Python sees only that one.
+            space = ObjectSpace.Unview(space)!;
             switch (space) {
                 case null:
                     throw new ArgumentNullException(nameof(space));
@@ -241,6 +247,8 @@ namespace Gym.Spaces {
         ///     whose samples are rarely one-hot, as Gymnasium warns.
         /// </remarks>
         public static Space FlattenSpace(Space space) {
+            // An untyped env's space is a view (ObjectSpace): dispatch on the space it shows, as Python sees only that one.
+            space = ObjectSpace.Unview(space)!;
             switch (space) {
                 case null:
                     throw new ArgumentNullException(nameof(space));
@@ -288,6 +296,9 @@ namespace Gym.Spaces {
         /// <exception cref="Gym.Exceptions.NotImplementedError">Thrown for a custom first space, with Gymnasium's message.</exception>
         /// <exception cref="TypeError">Thrown when either argument is <see langword="null"/> (Gymnasium's bare <c>TypeError()</c>).</exception>
         public static bool IsSpaceDtypeShapeEquiv(Space space1, Space space2) {
+            // An untyped env's space is a view (ObjectSpace): dispatch on the space it shows, as Python sees only that one.
+            space1 = ObjectSpace.Unview(space1)!;
+            space2 = ObjectSpace.Unview(space2)!;
             switch (space1) {
                 case null:
                     throw new TypeError("");

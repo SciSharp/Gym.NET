@@ -73,7 +73,7 @@ namespace Gym.Wrappers {
     }
 
     /// <summary>Gymnasium's <c>gymnasium.wrappers.utils</c> functions that this phase's wrappers use.</summary>
-    public static class WrapperFunctions {
+    public static partial class WrapperFunctions {
         /// <summary>
         ///     Gymnasium's <c>update_mean_var_count_from_moments</c>: merges running moments with a batch's, element by element,
         ///     in the dtype NumPy 2 computes them in (the statistics' dtype promoted with the batch's; the Python counts cast

@@ -730,6 +730,12 @@ one:
   `()`, `(message)` and `(message, innerException)`. `AttributeError` can't carry an inner exception today, so
   `get_wrapper_attr` loses Python's `raise ... from e` chain (found in P1). Gym.NET keeps its own two until NumSharp
   has them.
+- **N-4.** `np.linspace` takes only C# scalars, which stand for Python floats, so it has no form of NumPy's
+  `np.linspace(low[i], high[i], n)` over float32 NumPy scalars or arrays, which computes in float32: four of the eleven
+  samples of `np.linspace(np.float32(0.1), np.float32(0.7), 11)` differ from the float64 samples cast to float32 (found
+  in P6.3, 2026-11-10). `DiscretizeObservation` and `DiscretizeAction` were stuck without NumPy's float32 bin edges, so
+  they compute them through `WrapperFunctions.Linspace` until NumSharp has array bounds. Proven by
+  `NumSharpGapTests.N4_Linspace_TakesArrayBoundsAndKeepsTheirDtype` (`[OpenBugs("N-4")]`).
 
 ## 8. Risks
 

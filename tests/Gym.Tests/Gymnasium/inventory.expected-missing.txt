@@ -135,22 +135,7 @@ gymnasium.wrappers.stateful_action.StickyAction                                 
 gymnasium.wrappers.stateful_observation.DelayObservation                                 P6 wrappers, deferred in this run
 gymnasium.wrappers.stateful_observation.FrameStackObservation                            P6 wrappers, deferred in this run
 gymnasium.wrappers.stateful_observation.MaxAndSkipObservation                            P6 wrappers, deferred in this run
-gymnasium.wrappers.transform_action.ClipAction                                           P6 wrappers, deferred in this run
-gymnasium.wrappers.transform_action.DiscretizeAction                                     P6 wrappers, deferred in this run
-gymnasium.wrappers.transform_action.RescaleAction                                        P6 wrappers, deferred in this run
-gymnasium.wrappers.transform_action.TransformAction                                      P6 wrappers, deferred in this run
-gymnasium.wrappers.transform_observation.AddRenderObservation                            P6 wrappers, deferred in this run
-gymnasium.wrappers.transform_observation.DiscretizeObservation                           P6 wrappers, deferred in this run
-gymnasium.wrappers.transform_observation.DtypeObservation                                P6 wrappers, deferred in this run
-gymnasium.wrappers.transform_observation.FilterObservation                               P6 wrappers, deferred in this run
-gymnasium.wrappers.transform_observation.GrayscaleObservation                            P6 wrappers, deferred in this run
-gymnasium.wrappers.transform_observation.RescaleObservation                              P6 wrappers, deferred in this run
-gymnasium.wrappers.transform_observation.ReshapeObservation                              P6 wrappers, deferred in this run
 gymnasium.wrappers.transform_observation.ResizeObservation                               P6 wrappers, deferred in this run
-gymnasium.wrappers.transform_observation.TransformObservation                            P6 wrappers, deferred in this run
-gymnasium.wrappers.transform_reward.ClipReward                                           P6 wrappers, deferred in this run
-gymnasium.wrappers.transform_reward.TransformReward                                      P6 wrappers, deferred in this run
-gymnasium.wrappers.utils.create_zero_array                                               P6 wrappers, deferred in this run
 gymnasium.wrappers.vector.array_conversion.ArrayConversion                               n/a: JAX/PyTorch
 gymnasium.wrappers.vector.common.RecordEpisodeStatistics                                 P6 vector wrappers, deferred in this run
 gymnasium.wrappers.vector.dict_info_to_list.DictInfoToList                               P6 vector wrappers, deferred in this run

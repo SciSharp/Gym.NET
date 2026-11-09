@@ -1,5 +1,7 @@
 #nullable enable
 using System;
+using System.Linq;
+using System.Reflection;
 using NumSharp;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
@@ -84,6 +86,39 @@ namespace Gym.Tests.NumSharpGaps {
         [DataRow("IndexError")]
         public void NumSharpException_KeepsItsInnerExceptionConstructor(string name) {
             AssertTakesAnInnerException(name);
+        }
+
+        /// <summary>
+        ///     N-4: NumPy's <c>np.linspace</c> takes array bounds and computes in their result dtype, so
+        ///     <c>np.linspace(np.float32(0.1), np.float32(0.7), 11)</c> is float32 arithmetic, and four of its eleven samples
+        ///     differ from the float64 samples cast to float32. NumSharp 0.80.0 has only scalar overloads, whose C#
+        ///     <see cref="float"/> stands for a Python float (float64), so the discretizing wrappers compute NumPy's edges
+        ///     through <c>WrapperFunctions.Linspace</c> until this passes (P6.3).
+        /// </summary>
+        /// <exception cref="AssertFailedException">Thrown while NumSharp lacks the overload, or when it returns other bits.</exception>
+        [TestMethod]
+        [OpenBugs("N-4")]
+        public void N4_Linspace_TakesArrayBoundsAndKeepsTheirDtype() {
+            MethodInfo? linspace = typeof(np).GetMethods(BindingFlags.Public | BindingFlags.Static)
+                .FirstOrDefault(method => method.Name == "linspace" && method.GetParameters() is { Length: >= 3 } parameters &&
+                                          parameters[0].ParameterType == typeof(NDArray) && parameters[1].ParameterType == typeof(NDArray));
+            Assert.IsNotNull(linspace, "NumSharp has no np.linspace(NDArray start, NDArray stop, num, ...).");
+
+            using NDArray start = NDArray.Scalar(0.1f), stop = NDArray.Scalar(0.7f);
+            ParameterInfo[] declared = linspace!.GetParameters();
+            // num converts to whichever integer width the overload takes; the remaining parameters keep their defaults.
+            object?[] arguments = declared.Select((parameter, i) => i switch {
+                0 => start,
+                1 => stop,
+                2 => Convert.ChangeType(11, parameter.ParameterType),
+                _ => parameter.HasDefaultValue ? parameter.DefaultValue : Type.Missing,
+            }).ToArray();
+            using var samples = (NDArray)linspace.Invoke(null, arguments)!;
+
+            Assert.AreEqual(NPTypeCode.Single, samples.typecode, "NumPy keeps the float32 bounds' dtype.");
+            // np.linspace(np.float32(0.1), np.float32(0.7), 11).view(np.uint32), NumPy 2.4.2.
+            uint[] numpyBits = { 1036831949, 1042536202, 1046562734, 1049582632, 1051595898, 1053609164, 1055622429, 1057300152, 1058306785, 1059313418, 1060320051 };
+            CollectionAssert.AreEqual(numpyBits, samples.ToArray<float>().Select(BitConverter.SingleToUInt32Bits).ToArray(), "NumPy's float32 arithmetic, bit for bit.");
         }
 
         /// <summary>Asserts that NumSharp defines <paramref name="name"/> with a public <c>(string, Exception)</c> constructor.</summary>

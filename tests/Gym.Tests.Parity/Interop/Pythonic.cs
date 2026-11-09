@@ -1023,6 +1023,196 @@ namespace Gym.Tests.Parity {
                     return constructor.Invoke(env);
                 }
 
+                /// <summary><c>wrappers.TransformObservation(env, func, observation_space)</c>.</summary>
+                /// <param name="env">The env; the wrapper keeps its own reference.</param>
+                /// <param name="func">The Python function; stays owned by the caller.</param>
+                /// <param name="observation_space">The space, or Python's <c>None</c>; stays owned by the caller.</param>
+                /// <returns>A new owned reference to the wrapper.</returns>
+                /// <exception cref="PythonException">Thrown when the construction fails.</exception>
+                internal static PyObject TransformObservation(PyObject env, PyObject func, PyObject observation_space) =>
+                    Construct("TransformObservation", env, ("func", func), ("observation_space", observation_space));
+
+                /// <summary><c>wrappers.FilterObservation(env, filter_keys)</c>.</summary>
+                /// <param name="env">The env; the wrapper keeps its own reference.</param>
+                /// <param name="filter_keys">The keys, converted by <see cref="Oracle.PyConvert.ToPython"/> (a value tuple becomes a tuple, a list a list) or a <see cref="PyObject"/> passed as it is.</param>
+                /// <returns>A new owned reference to the wrapper.</returns>
+                /// <exception cref="PythonException">Thrown for keys the space refuses (<c>TypeError</c>, <c>ValueError</c>).</exception>
+                internal static PyObject FilterObservation(PyObject env, object? filter_keys) => Construct("FilterObservation", env, ("filter_keys", filter_keys));
+
+                /// <summary><c>wrappers.GrayscaleObservation(env, keep_dim=keep_dim)</c>.</summary>
+                /// <param name="env">The env; the wrapper keeps its own reference.</param>
+                /// <param name="keep_dim">Whether the channel axis is kept.</param>
+                /// <returns>A new owned reference to the wrapper.</returns>
+                /// <exception cref="PythonException">Thrown for a space that is no uint8 RGB image.</exception>
+                internal static PyObject GrayscaleObservation(PyObject env, bool keep_dim = false) => Construct("GrayscaleObservation", env, ("keep_dim", keep_dim));
+
+                /// <summary><c>wrappers.ReshapeObservation(env, shape)</c>, the shape as a Python tuple.</summary>
+                /// <param name="env">The env; the wrapper keeps its own reference.</param>
+                /// <param name="shape">The new shape.</param>
+                /// <returns>A new owned reference to the wrapper.</returns>
+                /// <exception cref="PythonException">Thrown for a shape whose product differs (<c>ValueError</c>).</exception>
+                internal static PyObject ReshapeObservation(PyObject env, long[] shape) {
+                    using PyObject shapeTuple = TupleOf(shape);
+                    return Construct("ReshapeObservation", env, ("shape", shapeTuple));
+                }
+
+                /// <summary><c>wrappers.RescaleObservation(env, min_obs, max_obs)</c>.</summary>
+                /// <param name="env">The env; the wrapper keeps its own reference.</param>
+                /// <param name="min_obs">The lower bound: converted by <see cref="Oracle.PyConvert.ToPython"/>, or a <see cref="PyObject"/> (a NumPy scalar) passed as it is.</param>
+                /// <param name="max_obs">The upper bound, in the same forms.</param>
+                /// <returns>A new owned reference to the wrapper.</returns>
+                /// <exception cref="PythonException">Thrown for bounds the space refuses.</exception>
+                internal static PyObject RescaleObservation(PyObject env, object min_obs, object max_obs) =>
+                    Construct("RescaleObservation", env, ("min_obs", min_obs), ("max_obs", max_obs));
+
+                /// <summary><c>wrappers.DtypeObservation(env, dtype)</c>.</summary>
+                /// <param name="env">The env; the wrapper keeps its own reference.</param>
+                /// <param name="dtype">The dtype: a <see cref="PyObject"/> (a NumPy type or dtype) or a dtype name.</param>
+                /// <returns>A new owned reference to the wrapper.</returns>
+                /// <exception cref="PythonException">Thrown for a space of another kind (<c>TypeError</c>).</exception>
+                internal static PyObject DtypeObservation(PyObject env, object dtype) => Construct("DtypeObservation", env, ("dtype", dtype));
+
+                /// <summary><c>wrappers.AddRenderObservation(env, render_only=..., render_key=..., obs_key=...)</c>.</summary>
+                /// <param name="env">The env; the wrapper keeps its own reference.</param>
+                /// <param name="render_only">Whether the frame replaces the observation.</param>
+                /// <param name="render_key">The frame's key.</param>
+                /// <param name="obs_key">The observation's key.</param>
+                /// <returns>A new owned reference to the wrapper.</returns>
+                /// <exception cref="PythonException">Thrown for a render mode that gives no array.</exception>
+                internal static PyObject AddRenderObservation(PyObject env, bool render_only = true, string render_key = "pixels", string obs_key = "state") =>
+                    Construct("AddRenderObservation", env, ("render_only", render_only), ("render_key", render_key), ("obs_key", obs_key));
+
+                /// <summary><c>wrappers.DiscretizeObservation(env, bins, multidiscrete=...)</c>.</summary>
+                /// <param name="env">The env; the wrapper keeps its own reference.</param>
+                /// <param name="bins">An int, or a value tuple of ints (a Python tuple).</param>
+                /// <param name="multidiscrete">Whether observations are MultiDiscrete.</param>
+                /// <returns>A new owned reference to the wrapper.</returns>
+                /// <exception cref="PythonException">Thrown for an unbounded space or mismatched bins.</exception>
+                internal static PyObject DiscretizeObservation(PyObject env, object bins, bool multidiscrete = false) =>
+                    Construct("DiscretizeObservation", env, ("bins", bins), ("multidiscrete", multidiscrete));
+
+                /// <summary><c>wrappers.TransformAction(env, func, action_space)</c>.</summary>
+                /// <param name="env">The env; the wrapper keeps its own reference.</param>
+                /// <param name="func">The Python function; stays owned by the caller.</param>
+                /// <param name="action_space">The space, or Python's <c>None</c>; stays owned by the caller.</param>
+                /// <returns>A new owned reference to the wrapper.</returns>
+                /// <exception cref="PythonException">Thrown when the construction fails.</exception>
+                internal static PyObject TransformAction(PyObject env, PyObject func, PyObject action_space) =>
+                    Construct("TransformAction", env, ("func", func), ("action_space", action_space));
+
+                /// <summary><c>wrappers.ClipAction(env)</c>.</summary>
+                /// <param name="env">The env; the wrapper keeps its own reference.</param>
+                /// <returns>A new owned reference to the wrapper.</returns>
+                /// <exception cref="PythonException">Thrown for an action space that is no Box (<c>TypeError</c>).</exception>
+                internal static PyObject ClipAction(PyObject env) => Construct("ClipAction", env);
+
+                /// <summary><c>wrappers.RescaleAction(env, min_action, max_action)</c>.</summary>
+                /// <param name="env">The env; the wrapper keeps its own reference.</param>
+                /// <param name="min_action">The lower bound: converted by <see cref="Oracle.PyConvert.ToPython"/>, or a <see cref="PyObject"/> passed as it is.</param>
+                /// <param name="max_action">The upper bound, in the same forms.</param>
+                /// <returns>A new owned reference to the wrapper.</returns>
+                /// <exception cref="PythonException">Thrown for bounds the space refuses, or equal bounds (<c>InvalidBound</c>).</exception>
+                internal static PyObject RescaleAction(PyObject env, object min_action, object max_action) =>
+                    Construct("RescaleAction", env, ("min_action", min_action), ("max_action", max_action));
+
+                /// <summary><c>wrappers.DiscretizeAction(env, bins, multidiscrete=...)</c>.</summary>
+                /// <param name="env">The env; the wrapper keeps its own reference.</param>
+                /// <param name="bins">An int, or a value tuple of ints (a Python tuple).</param>
+                /// <param name="multidiscrete">Whether actions are MultiDiscrete.</param>
+                /// <returns>A new owned reference to the wrapper.</returns>
+                /// <exception cref="PythonException">Thrown for an unbounded space or mismatched bins.</exception>
+                internal static PyObject DiscretizeAction(PyObject env, object bins, bool multidiscrete = false) =>
+                    Construct("DiscretizeAction", env, ("bins", bins), ("multidiscrete", multidiscrete));
+
+                /// <summary><c>wrappers.TransformReward(env, func)</c>.</summary>
+                /// <param name="env">The env; the wrapper keeps its own reference.</param>
+                /// <param name="func">The Python function; stays owned by the caller.</param>
+                /// <returns>A new owned reference to the wrapper.</returns>
+                /// <exception cref="PythonException">Thrown when the construction fails.</exception>
+                internal static PyObject TransformReward(PyObject env, PyObject func) => Construct("TransformReward", env, ("func", func));
+
+                /// <summary><c>wrappers.ClipReward(env, min_reward, max_reward)</c>.</summary>
+                /// <param name="env">The env; the wrapper keeps its own reference.</param>
+                /// <param name="min_reward">The lower bound, or <see langword="null"/> (Python's <c>None</c>).</param>
+                /// <param name="max_reward">The upper bound, or <see langword="null"/>.</param>
+                /// <returns>A new owned reference to the wrapper.</returns>
+                /// <exception cref="PythonException">Thrown for no bounds or reversed ones (<c>InvalidBound</c>).</exception>
+                internal static PyObject ClipReward(PyObject env, object? min_reward, object? max_reward) =>
+                    Construct("ClipReward", env, ("min_reward", min_reward), ("max_reward", max_reward));
+
+                /// <summary>
+                ///     Calls a wrapper class of <c>gymnasium.wrappers</c> with the env and keyword arguments: a <see cref="PyObject"/>
+                ///     value is passed as it is (and stays the caller's), anything else is converted by
+                ///     <see cref="Oracle.PyConvert.ToPython"/> and released after the call.
+                /// </summary>
+                /// <param name="name">The class name.</param>
+                /// <param name="env">The env; the wrapper keeps its own reference.</param>
+                /// <param name="kwargs">The keyword arguments, in order.</param>
+                /// <returns>A new owned reference to the wrapper.</returns>
+                /// <exception cref="PythonException">Thrown when the constructor raises.</exception>
+                private static PyObject Construct(string name, PyObject env, params (string Key, object? Value)[] kwargs) {
+                    using PyObject constructor = Module.GetAttr(name);
+                    using var arguments = new PyDict();
+                    var converted = new List<PyObject>();
+                    try {
+                        foreach ((string key, object? value) in kwargs) {
+                            if (value is PyObject given) {
+                                arguments[key] = given;
+                                continue;
+                            }
+
+                            PyObject owned = Oracle.PyConvert.ToPython(value);
+                            converted.Add(owned);
+                            arguments[key] = owned;
+                        }
+
+                        return constructor.Invoke(new[] { env }, arguments);
+                    } finally {
+                        foreach (PyObject owned in converted)
+                            owned.Dispose();
+                    }
+                }
+
+                /// <summary>A Python tuple of ints, as Gymnasium's shape arguments are.</summary>
+                /// <param name="items">The ints.</param>
+                /// <returns>A new owned reference to the tuple.</returns>
+                private static PyObject TupleOf(long[] items) {
+                    PyObject[] ints = items.Select(item => (PyObject)new PyInt(item)).ToArray();
+                    try {
+                        // The tuple takes its own references to the items.
+                        return new PyTuple(ints);
+                    } finally {
+                        foreach (PyObject item in ints)
+                            item.Dispose();
+                    }
+                }
+
+                /// <summary><c>gymnasium.wrappers.utils</c>.</summary>
+                internal static class utils {
+                    /// <summary>The cached module; never dispose it.</summary>
+                    private static PyObject UtilsModule => PythonRuntime.Import("gymnasium.wrappers.utils");
+
+                    /// <summary><c>utils.create_zero_array(space)</c>.</summary>
+                    /// <param name="space">The space; stays owned by the caller.</param>
+                    /// <returns>A new owned reference to the zero element.</returns>
+                    /// <exception cref="PythonException">Thrown for a space without a registered zero (<c>CustomSpaceError</c>).</exception>
+                    internal static PyObject create_zero_array(PyObject space) {
+                        using PyObject function = UtilsModule.GetAttr("create_zero_array");
+                        return function.Invoke(space);
+                    }
+
+                    /// <summary><c>utils.rescale_box(box, new_min, new_max)</c>.</summary>
+                    /// <param name="box">The Box; stays owned by the caller.</param>
+                    /// <param name="new_min">The new lower bound; stays owned by the caller.</param>
+                    /// <param name="new_max">The new upper bound; stays owned by the caller.</param>
+                    /// <returns>A new owned reference to the <c>(box, forward, backward)</c> tuple.</returns>
+                    /// <exception cref="PythonException">Thrown for bounds the box refuses.</exception>
+                    internal static PyObject rescale_box(PyObject box, PyObject new_min, PyObject new_max) {
+                        using PyObject function = UtilsModule.GetAttr("rescale_box");
+                        return function.Invoke(box, new_min, new_max);
+                    }
+                }
+
                 /// <summary><c>gymnasium.wrappers.common</c>, where the common wrappers are defined.</summary>
                 internal static class common {
                     /// <summary><c>OrderEnforcing</c> instance members.</summary>

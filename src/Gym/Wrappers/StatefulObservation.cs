@@ -56,8 +56,8 @@ namespace Gym.Wrappers {
             // Find the normalized time space.
             Space timeSpace = normalizeTime ? new Box(0.0, 1.0) : new Box(0, MaxTimesteps, dtype: np.int32);
 
-            // Find the observation space.
-            Space envSpace = env.ObservationSpace;
+            // Find the observation space: through an untyped env's view, so its Dict or Tuple is recognized as one.
+            Space envSpace = ObjectSpace.Unview(env.ObservationSpace)!;
             Space observationSpace;
             switch (envSpace) {
                 case Dict dict:

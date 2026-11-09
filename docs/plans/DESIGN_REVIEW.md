@@ -157,6 +157,15 @@ Effects of approved designs that only showed up in code. None changes a design; 
 - **Typed wrappers whose type depends on an argument** (found in P6.3, 2026-11-09): `TimeAwareObservation` returns an
   array when flattening and a dict or tuple otherwise, so its observations are `object`s; `FlattenObservation` is typed
   for arrays and refuses spaces whose flat form is not one (`Graph`, `Sequence`).
+- **The stateless wrappers** (found in P6.3, 2026-11-10): Python's `func` and duck-typed spaces become typed delegates
+  and `Space<T>`s, so `TransformObservation` without a space keeps the env's and refuses (`TypeError`) an env whose
+  observations are not of the wrapper's type. `FilterObservation` and `AddRenderObservation` build their spaces from
+  copies of the env's subspaces, where Python shares the objects: the wrapper owns and disposes what it builds (D19), and
+  sampling its space leaves the env's subspaces' generators where they are. `ReshapeObservation` takes a `long[]` (Python
+  an int or a tuple). `ClipReward`'s array bounds must clip a reward to one value (`TypeError` otherwise) where Python
+  would return an array reward, since rewards are float64. An untyped env's spaces are `ObjectSpace` views, so every
+  space tool that dispatches on the space's class unviews it first (`ObjectSpace.Unview`). The discretizing wrappers need
+  NumPy's float32 `linspace`, which NumSharp lacks (N-4, COMPLETION_PLAN §7).
 - **DR-34's generated docs** (found in P10.4, 2026-11-09): an options record copies each constructor `<param>` onto its
   property, and a `<paramref>` inside it is a broken reference on a property (CS1734 wherever documentation is generated,
   so in a consumer's build too). The generator now turns it into a `<see cref>` to the sibling property, or `<c>` text for
