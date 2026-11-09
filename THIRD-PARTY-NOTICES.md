@@ -1,18 +1,30 @@
 # Third-party notices
 
-Gym.NET is licensed under the Apache License 2.0 (see [LICENSE](LICENSE)). Parts of it are ports of third-party software,
-listed below with the notices their licenses require. The port plan's §4.3
-([docs/plans/GYMNASIUM_PORT_PLAN.md](docs/plans/GYMNASIUM_PORT_PLAN.md)) keeps this list in step with what is ported.
+Gym.NET is licensed under the Apache License 2.0 (see [LICENSE](LICENSE)). Parts of it follow third-party source code or
+carry third-party files; they are listed below with the notices their licenses require. The port plan's §4.3
+([docs/plans/GYMNASIUM_PORT_PLAN.md](docs/plans/GYMNASIUM_PORT_PLAN.md)) keeps this list in step with the code.
 
 ---
 
 ## Gymnasium (MIT)
 
-Gym.NET's environments, spaces and utilities are ports of [Gymnasium](https://github.com/Farama-Foundation/Gymnasium),
-pinned as the `refs/Gymnasium` submodule. Ported so far: `gymnasium/envs/classic_control/cartpole.py` and `utils.py`
-(`src/Gym.Environments/Envs/Classic`), `gymnasium/logger.py` and `gymnasium/utils/colorize.py` (`src/Gym/Logger.cs`),
-`gymnasium/utils/seeding.py` (`src/Gym/Utils/Seeding.cs`), `gymnasium/error.py` (`src/Gym/Exceptions`), and parts of
-`gymnasium/spaces` (`src/Gym/Spaces`).
+Gym.NET reproduces [Gymnasium](https://github.com/Farama-Foundation/Gymnasium)'s behavior, pinned at v1.4.0
+(`8ba8c3a63bb4e000b7f33923f43d292acac07be1`) as the `refs/Gymnasium` submodule; each member based on Gymnasium's source
+links the file it follows in its documentation. As of 2.0 that covers:
+
+- the core API, errors, logger and seeding (`gymnasium/core.py`, `error.py`, `logger.py`, `utils/seeding.py`):
+  `src/Gym/Envs`, `src/Gym/Exceptions`, `src/Gym/Logger.cs`, `src/Gym/Utils`;
+- the spaces and their utilities (`gymnasium/spaces`): `src/Gym/Spaces`;
+- registration and `make`/`make_vec` (`gymnasium/envs/registration.py`): `src/Gym/Envs/Registration`, `src/Gym/Gymnasium.cs`;
+- the env checkers and step-API helpers (`gymnasium/utils/env_checker.py`, `passive_env_checker.py`, `env_match.py`,
+  `step_api_compatibility.py`): `src/Gym/Utils`;
+- the wrappers 2.0 includes (`gymnasium/wrappers`): `src/Gym/Wrappers`;
+- the vector API (`gymnasium/vector`): `src/Gym/Vector`;
+- the classic_control and toy_text environments (`gymnasium/envs/classic_control`, `gymnasium/envs/toy_text`):
+  `src/Gym.Environments/Envs/Classic`, `src/Gym.Environments/Envs/ToyText`;
+- the images those environments draw, copied unchanged from Gymnasium v1.4.0 and embedded in Gym.NET.Environments
+  (`src/Gym.Environments/Assets`, whose README lists every file with its source path and SHA-256). The toy_text art is
+  the Farama Foundation's own, under the same license.
 
 ```
 The MIT License
@@ -77,11 +89,86 @@ Andreas Schiffler -- aschiffler at ferzkopp dot net
 
 ---
 
+## CPython 3.12 (PSF License Version 2)
+
+Three files in `src/Gym/Utils` follow CPython v3.12.12's source so that Gym.NET's error messages and printed values
+match Python's character for character:
+
+- `Difflib.cs` follows `Lib/difflib.py`: `SequenceMatcher` (its matching-block search, junk heuristic and ratio) and
+  `get_close_matches`, which Gymnasium's registry uses for its "Did you mean" suggestions. Changes: translated to C#,
+  reduced to what `get_close_matches` needs, over strings only.
+- `PyJson.cs` follows `Lib/json/encoder.py` and `Lib/json/decoder.py`: the text `json.dumps` writes and `json.loads`
+  reads for `EnvSpec.to_json`/`from_json`. Changes: written in C# over Gym.NET's value types, reduced to the value kinds
+  an `EnvSpec` holds.
+- `PyMath.cs` follows `Objects/floatobject.c` and `Python/bltinmodule.c`: Python's `//`, `%`, `divmod` and `round` on
+  floats and integers. Changes: written in C# over .NET's numeric types.
+
+Copyright (c) 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017,
+2018, 2019, 2020, 2021, 2022, 2023 Python Software Foundation; All Rights Reserved.
+
+```
+PYTHON SOFTWARE FOUNDATION LICENSE VERSION 2
+--------------------------------------------
+
+1. This LICENSE AGREEMENT is between the Python Software Foundation
+("PSF"), and the Individual or Organization ("Licensee") accessing and
+otherwise using this software ("Python") in source or binary form and
+its associated documentation.
+
+2. Subject to the terms and conditions of this License Agreement, PSF hereby
+grants Licensee a nonexclusive, royalty-free, world-wide license to reproduce,
+analyze, test, perform and/or display publicly, prepare derivative works,
+distribute, and otherwise use Python alone or in any derivative version,
+provided, however, that PSF's License Agreement and PSF's notice of copyright,
+i.e., "Copyright (c) 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010,
+2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023 Python Software Foundation;
+All Rights Reserved" are retained in Python alone or in any derivative version
+prepared by Licensee.
+
+3. In the event Licensee prepares a derivative work that is based on
+or incorporates Python or any part thereof, and wants to make
+the derivative work available to others as provided herein, then
+Licensee hereby agrees to include in any such work a brief summary of
+the changes made to Python.
+
+4. PSF is making Python available to Licensee on an "AS IS"
+basis.  PSF MAKES NO REPRESENTATIONS OR WARRANTIES, EXPRESS OR
+IMPLIED.  BY WAY OF EXAMPLE, BUT NOT LIMITATION, PSF MAKES NO AND
+DISCLAIMS ANY REPRESENTATION OR WARRANTY OF MERCHANTABILITY OR FITNESS
+FOR ANY PARTICULAR PURPOSE OR THAT THE USE OF PYTHON WILL NOT
+INFRINGE ANY THIRD PARTY RIGHTS.
+
+5. PSF SHALL NOT BE LIABLE TO LICENSEE OR ANY OTHER USERS OF PYTHON
+FOR ANY INCIDENTAL, SPECIAL, OR CONSEQUENTIAL DAMAGES OR LOSS AS
+A RESULT OF MODIFYING, DISTRIBUTING, OR OTHERWISE USING PYTHON,
+OR ANY DERIVATIVE THEREOF, EVEN IF ADVISED OF THE POSSIBILITY THEREOF.
+
+6. This License Agreement will automatically terminate upon a material
+breach of its terms and conditions.
+
+7. Nothing in this License Agreement shall be deemed to create any
+relationship of agency, partnership, or joint venture between PSF and
+Licensee.  This License Agreement does not grant permission to use PSF
+trademarks or trade name in a trademark sense to endorse or promote
+products or services of Licensee, or any third party.
+
+8. By copying, installing or otherwise using Python, Licensee
+agrees to be bound by the terms and conditions of this License
+Agreement.
+```
+
+---
+
 ## pygame-ce (behaviour reference only)
 
 `src/Gym.Rendering` reproduces the observable behaviour of [pygame-ce](https://github.com/pygame-community/pygame-ce)
-2.5.8 (LGPL-2.1): the argument conversion of `pygame.gfxdraw`, `Surface.fill`/`blit`, `transform.flip`, `surfarray`, and
-`math.Vector2.rotate_rad`. None of pygame-ce's own source code is copied: its behaviour was established by reading its
-source and documentation and by probing it, the implementations are Gym.NET's own, and the result is verified pixel for
-pixel and bit for bit by the live parity suite (`tests/Gym.Tests.Parity/Tests/Rendering`). Porting pygame's own `draw`
-module, if ever needed, is decision D4 of the port plan.
+2.5.8 (LGPL-2.1). None of pygame-ce's own source code is copied, and the implementations are Gym.NET's own:
+
+- the argument conversion of `pygame.gfxdraw`, `Surface.fill`/`blit`, `transform.flip`, `surfarray` and
+  `math.Vector2.rotate_rad`, established by reading pygame-ce's source and documentation and by probing it;
+- `draw.line`, `draw.rect`, `draw.aaline`/`aalines`, per-pixel alpha and its blit, `transform.scale`,
+  `transform.smoothscale` and `image.load`/`frombytes`, derived from pygame-ce's output alone, with none of its source
+  read (decision D4 of the completion plan).
+
+Everything is verified pixel for pixel and bit for bit against live pygame-ce by the parity suite
+(`tests/Gym.Tests.Parity/Tests/Rendering`); `draw.aaline`/`aalines` are the documented exception.

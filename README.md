@@ -1,110 +1,99 @@
 # Gym.NET
 
-[![NuGet](https://img.shields.io/nuget/dt/Gym.NET)](https://www.nuget.org/packages/Gym.NET)<a href="http://scisharpstack.org"><img src="https://github.com/SciSharp/SciSharp/blob/master/art/scisharp_badge.png" width="200" height="200" align="right" /></a>
+[![NuGet](https://img.shields.io/nuget/v/Gym.NET.Environments?label=Gym.NET.Environments)](https://www.nuget.org/packages/Gym.NET.Environments)
+[![NuGet downloads](https://img.shields.io/nuget/dt/Gym.NET)](https://www.nuget.org/packages/Gym.NET)
 
+Reinforcement-learning environments for .NET with [Farama Gymnasium](https://github.com/Farama-Foundation/Gymnasium)'s
+API and behavior. Given the same seed and actions, Gym.NET's environments return the same observations, rewards,
+`terminated`/`truncated` flags and infos as Gymnasium's, bit for bit, and render the same frames, pixel for pixel. A test
+suite that runs Gymnasium itself inside the test process checks this, call by call.
 
-A port of [openai/gym](https://github.com/openai/gym) to C#.<br>
-
-
-##### openai/gym
-OpenAI Gym is a toolkit for developing and comparing reinforcement learning algorithms. This is the gym open-source library, which gives you access to a standardized set of environments.
+Gym.NET is part of the [SciSharp STACK](https://scisharpstack.org) and builds on [NumSharp](https://github.com/SciSharp/NumSharp)
+for arrays and NumPy-exact random generators.
 
 ## Installation
-```sh
-### For gym's abstract classes for RL, install:
-PM> Install-Package Gym.NET
 
-### For implemented environments, install:
-PM> Install-Package Gym.NET.Environments
-PM> Install-Package Gym.NET.Rendering.Avalonia
-PM> Install-Package Gym.NET.Rendering.WinForm
+```sh
+dotnet add package Gym.NET.Environments          # the environments, with Gym.NET's core (Gym.NET)
+dotnet add package Gym.NET.Rendering.Avalonia    # optional: a window for render_mode "human" (Windows, Linux, macOS)
+dotnet add package Gym.NET.Rendering.WinForm     # optional: the same on Windows Forms
 ```
+
+Gym.NET 2.0 targets .NET 8 and .NET 10.
 
 ## Example
-The following example runs and renders the CartPole-v1 environment with Gymnasium's API: `Reset(seed)` returns
-`(observation, info)`, `Step` returns `(observation, reward, terminated, truncated, info)`, and the render mode is chosen
-at construction.
-```C#
-using NumSharp;
-using Gym.Environments.Envs.Classic;
+
+```csharp
+using System;
+using Gym;
 using Gym.Envs;
-using Gym.Rendering.WinForm;
-using Gym.Wrappers;
+using NumSharp;
 
-// "human" renders every reset and step into the window, paced at metadata["render_fps"] (50 fps);
-// "rgb_array" would instead make Render() return each frame as a RenderResult.Rgb.
-using var cp = new TimeLimit<NDArray, NDArray>(
-    new CartPoleEnv(renderMode: "human", viewerFactory: WinFormEnvViewer.Factory), //or AvaloniaEnvViewer.Factory
-    maxEpisodeSteps: 500);
-
-var (observation, info) = cp.Reset(seed: 42);
-for (int i = 0; i < 100_000; i++)
-{
-    var (next, reward, terminated, truncated, stepInfo) = cp.Step(i % 2); //we switch between moving left and right
-    //do something with the reward and observation.
+// make builds the registered env inside Gymnasium's wrappers: TimeLimit(500), OrderEnforcing, PassiveEnvChecker.
+using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("CartPole-v1");
+env.ActionSpace.Seed(42);
+NDArray observation = env.Reset(seed: 42).Observation;
+double episodeReturn = 0;
+while (true) {
+    using NDArray action = env.ActionSpace.Sample();   // 0 (push left) or 1 (push right)
+    var (next, reward, terminated, truncated, info) = env.Step(action);
+    observation.Dispose();                            // the arrays an env returns belong to the caller
+    observation = next;
+    episodeReturn += reward;
     if (terminated || truncated)
-        (observation, info) = cp.Reset();
-    else
-        observation = next;
+        break;
 }
+
+observation.Dispose();
+Console.WriteLine($"Episode return: {episodeReturn}");
 ```
-Code written for the pre-0.26 API (`Reset()` returning the observation, the 4-tuple `Step`, `Seed(s)`) keeps working for
-now through `Gym.Legacy.LegacyEnvAdapter`.
 
-## Roadmap
-- Implement [Spaces](https://github.com/openai/gym/tree/master/gym/spaces)
-  - [X] `Space` (base class)
-  - [X] `Box`
-  - [X] `Discrete`
-  - [ ] `multi.*.py`
+`Reset(seed)` returns `(observation, info)`. `Step(action)` returns `(observation, reward, terminated, truncated, info)`:
+`terminated` means the task ended (the pole fell), and `truncated` means a limit cut the episode short (`TimeLimit`'s 500
+steps). The render mode is chosen when the env is built: `Gymnasium.Make("CartPole-v1", new { render_mode = "rgb_array" })`.
 
-- Implement [Env](https://github.com/openai/gym/blob/master/gym/core.py) base classes
-  - [X] Env(object)
-  - [ ] GoalEnv(Env)
+[examples/CartPole](https://github.com/SciSharp/Gym.NET/tree/master/examples/CartPole) trains a policy that balances
+the pole, playing 100 carts at once through `Gymnasium.MakeVec`.
 
-- Implement vector environments (`gymnasium.vector`)
-  - [X] `VectorEnv`, `SyncVectorEnv`, `Gymnasium.MakeVec` (sync and vector entry point), `CartPoleVectorEnv`
-  - [ ] `AsyncVectorEnv`, vector wrappers
+## What is in 2.0
 
-- Implement wrappers (`gymnasium.wrappers`)
-  - [X] `TimeLimit`, `OrderEnforcing`, `PassiveEnvChecker`, `Autoreset`, `RecordEpisodeStatistics`, `RenderCollection`
-  - [X] `NormalizeObservation`, `NormalizeReward`, `TimeAwareObservation`, `FlattenObservation`
-  - [ ] the other transform, rendering and stateful wrappers
+| Area | Contents |
+|---|---|
+| Core | `Env<TObs, TAct>`, `IEnv`, `Wrapper` and the observation, action and reward wrapper bases, `StepResult`/`ResetResult`, `Info`, `Metadata`, `RenderResult`, every Gymnasium error |
+| Spaces | `Box`, `Discrete`, `MultiBinary`, `MultiDiscrete`, `Tuple`, `Dict`, `Text`, `Sequence`, `Graph`, `OneOf`, and `SpaceUtils` (flatten, unflatten, flatdim) |
+| Registry | `Gymnasium.Make`, `Gymnasium.MakeVec`, `Gymnasium.Register`, `Gymnasium.Spec`, `Gymnasium.PprintRegistry`; constructor arguments by Python name, from an anonymous object, a dictionary or a generated options record |
+| Wrappers | `TimeLimit`, `OrderEnforcing`, `PassiveEnvChecker`, `Autoreset`, `RecordEpisodeStatistics`, `RenderCollection`, `NormalizeObservation`, `NormalizeReward`, `TimeAwareObservation`, `FlattenObservation` |
+| Vector envs | `VectorEnv<TObs, TAct>`, `SyncVectorEnv` in every autoreset mode, `CartPoleVectorEnv`, the vector wrapper bases |
+| Checkers | `EnvChecker.CheckEnv`, `PassiveChecker`, `EnvMatch` |
+| Environments | classic_control: CartPole-v0/v1, MountainCar-v0, MountainCarContinuous-v0, Pendulum-v1, Acrobot-v1. toy_text: FrozenLake-v1, FrozenLake8x8-v1, CliffWalking-v1, CliffWalkingSlippery-v1, Taxi-v4, Blackjack-v1 |
+| Rendering | `rgb_array` and `ansi` frames equal to Gymnasium's; `human` mode in an Avalonia or Windows Forms window |
 
- - Implement environments<br>
-    To run an environment, see [Gym.Tests](./tests/Gym.Tests/)
-   - [X] Convert Gym.Environments to a net-standard project.
-   - [ ] classics
-     - [X] CartPole-v1 
-       - [ ] Compare visually against python's version
-     - [ ] walker2d_v3
-     - [X] acrobot (Acrobot-v1)
-     - [X] continuous_mountain_car (MountainCarContinuous-v0, `MountainCarEnv(continuous: true)`)
-     - [X] mountain_car (MountainCar-v0)
-     - [X] pendulum (Pendulum-v1)
-     - [ ] rendering
-   - [ ] Mujco
-     - [ ] ant_v3						
-     - [ ] half_cheetah_v3			
-     - [ ] hopper_v3					
-     - [ ] humanoid_v3				
-     - [ ] humanoidstandup			
-     - [ ] inverted_double_pendulum	
-     - [ ] inverted_pendulum			
-     - [ ] mujoco_env					
-     - [ ] pusher						
-     - [ ] reacher					
-     - [ ] striker					
-     - [ ] swimmer_v3					
-     - [ ] thrower				
-   - [ ] box2d
-     - [ ] bipedal_walker
-     - [ ] car_dynamics
-     - [ ] car_racing
-     - [X] lunar_lander
-   - [X] toy_text
-     - [X] blackjack (Blackjack-v1)
-     - [X] cliffwalking (CliffWalking-v1, CliffWalkingSlippery-v1)
-     - [X] frozen_lake (FrozenLake-v1, FrozenLake8x8-v1)
-     - [X] taxi (Taxi-v4)
-   - [ ] atari
+Box2D's environments (LunarLander, BipedalWalker, CarRacing) are in progress. MuJoCo's are postponed beyond 2.0. The
+release notes list what 2.0 leaves out and every known difference from Gymnasium:
+[docs/releases/RELEASE_2.0.0.md](https://github.com/SciSharp/Gym.NET/blob/master/docs/releases/RELEASE_2.0.0.md).
+
+## Documentation
+
+- [Getting started](https://github.com/SciSharp/Gym.NET/blob/master/docs/guides/getting_started.md): making envs,
+  seeding, spaces, rendering, wrappers, vector envs.
+- [Creating custom environments](https://github.com/SciSharp/Gym.NET/blob/master/docs/guides/creating_custom_environments.md):
+  an `Env<TObs, TAct>`, its registration, and checking it.
+- [Migrating from 0.2 to 2.0](https://github.com/SciSharp/Gym.NET/blob/master/docs/guides/migrating_to_2.0.md): the old
+  calls and their replacements, and `Gym.Legacy` for code that cannot move yet.
+- [Architecture](https://github.com/SciSharp/Gym.NET/blob/master/docs/architecture.md): the packages, and how Gym.NET
+  is held to Gymnasium's behavior.
+- [Development and testing](https://github.com/SciSharp/Gym.NET/blob/master/docs/guides/development_and_testing.md):
+  building, the unit suite, and the live parity suite.
+
+## A note on SixLabors.ImageSharp
+
+Gym.NET depends on SixLabors.ImageSharp 2.1.13, the last release under the Apache-2.0 license. GitHub published five
+advisories against it on 2026-10-07, which NuGet reports in your restore as NU1902/NU1903 (and which fail it under
+`TreatWarningsAsErrors`). None of them is reachable through Gym.NET: it never encodes or decodes TIFF, never runs
+histogram equalization, and decodes only its own embedded PNG assets. If you don't use ImageSharp yourself on untrusted
+input, you can suppress them; the release notes list the five advisories and the `NuGetAuditSuppress` lines.
+
+## License
+
+Apache-2.0. Gymnasium's environment assets are used under Gymnasium's MIT license; see
+[THIRD-PARTY-NOTICES.md](https://github.com/SciSharp/Gym.NET/blob/master/THIRD-PARTY-NOTICES.md).

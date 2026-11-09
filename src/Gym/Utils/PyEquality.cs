@@ -18,7 +18,7 @@ namespace Gym.Utils {
     ///     <para>
     ///     Arrays are the one deliberate deviation. In Python, <c>==</c> between arrays is element-wise and a dict comparison
     ///     then asks for the truth of the result, which raises <c>ValueError</c> for arrays of more than one element. Here two
-    ///     arrays are equal when <see cref="np.array_equal(NDArray, NDArray)"/> says so (same shape, equal elements, any
+    ///     arrays are equal when <see cref="np.array_equal(NDArray, NDArray, bool)"/> says so (same shape, equal elements, any
     ///     dtypes; NaN never equals NaN), so an <see cref="Gym.Envs.Info"/> holding arrays can still be compared. A 0-d array
     ///     is the NumPy scalar it stands for and compares as a number; a one-element array compared with a number compares
     ///     its element, as Python's truth test of a one-element array does.
@@ -107,7 +107,7 @@ namespace Gym.Utils {
         }
 
         /// <summary>
-        ///     Compares an array with any value: another array through <see cref="np.array_equal(NDArray, NDArray)"/>, a
+        ///     Compares an array with any value: another array through <see cref="np.array_equal(NDArray, NDArray, bool)"/>, a
         ///     number through the array's only element (the truth of Python's element-wise result for one element).
         /// </summary>
         /// <param name="array">The array, not 0-d (0-d arrays are numbers).</param>

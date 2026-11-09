@@ -5,23 +5,28 @@
     <LangVersion>latest</LangVersion>
     <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
     <PackageId>Gym.NET.Rendering.Avalonia</PackageId>
-    <Version>0.2.0</Version>
+    <Version>2.0.0</Version>
     <Authors>Eli Belash</Authors>
     <Company>SciSharp STACK</Company>
     <Product>Gym.NET.Rendering.Avalonia</Product>
-    <Description>openai/gym's popular toolkit for developing and comparing reinforcement learning algorithms port to C#.  This package contains ported gym's environments.</Description>
-    <Copyright>2019 © SciSharp STACK Team</Copyright>
+    <Description>A desktop window for Gym.NET's human render mode on Avalonia (Windows, Linux, macOS): set Gymnasium.HumanViewerFactory = AvaloniaEnvViewer.Factory and make an env with render_mode "human".</Description>
+    <Copyright>2019-2026 © SciSharp STACK Team</Copyright>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/SciSharp/Gym.NET</PackageProjectUrl>
     <PackageIcon>icon.png</PackageIcon>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <RepositoryUrl>https://github.com/SciSharp/Gym.NET</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
-    <PackageTags>gym, openai, reinforcement learning,learning,learning,NumPy, NumSharp, MachineLearning</PackageTags>
+    <PackageTags>gym;gymnasium;reinforcement-learning;rendering;avalonia;viewer</PackageTags>
+    <PackageReleaseNotes>https://github.com/SciSharp/Gym.NET/blob/master/docs/releases/RELEASE_2.0.0.md</PackageReleaseNotes>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <AllowedOutputExtensionsInPackageBuildOutputFolder>$(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb</AllowedOutputExtensionsInPackageBuildOutputFolder>
-    <AssemblyVersion>0.1.0.2</AssemblyVersion>
-    <FileVersion>0.1.0.2</FileVersion>
+    <!-- The XML documentation goes into the package next to the assembly, so consumers' IntelliSense shows Gym.NET's docs
+         (P10.4). Members of the pre-2.0 code without docs (Gym.Internal, the 0.2 LunarLander, the viewers' XAML classes)
+         raise CS1591 warnings, which the build tolerates (DR-05). -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <AssemblyVersion>2.0.0.0</AssemblyVersion>
+    <FileVersion>2.0.0.0</FileVersion>
     <ApplicationIcon />
     <StartupObject />
     <!-- Avalonia 11+ source-generates a partial class (InitializeComponent + named-element fields) for every x:Class

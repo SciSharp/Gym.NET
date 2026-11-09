@@ -157,6 +157,15 @@ Effects of approved designs that only showed up in code. None changes a design; 
 - **Typed wrappers whose type depends on an argument** (found in P6.3, 2026-11-09): `TimeAwareObservation` returns an
   array when flattening and a dict or tuple otherwise, so its observations are `object`s; `FlattenObservation` is typed
   for arrays and refuses spaces whose flat form is not one (`Graph`, `Sequence`).
+- **DR-34's generated docs** (found in P10.4, 2026-11-09): an options record copies each constructor `<param>` onto its
+  property, and a `<paramref>` inside it is a broken reference on a property (CS1734 wherever documentation is generated,
+  so in a consumer's build too). The generator now turns it into a `<see cref>` to the sibling property, or `<c>` text for
+  a parameter with no property (a wrapper's `env`), and drops `<typeparamref>`s the record does not declare.
+- **D13 without a learning library** (found in P10.3, 2026-11-09): "rewrite one CartPole example on the new API" is read
+  as one example that learns CartPole with Gym.NET alone. The old runners' NeuralNetwork.NET (last released in 2020)
+  depends on ImageSharp 1.0.0-beta0005 and the Alea GPU runtime; the cross-entropy method over linear policies solves CartPole-v1 in seconds
+  and shows `MakeVec`, `Make`, seeding and `human` rendering. A maintainer who wants a neural-network example gets a
+  design question for its library first.
 - **Float64 rewards with the registry** (found in P5.4, 2026-11-09): `EnvSpec.RewardThreshold` is a `double?`, so
   Taxi-v4's threshold, which Gymnasium registers as the `int` 8 (its annotation says `float`), prints `8.0` in
   `pprint` and `to_json`; the value is equal. Pinned by `RegistrationLiveParityTests.Spec_TaxiRewardThreshold_IsFloat64`,

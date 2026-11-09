@@ -89,10 +89,11 @@ namespace Gym.SourceGenerators {
 
             IParameterSymbol[] options = constructor.Parameters.Where(p => p.Name != "env").ToArray();
             IParameterSymbol? env = constructor.Parameters.FirstOrDefault(p => p.Name == "env");
-            Dictionary<string, string> parameterDocs = ParameterDocs(constructor);
 
             // The record is generic when an option's type mentions the class's type parameters (a TObs fill value).
             ITypeParameterSymbol[] usedTypeParameters = type.TypeParameters.Where(t => options.Any(p => Mentions(p.Type, t))).ToArray();
+            // Read after the record's type parameters are known: a copied <typeparamref> must name one of them.
+            Dictionary<string, string> parameterDocs = ParameterDocs(constructor, options.Select(p => p.Name), usedTypeParameters.Select(t => t.Name));
             string recordName = type.Name + "Options";
             string recordTypeArguments = usedTypeParameters.Length == 0 ? "" : "<" + string.Join(", ", usedTypeParameters.Select(t => t.Name)) + ">";
             string classTypeParameters = type.TypeParameters.Length == 0 ? "" : "<" + string.Join(", ", type.TypeParameters.Select(t => t.Name)) + ">";
@@ -422,14 +423,26 @@ namespace Gym.SourceGenerators {
         }
 
         /// <summary>
-        ///     The <c>&lt;param&gt;</c> texts of a constructor's documentation, by parameter name, as single lines. Read from the
-        ///     compiler's documentation when the project produces it, else from the <c>///</c> comment lines themselves, which
-        ///     the compiler keeps as plain trivia when documentation is off.
+        ///     The <c>&lt;param&gt;</c> texts of a constructor's documentation, by parameter name, as single lines, ready to sit
+        ///     on the record's properties. Read from the compiler's documentation when the project produces it, else from the
+        ///     <c>///</c> comment lines themselves, which the compiler keeps as plain trivia when documentation is off.
         /// </summary>
         /// <param name="constructor">The constructor.</param>
+        /// <param name="optionNames">
+        ///     The parameters that become record properties: a <c>&lt;paramref&gt;</c> to one of them turns into a
+        ///     <c>&lt;see cref&gt;</c> to its property.
+        /// </param>
+        /// <param name="recordTypeParameters">The record's own type parameters, the only ones a copied <c>&lt;typeparamref&gt;</c> may name.</param>
         /// <returns>The texts.</returns>
-        private static Dictionary<string, string> ParameterDocs(IMethodSymbol constructor) {
+        /// <remarks>
+        ///     A property has no parameters, so a <c>&lt;paramref&gt;</c> copied as it stands is a broken reference: the
+        ///     compiler warns (CS1734) in every project that generates documentation, the consumer's included. References to
+        ///     other parameters (a wrapper's <c>env</c>) and to type parameters the record lacks become <c>&lt;c&gt;</c> text.
+        /// </remarks>
+        private static Dictionary<string, string> ParameterDocs(IMethodSymbol constructor, IEnumerable<string> optionNames, IEnumerable<string> recordTypeParameters) {
             var docs = new Dictionary<string, string>(StringComparer.Ordinal);
+            var properties = new HashSet<string>(optionNames, StringComparer.Ordinal);
+            var typeParameters = new HashSet<string>(recordTypeParameters, StringComparer.Ordinal);
             string? xml = constructor.GetDocumentationCommentXml();
             if (string.IsNullOrWhiteSpace(xml))
                 xml = DocumentationFromTrivia(constructor);
@@ -440,6 +453,20 @@ namespace Gym.SourceGenerators {
                     string? name = param.Attribute("name")?.Value;
                     if (name is null)
                         continue;
+                    // ToList: the loop replaces the elements it walks.
+                    foreach (XElement reference in param.Descendants("paramref").ToList()) {
+                        string target = reference.Attribute("name")?.Value ?? "";
+                        reference.ReplaceWith(properties.Contains(target)
+                            ? new XElement("see", new XAttribute("cref", PropertyName(target)))
+                            : new XElement("c", target));
+                    }
+
+                    foreach (XElement reference in param.Descendants("typeparamref").ToList()) {
+                        string target = reference.Attribute("name")?.Value ?? "";
+                        if (!typeParameters.Contains(target))
+                            reference.ReplaceWith(new XElement("c", target));
+                    }
+
                     // The inner XML, so <c> and <see> survive, collapsed to one line for the generated comment.
                     string inner = string.Concat(param.Nodes().Select(node => node.ToString()));
                     docs[name] = string.Join(" ", inner.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries).Select(line => line.Trim()));

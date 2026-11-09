@@ -8,6 +8,7 @@ Gym.NET is a native C# (.NET) reinforcement learning environment toolkit and ben
 
 - **Canonical SOT Submodule:** `refs/Gymnasium` (Farama Foundation Gymnasium Git submodule for behavioral, mathematical, and algorithmic parity).
 - **Roadmap:** `docs/plans/COMPLETION_PLAN.md` orders the remaining work to one 2.0 release (phases R0, P0r, P2, P3, P7, P4, P5, P6, P8, P10; MuJoCo's P9 is postponed) and records the 2026-11-08 decisions; `docs/plans/GYMNASIUM_PORT_PLAN.md` holds the per-area specifications.
+- **User docs (P10):** `docs/README.md` indexes the guides, `docs/architecture.md` and the draft release notes `docs/releases/RELEASE_2.0.0.md`; every code sample in them was compiled and run against the tree. Keep them true when the API changes.
 - **Design gate:** `docs/plans/DESIGN_REVIEW.md` holds the approved implementation designs (DR-01…DR-36). Implement only what an approved design covers; a design question no DR-xx answers goes back to the maintainer for review before the step continues.
 - **Working branch:** `journey1` until 2.0 (decision D20); it merges into `master` once, at the release.
 
@@ -65,8 +66,12 @@ refs/Gym.NET/
 │
 ├── tools/parity/                  # Parity stack: manifest.json (pins), requirements.txt, setup_venv.{ps1,sh}; audit probes
 │
-├── examples/                      # Standalone reinforcement learning sample runners
-│   └── ReinforcementLearning/     # CartPole neural network training via parameters vs image observations
+├── examples/
+│   └── CartPole/                  # The one example (D13): the cross-entropy method over linear policies, 100 carts at once through
+│                                  #   MakeVec, then a played episode (--render: Avalonia window); in Gym.NET.sln, so API changes break its build
+│
+├── docs/                          # README.md (index), architecture.md, guides/ (getting_started, creating_custom_environments,
+│                                  #   migrating_to_2.0, development_and_testing), releases/RELEASE_2.0.0.md (draft), plans/
 │
 └── refs/
     └── Gymnasium/                 # Submodule: Farama-Foundation/Gymnasium (Python Master SOT)
@@ -105,6 +110,12 @@ dotnet build src/Gym/Gym.csproj -c Release
 dotnet build src/Gym.Environments/Gym.Environments.csproj -c Release
 dotnet build src/Gym.Rendering.Avalonia/Gym.Rendering.Avalonia.csproj -c Release
 dotnet build src/Gym.Rendering.WinForm/Gym.Rendering.WinForm.csproj -c Release
+
+# The example: trains CartPole headless in about two seconds, exits 0 when solved (--render opens a window: desktops only)
+dotnet run --project examples/CartPole -c Release
+
+# The packages (versions 2.0.0, P10.4) into a folder of your choice; building also packs (GeneratePackageOnBuild)
+dotnet pack Gym.NET.sln -c Release -o <folder>
 ```
 
 ### 3.2 Running Automated Tests

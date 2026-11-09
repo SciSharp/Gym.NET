@@ -577,7 +577,8 @@ Specs: the port plan's §9 and §10; sources `vector` 3,113 lines and `wrappers`
     `VectorEnvTests`, and Gymnasium's three make-with-spec tests ported in place of P3's placeholder; inventory ratchet
     −16 names, the 65 P6 names left marked "deferred in this run".*
   - *Deferred, each with its design still approved: P6.2 `AsyncVectorEnv` (DR-22; `MakeVec(..., "async")` raises
-    `NotImplementedError` naming P6.2), the other 30 wrappers of P6.3, P6.4's F8 (DR-23), P6.5's rendering wrappers
+    `NotImplementedError` naming P6.2), the other 24 single-env wrappers (P6.3's transforms and stateful wrappers,
+    P6.4's `ResizeObservation`, P6.5's rendering wrappers; `create_zero_array` with them), P6.4's F8 (DR-23), P6.5's rendering wrappers
     (`HumanRendering`, so `make`'s human-rendering path still raises, and `RecordVideo`, DR-25), P6.6's vector wrappers
     (DR-24's names), P6.7 (`play`, `PlayPlot`, `FuncEnv`, `performance`, DR-36), and P6.8's ports of `tests/vector` and
     `tests/wrappers`.*
@@ -639,6 +640,37 @@ designs for that time are:
 - **P10.5** Merge `journey1` into `master` (D20), tag, publish.
 - **Exit:** the port plan's definition of done (§1.5) for everything but MuJoCo; the inventory's expected-missing list
   holds only MuJoCo's names and `AtariPreprocessing` (DR-36).
+- *Prepared 2026-11-09, P10.1–P10.4, with nothing merged, tagged, pushed or published (the run's approval: "prepare
+  P10 but no publish or push"):*
+  - *P10.1: PR #24's `PRD.md` and `ROADMAP.md` (root and `docs/`), `docs/architecture/`, `docs/sot/` and
+    `expressive-nibbling-goose.md` removed. New: `docs/README.md` (index), `docs/architecture.md`,
+    `docs/guides/getting_started.md`, `creating_custom_environments.md` and `development_and_testing.md` (both
+    rewritten), the root README (also the packages' readme) and `THIRD-PARTY-NOTICES.md` brought to 2.0's scope
+    (Gymnasium's areas and assets, CPython's PSF notice for `Difflib`/`PyJson`/`PyMath`, P7's pygame-derived drawing).
+    Every code sample was compiled and run from a consumer project outside the tree (NumSharp's analyzer active, no
+    warning); the guide's custom env passes `EnvChecker.CheckEnv`.*
+  - *P10.2: `docs/guides/migrating_to_2.0.md`, from 0.2: the last published release (2023, netcoreapp3.1/net6.0 on
+    NumSharp.Lite 0.1.12), since Gym.NET never had a 1.x.*
+  - *P10.3: `examples/CartPole`, the cross-entropy method over linear policies with 100 carts at once through
+    `MakeVec` (CartPoleVectorEnv), solved by Gymnasium's measure (475 averaged over 100 unseen episodes) in 7 generations,
+    about 1.6 s, reproducible; part of `Gym.NET.sln`, so an API change breaks its build. It needs no learning library:
+    the old runners' NeuralNetwork.NET (last released in 2020) depends on ImageSharp 1.0.0-beta0005 and the Alea GPU
+    runtime. The
+    `ReinforcementLearning` examples are removed (B-36). Its `--render` path compiles but was not run (it opens a window).*
+  - *P10.4: the five packages at 2.0.0 (assembly and file versions 2.0.0.0), descriptions in Gym.NET's own voice, tags,
+    a release-notes link, and the XML documentation (`GenerateDocumentationFile` on the four that lacked it). `dotnet
+    pack Gym.NET.sln` gives exactly the five, depending on each other at 2.0.0, the generator under
+    `analyzers/dotnet/cs`, the registration targets under `buildTransitive`. Draft release notes:
+    `docs/releases/RELEASE_2.0.0.md` (D18's five advisories with the consumer's suppression lines, DR-35, every
+    deviation, gap and deferral).*
+  - *Found while packaging: the generator copied `<paramref>`s into the options records' property docs, a broken
+    reference (CS1734) in any project that generates documentation, consumers' included; they now link the sibling
+    property, pinned by `GymRecordsTests.OptionsRecord_DocumentationLinksTheOtherOptions` (shown to fail with the defect
+    planted). Three crefs to `np.array_equal` fixed. The other documentation warnings are in pre-2.0 code
+    (`Gym.Internal`, the 0.2 LunarLander, the viewers): CS1591 and about a dozen broken crefs, tolerated (DR-05).*
+  - *Not done: P10.5. Before it: P8, the deferred part of P6 (69 inventory names) and the `aaline` decision (D4); the
+    exit's inventory check is unmet until then (69 P6 and 12 P8 names besides MuJoCo's 33, `AtariPreprocessing` and the
+    n/a and by-design entries).*
 
 ## 6. How every step is done
 

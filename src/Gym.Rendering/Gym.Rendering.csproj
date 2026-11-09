@@ -14,19 +14,20 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
     <PackageId>Gym.NET.Rendering</PackageId>
-    <Version>0.2.0</Version>
+    <Version>2.0.0</Version>
     <Authors>Eli Belash</Authors>
     <Company>SciSharp STACK</Company>
     <Product>Gym.NET.Rendering</Product>
-    <Description>pygame-compatible software rasterizer for Gym.NET: the Surface, gfxdraw primitives (a C# port of SDL_gfx 2.0.26), transform.flip, surfarray and Vector2.rotate_rad that Gymnasium's environments render with, reproduced pixel for pixel.</Description>
-    <Copyright>2023 © SciSharp STACK Team</Copyright>
+    <Description>The software rasterizer Gym.NET's environments draw their rgb_array frames with, pixel for pixel as pygame-ce draws Gymnasium's: a Surface with pygame's semantics, SDL_gfx 2.0.26's gfxdraw primitives in C#, draw.line and draw.rect, alpha blitting, transform.flip/scale/smoothscale, image loading, surfarray and Vector2.</Description>
+    <Copyright>2019-2026 © SciSharp STACK Team</Copyright>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/SciSharp/Gym.NET</PackageProjectUrl>
     <PackageIcon>icon.png</PackageIcon>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <RepositoryUrl>https://github.com/SciSharp/Gym.NET</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
-    <PackageTags>gym, gymnasium, reinforcement learning, rendering, pygame, SDL_gfx, NumSharp</PackageTags>
+    <PackageTags>gym;gymnasium;reinforcement-learning;rendering;rasterizer;pygame;sdl_gfx</PackageTags>
+    <PackageReleaseNotes>https://github.com/SciSharp/Gym.NET/blob/master/docs/releases/RELEASE_2.0.0.md</PackageReleaseNotes>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <AllowedOutputExtensionsInPackageBuildOutputFolder>$(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb</AllowedOutputExtensionsInPackageBuildOutputFolder>
   </PropertyGroup>

@@ -17,6 +17,8 @@
 [Dd]ebugPublic/
 [Rr]elease/
 [Rr]eleases/
+# ...except the release notes (docs/releases/RELEASE_<version>.md), which the pattern above would hide.
+!/docs/releases/
 x64/
 x86/
 bld/

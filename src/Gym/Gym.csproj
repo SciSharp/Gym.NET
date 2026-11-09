@@ -5,22 +5,27 @@
     <LangVersion>latest</LangVersion>
     <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
     <PackageId>Gym.NET</PackageId>
-    <Version>0.2.0</Version>
+    <Version>2.0.0</Version>
     <Authors>Eli Belash</Authors>
     <Company>SciSharp STACK</Company>
     <Product>Gym.NET</Product>
-    <Description>openai/gym's popular toolkit for developing and comparing reinforcement learning algorithms port to C#. This package contains the base classes to mimic gym's OOP structure.</Description>
-    <Copyright>2023 © SciSharp STACK Team</Copyright>
+    <Description>Reinforcement-learning environments for .NET with Gymnasium's API and behavior: Env&lt;TObs, TAct&gt;, wrappers, the ten spaces, the registry with Gymnasium.Make and Gymnasium.MakeVec, vector envs and the env checkers. Seeded runs reproduce Gymnasium's random streams, observations and rewards bit for bit. The pre-0.26 API stays available, obsolete, in Gym.Legacy.</Description>
+    <Copyright>2019-2026 © SciSharp STACK Team</Copyright>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/SciSharp/Gym.NET</PackageProjectUrl>
     <PackageIcon>icon.png</PackageIcon>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <RepositoryUrl>https://github.com/SciSharp/Gym.NET</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
-    <PackageTags>gym, openai, reinforcement learning,learning,learning,NumPy, NumSharp, MachineLearning</PackageTags>
+    <PackageTags>gym;gymnasium;reinforcement-learning;rl;environments;numsharp;numpy;machine-learning</PackageTags>
+    <PackageReleaseNotes>https://github.com/SciSharp/Gym.NET/blob/master/docs/releases/RELEASE_2.0.0.md</PackageReleaseNotes>
     <AllowedOutputExtensionsInPackageBuildOutputFolder>$(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb</AllowedOutputExtensionsInPackageBuildOutputFolder>
-    <AssemblyVersion>0.1.0.2</AssemblyVersion>
-    <FileVersion>0.1.0.2</FileVersion>
+    <!-- The XML documentation goes into the package next to the assembly, so consumers' IntelliSense shows Gym.NET's docs
+         (P10.4). Members of the pre-2.0 code without docs (Gym.Internal, the 0.2 LunarLander, the viewers' XAML classes)
+         raise CS1591 warnings, which the build tolerates (DR-05). -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <AssemblyVersion>2.0.0.0</AssemblyVersion>
+    <FileVersion>2.0.0.0</FileVersion>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
   </PropertyGroup>
   <ItemGroup>

@@ -53,6 +53,32 @@ namespace Gym.Tests.Utils {
             Assert.AreEqual(5L, limited.MaxEpisodeSteps);
         }
 
+        /// <summary>
+        ///     An options record's properties carry the constructor's parameter docs with every <c>&lt;paramref&gt;</c> turned
+        ///     into a link to the sibling property: a property has no parameters, so a copied <c>&lt;paramref&gt;</c> would be a
+        ///     broken reference (CS1734 in every project that generates documentation, a consumer's included). Read from the
+        ///     XML documentation Gym.NET.Environments ships, which MSBuild copies next to its assembly.
+        /// </summary>
+        [TestMethod]
+        public void OptionsRecord_DocumentationLinksTheOtherOptions() {
+            string assembly = typeof(Gym.Environments.Envs.ToyText.BlackjackEnvOptions).Assembly.Location;
+            string xmlPath = System.IO.Path.ChangeExtension(assembly, ".xml");
+            Assert.IsTrue(System.IO.File.Exists(xmlPath), $"The package's documentation file is missing: {xmlPath}");
+            System.Xml.Linq.XDocument xml = System.Xml.Linq.XDocument.Load(xmlPath);
+            System.Xml.Linq.XElement[] members = xml.Descendants("member").ToArray();
+
+            // BlackjackEnv's natural parameter says it is ignored when sab is set: on the record, that is a link to Sab.
+            System.Xml.Linq.XElement natural = members.Single(m => (string?)m.Attribute("name") == "P:Gym.Environments.Envs.ToyText.BlackjackEnvOptions.Natural");
+            CollectionAssert.Contains(natural.Descendants("see").Select(see => (string?)see.Attribute("cref")).ToArray(),
+                "P:Gym.Environments.Envs.ToyText.BlackjackEnvOptions.Sab");
+            // And no generated options property anywhere keeps a parameter reference (properties only: the generated
+            // constructors and checks rightly reference their own options parameter).
+            string[] broken = members.Where(m => ((string?)m.Attribute("name") ?? "") is var name && name.StartsWith("P:", System.StringComparison.Ordinal)
+                    && name.Contains("Options.", System.StringComparison.Ordinal) && m.Descendants("paramref").Any())
+                .Select(m => (string)m.Attribute("name")!).ToArray();
+            Assert.AreEqual(0, broken.Length, "Options properties with a <paramref>: " + string.Join(", ", broken));
+        }
+
         /// <summary>A required argument left unset is refused with Python's missing-argument text, before the base constructor runs.</summary>
         [TestMethod]
         public void OptionsRecord_MissingRequiredArgument() {

@@ -5,23 +5,28 @@
     <LangVersion>latest</LangVersion>
     <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
     <PackageId>Gym.NET.Environments</PackageId>
-    <Version>0.2.0</Version>
+    <Version>2.0.0</Version>
     <Authors>Eli Belash</Authors>
     <Company>SciSharp STACK</Company>
     <Product>Gym.NET.Environments</Product>
-    <Description>openai/gym's popular toolkit for developing and comparing reinforcement learning algorithms port to C#.  This package contains ported gym's environments.</Description>
-    <Copyright>2023 © SciSharp STACK Team</Copyright>
+    <Description>Gym.NET's environments, registered for Gymnasium.Make: classic_control (CartPole, MountainCar, MountainCarContinuous, Pendulum, Acrobot) and toy_text (FrozenLake, CliffWalking, Taxi, Blackjack), each equal to Gymnasium's step for step and frame for frame, and CartPole's vector env for Gymnasium.MakeVec.</Description>
+    <Copyright>2019-2026 © SciSharp STACK Team</Copyright>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/SciSharp/Gym.NET</PackageProjectUrl>
     <PackageIcon>icon.png</PackageIcon>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <RepositoryUrl>https://github.com/SciSharp/Gym.NET</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
-    <PackageTags>gym, openai, reinforcement learning,learning,learning,NumPy, NumSharp, MachineLearning</PackageTags>
+    <PackageTags>gym;gymnasium;reinforcement-learning;rl;environments;cartpole;mountaincar;pendulum;acrobot;frozenlake;taxi;blackjack</PackageTags>
+    <PackageReleaseNotes>https://github.com/SciSharp/Gym.NET/blob/master/docs/releases/RELEASE_2.0.0.md</PackageReleaseNotes>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <AllowedOutputExtensionsInPackageBuildOutputFolder>$(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb</AllowedOutputExtensionsInPackageBuildOutputFolder>
-    <AssemblyVersion>0.1.0.2</AssemblyVersion>
-    <FileVersion>0.1.0.2</FileVersion>
+    <!-- The XML documentation goes into the package next to the assembly, so consumers' IntelliSense shows Gym.NET's docs
+         (P10.4). Members of the pre-2.0 code without docs (Gym.Internal, the 0.2 LunarLander, the viewers' XAML classes)
+         raise CS1591 warnings, which the build tolerates (DR-05). -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <AssemblyVersion>2.0.0.0</AssemblyVersion>
+    <FileVersion>2.0.0.0</FileVersion>
   </PropertyGroup>
 
   <ItemGroup>

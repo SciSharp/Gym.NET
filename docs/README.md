@@ -1,61 +1,35 @@
-# Gym.NET Documentation Hub
+# Gym.NET documentation
 
-Welcome to the central documentation hub for **Gym.NET**, the native C# (.NET 8/10) port of Farama Gymnasium.
+Gym.NET gives .NET reinforcement-learning environments with Farama Gymnasium's API, and holds them to Gymnasium's
+behavior bit for bit and pixel for pixel. These pages cover the 2.0 API.
 
----
+## Guides
 
-## 1. Documentation Index
+| Page | For |
+|---|---|
+| [Getting started](guides/getting_started.md) | Making envs, the reset/step loop, seeding, spaces, render modes, wrappers, vector envs |
+| [Creating custom environments](guides/creating_custom_environments.md) | Writing an `Env<TObs, TAct>`, registering it for `Gymnasium.Make`, checking it with `EnvChecker.CheckEnv` |
+| [Migrating from 0.2 to 2.0](guides/migrating_to_2.0.md) | What changed in each 0.2 call, and `Gym.Legacy` for code that cannot move yet |
+| [Development and testing](guides/development_and_testing.md) | Building, the unit suite, the live parity suite against Gymnasium, goldens, `[OpenBugs]` |
 
-### Core Specifications & Roadmap
-- [**Product Requirements Document (PRD)**](./PRD.md) — Complete functional, architectural, and quality specifications.
-- [**Milestone Roadmap**](./ROADMAP.md) — Live deliverables matrix and implementation phases.
+## Reference
 
-### System Architecture
-- [**Core Lifecycle & Spaces**](./architecture/core_lifecycle_and_spaces.md) — Modern `Reset(seed, options)`, 5-tuple `StepResult`, and space hierarchy.
-- [**Wrapper Architecture**](./architecture/wrapper_architecture.md) — Transformation pipeline, `TimeLimit`, monitoring, and wrappers.
-- [**Vector Environments**](./architecture/vector_environments.md) — Synchronous (`SyncVectorEnv`) and asynchronous (`AsyncVectorEnv`) vectorization.
-- [**Decoupled Rendering**](./architecture/decoupled_rendering.md) — Headless `NullEnvViewer` vs. Avalonia / WinForms UI rendering.
-- [**Agent Architecture & Ontology Graph**](./architecture/ontology.json) — Machine-readable component ontology and dependency graph for guide agents.
+| Page | Holds |
+|---|---|
+| [Architecture](architecture.md) | The packages and projects, the env contract, typed and untyped APIs, array ownership, how parity with Gymnasium is proven |
+| [Release notes 2.0.0](releases/RELEASE_2.0.0.md) | What 2.0 contains and leaves out, every known difference from Gymnasium, the ImageSharp advisories |
+| [Third-party notices](../THIRD-PARTY-NOTICES.md) | Gymnasium (MIT), SDL_gfx (zlib), CPython (PSF), pygame-ce as a behavior reference |
+| [Example: CartPole](../examples/CartPole/README.md) | Learning CartPole with the cross-entropy method, 100 carts at once in a vector env |
 
-### Source of Truth (SOT)
-- [**Gymnasium SOT Mapping**](./sot/gymnasium_sot_mapping.md) — Canonical mapping to Farama Gymnasium (`refs/Gymnasium`).
-- [**Golden Trajectory Baselines**](./sot/golden_trajectory_baseline.md) — Deterministic seed test vectors and trajectory verification.
+## Plans
 
-### Developer Guides
-- [**Development & Testing Guide**](./guides/development_and_testing.md) — Building, running tests, single test filtering, and TDD workflow.
-- [**Creating Custom Environments**](./guides/creating_custom_environments.md) — Step-by-step guide for implementing new Gymnasium-compliant C# environments.
+The working documents behind 2.0. They record why the code is the way it is; the pages above describe what it does.
 
----
-
-## 2. Quickstart Example
-
-```csharp
-using Gym.Environments.Envs.Classic;
-using Gym.Rendering.Avalonia;
-using NumSharp;
-
-// 1. Instantiate environment with render mode and viewer factory
-var env = new CartPoleEnv(renderMode: "human", viewerFactory: AvaloniaEnvViewer.Factory);
-
-// 2. Reset environment with deterministic seed
-var (observation, info) = env.Reset(seed: 42);
-
-bool terminated = false;
-bool truncated = false;
-
-while (!terminated && !truncated) {
-    // 3. Sample an action from the action space
-    var action = env.ActionSpace.Sample();
-
-    // 4. Step dynamics (returns 5-tuple)
-    var step = env.Step(action);
-    observation = step.Observation;
-    terminated = step.Terminated;
-    truncated = step.Truncated;
-
-    // 5. Render frame
-    env.Render();
-}
-
-env.Close();
-```
+| Plan | Holds |
+|---|---|
+| [Completion plan](plans/COMPLETION_PLAN.md) | The phases to 2.0, each with its status, scope and deferrals; the decisions D2–D22 |
+| [Design review](plans/DESIGN_REVIEW.md) | The approved implementation designs DR-01…DR-36, and the consequences found while implementing them |
+| [Gymnasium port plan](plans/GYMNASIUM_PORT_PLAN.md) | The per-area specifications, the name map, the defect register |
+| [Parity testing](plans/GYM_PARITY_INTEROP_TESTING.md) | The design of the live parity suite |
+| [NumSharp migration](plans/NUMSHARP_MIGRATION_PLAN.md) | The move from NumSharp.Lite to NumSharp |
+| [Parity audit](plans/GYMNASIUM_PARITY_AUDIT.md) | The 2026-09 measurement of where the 0.2 codebase stood against Gymnasium |

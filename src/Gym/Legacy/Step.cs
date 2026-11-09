@@ -78,7 +78,7 @@ namespace Gym.Legacy {
 
         /// <summary>
         ///     Exact, non-broadcasting equality of two observations: the same shape, the same dtype, then
-        ///     <see cref="np.array_equal(NDArray, NDArray)"/>. Two <see langword="null"/> observations are equal.
+        ///     <see cref="np.array_equal(NDArray, NDArray, bool)"/>. Two <see langword="null"/> observations are equal.
         /// </summary>
         /// <param name="left">The first observation; may be <see langword="null"/>.</param>
         /// <param name="right">The second observation; may be <see langword="null"/>.</param>
