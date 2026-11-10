@@ -321,9 +321,11 @@ Effects of approved designs that only showed up in code. None changes a design; 
   TAct, TReward, TTerminal, TRenderState, TParams>` (namespace `Gym.Experimental.Functional`, with an untyped `FuncEnv`)
   keeps Gymnasium's functions as virtual methods raising `NotImplementedError`, sets its options by Python name
   (`IDynamicAttributes` holds the undeclared ones) and reads `get_default_params` after them. `transform(func)` rebinds
-  Python's attributes, which C# methods cannot be: Gym.NET's stores the transformed functions as run-time attributes of
-  the same Python names (`step_info` for `transition_info`, Gymnasium's own naming), so `PyAttributes.GetAttr` sees them
-  while direct C# calls run the originals; no Gymnasium test exercises it. `Gym.Utils.Performance` reads its clock through
+  Python's attributes, which C# methods cannot be: Gym.NET's stored the transformed functions as run-time attributes of
+  the same Python names (`step_info` for `transition_info`, Gymnasium's own naming), so `PyAttributes.GetAttr` saw them
+  while direct C# calls ran the originals; no Gymnasium test exercises it. DR-43 replaced this: the functions are
+  delegate properties under Gymnasium's names, bound to protected `…Core` methods, and `Transform` reassigns them for
+  every caller. `Gym.Utils.Performance` reads its clock through
   a replaceable `Performance.Time` (Python's `time.time`, which Gymnasium's tests monkeypatch) and disposes what its loops
   drop, so collection does not leak into the measurement; a zero elapsed time raises Python's `float division by zero`.
   `step_api_compatibility` over tuples is `StepApiCompatibility.Dispatch` (the class takes the name), marked

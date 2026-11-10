@@ -699,7 +699,14 @@ Specs: the port plan's §9 and §10; sources `vector` 3,113 lines and `wrappers`
     layout's virtual key) instead of `PhysicalKey`; WinForms' virtual keys already followed the layout and its docs are
     corrected; keys whose layout character differs from their virtual key (AZERTY's digit row) stay a documented
     difference from SDL. A reflection test pins both maps; no non-US layout was exercised on a desktop.*
-  - DR-43: `FuncEnv`'s functions as delegate properties, and a typed `Transform`.
+  - DR-43: `FuncEnv`'s functions as delegate properties, and a typed `Transform`. *Done 2026-11-10:*
+    - `Initial`, `Transition`, `Observation`, `Reward`, `Terminal`, `StateInfo`, `TransitionInfo` and `StepInfo`
+      are settable delegate properties, bound at construction to protected `…Core` methods that subclasses override.
+      `StepInfo` is absent until a transform creates it.
+    - `Transform(IFunctionTransform)` is generic over every signature. `Transform(Func<Delegate, Delegate>)` rebinds
+      a same-signature lambda to its slot's type.
+    - The test envs override the cores. A counting expression-tree transform shows that C# calls run the transformed
+      functions while `transition_info` stays as it was.*
   - DR-41 and DR-44: `PygameContext` instances with a process-wide default, and `Play.RunAsync` on a dedicated thread or
     the thread pool.
   - DR-38: the public `worker` delegate, `daemon` and `context`.

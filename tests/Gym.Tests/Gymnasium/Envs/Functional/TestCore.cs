@@ -26,14 +26,14 @@ namespace Gym.Tests.Gymnasium.Envs.Functional {
             /// <param name="rng">Ignored.</param>
             /// <param name="params">Ignored.</param>
             /// <returns>The state.</returns>
-            public override object? Initial(object? rng, object? @params = null) => np.array(new float[] { 0, 0 });
+            protected override object? InitialCore(object? rng, object? @params) => np.array(new float[] { 0, 0 });
 
             /// <summary>The state itself.</summary>
             /// <param name="state">The state.</param>
             /// <param name="rng">Ignored.</param>
             /// <param name="params">Ignored.</param>
             /// <returns>The state.</returns>
-            public override object? Observation(object? state, object? rng, object? @params = null) => state;
+            protected override object? ObservationCore(object? state, object? rng, object? @params) => state;
 
             /// <summary>Adds <c>[0, action]</c>, float32.</summary>
             /// <param name="state">The state.</param>
@@ -41,7 +41,7 @@ namespace Gym.Tests.Gymnasium.Envs.Functional {
             /// <param name="rng">Ignored.</param>
             /// <param name="params">Ignored.</param>
             /// <returns>The next state.</returns>
-            public override object? Transition(object? state, object? action, object? rng, object? @params = null) {
+            protected override object? TransitionCore(object? state, object? action, object? rng, object? @params) {
                 using NDArray step = np.array(new float[] { 0, (float)PyBuiltins.Float(action) });
                 return (NDArray)state! + step;
             }
@@ -53,7 +53,7 @@ namespace Gym.Tests.Gymnasium.Envs.Functional {
             /// <param name="rng">Ignored.</param>
             /// <param name="params">Ignored.</param>
             /// <returns>The reward.</returns>
-            public override object? Reward(object? state, object? action, object? nextState, object? rng, object? @params = null) =>
+            protected override object? RewardCore(object? state, object? action, object? nextState, object? rng, object? @params) =>
                 ((NDArray)nextState!).GetSingle(1) > 0 ? 1.0 : 0.0;
 
             /// <summary>Whether the second entry is positive.</summary>
@@ -61,7 +61,7 @@ namespace Gym.Tests.Gymnasium.Envs.Functional {
             /// <param name="rng">Ignored.</param>
             /// <param name="params">Ignored.</param>
             /// <returns>Whether the state is terminal.</returns>
-            public override object? Terminal(object? state, object? rng, object? @params = null) => ((NDArray)state!).GetSingle(1) > 0;
+            protected override object? TerminalCore(object? state, object? rng, object? @params) => ((NDArray)state!).GetSingle(1) > 0;
         }
     }
 }

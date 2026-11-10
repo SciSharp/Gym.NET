@@ -1,5 +1,6 @@
 #nullable enable
 using System.Collections.Generic;
+using System.Linq;
 using Gym.Experimental.Functional;
 using Gym.Utils;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -20,8 +21,9 @@ namespace Gym.Tests.Gymnasium.Functional {
         public void TestFunctionalApi() => FunctionalApi.Check(new GenericTestFuncEnv());
 
         /// <summary>
-        ///     The constructor's options set attributes by Python name, declared or not, and <see cref="FuncEnv{TState, TObs, TAct, TReward, TTerminal, TRenderState, TParams}.Transform"/>
-        ///     stores each transformed function under its Python name (<c>step_info</c> for <c>transition_info</c>).
+        ///     The constructor's options set attributes by Python name, declared or not, and <see cref="FuncEnv{TState, TObs, TAct, TReward, TTerminal, TRenderState, TParams}.Transform(System.Func{System.Delegate, System.Delegate})"/>
+        ///     visits the functions in Gymnasium's order, each bound to its <c>…Core</c> method (DR-43), and creates
+        ///     <c>step_info</c> from <c>transition_info</c>; every function is an attribute, as in Python.
         /// </summary>
         [TestMethod]
         public void TestOptionsAndTransform() {
@@ -29,16 +31,59 @@ namespace Gym.Tests.Gymnasium.Functional {
             Assert.AreEqual(2.0, PyAttributes.GetAttr(env, "scale"));
             // get_default_params runs after the options, as Python's __init__ orders them.
             Assert.IsNull(env.DefaultParams);
+            Assert.IsFalse(PyAttributes.HasAttr(env, "step_info"), "step_info exists only once a transform made it");
 
             var names = new List<string>();
             env.Transform(function => {
                 names.Add(function.Method.Name);
                 return function;
             });
-            CollectionAssert.AreEqual(new[] { "Initial", "Transition", "Observation", "Reward", "Terminal", "StateInfo", "TransitionInfo" }, names);
-            foreach (string name in new[] { "initial", "transition", "observation", "reward", "terminal", "state_info", "step_info" })
+            CollectionAssert.AreEqual(new[] { "InitialCore", "TransitionCore", "ObservationCore", "RewardCore", "TerminalCore", "StateInfoCore", "TransitionInfoCore" }, names);
+            foreach (string name in new[] { "initial", "transition", "observation", "reward", "terminal", "state_info", "transition_info", "step_info" })
                 Assert.IsTrue(PyAttributes.HasAttr(env, name), name);
-            Assert.IsFalse(PyAttributes.HasAttr(env, "transition_info"));
+        }
+
+        /// <summary>
+        ///     DR-43: a transform replaces the functions for every caller, C# calls included, and Gymnasium's quirk holds:
+        ///     <c>transition_info</c> stays as it was while the transformed one is <c>step_info</c>. A typed transform wraps
+        ///     every signature (an expression tree around each function, counting its calls).
+        /// </summary>
+        [TestMethod]
+        public void Transform_ReplacesTheFunctionsForEveryCaller() {
+            var env = new GenericTestFuncEnv();
+            var counting = new CountingTransform();
+            env.Transform(counting);
+
+            using var state = (NDArray)env.Initial(null)!;
+            Assert.AreEqual(1, counting.Calls, "Initial runs the transformed function");
+            using var next = (NDArray)env.Transition(state, 1, null)!;
+            Assert.AreEqual(2, counting.Calls, "Transition runs the transformed function");
+            env.TransitionInfo(state, 1, next);
+            Assert.AreEqual(2, counting.Calls, "transition_info is left as it was");
+            env.StepInfo(state, 1, next);
+            Assert.AreEqual(3, counting.Calls, "step_info is the transformed transition_info");
+        }
+
+        /// <summary>A typed transform that wraps each function in a delegate of its own type, counting the calls.</summary>
+        private sealed class CountingTransform : IFunctionTransform {
+            /// <summary>How many wrapped calls ran.</summary>
+            public int Calls { get; private set; }
+
+            /// <summary>Wraps <paramref name="function"/>: a delegate of the same type that counts, then calls it.</summary>
+            /// <typeparam name="TDelegate">The function's delegate type.</typeparam>
+            /// <param name="function">The function.</param>
+            /// <returns>The counting wrapper.</returns>
+            public TDelegate Apply<TDelegate>(TDelegate function) where TDelegate : System.Delegate {
+                var parameters = typeof(TDelegate).GetMethod("Invoke")!.GetParameters()
+                                                   .Select(p => System.Linq.Expressions.Expression.Parameter(p.ParameterType, p.Name)).ToArray();
+                var body = System.Linq.Expressions.Expression.Block(
+                    System.Linq.Expressions.Expression.Call(System.Linq.Expressions.Expression.Constant(this), typeof(CountingTransform).GetMethod(nameof(Count))!),
+                    System.Linq.Expressions.Expression.Invoke(System.Linq.Expressions.Expression.Constant(function), parameters));
+                return System.Linq.Expressions.Expression.Lambda<TDelegate>(body, parameters).Compile();
+            }
+
+            /// <summary>Counts one call.</summary>
+            public void Count() => Calls++;
         }
 
         /// <summary>Generic testing functional environment (<c>GenericTestFuncEnv</c>): a float32 pair whose second entry accumulates the actions.</summary>
@@ -51,14 +96,14 @@ namespace Gym.Tests.Gymnasium.Functional {
             /// <param name="rng">Ignored.</param>
             /// <param name="params">Ignored.</param>
             /// <returns>The state.</returns>
-            public override object? Initial(object? rng, object? @params = null) => np.array(new float[] { 0, 0 });
+            protected override object? InitialCore(object? rng, object? @params) => np.array(new float[] { 0, 0 });
 
             /// <summary>Testing observation function: the state itself.</summary>
             /// <param name="state">The state.</param>
             /// <param name="rng">Ignored.</param>
             /// <param name="params">Ignored.</param>
             /// <returns>The state.</returns>
-            public override object? Observation(object? state, object? rng, object? @params = null) => state;
+            protected override object? ObservationCore(object? state, object? rng, object? @params) => state;
 
             /// <summary>Testing transition function: adds <c>[0, action]</c> to the state.</summary>
             /// <param name="state">The state.</param>
@@ -66,7 +111,7 @@ namespace Gym.Tests.Gymnasium.Functional {
             /// <param name="rng">Ignored.</param>
             /// <param name="params">Ignored.</param>
             /// <returns>The next state, float32.</returns>
-            public override object? Transition(object? state, object? action, object? rng, object? @params = null) {
+            protected override object? TransitionCore(object? state, object? action, object? rng, object? @params) {
                 using NDArray step = np.array(new float[] { 0, (float)PyBuiltins.Float(action) });
                 return (NDArray)state! + step;
             }
@@ -78,7 +123,7 @@ namespace Gym.Tests.Gymnasium.Functional {
             /// <param name="rng">Ignored.</param>
             /// <param name="params">Ignored.</param>
             /// <returns>The reward.</returns>
-            public override object? Reward(object? state, object? action, object? nextState, object? rng, object? @params = null) =>
+            protected override object? RewardCore(object? state, object? action, object? nextState, object? rng, object? @params) =>
                 ((NDArray)nextState!).GetSingle(1) > 0 ? 1.0 : 0.0;
 
             /// <summary>Testing terminal function: the second entry is positive.</summary>
@@ -86,7 +131,7 @@ namespace Gym.Tests.Gymnasium.Functional {
             /// <param name="rng">Ignored.</param>
             /// <param name="params">Ignored.</param>
             /// <returns>Whether the state is terminal.</returns>
-            public override object? Terminal(object? state, object? rng, object? @params = null) => ((NDArray)state!).GetSingle(1) > 0;
+            protected override object? TerminalCore(object? state, object? rng, object? @params) => ((NDArray)state!).GetSingle(1) > 0;
         }
     }
 

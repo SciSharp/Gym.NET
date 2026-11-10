@@ -173,7 +173,9 @@ namespace Gym.Tests.Parity.Tests.Utils {
 
                 var names = new List<object?>();
                 env.Transform(function => {
-                    names.Add(PyAttributes.SnakeCase(function.Method.Name));
+                    // Each function starts bound to its …Core method (DR-43), whose name less the suffix is Gymnasium's __name__.
+                    string method = function.Method.Name;
+                    names.Add(PyAttributes.SnakeCase(method.EndsWith("Core", StringComparison.Ordinal) ? method.Substring(0, method.Length - 4) : method));
                     return function;
                 });
                 return new object?[] {
