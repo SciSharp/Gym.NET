@@ -9,7 +9,7 @@
     <Authors>Eli Belash</Authors>
     <Company>SciSharp STACK</Company>
     <Product>Gym.NET.Environments</Product>
-    <Description>Gym.NET's environments, registered for Gymnasium.Make: classic_control (CartPole, MountainCar, MountainCarContinuous, Pendulum, Acrobot), box2d (LunarLander, LunarLanderContinuous, on Box2D 2.3 in managed C#) and toy_text (FrozenLake, CliffWalking, Taxi, Blackjack), each equal to Gymnasium's step for step and frame for frame, and CartPole's vector env for Gymnasium.MakeVec.</Description>
+    <Description>Gym.NET's environments, registered for Gymnasium.Make: classic_control (CartPole, MountainCar, MountainCarContinuous, Pendulum, Acrobot), box2d (LunarLander, LunarLanderContinuous, BipedalWalker, BipedalWalkerHardcore, on Box2D 2.3 in managed C#) and toy_text (FrozenLake, CliffWalking, Taxi, Blackjack), each equal to Gymnasium's step for step and frame for frame, and CartPole's vector env for Gymnasium.MakeVec.</Description>
     <Copyright>2019-2026 © SciSharp STACK Team</Copyright>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/SciSharp/Gym.NET</PackageProjectUrl>
@@ -17,7 +17,7 @@
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <RepositoryUrl>https://github.com/SciSharp/Gym.NET</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
-    <PackageTags>gym;gymnasium;reinforcement-learning;rl;environments;cartpole;mountaincar;pendulum;acrobot;lunarlander;box2d;frozenlake;taxi;blackjack</PackageTags>
+    <PackageTags>gym;gymnasium;reinforcement-learning;rl;environments;cartpole;mountaincar;pendulum;acrobot;lunarlander;bipedalwalker;box2d;frozenlake;taxi;blackjack</PackageTags>
     <PackageReleaseNotes>https://github.com/SciSharp/Gym.NET/blob/master/docs/releases/RELEASE_2.0.0.md</PackageReleaseNotes>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <AllowedOutputExtensionsInPackageBuildOutputFolder>$(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb</AllowedOutputExtensionsInPackageBuildOutputFolder>

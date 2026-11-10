@@ -14,8 +14,8 @@ using SpaceTuple = Gym.Spaces.Tuple;
 namespace Gym.Tests.Gymnasium.Vector {
     /// <summary>Gymnasium's <c>SyncVectorEnv</c> tests (<c>test_sync_vector_env.py</c>), run against <see cref="SyncVectorEnv"/>.</summary>
     /// <remarks>
-    ///     The seed test runs over BipedalWalker-v3, which arrives with Box2D (P8), so it is <c>[OpenBugs("P8")]</c>; the
-    ///     determinism test runs over every env Gym.NET registers, as Gymnasium's runs over every one it can make.
+    ///     The seed test runs over BipedalWalker-v3, as Gymnasium's does; the determinism test runs over every env Gym.NET
+    ///     registers, as Gymnasium's runs over every one it can make.
     ///     Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/tests/vector/test_sync_vector_env.py">tests/vector/test_sync_vector_env.py</see>.
     /// </remarks>
     [TestClass]
@@ -209,11 +209,9 @@ namespace Gym.Tests.Gymnasium.Vector {
 
         /// <summary>Test seeding for sync vector environments: the vector env's action space samples as the single env's does.</summary>
         /// <remarks>
-        ///     BipedalWalker-v3 arrives with Box2D (P8).
         ///     Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/tests/vector/test_sync_vector_env.py#L205">tests/vector/test_sync_vector_env.py (test_sync_vector_env_seed)</see>.
         /// </remarks>
         [TestMethod]
-        [OpenBugs("P8")]
         public void TestSyncVectorEnvSeed() {
             using IEnv env = TestingUtils.MakeEnv("BipedalWalker-v3", seed: 123)();
             using var syncVectorEnv = new SyncVectorEnv(new[] { TestingUtils.MakeEnv("BipedalWalker-v3", seed: 123) });
@@ -222,7 +220,10 @@ namespace Gym.Tests.Gymnasium.Vector {
             for (int i = 0; i < 100; i++) {
                 using var envAction = (NDArray)env.ActionSpace.Sample()!;
                 using var vectorAction = (NDArray)syncVectorEnv.ActionSpace.Sample()!;
-                Assert.IsTrue(np.array_equal(envAction, vectorAction));
+                // np.all(env_action == vector_action): the (4,) action broadcasts against the (1, 4) batch, where
+                // np.array_equal would refuse the shapes.
+                using NDArray equal = np.equal(envAction, vectorAction);
+                Assert.IsTrue(np.all(equal));
             }
 
             env.Close();

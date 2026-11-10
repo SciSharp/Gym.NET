@@ -146,10 +146,15 @@ namespace Gym.Tests.Parity.Bridge {
                         using PyObject reward = _reward switch {
                             BridgeReward.NumpyFloat64 => Python.numpy.float64(result.Reward),
                             BridgeReward.Int => new PyInt(checked((long)result.Reward)),
-                            // LunarLander's and BipedalWalker's terminal -100/+100 are Python int literals.
+                            // LunarLander's terminal -100/+100 are Python int literals.
                             BridgeReward.NumpyFloat64OrTerminalInt => result.Terminated && Math.Abs(result.Reward) == 100
                                 ? new PyInt((long)result.Reward)
                                 : Python.numpy.float64(result.Reward),
+                            // BipedalWalker's fall is the int literal -100; its other rewards take the float32 actions'
+                            // precision. The double is a float32 value widened, so the narrowing is exact.
+                            BridgeReward.NumpyFloat32OrFallInt => result.Terminated && result.Reward == -100
+                                ? new PyInt(-100)
+                                : Python.numpy.float32((float)result.Reward),
                             _ => new PyFloat(result.Reward),
                         };
                         using PyObject terminated = result.Terminated.ToPython();
@@ -538,10 +543,17 @@ namespace Gym.Tests.Parity.Bridge {
         Int,
 
         /// <summary>
-        ///     A NumPy <c>np.float64</c> (the shaping differences of the box2d envs), except a terminal -100 or +100, which
-        ///     LunarLander and BipedalWalker assign as Python <c>int</c> literals (BipedalWalker's finish keeps its float).
+        ///     A NumPy <c>np.float64</c> (LunarLander's shaping differences), except a terminal -100 or +100, which LunarLander
+        ///     assigns as Python <c>int</c> literals.
         /// </summary>
         NumpyFloat64OrTerminalInt,
+
+        /// <summary>
+        ///     A NumPy <c>np.float32</c>: BipedalWalker's reward under the float32 actions Gymnasium's tools sample (a Python float
+        ///     shaping difference less float32 energy terms is a float32 under NEP 50), except a fall's -100, a Python
+        ///     <c>int</c> literal; the far end's finish keeps its float32.
+        /// </summary>
+        NumpyFloat32OrFallInt,
     }
 
     /// <summary>

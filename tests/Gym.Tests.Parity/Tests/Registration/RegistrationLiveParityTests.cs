@@ -133,17 +133,19 @@ namespace Gym.Tests.Parity.Tests.Registration {
         }
 
         /// <summary>
-        ///     The box2d ids of P8: <c>str(make(id))</c> is Gymnasium's (<c>LunarLander</c>'s class name, DR-32), and so are the
-        ///     printed specs of the stack and of the unwrapped env except the threshold, which Gymnasium registers as an int
-        ///     (<c>200</c>) and Gym.NET's float64 thresholds print as <c>200.0</c>, as for Taxi-v4
-        ///     (<see cref="Spec_TaxiRewardThreshold_IsFloat64"/>). LunarLanderContinuous-v3's kwargs are Gymnasium's own,
-        ///     <c>{'continuous': True}</c> (one class in both libraries).
+        ///     The box2d ids of P8: <c>str(make(id))</c> is Gymnasium's (<c>LunarLander</c>'s and <c>BipedalWalker</c>'s class
+        ///     names, DR-32), and so are the printed specs of the stack and of the unwrapped env except the threshold, which
+        ///     Gymnasium registers as an int (<c>200</c>, <c>300</c>) and Gym.NET's float64 thresholds print as <c>200.0</c>, as for
+        ///     Taxi-v4 (<see cref="Spec_TaxiRewardThreshold_IsFloat64"/>). The second ids' kwargs are Gymnasium's own,
+        ///     <c>{'continuous': True}</c> and <c>{'hardcore': True}</c> (one class per pair in both libraries).
         /// </summary>
         /// <param name="id">The id.</param>
         /// <param name="threshold">Gymnasium's int threshold.</param>
         [TestMethod]
         [DataRow("LunarLander-v3", 200)]
         [DataRow("LunarLanderContinuous-v3", 200)]
+        [DataRow("BipedalWalker-v3", 300)]
+        [DataRow("BipedalWalkerHardcore-v3", 300)]
         public void Make_Box2D_StackAndSpecs_MatchGymnasium(string id, int threshold) {
             using PyRef python = PyRef.Of(() => Python.gymnasium.make(id));
             using IEnv dotnet = Gymnasium.Make(id);

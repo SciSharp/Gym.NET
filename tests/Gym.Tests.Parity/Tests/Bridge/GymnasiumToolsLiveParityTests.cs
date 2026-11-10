@@ -386,6 +386,8 @@ namespace Gym.Tests.Parity.Tests.Bridge {
         [TestMethod]
         [DataRow("LunarLander-v3")]
         [DataRow("LunarLanderContinuous-v3")]
+        [DataRow("BipedalWalker-v3")]
+        [DataRow("BipedalWalkerHardcore-v3")]
         public void CheckEnv_PassesGymNetsBox2DEnvs_AsGymnasiumsOwn(string id) {
             SkipOffReferencePlatform("Box2D's sinf/cosf");
             IEnvironmentViewerFactoryDelegate? previous = Gymnasium.HumanViewerFactory;
@@ -395,7 +397,7 @@ namespace Gym.Tests.Parity.Tests.Bridge {
                 using var bridge = new ReverseBridge();
                 using PyRef python = PyRef.Of(() => MadeUnwrapped(Python.gymnasium.make(id)));
                 using PyRef shim = PyRef.Of(() => {
-                    using PyObject spec = bridge.Spec(Gymnasium.Spec(id), reward: BridgeReward.NumpyFloat64OrTerminalInt);
+                    using PyObject spec = bridge.Spec(Gymnasium.Spec(id), reward: Box2DReward(id));
                     return MadeUnwrapped(Python.gymnasium.make(spec));
                 });
                 using IEnv dotnet = Gymnasium.Make(id);
@@ -410,30 +412,45 @@ namespace Gym.Tests.Parity.Tests.Bridge {
 
         /// <summary>
         ///     Gymnasium's <c>check_environments_match</c> finds Gym.NET's box2d envs of P8 equal to its own over two seeds of 200
-        ///     sampled steps, in both orders, <c>rgb_array</c> frames included (the exhaust particles too). The tool compares
-        ///     reward types, so the bridge returns Gymnasium's: an <c>np.float64</c>, and the int -100 or +100 on termination.
+        ///     sampled steps, in both orders, <c>rgb_array</c> frames included (LunarLander's exhaust particles, BipedalWalker's
+        ///     scrolling world and lidar sweep). The tool compares reward types, so the bridge returns Gymnasium's
+        ///     (<see cref="Box2DReward"/>).
         /// </summary>
+        /// <remarks>
+        ///     Every pair compared has the same past: BipedalWalker keeps its Box2D world across resets, and the broad phase
+        ///     hands freed tree nodes to the next episode's fixtures, so contact events come in an order an env's history
+        ///     decides and <c>reset(seed)</c> alone does not fix the episode (Gymnasium's own env compared, once used, with a
+        ///     fresh one diverges: at step 96 for BipedalWalker-v3 and seed 0, measured). So the reference pair and the
+        ///     Gymnasium/Gym.NET pair each run the first order and then the second.
+        /// </remarks>
         /// <param name="id">The id.</param>
         [TestMethod]
         [DataRow("LunarLander-v3")]
         [DataRow("LunarLanderContinuous-v3")]
+        [DataRow("BipedalWalker-v3")]
+        [DataRow("BipedalWalkerHardcore-v3")]
         public void CheckEnvironmentsMatch_GymNetsBox2DEnvs_AsGymnasiumsOwn(string id) {
             SkipOffReferencePlatform("Box2D's sinf/cosf");
             using var bridge = new ReverseBridge();
             foreach (long seed in new long[] { 0, 123 }) {
-                using PyRef python = PyRef.Of(() => Python.gymnasium.make(id, render_mode: "rgb_array"));
+                using PyRef reference = PyRef.Of(() => Python.gymnasium.make(id, render_mode: "rgb_array"));
                 using PyRef twin = PyRef.Of(() => Python.gymnasium.make(id, render_mode: "rgb_array"));
+                using PyRef python = PyRef.Of(() => Python.gymnasium.make(id, render_mode: "rgb_array"));
                 using PyRef shim = PyRef.Of(() => {
-                    using PyObject spec = bridge.Spec(Gymnasium.Spec(id), reward: BridgeReward.NumpyFloat64OrTerminalInt);
+                    using PyObject spec = bridge.Spec(Gymnasium.Spec(id), reward: Box2DReward(id));
                     return Python.gymnasium.make(spec, render_mode: "rgb_array");
                 });
-                Outcome expected = Outcome.CapturePython(() => Python.gymnasium.utils.env_match.check_environments_match(python.Object, twin.Object, 200, seed));
+                Outcome expected = Outcome.CapturePython(() => Python.gymnasium.utils.env_match.check_environments_match(reference.Object, twin.Object, 200, seed));
                 // The reference must pass, or two equal failures would pass the comparison.
                 expected.Expect($"check_environments_match({id}: gymnasium, gymnasium, 200, seed={seed})");
                 ByteContract.AssertSame($"check_environments_match({id}: gymnasium, gym.net, 200, seed={seed})", expected,
                     ReverseBridge.AsBridgedSide(Outcome.CapturePython(() => Python.gymnasium.utils.env_match.check_environments_match(python.Object, shim.Object, 200, seed))));
-                // Gymnasium samples from env_a's action space, so the other order samples from the bridge's mirror.
-                ByteContract.AssertSame($"check_environments_match({id}: gym.net, gymnasium, 200, seed={seed})", expected,
+
+                // The second order, on the same envs, now each with the first order's past.
+                Outcome expectedAgain = Outcome.CapturePython(() => Python.gymnasium.utils.env_match.check_environments_match(twin.Object, reference.Object, 200, seed));
+                expectedAgain.Expect($"check_environments_match({id}: gymnasium, gymnasium, 200, seed={seed}), the second call");
+                // Gymnasium samples from env_a's action space, so this order samples from the bridge's mirror.
+                ByteContract.AssertSame($"check_environments_match({id}: gym.net, gymnasium, 200, seed={seed})", expectedAgain,
                     ReverseBridge.AsBridgedSide(Outcome.CapturePython(() => Python.gymnasium.utils.env_match.check_environments_match(shim.Object, python.Object, 200, seed))));
             }
         }
@@ -445,6 +462,16 @@ namespace Gym.Tests.Parity.Tests.Bridge {
         /// <param name="id">The id.</param>
         /// <returns>The bridge's reward type for it.</returns>
         private static BridgeReward ToyTextReward(string id) => id == "Blackjack-v1" ? BridgeReward.Float : BridgeReward.Int;
+
+        /// <summary>
+        ///     The Python type of a box2d env's reward in Gymnasium under the tools' float32 sampled actions: LunarLander's
+        ///     <c>np.float64</c> with the int ±100 on termination, BipedalWalker's <c>np.float32</c> (its energy cost takes the
+        ///     action's precision) with the int -100 on a fall.
+        /// </summary>
+        /// <param name="id">The id.</param>
+        /// <returns>The bridge's reward type for it.</returns>
+        private static BridgeReward Box2DReward(string id) =>
+            id.StartsWith("BipedalWalker", StringComparison.Ordinal) ? BridgeReward.NumpyFloat32OrFallInt : BridgeReward.NumpyFloat64OrTerminalInt;
 
         /// <summary>
         ///     What a Gym.NET env raises reaches Gymnasium as the Python type it stands for: <c>make</c> with a keyword the

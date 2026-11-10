@@ -2941,6 +2941,27 @@ namespace Gym.Tests.Parity {
                             return function.Invoke(env, s);
                         }
                     }
+
+                    /// <summary><c>gymnasium.envs.box2d.bipedal_walker</c>.</summary>
+                    internal static class bipedal_walker {
+                        /// <summary><c>BipedalWalkerHeuristics()</c>: a new gait state machine, at its first phase with the left leg moving.</summary>
+                        /// <returns>A new owned reference.</returns>
+                        /// <exception cref="PythonException">Thrown when the constructor raises.</exception>
+                        internal static PyObject BipedalWalkerHeuristics() {
+                            using PyObject type = PythonRuntime.Import("gymnasium.envs.box2d.bipedal_walker").GetAttr("BipedalWalkerHeuristics");
+                            return type.Invoke();
+                        }
+
+                        /// <summary>
+                        ///     <c>heuristics.step_heuristic(s)</c>: advances the gait and returns its float64 action, the instance's own
+                        ///     <c>a</c> array (which the next call overwrites in place).
+                        /// </summary>
+                        /// <param name="heuristics">The state machine; stays owned by the caller.</param>
+                        /// <param name="s">The observation; stays owned by the caller.</param>
+                        /// <returns>A new owned reference to the action array.</returns>
+                        /// <exception cref="PythonException">Thrown when the gait raises (an observation too short).</exception>
+                        internal static PyObject step_heuristic(PyObject heuristics, PyObject s) => heuristics.InvokeMethod("step_heuristic", s);
+                    }
                 }
             }
         }

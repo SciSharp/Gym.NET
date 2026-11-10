@@ -395,6 +395,16 @@ Effects of approved designs that only showed up in code. None changes a design; 
   - Rewards are float64 as everywhere (Gymnasium's are an `np.float64`, and the int -100/+100 on termination). The
     registered threshold `200` prints `200.0` in the spec, as Taxi-v4's `8` does.
   - `heuristic` returns DR-08's 0-d int64 array where Python returns an `int`.
+- **DR-32 and DR-28 on BipedalWalker** (P8.3, 2026-11-11):
+  - One class, `BipedalWalkerEnv` (`[PyName("BipedalWalker")]`), for both ids; `BipedalWalkerHardcoreEnv` only refuses,
+    as Gymnasium's `BipedalWalkerHardcore` does. `ContactDetector` is private and nested (DR-28), and so is the lidar's
+    ray-cast callback, which Gymnasium defines inside `reset`.
+  - The body attributes live beside the bodies, as for LunarLander: `TerrainColors` for `terrain[i].color1/color2`, and
+    `LegGroundContact` with `null` for the upper legs, which have no `ground_contact` attribute in Python.
+  - Rewards are float64 values, as everywhere; their precision is the action's, as NumPy 2 computes them (float32 for
+    float32 actions). The float64 carries the float32 value exactly.
+  - `BipedalWalkerHeuristics.StepHeuristic` returns a new array per call. Python returns the instance's own `a` array,
+    which its next call overwrites in place; Gym.NET keeps a copy in `A`. The values are the same.
 - **D4's rasterizer and non-finite coordinates** (P8.2, 2026-11-11): pygame's C code converts a NaN, infinite or
   out-of-range coordinate to `INT_MIN` and draws the visible part. P7's `Draw.Line(double…)` raised `ValueError` there
   instead; it now converts as pygame does, like the new `Polygon`, `Circle` and `Lines`. `Aaline`/`Aalines` (DR-37's

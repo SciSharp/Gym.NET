@@ -78,7 +78,9 @@ refs/Gym.NET/
 │   │   ├── Envs/                  # NpScalar (NEP 50 scalars), HumanWindow (DR-20), EnvAssets (DR-19), RenderMath
 │   │   ├── Assets/                # Embedded env images copied from Gymnasium (classic_control, toy_text; README lists sources and hashes)
 │   │   ├── Envs/Box2D/            # LunarLanderEnv (LunarLander-v3 and LunarLanderContinuous-v3, [PyName("LunarLander")], DR-32; Heuristic,
-│   │   │                          #   DemoHeuristicLander, a private ContactDetector, DR-28; LunarLanderContinuousEnv, the refusing stub) on Gym.Box2D
+│   │   │                          #   DemoHeuristicLander, a private ContactDetector, DR-28; LunarLanderContinuousEnv, the refusing stub) on Gym.Box2D;
+│   │   │                          #   BipedalWalkerEnv (BipedalWalker-v3 and BipedalWalkerHardcore-v3, [PyName("BipedalWalker")]; one world per env,
+│   │   │                          #   lidar ray casts, NEP 50 rewards; private ContactDetector), BipedalWalkerHeuristics, BipedalWalkerHardcoreEnv (stub)
 │   │   ├── Envs/Aether/           # The 0.2 LunarLanderEnv (Aether.Physics2D), unregistered; deleted in P8.5 (D10)
 │   │   ├── GymEnvironments.cs     # Register(): the built-in ids, from a module initializer (DR-12; GYMNET_DISABLE_ENV_REGISTRATION disarms it, DR-14)
 │   │   └── buildTransitive/       # Gym.NET.Environments.targets: the app-side registration initializer (DR-17)

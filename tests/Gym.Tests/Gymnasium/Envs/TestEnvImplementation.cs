@@ -17,13 +17,12 @@ using NumSharp;
 namespace Gym.Tests.Gymnasium.Envs {
     /// <summary>
     ///     Gymnasium's env implementation tests (<c>tests/envs/test_env_implementation.py</c>): LunarLander's heuristic and
-    ///     wind seeding, CliffWalking's transition tables, FrozenLake's map generation, the classic envs' customizable resets,
-    ///     CartPole's vector equivalence, and the discrete action check.
+    ///     wind seeding, BipedalWalker's hardcore terrain, CliffWalking's transition tables, FrozenLake's map generation, the
+    ///     classic envs' customizable resets, CartPole's vector equivalence, and the discrete action check.
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///     The CarRacing tests are the <c>[OpenBugs("P8")]</c> methods until CarRacing-v3 arrives (P8.4);
-    ///     <c>test_bipedal_walker_hardcore_creation</c> joins with BipedalWalker (P8.3), whose terrain colours it reads.
+    ///     The CarRacing tests are the <c>[OpenBugs("P8")]</c> methods until CarRacing-v3 arrives (P8.4).
     ///     </para>
     ///     <para>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/tests/envs/test_env_implementation.py">tests/envs/test_env_implementation.py</see>.</para>
     /// </remarks>
@@ -118,6 +117,50 @@ namespace Gym.Tests.Gymnasium.Envs {
                     Assert.IsTrue(transitions.All(r => r.Probability == 1.0));
                 }
             }
+        }
+
+        /// <summary>
+        ///     BipedalWalker with <c>hardcore=True</c> has ladders, stumps and pitfalls, which a convenient way identifies: their
+        ///     white and grey terrain colours, absent from the normal variant's terrain and present in the hardcore one's.
+        /// </summary>
+        /// <param name="seed">The environment seed.</param>
+        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/tests/envs/test_env_implementation.py#L107">test_bipedal_walker_hardcore_creation</see>.</remarks>
+        [TestMethod]
+        [DataRow(0)]
+        [DataRow(1)]
+        [DataRow(2)]
+        [DataRow(3)]
+        [DataRow(4)]
+        public void TestBipedalWalkerHardcoreCreation(int seed) {
+            var hcTerrainsColor1 = new Gym.Rendering.Color(255, 255, 255);
+            var hcTerrainsColor2 = new Gym.Rendering.Color(153, 153, 153);
+
+            using IEnv envMade = Make("BipedalWalker-v3", disableEnvChecker: true);
+            using IEnv hcEnvMade = Make("BipedalWalkerHardcore-v3", disableEnvChecker: true);
+            var env = envMade.Unwrapped as BipedalWalkerEnv;
+            var hcEnv = hcEnvMade.Unwrapped as BipedalWalkerEnv;
+            Assert.IsTrue(env != null && hcEnv != null);
+            Assert.IsTrue(env.Hardcore == false && hcEnv.Hardcore == true);
+
+            env.Reset(seed).Observation.Dispose();
+            hcEnv.Reset(seed).Observation.Dispose();
+
+            foreach ((Gym.Rendering.Color color1, Gym.Rendering.Color color2) in env.TerrainColors) {
+                Assert.AreNotEqual(hcTerrainsColor1, color1);
+                Assert.AreNotEqual(hcTerrainsColor2, color2);
+            }
+
+            int hcTerrainsColor1Count = 0;
+            int hcTerrainsColor2Count = 0;
+            foreach ((Gym.Rendering.Color color1, Gym.Rendering.Color color2) in hcEnv.TerrainColors) {
+                if (color1 == hcTerrainsColor1)
+                    hcTerrainsColor1Count += 1;
+                if (color2 == hcTerrainsColor2)
+                    hcTerrainsColor2Count += 1;
+            }
+
+            Assert.IsTrue(hcTerrainsColor1Count > 0);
+            Assert.IsTrue(hcTerrainsColor2Count > 0);
         }
 
         /// <summary>FrozenLake's random maps of sizes 5, 10 and 16 always have a path from the start to the goal.</summary>

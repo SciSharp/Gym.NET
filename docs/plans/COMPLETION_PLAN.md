@@ -874,6 +874,36 @@ Specs: the port plan's §5.6 and §11.3; sources 2,979 lines.
     four fewer missing names.
 - **P8.3** BipedalWalker-v3 and BipedalWalkerHardcore-v3 as `BipedalWalkerEnv` (lidar ray casts), with its own private
   `ContactDetector`.
+  *Done 2026-11-11:*
+  - `src/Gym.Environments/Envs/Box2D/BipedalWalkerEnv.cs`: Gymnasium's `BipedalWalker` on `Gym.Box2D` in Gymnasium's
+    order of calls and draws. One world for the env's life, as in Gymnasium: each reset destroys the last bodies in
+    Gymnasium's order, so the broad phase hands freed nodes out as pybox2d's does. The terrain's states (grass, and in
+    hardcore mode stumps, stairs and pits) draw from the generator as Gymnasium does (`integers(4, 5)` draws nothing).
+    The obstacles' polygons go through Box2D's hull. Also the clouds, the hull's push, the legs on their limited motors,
+    the reset's int64 zero-action step, and the ten lidar ray casts keeping the closest ground hit. The reward's
+    precision is the action's under NEP 50 (float32 for sampled actions), and NumPy's errors for refused actions (0-d,
+    too short, rows, booleans) carry its texts. The frame is drawn on a surface as wide as the scrolled world and
+    cropped to its right 600 columns. Human mode blits at the truncated scroll onto a window it never clears. The
+    lidar ray sweeps one per frame.
+  - `BipedalWalkerHeuristics`: the gait's state machine in float32 as NumPy computes it on a float32 observation. Its
+    knee target switches between a Python float and an `np.float32`, which changes the precision of its increments;
+    Gym.NET tracks that kind (`NpScalar`). `BipedalWalkerHardcoreEnv` refuses as Gymnasium's class does.
+  - Finding, Gymnasium's own: `reset(seed)` does not alone decide a BipedalWalker episode. The freed tree nodes order
+    the next episode's contacts and so the contact listener's events. Gymnasium's env, used once by
+    `check_environments_match` and then compared with a fresh one, differs at step 96 (seed 0). Gym.NET matches it
+    whenever both have the same past. The bridge cell now compares only envs with equal pasts, and the env's docs carry
+    the footgun.
+  - Parity: the env's own suite (`BipedalWalkerLiveParityTests`, 45 gated): resets; the terrain, clouds and bodies
+    value for value (7 seeds); the gait's episodes; sampled episodes with a second episode in the same world; four
+    same-seed episodes in a row; `check_environments_match`'s loop in lockstep, twice on the same envs; frames along
+    the gait's and sampled episodes; 11 action forms; render before reset; the gait on its own (3 episodes, 1,500
+    random observations); spaces; metadata; both `make` stacks; `BipedalWalkerHardcore()`. The step before a reset is
+    open (N-1). Also: registration (threshold `300` printing `300.0`), `check_env` and `check_environments_match`
+    through the reverse bridge (`BridgeReward.NumpyFloat32OrFallInt`), a golden per id, and the coverage cells. The
+    parity harness maps NumPy's `_UFuncNoLoopError` to NumSharp's `TypeError`, NumSharp's own convention.
+  - Unit tests: `test_bipedal_walker_hardcore_creation` and `test_sync_vector_env_seed` run. The latter's port compared
+    a `(4,)` action with the `(1, 4)` batch through `np.array_equal`; it now broadcasts as Gymnasium's `np.all(a == b)`
+    does. The inventory lists three fewer missing names.
 - **P8.4** CarRacing-v3 as `CarRacingEnv` with `car_dynamics`; its score text drawn from glyph data recorded once from
   live pygame and SDL_ttf's shaded layout (DR-27), after the font-data license check; coordinate with PR #13.
 - **P8.5** Delete the Aether LunarLander (D10) and the `Aether.Physics2D`, `ImageSharp.Drawing` and `Fonts`

@@ -31,6 +31,12 @@ namespace Gym.Tests.Parity.Oracle {
         /// <summary>Gymnasium's last observation, which policies act on; <see langword="null"/> before the first reset.</summary>
         private PyObject? _lastObservation;
 
+        /// <summary>
+        ///     The episode's <c>BipedalWalkerHeuristics</c>, a state machine the <c>bipedal_walker_heuristic</c> policy creates
+        ///     at its first action and every reset drops, so each episode starts the gait afresh.
+        /// </summary>
+        private PyObject? _bipedalHeuristics;
+
         /// <summary>Takes ownership of the made env and its unwrapped env.</summary>
         /// <param name="made">The made env.</param>
         /// <param name="unwrapped">Its unwrapped env (a separate reference).</param>
@@ -147,6 +153,12 @@ namespace Gym.Tests.Parity.Oracle {
                     }
                     case "lunar_lander_heuristic":
                         return ParityAction.FromPython(Python.gymnasium.envs.box2d.lunar_lander.heuristic(Unwrapped, observation));
+                    case "bipedal_walker_heuristic":
+                        // Gymnasium's gait is a state machine: one instance per episode, fed every observation in order. Its
+                        // float64 action array is its own attribute, which its next call overwrites in place; that call comes
+                        // after the step this action drives, and the action's facts are read now.
+                        _bipedalHeuristics ??= Python.gymnasium.envs.box2d.bipedal_walker.BipedalWalkerHeuristics();
+                        return ParityAction.FromPython(Python.gymnasium.envs.box2d.bipedal_walker.step_heuristic(_bipedalHeuristics, observation));
                     case "mountaincar_momentum": {
                         using NDArray values = observation.ToNDArray();
                         using NDArray widened = values.astype(np.float64);
@@ -294,9 +306,11 @@ namespace Gym.Tests.Parity.Oracle {
                 }
 
                 _lastObservation?.Dispose();
+                _bipedalHeuristics?.Dispose();
                 _unwrapped?.Dispose();
                 _made.Dispose();
                 _lastObservation = null;
+                _bipedalHeuristics = null;
                 _unwrapped = null;
                 _made = null;
             });
@@ -357,6 +371,12 @@ namespace Gym.Tests.Parity.Oracle {
                 using (result) {
                     _lastObservation?.Dispose();
                     _lastObservation = result[0];
+                    if (reset) {
+                        // A new episode: a stateful policy starts over, as Gymnasium's demo makes one heuristic per episode.
+                        _bipedalHeuristics?.Dispose();
+                        _bipedalHeuristics = null;
+                    }
+
                     ValueFacts described = ValueFacts.FromPython(result);
                     return CallResult.Of(reset ? Transition.FromReset(described) : Transition.FromStep(described));
                 }

@@ -212,6 +212,9 @@ namespace Gym.Tests.Parity.Oracle {
             ["ModuleNotFoundError"] = "Gym.Exceptions.ModuleNotFoundError",
             // json.loads' error is a ValueError subclass; EnvSpec.FromJson raises its base, as NumSharp has no JSONDecodeError.
             ["json.decoder.JSONDecodeError"] = "NumSharp.ValueError",
+            // A ufunc without a loop for the operands' dtypes (np.sign of booleans in BipedalWalker's step) raises this
+            // TypeError subclass; NumSharp raises its TypeError with the same text, so Gym.NET raises that base too.
+            ["numpy._core._exceptions._UFuncNoLoopError"] = "NumSharp.TypeError",
             // Not built-ins, but errors of Gymnasium's play module and of the libraries under it, whose .NET counterparts
             // live where Gym.NET's play does (the port plan's §3.4 has no rule for them).
             ["gymnasium.utils.play.MissingKeysToAction"] = "Gym.Utils.MissingKeysToAction",

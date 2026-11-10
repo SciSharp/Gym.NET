@@ -27,9 +27,11 @@ namespace Gym.Environments {
     ///     <see cref="Register"/> still registers when called.
     ///     </para>
     ///     <para>
-    ///     Ids register in Gymnasium's order as their phases port them: classic_control's five now (CartPole-v0/v1,
-    ///     MountainCar-v0, MountainCarContinuous-v0, Pendulum-v1, Acrobot-v1). The vectorized entry points
-    ///     (<c>CartPoleVectorEnv</c>) come with the vector envs.
+    ///     Ids register in Gymnasium's order as their phases port them: classic_control's (CartPole-v0/v1, MountainCar-v0,
+    ///     MountainCarContinuous-v0, Pendulum-v1, Acrobot-v1), box2d's (LunarLander-v3, LunarLanderContinuous-v3,
+    ///     BipedalWalker-v3, BipedalWalkerHardcore-v3; CarRacing-v3 comes with P8.4) and toy_text's (Blackjack-v1,
+    ///     FrozenLake-v1, FrozenLake8x8-v1, CliffWalking-v1, CliffWalkingSlippery-v1, Taxi-v4). CartPole's two register
+    ///     <c>CartPoleVectorEnv</c> as their vectorized entry point.
     ///     </para>
     ///     <para>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/envs/__init__.py">gymnasium/envs/__init__.py</see>.</para>
     /// </remarks>
@@ -81,6 +83,11 @@ namespace Gym.Environments {
             // The same class with continuous=True, as Gymnasium registers it (no DR-32 deviation here).
             EnvRegistry.Register("LunarLanderContinuous-v3", typeof(LunarLanderEnv), kwargs: new LunarLanderEnvOptions { Continuous = true },
                 maxEpisodeSteps: 1000, rewardThreshold: 200);
+
+            EnvRegistry.Register("BipedalWalker-v3", typeof(BipedalWalkerEnv), maxEpisodeSteps: 1600, rewardThreshold: 300);
+            // The same class with hardcore=True, as Gymnasium registers it.
+            EnvRegistry.Register("BipedalWalkerHardcore-v3", typeof(BipedalWalkerEnv), kwargs: new BipedalWalkerEnvOptions { Hardcore = true },
+                maxEpisodeSteps: 2000, rewardThreshold: 300);
 
             // Toy Text
             // ----------------------------------------

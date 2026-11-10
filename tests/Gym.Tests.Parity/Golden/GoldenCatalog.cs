@@ -221,6 +221,33 @@ namespace Gym.Tests.Parity.Golden {
                 PlatformDependence = "Box2D's sinf/cosf and LunarLander's sin/cos",
                 CreateDotNet = renderMode => new GymNetEnv(new LunarLanderEnv(renderMode: renderMode, continuous: true)),
             },
+            // BipedalWalker-v3 walked by Gymnasium's gait for 800 steps, a frame every 40: the terrain and clouds a seed
+            // draws, the motors, the lidar's closest hits, the float64 rewards of the gait's float64 actions, and the frame
+            // scrolling with the walker.
+            new GoldenCase {
+                Suite = "box2d",
+                Name = "BipedalWalker-v3.heuristic.seed0",
+                EnvId = "BipedalWalker-v3",
+                Seed = 0,
+                Actions = new GoldenActions.Policy("bipedal_walker_heuristic"),
+                MaxSteps = 800,
+                FrameEvery = 40,
+                PlatformDependence = "Box2D's sinf/cosf and BipedalWalker's sin/cos",
+                CreateDotNet = renderMode => new GymNetEnv(new BipedalWalkerEnv(renderMode: renderMode)),
+            },
+            // BipedalWalkerHardcore-v3 (registered hardcore=True) under seeded float32 actions until the fall or 300 steps, a
+            // frame every 30: the obstacles' draws and bodies, and the float32 rewards.
+            new GoldenCase {
+                Suite = "box2d",
+                Name = "BipedalWalkerHardcore-v3.sampled.seed2",
+                EnvId = "BipedalWalkerHardcore-v3",
+                Seed = 2,
+                Actions = new GoldenActions.Sampled(2),
+                MaxSteps = 300,
+                FrameEvery = 30,
+                PlatformDependence = "Box2D's sinf/cosf and BipedalWalker's sin/cos",
+                CreateDotNet = renderMode => new GymNetEnv(new BipedalWalkerEnv(renderMode: renderMode, hardcore: true)),
+            },
         }.ToDictionary(c => c.Key, StringComparer.Ordinal);
 
         /// <summary>Every case's key, as MSTest data rows: one row per case, named by its key in test results.</summary>
