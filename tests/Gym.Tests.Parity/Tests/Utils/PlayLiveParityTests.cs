@@ -292,7 +292,35 @@ namespace Gym.Tests.Parity.Tests.Utils {
         [DataRow("list-render")]
         [DataRow("noop-transpose")]
         [DataRow("resize")]
-        public void Play_MatchesGymnasium(string scenario) {
+        public void Play_MatchesGymnasium(string scenario) => AssertPlay(scenario, viaRunAsync: false);
+
+        /// <summary>
+        ///     The scenarios of <see cref="Play_MatchesGymnasium"/> through <see cref="Play.RunAsync"/> (DR-44), awaited: headless,
+        ///     so the loop runs on the thread pool with awaited pacing, and every callback, display and refusal must still be
+        ///     Gymnasium's <c>play</c>'s.
+        /// </summary>
+        /// <param name="scenario">Which mapping and script.</param>
+        [TestMethod]
+        [DataRow("str")]
+        [DataRow("int")]
+        [DataRow("tuple")]
+        [DataRow("wrapper")]
+        [DataRow("episodes")]
+        [DataRow("combination")]
+        [DataRow("wait")]
+        [DataRow("list-render")]
+        [DataRow("noop-transpose")]
+        [DataRow("resize")]
+        public void Play_RunAsync_MatchesGymnasium(string scenario) => AssertPlay(scenario, viaRunAsync: true);
+
+        /// <summary>
+        ///     Runs one <c>play</c> scenario on both sides and compares the outcomes: the callbacks' arguments with the display
+        ///     at each, or the error.
+        /// </summary>
+        /// <param name="scenario">Which mapping and script.</param>
+        /// <param name="viaRunAsync">Play through <see cref="Play.RunAsync"/>, awaited, instead of <see cref="Play.Run"/>.</param>
+        /// <exception cref="Gym.Tests.Parity.Pair.ParityException">Thrown when the outcomes differ.</exception>
+        private static void AssertPlay(string scenario, bool viaRunAsync) {
             const int a = 97, d = 100;
             object?[] tuples = Pairs((ValueTuple.Create(a), 0), (ValueTuple.Create(d), 1));
             var setup = new PlayScenario { Pairs = tuples, Script = AlternateKeys(a, d) };
@@ -345,7 +373,7 @@ namespace Gym.Tests.Parity.Tests.Utils {
                     break;
             }
 
-            ByteContract.AssertSame($"play over CartPole-v1 ({scenario})", PlayPython(setup), PlayDotNet(setup));
+            ByteContract.AssertSame($"play over CartPole-v1 ({scenario}{(viaRunAsync ? ", RunAsync" : "")})", PlayPython(setup), PlayDotNet(setup, viaRunAsync));
         }
 
         /// <summary>
@@ -353,10 +381,13 @@ namespace Gym.Tests.Parity.Tests.Utils {
         ///     an attribute mapping of <c>None</c> or a list, an empty key tuple (MountainCar-v0's own mapping has one), a tuple
         ///     holding a float, a float key, an action outside the space, a two-character string inside a tuple (<c>ord</c>),
         ///     no render mode, a zero zoom, a float <c>render_fps</c>, a negative seed, and MountainCarContinuous-v0, which has no
-        ///     mapping.
+        ///     mapping; through <see cref="Play.Run"/>, and through <see cref="Play.RunAsync"/>, whose task carries the same error.
         /// </summary>
+        /// <param name="viaRunAsync">Play through <see cref="Play.RunAsync"/> and wait for its task, instead of <see cref="Play.Run"/>.</param>
         [TestMethod]
-        public void Play_Refusals_MatchGymnasium() {
+        [DataRow(false)]
+        [DataRow(true)]
+        public void Play_Refusals_MatchGymnasium(bool viaRunAsync) {
             var cases = new (string Label, string Env, string Setup, object?[]? Pairs, double? Zoom, long Seed)[] {
                 ("no mapping", "make('CartPole-v1', render_mode='rgb_array')", "", null, null, 1),
                 ("no mapping, no spec", "bare", "", null, null, 1),
@@ -420,7 +451,10 @@ namespace Gym.Tests.Parity.Tests.Utils {
                             break;
                     }
 
-                    Play.Run(env, zoom: c.Zoom, keysToAction: c.Pairs is null ? null : ToDictionary(c.Pairs), seed: c.Seed);
+                    if (viaRunAsync)
+                        Play.RunAsync(env, zoom: c.Zoom, keysToAction: c.Pairs is null ? null : ToDictionary(c.Pairs), seed: c.Seed).GetAwaiter().GetResult();
+                    else
+                        Play.Run(env, zoom: c.Zoom, keysToAction: c.Pairs is null ? null : ToDictionary(c.Pairs), seed: c.Seed);
                     return null;
                 });
                 ByteContract.AssertSame($"play refuses: {c.Label}", python, dotnet);
@@ -646,8 +680,9 @@ namespace Gym.Tests.Parity.Tests.Utils {
 
         /// <summary>Gym.NET's <see cref="Play.Run"/> under the scenario: every callback's arguments, described at the call, and the display then.</summary>
         /// <param name="setup">The scenario.</param>
+        /// <param name="viaRunAsync">Play through <see cref="Play.RunAsync"/> and wait for its task, instead of <see cref="Play.Run"/>.</param>
         /// <returns>The described records, or the error.</returns>
-        private static Outcome PlayDotNet(PlayScenario setup) {
+        private static Outcome PlayDotNet(PlayScenario setup, bool viaRunAsync = false) {
             var records = new List<ValueFacts>();
             int calls = 0;
 
@@ -670,8 +705,14 @@ namespace Gym.Tests.Parity.Tests.Utils {
                 IEnv env = setup.Wrapper ? new KeysToActionWrapper(made, keys) : made;
                 foreach ((int type, object? attributes) in setup.Before)
                     EventQueue.Post(new Event(type, attributes));
-                Play.Run(env, transpose: setup.Transpose, fps: setup.Fps, zoom: setup.Zoom, callback: Callback, keysToAction: setup.Wrapper ? null : keys, seed: 7,
-                    noop: setup.Noop, waitOnPlayer: setup.WaitOnPlayer);
+                if (viaRunAsync) {
+                    // GetResult rethrows the task's failure as thrown, so a refusal is compared as Run's would be.
+                    Play.RunAsync(env, transpose: setup.Transpose, fps: setup.Fps, zoom: setup.Zoom, callback: Callback, keysToAction: setup.Wrapper ? null : keys,
+                        seed: 7, noop: setup.Noop, waitOnPlayer: setup.WaitOnPlayer).GetAwaiter().GetResult();
+                } else {
+                    Play.Run(env, transpose: setup.Transpose, fps: setup.Fps, zoom: setup.Zoom, callback: Callback, keysToAction: setup.Wrapper ? null : keys, seed: 7,
+                        noop: setup.Noop, waitOnPlayer: setup.WaitOnPlayer);
+                }
             } catch (Exception e) {
                 return Outcome.Capture(() => throw e);
             }

@@ -58,8 +58,10 @@ refs/Gym.NET/
 │   │   │                          #   aaline/aalines in Draw.Aaline.cs, translated from pygame-ce's draw.c under its LGPL-2.0-or-later, DR-37: the
 │   │   │                          #   package is Apache-2.0 AND LGPL-2.0-or-later), Transform (flip, scale, smoothscale), ImageIO (image.load/frombytes),
 │   │   │                          #   SurfArray (incl. make_surface), Vector2;
-│   │   │                          #   pygame's display and event queue (Display, EventQueue, Event, EventType, KeyCode), process-wide like pygame's
-│   │   └── Utils/                 # namespace Gym.Utils: Play (play, display_arr), PlayableGame, MissingKeysToAction, PlayPlot (IPlotFigure, PlotFigure); DR-36
+│   │   │                          #   pygame's display and event queue as PygameContext instances (PygameDisplay, PygameEventQueue; DR-41), whose
+│   │   │                          #   Default the static Display/EventQueue forward to, process-wide like pygame's; Event, EventType, KeyCode
+│   │   └── Utils/                 # namespace Gym.Utils: Play (play, display_arr, RunAsync: DR-44), PlayableGame, MissingKeysToAction, PlayPlot
+│   │                              #   (IPlotFigure, PlotFigure); DR-36
 │   ├── Gym.Environments/          # Concrete environment implementations
 │   │   ├── Envs/Classic/          # CartPoleEnv (+ CartPoleVectorEnv, CartPole's vector entry point), MountainCarEnv (MountainCar-v0 and
 │   │   │                          #   MountainCarContinuous-v0, DR-32), PendulumEnv, AcrobotEnv, ClassicControlUtils

@@ -170,6 +170,16 @@ built until then:
 3. `HumanRendering` in the core assembly, with the frame `Clock` moved into `Gym` (same section, DR-25 and DR-20).
 4. D13's one example: the cross-entropy method with Gym.NET alone (same section).
 5. DR-45's return type: key-code combinations to the env's actions, in place of P6.7's `Dictionary<object, object?>`.
+6. DR-37's license term (added when it was implemented): the question page said `MIT AND LGPL-2.1-or-later`, but
+   `Gym.NET.Rendering` was Apache-2.0 and `draw.c`'s own header grants the GNU Library GPL version 2 or any later
+   version, so the package says `Apache-2.0 AND LGPL-2.0-or-later`. It does not pack THIRD-PARTY-NOTICES or the LGPL
+   text yet (P10's packaging).
+7. DR-44's thread choice (added when it was implemented): DR-22's rule (a human-mode env is thread-bound) never applies
+   to `play`, which accepts only `rgb_array` envs, so `RunAsync` reads a real window as what binds a game to a thread:
+   a game whose display is any viewer but `NullEnvViewer.Factory` (or whose env renders in human mode) runs on a
+   dedicated background thread with blocking pacing, and a headless game runs on the thread pool with awaited pacing.
+   That keeps the recommended option's thread for a person playing in a window, and the pool for what "renders
+   nothing", as the maintainer's note put it.
 
 Three answers were recorded in the reading below; a correction from the maintainer replaces the row before the step that depends on it starts:
 
@@ -299,7 +309,7 @@ Effects of approved designs that only showed up in code. None changes a design; 
   surface is replaced when the user resizes a resizable display) and `Gym.Rendering.EventQueue` (posted events, plus
   the window's input moved in when `Get` pumps it), with `Event`, `EventType` and `KeyCode` (SDL keycodes read from
   pygame-ce 2.5.8). Gymnasium's tests therefore translate line for line (a callback posts events), and the footgun is
-  pygame's: one game per process. Viewers report input through the new `IInteractiveEnvViewer`. Keys were SDL keycodes by
+  pygame's: one game per process (since DR-41, one per `PygameContext`; the statics are the default context's). Viewers report input through the new `IInteractiveEnvViewer`. Keys were SDL keycodes by
   physical position on a US layout in the Avalonia viewer (WinForms' virtual keys followed the layout already); since
   DR-47 both report the layout's key, as pygame does, with no auto-repeat (pygame's default). While input is on, the close button
   posts `WINDOWCLOSE` then `QUIT` and keeps the window open, and any resize not made by the viewer's own code (a drag, maximizing, snapping, another program) posts `WINDOWRESIZED`, as SDL reports every size change. Before

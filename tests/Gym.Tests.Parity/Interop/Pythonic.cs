@@ -3310,7 +3310,6 @@ namespace Gym.Tests.Parity {
             }
         }
 
-        /// <summary><c>cv2</c>, OpenCV's Python module: the oracle of <c>Gym.Utils.Cv2</c> and of <c>ResizeObservation</c>.</summary>
         /// <summary>
         ///     <c>multiprocessing</c>: the start configuration Gymnasium's <c>AsyncVectorEnv</c> spawns its workers with. Embedded,
         ///     <c>sys.executable</c> is the .NET test host, so the spawn start method needs the real interpreter named.
@@ -3338,6 +3337,7 @@ namespace Gym.Tests.Parity {
             }
         }
 
+        /// <summary><c>cv2</c>, OpenCV's Python module: the oracle of <c>Gym.Utils.Cv2</c> and of <c>ResizeObservation</c>.</summary>
         internal static class cv2 {
             /// <summary>The cached module; never dispose it.</summary>
             private static PyObject Module => PythonRuntime.Import("cv2");

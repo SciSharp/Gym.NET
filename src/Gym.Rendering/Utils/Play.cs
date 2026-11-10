@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using System.Threading;
+using System.Threading.Tasks;
 using Gym.Environments;
 using Gym.Envs;
 using Gym.Exceptions;
@@ -32,10 +34,11 @@ namespace Gym.Utils {
     public delegate void PlayCallback(object? obsT, object? obsTp1, object? action, double rew, bool terminated, bool truncated, Info info);
 
     /// <summary>
-    ///     Gymnasium's <c>gymnasium.utils.play</c>: play an env from the keyboard (<see cref="Run"/>, <c>play</c>), and show a
-    ///     frame on a surface (<see cref="DisplayArr"/>, <c>display_arr</c>). The window is the process-wide
-    ///     <see cref="Display"/>, made by the viewer factory (DR-20); the keys come from it through <see cref="EventQueue"/>,
-    ///     or from events a program posts there.
+    ///     Gymnasium's <c>gymnasium.utils.play</c>: play an env from the keyboard (<see cref="Run"/>, <c>play</c>, or
+    ///     <see cref="RunAsync"/> to await a game), and show a frame on a surface (<see cref="DisplayArr"/>,
+    ///     <c>display_arr</c>). The window is a <see cref="PygameContext"/>'s display, <see cref="PygameContext.Default"/>'s
+    ///     (the static <see cref="Display"/>) unless a context is given, made by the viewer factory (DR-20); the keys come
+    ///     from it through the context's event queue, or from events a program posts there.
     /// </summary>
     /// <remarks>
     ///     <para>
@@ -74,7 +77,14 @@ namespace Gym.Utils {
         /// <param name="seed">The seed of every reset; <see langword="null"/> does not reseed.</param>
         /// <param name="noop">The action when no mapped combination is held; <see langword="null"/> is Gymnasium's default, the int 0.</param>
         /// <param name="waitOnPlayer">Step only while a mapped key is held (turn-based envs); otherwise the no-op plays on.</param>
-        /// <param name="viewerFactory">The window's factory; <see langword="null"/> reads <c>Gymnasium.HumanViewerFactory</c>.</param>
+        /// <param name="viewerFactory">
+        ///     The window's factory; <see langword="null"/> takes the context's <see cref="PygameContext.ViewerFactory"/>, then
+        ///     <c>Gymnasium.HumanViewerFactory</c>.
+        /// </param>
+        /// <param name="context">
+        ///     The display and event queue the game runs in (DR-41); <see langword="null"/> is <see cref="PygameContext.Default"/>,
+        ///     the static <see cref="Display"/> and <see cref="EventQueue"/>. Two games at once need two contexts.
+        /// </param>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="env"/> is <see langword="null"/>.</exception>
         /// <exception cref="Error">Thrown for a negative seed, by the first reset.</exception>
         /// <exception cref="MissingKeysToAction">Thrown when no mapping is given and the env has none: <c>CartPole-v1 does not have explicit key to action mapping, please specify one manually</c>.</exception>
@@ -94,18 +104,104 @@ namespace Gym.Utils {
         ///     <para>
         ///     Gymnasium's own quirks are kept: the callback's first <c>obs_t</c> of an episode is the reset's
         ///     <c>(obs, info)</c>; every reset reuses <paramref name="seed"/>, so a seeded game repeats its starting state; and
-        ///     an exception leaves the display open (call <see cref="Display.Quit"/>), as pygame stays initialized.
+        ///     an exception leaves the display open (call the context's <see cref="PygameDisplay.Quit"/>, <see cref="Display.Quit"/>
+        ///     for the default one), as pygame stays initialized.
         ///     </para>
         ///     <para>
-        ///     The process-wide display and event queue make one game per process at a time; see <see cref="EventQueue"/>.
+        ///     One game per context at a time; see <see cref="PygameEventQueue"/>. The game runs on the calling thread, which
+        ///     the frame clock blocks between frames, as pygame's loop does; <see cref="RunAsync"/> runs the same loop without
+        ///     blocking the caller. The env is stepped through its <c>StepAsync</c>, which every built-in env completes on the
+        ///     calling thread; an env whose steps are genuinely asynchronous continues the game on a thread-pool thread after
+        ///     its first such step, while this call waits.
         ///     </para>
         /// </remarks>
         [PyName("play")]
         public static void Run(IEnv env, bool? transpose = true, double? fps = null, double? zoom = null, PlayCallback? callback = null,
             object? keysToAction = null, BigInteger? seed = null, object? noop = null, bool waitOnPlayer = false,
-            IEnvironmentViewerFactoryDelegate? viewerFactory = null) {
+            IEnvironmentViewerFactoryDelegate? viewerFactory = null, PygameContext? context = null) {
             if (env is null)
                 throw new ArgumentNullException(nameof(env));
+            // The one loop body (DR-44) with blocking pacing: every await in it completes synchronously for an env whose steps
+            // do, so the game runs on this thread, and GetResult rethrows a failure as it was thrown.
+            RunLoopAsync(env, transpose, fps, zoom, callback, keysToAction, seed, noop, waitOnPlayer, viewerFactory, context ?? PygameContext.Default,
+                awaitPacing: false, CancellationToken.None).GetAwaiter().GetResult();
+        }
+
+        /// <summary>
+        ///     <see cref="Run"/> as a task that completes when the game ends (DR-44): the same loop, on a thread of its own when
+        ///     the game shows a real window, on the thread pool when it is headless, so the caller (a UI, a test, an agent) can
+        ///     await a game, or several in their own contexts, without blocking its thread.
+        /// </summary>
+        /// <param name="env">The env, in render mode <c>rgb_array</c> or <c>rgb_array_list</c>; it is not closed.</param>
+        /// <param name="transpose">Whether frames are transposed for display, as in <see cref="Run"/>.</param>
+        /// <param name="fps">The most steps per second, as in <see cref="Run"/>.</param>
+        /// <param name="zoom">Scales the window; must be positive.</param>
+        /// <param name="callback">Called after every step, with borrowed arguments, on the game's thread (not the caller's synchronization context).</param>
+        /// <param name="keysToAction">A dictionary from keys to actions, or <see langword="null"/> for the env's own, as in <see cref="Run"/>.</param>
+        /// <param name="seed">The seed of every reset; <see langword="null"/> does not reseed.</param>
+        /// <param name="noop">The action when no mapped combination is held; <see langword="null"/> is the int 0.</param>
+        /// <param name="waitOnPlayer">Step only while a mapped key is held (turn-based envs).</param>
+        /// <param name="viewerFactory">The window's factory; <see langword="null"/> takes the context's, then <c>Gymnasium.HumanViewerFactory</c>.</param>
+        /// <param name="context">The display and event queue the game runs in; <see langword="null"/> is <see cref="PygameContext.Default"/>.</param>
+        /// <param name="cancellationToken">
+        ///     Ends the game as Escape or the window's close button does: the current frame finishes (a frame wait or an env's
+        ///     asynchronous step is cut short), the display closes and the task completes normally, not as canceled.
+        /// </param>
+        /// <returns>A task that completes when the game ends, faulted with what <see cref="Run"/> would have thrown.</returns>
+        /// <exception cref="ArgumentNullException">Thrown here, not through the task, when <paramref name="env"/> is <see langword="null"/>.</exception>
+        /// <remarks>
+        ///     <para>
+        ///     Where it runs follows DR-22's rule for thread-bound envs: a game whose env renders into a window of its own
+        ///     (<c>render_mode="human"</c>, which <see cref="PlayableGame"/> then refuses) or whose display is a real window
+        ///     (any viewer factory but <see cref="NullEnvViewer.Factory"/>) runs on a dedicated background thread, paced by
+        ///     the blocking clock, as pygame's loop is; a headless game (<see cref="NullEnvViewer.Factory"/>) runs on the
+        ///     thread pool with awaited pacing (<see cref="Clock.TickAsync"/>), holding no thread between frames. The dedicated
+        ///     thread is a background thread: the process does not wait for a game to end.
+        ///     </para>
+        ///     <para>
+        ///     Every error <see cref="Run"/> throws surfaces through the task instead, Gymnasium's messages unchanged. Games
+        ///     that share a context steal each other's events, as in <see cref="Run"/>; give each its own
+        ///     <see cref="PygameContext"/>.
+        ///     </para>
+        /// </remarks>
+        public static Task RunAsync(IEnv env, bool? transpose = true, double? fps = null, double? zoom = null, PlayCallback? callback = null,
+            object? keysToAction = null, BigInteger? seed = null, object? noop = null, bool waitOnPlayer = false,
+            IEnvironmentViewerFactoryDelegate? viewerFactory = null, PygameContext? context = null, CancellationToken cancellationToken = default) {
+            if (env is null)
+                throw new ArgumentNullException(nameof(env));
+            PygameContext game = context ?? PygameContext.Default;
+            // DR-22's auto-switch: a window binds the game to a thread; a headless game borrows the pool between frames.
+            if (env.RenderMode is "human" || game.OpensRealWindow(viewerFactory)) {
+                return RunOnOwnThread(() => RunLoopAsync(env, transpose, fps, zoom, callback, keysToAction, seed, noop, waitOnPlayer, viewerFactory, game,
+                    awaitPacing: false, cancellationToken));
+            }
+
+            return Task.Run(() => RunLoopAsync(env, transpose, fps, zoom, callback, keysToAction, seed, noop, waitOnPlayer, viewerFactory, game,
+                awaitPacing: true, cancellationToken));
+        }
+
+        /// <summary>
+        ///     The one loop body of <see cref="Run"/> and <see cref="RunAsync"/> (DR-44): Gymnasium's <c>play</c>, stepping
+        ///     through the env's <c>StepAsync</c> and pacing through the clock, blocking or awaited.
+        /// </summary>
+        /// <param name="env">The env.</param>
+        /// <param name="transpose">Whether frames are transposed for display.</param>
+        /// <param name="fps">The most steps per second, or <see langword="null"/> for the env's <c>render_fps</c>.</param>
+        /// <param name="zoom">The window's scale.</param>
+        /// <param name="callback">The per-step callback.</param>
+        /// <param name="keysToAction">The key mapping, or <see langword="null"/> for the env's own.</param>
+        /// <param name="seed">The seed of every reset.</param>
+        /// <param name="noop">The action when nothing mapped is held.</param>
+        /// <param name="waitOnPlayer">Step only while a mapped key is held.</param>
+        /// <param name="viewerFactory">The window's factory.</param>
+        /// <param name="context">The display and event queue.</param>
+        /// <param name="awaitPacing">Pace with <see cref="Clock.TickAsync"/> (no thread held) instead of <see cref="Clock.Tick"/>.</param>
+        /// <param name="cancellationToken">Ends the game after the current frame, as Escape does.</param>
+        /// <returns>A task that completes when the game ends.</returns>
+        /// <exception cref="Exception">Every exception <see cref="Run"/> documents, through the task.</exception>
+        private static async Task RunLoopAsync(IEnv env, bool? transpose, double? fps, double? zoom, PlayCallback? callback, object? keysToAction,
+            BigInteger? seed, object? noop, bool waitOnPlayer, IEnvironmentViewerFactoryDelegate? viewerFactory, PygameContext context, bool awaitPacing,
+            CancellationToken cancellationToken) {
             object noopAction = noop ?? 0;
             Release(env.Reset(seed));
 
@@ -151,7 +247,7 @@ namespace Gym.Utils {
                     keyCodeToAction[keyCode] = action;
                 }
 
-                var game = new PlayableGame(env, keyCodeToAction, zoom, viewerFactory);
+                var game = new PlayableGame(env, keyCodeToAction, zoom, viewerFactory, context);
 
                 double framerate;
                 if (fps is { } given) {
@@ -177,7 +273,15 @@ namespace Gym.Utils {
                         object?[] held = PlayKeys.Sorted(game.PressedKeys).ToArray();
                         object? action = keyCodeToAction.TryGetValue(held, out object? mapped) ? mapped : noopAction;
                         object? previous = obs;
-                        StepResult<object?> step = env.Step(action);
+                        StepResult<object?> step;
+                        try {
+                            // Every built-in env completes this on the calling thread, so the blocking loop stays where it is.
+                            step = await env.StepAsync(action, cancellationToken).ConfigureAwait(false);
+                        } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
+                            // Canceled before (or during) the step: the game ends as with Escape, and the step did not count.
+                            break;
+                        }
+
                         obs = step.Observation;
                         done = step.Terminated || step.Truncated;
                         callback?.Invoke(previous, obs, action, step.Reward, step.Terminated, step.Truncated, step.Info);
@@ -191,17 +295,53 @@ namespace Gym.Utils {
                         DisplayArr(game.Screen, FrameOf(rendered), game.VideoSize, transpose);
                     }
 
-                    foreach (Event @event in EventQueue.Get())
+                    foreach (Event @event in context.Events.Get())
                         game.ProcessEvent(@event);
-                    Display.Flip();
-                    clock.Tick(framerate);
+                    context.Display.Flip();
+                    if (awaitPacing) {
+                        try {
+                            await clock.TickAsync(framerate, cancellationToken).ConfigureAwait(false);
+                        } catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested) {
+                            // Canceled during the wait: this frame was shown, and the check below ends the game.
+                        }
+                    } else {
+                        clock.Tick(framerate);
+                    }
+
+                    // Cancellation acts like Escape or the close button: the game ends after the current frame.
+                    if (cancellationToken.IsCancellationRequested)
+                        game.Running = false;
                 }
 
-                Display.Quit();
+                context.Display.Quit();
                 Release(obs);
             } finally {
                 PlayKeys.ReleaseActions(envMapping);
             }
+        }
+
+        /// <summary>
+        ///     Runs a game loop on a background thread of its own and reports its end through a task: the thread blocks in the
+        ///     loop's frame clock, as pygame's does, and nothing else runs on it.
+        /// </summary>
+        /// <param name="loop">Starts the loop; called on the new thread.</param>
+        /// <returns>A task that completes when the loop does, faulted with its exception.</returns>
+        private static Task RunOnOwnThread(Func<Task> loop) {
+            // Continuations run elsewhere, so an awaiting caller never resumes on the game's thread.
+            var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var thread = new Thread(() => {
+                try {
+                    loop().GetAwaiter().GetResult();
+                    completion.SetResult();
+                } catch (Exception exception) {
+                    completion.SetException(exception);
+                }
+            }) {
+                IsBackground = true,
+                Name = "Gym.Utils.Play",
+            };
+            thread.Start();
+            return completion.Task;
         }
 
         /// <summary>

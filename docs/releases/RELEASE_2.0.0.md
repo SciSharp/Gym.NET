@@ -81,6 +81,8 @@ In short:
 - **Playing from the keyboard**: `Play.Run` (Gymnasium's `play`), `PlayableGame`, `Play.DisplayArr` and `PlayPlot`, in
   a window from the viewer factory; the Avalonia and WinForms viewers report keys, their close button and resizes, and
   headless runs are driven by events posted to `Gym.Rendering.EventQueue`, as Gymnasium's tests post them.
+  `Play.RunAsync` awaits a game, on a thread of its own for a window and on the thread pool headless; a
+  `PygameContext` gives a game its own display and event queue, so two games can run at once.
 - **Environments** (all registered for `Gymnasium.Make`, each with `rgb_array` frames equal to Gymnasium's, `ansi` text
   for toy_text, and `human` mode):
 

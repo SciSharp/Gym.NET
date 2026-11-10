@@ -14,8 +14,8 @@ namespace Gym.Experimental.Functional {
     /// </summary>
     /// <remarks>
     ///     A transform returns a delegate of the type it was given, so the env stores it back in the same slot; one that
-    ///     wraps the function (logging, timing, caching) builds a delegate of <typeparamref name="TDelegate"/> around it, an
-    ///     expression tree being the general way.
+    ///     wraps the function (logging, timing, caching) builds a delegate of that same type around it (the type parameter
+    ///     of <see cref="Apply{TDelegate}"/>), an expression tree being the general way.
     /// </remarks>
     public interface IFunctionTransform {
         /// <summary>Transforms one function.</summary>

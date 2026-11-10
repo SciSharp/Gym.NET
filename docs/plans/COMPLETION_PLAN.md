@@ -717,7 +717,17 @@ Specs: the port plan's §9 and §10; sources `vector` 3,113 lines and `wrappers`
     - The test envs override the cores. A counting expression-tree transform shows that C# calls run the transformed
       functions while `transition_info` stays as it was.*
   - DR-41 and DR-44: `PygameContext` instances with a process-wide default, and `Play.RunAsync` on a dedicated thread or
-    the thread pool.
+    the thread pool. *Done 2026-11-10:*
+    - `PygameContext` (optionally with its own viewer factory, disposable as `pygame.quit()`) holds a `PygameDisplay`
+      and a `PygameEventQueue`, the former static `Display`/`EventQueue` code as instances. The statics forward to
+      `PygameContext.Default`, so pygame's spelling stays. `Play.Run` and `PlayableGame` take an optional context.
+    - `Run` and `RunAsync` share one loop body, which steps through `StepAsync` and paces through the clock, blocking
+      or awaited (`Clock.TickAsync`, the same arithmetic as `Tick`). `RunAsync` puts a game with a real window on a
+      background thread of its own and a headless one on the thread pool (a reading to confirm, DESIGN_REVIEW's list).
+      Cancellation ends the game after the current frame, as Escape does, and the task completes normally.
+    - Tests: two contexts side by side, the factory order, `Run` in a context, both `RunAsync` placements, cancellation
+      on each, failures through the task, two games at once and `TickAsync`. The play parity scenarios and refusals
+      also run through `RunAsync`.*
   - DR-38: the public `worker` delegate, `daemon` and `context`.
   - DR-46: OpenCV's float32 resize paths.
   - DR-39: ScottPlot figures in the two viewer packages.

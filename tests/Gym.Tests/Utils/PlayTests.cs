@@ -2,7 +2,9 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Gym.Environments;
 using Gym.Environments.Envs.Classic;
@@ -18,13 +20,14 @@ using RColor = Gym.Rendering.Color;
 namespace Gym.Tests.Utils {
     /// <summary>
     ///     Gym.NET's own parts of <c>play</c>: pygame's event queue and display (<see cref="EventQueue"/>,
-    ///     <see cref="Display"/>) with a scripted interactive window, <c>make_surface</c>, <c>display_arr</c>'s
-    ///     letterboxing, a whole game driven by a window's keys, <see cref="PlayPlot"/> over a recording figure, and
-    ///     MountainCar's key mapping.
+    ///     <see cref="Display"/>) with a scripted interactive window, <see cref="PygameContext"/>s side by side (DR-41),
+    ///     <c>make_surface</c>, <c>display_arr</c>'s letterboxing, a whole game driven by a window's keys, games awaited
+    ///     through <see cref="Play.RunAsync"/> on a thread of their own or on the pool (DR-44), <see cref="PlayPlot"/> over a
+    ///     recording figure, and MountainCar's key mapping.
     /// </summary>
     /// <remarks>
-    ///     The display, the queue and the viewer factory are process-wide, so the class never runs in parallel; every test
-    ///     quits the display afterwards. Parity with pygame and Gymnasium is proven in the live suite
+    ///     The default context's display and queue and the viewer factory are process-wide, so the class never runs in
+    ///     parallel; every test quits the default display afterwards, and the tests with contexts of their own dispose them. Parity with pygame and Gymnasium is proven in the live suite
     ///     (<c>PlayLiveParityTests</c>); these tests pin the .NET-only behaviour (the window's input, ownership).
     /// </remarks>
     [TestClass]
@@ -190,6 +193,226 @@ namespace Gym.Tests.Utils {
             Assert.AreEqual((600, 400), window.Frames[0].Size);
             foreach (NDArray observation in observations)
                 observation.Dispose();
+        }
+
+        /// <summary>
+        ///     Two contexts keep their own display and queue (DR-41): a post to one is not in the other, each window opens and
+        ///     quits alone, a quit context stays usable, and the static <see cref="Display"/>/<see cref="EventQueue"/> are the
+        ///     default context's.
+        /// </summary>
+        [TestMethod]
+        public void Contexts_KeepTheirOwnDisplayAndQueue_AndTheStaticsAreTheDefault() {
+            using var first = new PygameContext(NullEnvViewer.Factory);
+            using var second = new PygameContext(NullEnvViewer.Factory);
+            first.Display.SetMode(10, 6);
+            second.Display.SetMode(4, 3);
+            first.Events.Post(new Event(EventType.Quit));
+            Assert.AreEqual(1, first.Events.Count);
+            Assert.AreEqual(0, second.Events.Count);
+            Assert.AreEqual(0, EventQueue.Count);
+            Assert.IsFalse(Display.GetInit());
+            Assert.AreEqual(10, first.Display.GetSurface()!.Width);
+            Assert.AreEqual(4, second.Display.GetSurface()!.Width);
+
+            // pygame.quit() for the first context only: its window and events go, the second's stay.
+            first.Dispose();
+            Assert.IsFalse(first.Display.GetInit());
+            Assert.AreEqual(0, first.Events.Count);
+            Assert.IsTrue(second.Display.GetInit());
+            first.Display.SetMode(2, 2);
+            Assert.IsTrue(first.Display.GetInit());
+
+            EventQueue.Post(new Event(EventType.Quit));
+            Assert.AreEqual(1, PygameContext.Default.Events.Count);
+            Display.SetMode(3, 2);
+            Assert.AreSame(Display.GetSurface(), PygameContext.Default.Display.GetSurface());
+            Assert.AreSame(PygameContext.Default, PygameContext.Default.Display.Context);
+            Assert.AreSame(PygameContext.Default, PygameContext.Default.Events.Context);
+        }
+
+        /// <summary>A window opens with the call's factory, else the context's, else <c>Gymnasium.HumanViewerFactory</c>.</summary>
+        [TestMethod]
+        public void Context_ViewerFactory_ComesBetweenTheCallsAndTheGlobalOne() {
+            var contextWindow = new ScriptedViewer();
+            var callWindow = new ScriptedViewer();
+            using var context = new PygameContext(contextWindow.Factory);
+            context.Display.SetMode(5, 4, title: "context");
+            Assert.AreEqual("context", contextWindow.Title);
+            context.Display.SetMode(5, 4, viewerFactory: callWindow.Factory, title: "call");
+            Assert.AreEqual("call", callWindow.Title);
+            Assert.IsTrue(contextWindow.Closed, "The second window replaced the first.");
+
+            // No factory of its own: the global one (NullEnvViewer here) opens it.
+            using var plain = new PygameContext();
+            plain.Display.SetMode(1, 1);
+            Assert.IsTrue(plain.Display.GetInit());
+        }
+
+        /// <summary>
+        ///     <see cref="Play.Run"/> in a context of its own plays there: a quit posted to the context's queue ends it, its window
+        ///     is the context's, and the default display and queue are untouched.
+        /// </summary>
+        [TestMethod]
+        public void Run_InAContext_PlaysInThatContextOnly() {
+            var window = new ScriptedViewer();
+            using var context = new PygameContext(window.Factory);
+            using IEnv env = Make("CartPole-v1", new { render_mode = "rgb_array" });
+            int steps = 0;
+
+            void Callback(object? obsT, object? obsTp1, object? action, double rew, bool terminated, bool truncated, Info info) {
+                if (++steps == 3)
+                    context.Events.Post(new Event(EventType.Quit));
+            }
+
+            Play.Run(env, fps: 1000, callback: Callback, keysToAction: new Dictionary<object, object?> { ["a"] = 0, ["d"] = 1 }, seed: 3, context: context);
+
+            Assert.AreEqual(3, steps);
+            Assert.IsTrue(window.Closed);
+            Assert.IsTrue(window.Frames.Count >= 3);
+            Assert.IsFalse(context.Display.GetInit());
+            Assert.IsFalse(Display.GetInit());
+            Assert.AreEqual(0, EventQueue.Count);
+        }
+
+        /// <summary>
+        ///     A headless game (<see cref="NullEnvViewer"/>) awaited through <see cref="Play.RunAsync"/> runs on the thread pool
+        ///     (DR-44) and ends on a posted quit, closing its display.
+        /// </summary>
+        /// <returns>The test.</returns>
+        [TestMethod]
+        public async Task RunAsync_Headless_RunsOnThePool_AndEndsOnQuit() {
+            using var context = new PygameContext(NullEnvViewer.Factory);
+            using IEnv env = Make("CartPole-v1", new { render_mode = "rgb_array" });
+            var onThePool = new ConcurrentBag<bool>();
+            int steps = 0;
+
+            void Callback(object? obsT, object? obsTp1, object? action, double rew, bool terminated, bool truncated, Info info) {
+                onThePool.Add(Thread.CurrentThread.IsThreadPoolThread);
+                if (++steps == 3)
+                    context.Events.Post(new Event(EventType.Quit));
+            }
+
+            await Play.RunAsync(env, fps: 1000, callback: Callback, keysToAction: new Dictionary<object, object?> { ["a"] = 0, ["d"] = 1 }, seed: 3, context: context);
+
+            Assert.AreEqual(3, steps);
+            Assert.IsTrue(onThePool.All(pool => pool), "Every callback ran on a thread-pool thread.");
+            Assert.IsFalse(context.Display.GetInit());
+        }
+
+        /// <summary>
+        ///     A game with a real window runs on a background thread of its own, named for play, never on the pool, and ends
+        ///     on the window's Escape like <see cref="Play.Run"/>.
+        /// </summary>
+        /// <returns>The test.</returns>
+        [TestMethod]
+        public async Task RunAsync_WithAWindow_RunsOnAThreadOfItsOwn() {
+            var window = new ScriptedViewer();
+            using var context = new PygameContext(window.Factory);
+            using IEnv env = Make("CartPole-v1", new { render_mode = "rgb_array" });
+            (string? Name, bool Background, bool Pool) thread = default;
+            int steps = 0;
+
+            void Callback(object? obsT, object? obsTp1, object? action, double rew, bool terminated, bool truncated, Info info) {
+                thread = (Thread.CurrentThread.Name, Thread.CurrentThread.IsBackground, Thread.CurrentThread.IsThreadPoolThread);
+                if (++steps == 2)
+                    window.Inputs.Enqueue(ViewerInput.KeyDown(KeyCode.Escape));
+            }
+
+            await Play.RunAsync(env, fps: 1000, callback: Callback, keysToAction: new Dictionary<object, object?> { ["a"] = 0, ["d"] = 1 }, seed: 3, context: context);
+
+            Assert.AreEqual(2, steps);
+            Assert.AreEqual(("Gym.Utils.Play", true, false), thread);
+            Assert.IsTrue(window.Closed);
+        }
+
+        /// <summary>
+        ///     Canceling a game ends it as Escape does: the current frame finishes, the display closes, and the task completes
+        ///     normally, on the pool (awaited pacing cut short) and on a thread of its own (blocking pacing) alike.
+        /// </summary>
+        /// <returns>The test.</returns>
+        [TestMethod]
+        public async Task RunAsync_Canceled_EndsTheGameAsEscapeDoes() {
+            foreach (bool headless in new[] { true, false }) {
+                var window = new ScriptedViewer();
+                using var context = new PygameContext(headless ? NullEnvViewer.Factory : window.Factory);
+                using IEnv env = Make("CartPole-v1", new { render_mode = "rgb_array" });
+                using var cancellation = new CancellationTokenSource();
+                int steps = 0;
+
+                void Callback(object? obsT, object? obsTp1, object? action, double rew, bool terminated, bool truncated, Info info) {
+                    if (++steps == 2)
+                        cancellation.Cancel();
+                }
+
+                Task game = Play.RunAsync(env, fps: 1000, callback: Callback, keysToAction: new Dictionary<object, object?> { ["a"] = 0, ["d"] = 1 }, seed: 3,
+                    context: context, cancellationToken: cancellation.Token);
+                await game;
+
+                Assert.IsTrue(game.IsCompletedSuccessfully, $"headless={headless}: the task completes normally, not as canceled.");
+                Assert.AreEqual(2, steps, $"headless={headless}: the frame of the canceling step was the last.");
+                Assert.IsFalse(context.Display.GetInit());
+            }
+        }
+
+        /// <summary>
+        ///     <see cref="Play.RunAsync"/> refuses a missing env at once, and every other error, here CartPole's missing key
+        ///     mapping, through its task with <see cref="Play.Run"/>'s message.
+        /// </summary>
+        /// <returns>The test.</returns>
+        [TestMethod]
+        public async Task RunAsync_Failures_SurfaceThroughTheTask() {
+            Assert.ThrowsExactly<ArgumentNullException>(() => Play.RunAsync(null!));
+            using var context = new PygameContext(NullEnvViewer.Factory);
+            using IEnv env = Make("CartPole-v1", new { render_mode = "rgb_array" });
+            Task game = Play.RunAsync(env, context: context);
+            MissingKeysToAction error = await Assert.ThrowsExactlyAsync<MissingKeysToAction>(() => game);
+            Assert.AreEqual("CartPole-v1 does not have explicit key to action mapping, please specify one manually", error.Message);
+        }
+
+        /// <summary>Two games in two contexts run at once, each reading only its own queue, as DR-41's example plays two windows.</summary>
+        /// <returns>The test.</returns>
+        [TestMethod]
+        public async Task RunAsync_TwoContexts_PlayTwoGamesAtOnce() {
+            using var first = new PygameContext(NullEnvViewer.Factory);
+            using var second = new PygameContext(NullEnvViewer.Factory);
+            using IEnv firstEnv = Make("CartPole-v1", new { render_mode = "rgb_array" });
+            using IEnv secondEnv = Make("CartPole-v1", new { render_mode = "rgb_array" });
+            var keys = new Dictionary<object, object?> { ["a"] = 0, ["d"] = 1 };
+            int firstSteps = 0, secondSteps = 0;
+            Task firstGame = Play.RunAsync(firstEnv, fps: 1000, keysToAction: keys, seed: 1, context: first, callback: (_, _, _, _, _, _, _) => {
+                if (++firstSteps == 4)
+                    first.Events.Post(new Event(EventType.Quit));
+            });
+            Task secondGame = Play.RunAsync(secondEnv, fps: 1000, keysToAction: keys, seed: 2, context: second, callback: (_, _, _, _, _, _, _) => {
+                if (++secondSteps == 6)
+                    second.Events.Post(new Event(EventType.Quit));
+            });
+
+            await Task.WhenAll(firstGame, secondGame);
+
+            Assert.AreEqual(4, firstSteps);
+            Assert.AreEqual(6, secondSteps);
+        }
+
+        /// <summary>
+        ///     <see cref="Clock.TickAsync"/> paces as <see cref="Clock.Tick"/> does, awaiting the wait (20 ms at 50 fps), returns
+        ///     the time since the previous tick, and a canceled wait throws through its task.
+        /// </summary>
+        /// <returns>The test.</returns>
+        [TestMethod]
+        public async Task Clock_TickAsync_PacesAndCancels() {
+            var clock = new Clock();
+            await clock.TickAsync(50);
+            var watch = Stopwatch.StartNew();
+            long passed = await clock.TickAsync(50);
+            Assert.IsTrue(watch.ElapsedMilliseconds >= 15, $"The tick waited {watch.ElapsedMilliseconds} ms for a 20 ms frame.");
+            Assert.IsTrue(passed >= 19, $"The tick measured {passed} ms for a 20 ms frame.");
+
+            using var cancellation = new CancellationTokenSource();
+            cancellation.Cancel();
+            await Assert.ThrowsAsync<OperationCanceledException>(async () => await clock.TickAsync(1, cancellation.Token));
+            // No rate, no wait: the canceled token is never read, and the tick is marked.
+            Assert.IsTrue(await new Clock().TickAsync(0, cancellation.Token) >= 0);
         }
 
         /// <summary><c>make_surface</c> reads <c>[x][y]</c> RGB, maps 2-D values through pygame's 8-bit palette, and refuses other shapes and dtypes.</summary>

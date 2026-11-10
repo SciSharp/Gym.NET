@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace Gym.Rendering {
     /// <summary>
@@ -14,7 +15,10 @@ namespace Gym.Rendering {
     ///     initialization); only differences are observable, and timing takes no part in parity. The arithmetic is pygame's,
     ///     including its float32 frame-time computation and whole-millisecond sleeps, so the pacing matches.
     ///     </para>
-    ///     <para>Not thread-safe: tick a clock from the thread that renders.</para>
+    ///     <para>
+    ///     Not thread-safe: tick a clock from the thread that renders, or, with <see cref="TickAsync"/>, from one loop that
+    ///     awaits each tick before the next (its continuation may resume on another thread).
+    ///     </para>
     ///     <para>
     ///     It lives in the Gym assembly, beside the viewers it paces (namespace <c>Gym.Rendering</c> unchanged), so the
     ///     <c>HumanRendering</c> wrapper paces its frames with it as the built-in envs do.
@@ -61,18 +65,56 @@ namespace Gym.Rendering {
         ///     Reference: <see href="https://github.com/pygame-community/pygame-ce/blob/2.5.8/src_c/time.c#L535">src_c/time.c</see>.
         /// </remarks>
         public long Tick(double framerate = 0) {
-            float rate = (float)framerate;
-            // C's `if (framerate)`: NaN is non-zero, so it takes this branch too.
-            if (rate != 0f) {
-                int endtime = unchecked((int)((1.0f / rate) * 1000.0f));
-                _rawPassed = Now() - _lastTick;
-                // In long arithmetic, where pygame's int subtraction could overflow for an extreme endtime.
-                long delay = endtime - _rawPassed;
-                delay = Math.Max(delay, 0);
-                if (delay > 0)
-                    Thread.Sleep(TimeSpan.FromMilliseconds(delay));
-            }
+            long delay = Delay(framerate, out float rate);
+            if (delay > 0)
+                Thread.Sleep(TimeSpan.FromMilliseconds(delay));
+            return Mark(rate);
+        }
 
+        /// <summary>
+        ///     <see cref="Tick"/> with an awaited wait instead of a blocking sleep (DR-44): the same arithmetic and the same
+        ///     whole-millisecond delay, during which no thread is held, so a game loop on the thread pool paces itself as
+        ///     pygame's clock does.
+        /// </summary>
+        /// <param name="framerate">The frame rate to hold, frames per second; 0 (the default) does not wait.</param>
+        /// <param name="cancellationToken">Ends the wait early; the tick is then not marked.</param>
+        /// <returns>A task of the milliseconds since the previous tick, the wait included.</returns>
+        /// <exception cref="OperationCanceledException">Thrown (through the task) when <paramref name="cancellationToken"/> is canceled during the wait.</exception>
+        /// <remarks>
+        ///     A wait shorter than the system timer's period may last a whole period (about 15.6 ms on Windows unless the
+        ///     process raised the timer resolution), where <see cref="Tick"/>'s sleep has the same limit: hold rates of 60 fps
+        ///     and below for even pacing. One tick at a time: await each before the next, from any thread.
+        /// </remarks>
+        public async ValueTask<long> TickAsync(double framerate = 0, CancellationToken cancellationToken = default) {
+            long delay = Delay(framerate, out float rate);
+            if (delay > 0)
+                await Task.Delay(TimeSpan.FromMilliseconds(delay), cancellationToken).ConfigureAwait(false);
+            return Mark(rate);
+        }
+
+        /// <summary>
+        ///     The first half of pygame's <c>accurate_delay</c> pacing: the milliseconds to wait before this tick, measuring
+        ///     the raw time since the previous one on the way.
+        /// </summary>
+        /// <param name="framerate">The frame rate to hold.</param>
+        /// <param name="rate">The rate as pygame's C <c>float</c>, for <see cref="Mark"/>.</param>
+        /// <returns>The wait in milliseconds, 0 for a rate of 0 or a frame that already took long enough.</returns>
+        private long Delay(double framerate, out float rate) {
+            rate = (float)framerate;
+            // C's `if (framerate)`: NaN is non-zero, so it takes this branch too.
+            if (rate == 0f)
+                return 0;
+            int endtime = unchecked((int)((1.0f / rate) * 1000.0f));
+            _rawPassed = Now() - _lastTick;
+            // In long arithmetic, where pygame's int subtraction could overflow for an extreme endtime.
+            long delay = endtime - _rawPassed;
+            return Math.Max(delay, 0);
+        }
+
+        /// <summary>The second half of a tick, after the wait: records the tick's time and updates the frame-rate window.</summary>
+        /// <param name="rate">The rate as pygame's C <c>float</c>, from <see cref="Delay"/>.</param>
+        /// <returns>The milliseconds since the previous tick, the wait included.</returns>
+        private long Mark(float rate) {
             long nowtime = Now();
             _timePassed = nowtime - _lastTick;
             _fpsCount += 1;

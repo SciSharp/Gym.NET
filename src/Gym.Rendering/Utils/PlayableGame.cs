@@ -9,16 +9,17 @@ using NumSharp;
 
 namespace Gym.Utils {
     /// <summary>
-    ///     An env being played from the keyboard, as Gymnasium's <c>PlayableGame</c>: it opens the <see cref="Display"/> at
-    ///     the size of the env's frame (times the zoom), knows which keys matter, and tracks which of them are held as
+    ///     An env being played from the keyboard, as Gymnasium's <c>PlayableGame</c>: it opens its context's display at the
+    ///     size of the env's frame (times the zoom), knows which keys matter, and tracks which of them are held as
     ///     <see cref="ProcessEvent"/> reads key events. <see cref="Play.Run"/> builds one and drives it; build one directly
     ///     to run a loop of your own.
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///     Constructing it opens the process-wide display (pygame's <c>set_mode</c>), replacing any open one; call
-    ///     <see cref="Display.Quit"/> when done, as Gymnasium's tests call <c>pygame.quit()</c>. Not thread-safe: process
-    ///     events from the thread that plays.
+    ///     Constructing it opens the display of its <see cref="Context"/> (pygame's <c>set_mode</c>), replacing any window
+    ///     open there; call the context's <see cref="PygameDisplay.Quit"/> (<see cref="Display.Quit"/> for the default
+    ///     context) when done, as Gymnasium's tests call <c>pygame.quit()</c>. Not thread-safe: process events from the
+    ///     thread that plays.
     ///     </para>
     ///     <para>
     ///     The key sets hold keys with Python's equality and hashing (an event's <c>97.0</c> matches a relevant <c>97</c>);
@@ -38,7 +39,14 @@ namespace Gym.Utils {
         ///     elements are read here; <see cref="Play.Run"/> converts strings and single codes into such tuples first.
         /// </param>
         /// <param name="zoom">Scales the window; <see langword="null"/> keeps the frame's size. Must be positive.</param>
-        /// <param name="viewerFactory">The window's factory; <see langword="null"/> reads <c>Gymnasium.HumanViewerFactory</c>.</param>
+        /// <param name="viewerFactory">
+        ///     The window's factory; <see langword="null"/> takes the context's <see cref="PygameContext.ViewerFactory"/>, then
+        ///     <c>Gymnasium.HumanViewerFactory</c>.
+        /// </param>
+        /// <param name="context">
+        ///     The display and event queue the game uses (DR-41); <see langword="null"/> is <see cref="PygameContext.Default"/>,
+        ///     the static <see cref="Display"/> and <see cref="EventQueue"/>.
+        /// </param>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="env"/> is <see langword="null"/>.</exception>
         /// <exception cref="ValueError">
         ///     Thrown for another render mode (<c>PlayableGame wrapper works only with rgb_array and rgb_array_list render
@@ -55,7 +63,8 @@ namespace Gym.Utils {
         /// <exception cref="OverflowException">Thrown, as Python's <c>OverflowError</c>, for an infinite zoom.</exception>
         /// <exception cref="ArgumentOutOfRangeException">Thrown when the window's size comes out zero, which pygame would turn into a desktop-sized window (not modelled).</exception>
         /// <exception cref="DependencyNotInstalled">Thrown when no viewer factory is given or set.</exception>
-        public PlayableGame(IEnv env, object? keysToAction = null, double? zoom = null, IEnvironmentViewerFactoryDelegate? viewerFactory = null) {
+        public PlayableGame(IEnv env, object? keysToAction = null, double? zoom = null, IEnvironmentViewerFactoryDelegate? viewerFactory = null,
+            PygameContext? context = null) {
             if (env is null)
                 throw new ArgumentNullException(nameof(env));
             if (env.RenderMode is not ("rgb_array" or "rgb_array_list"))
@@ -65,17 +74,24 @@ namespace Gym.Utils {
                 throw new ValueError($"Zoom must be a positive float, got {PyBuiltins.Str(factor)}");
 
             Env = env;
+            Context = context ?? PygameContext.Default;
             RelevantKeys = GetRelevantKeys(keysToAction);
             // Kept apart from VideoSize so that resizes always scale from the frame's size and never drift.
             OriginalVideoSize = GetVideoSize(zoom);
             VideoSize = OriginalVideoSize;
-            Display.SetMode(VideoSize.Width, VideoSize.Height, resizable: true, viewerFactory, env.Spec?.Id ?? env.Unwrapped.GetType().Name);
+            Context.Display.SetMode(VideoSize.Width, VideoSize.Height, resizable: true, viewerFactory, env.Spec?.Id ?? env.Unwrapped.GetType().Name);
             PressedKeys = new HashSet<object?>(PyKeyComparer.Instance);
             Running = true;
         }
 
         /// <summary>The env being played (<c>env</c>).</summary>
         public IEnv Env { get; }
+
+        /// <summary>
+        ///     The display and event queue this game uses (DR-41): its window is the context's display, and
+        ///     <see cref="Play.Run"/> reads the context's queue. Not one of Gymnasium's attributes.
+        /// </summary>
+        public PygameContext Context { get; }
 
         /// <summary>
         ///     Every key that appears in a combination of the mapping (<c>relevant_keys</c>): only these are tracked as
@@ -93,11 +109,11 @@ namespace Gym.Utils {
         public (int Width, int Height) VideoSize { get; set; }
 
         /// <summary>
-        ///     The display surface (<c>screen</c>), read from <see cref="Display.GetSurface"/> each time, because a resize of
-        ///     the window replaces it (pygame swaps the surface behind the same object).
+        ///     The display surface (<c>screen</c>), read from the context's <see cref="PygameDisplay.GetSurface"/> each time,
+        ///     because a resize of the window replaces it (pygame swaps the surface behind the same object).
         /// </summary>
-        /// <exception cref="SdlError">Thrown after <see cref="Display.Quit"/>, with pygame's message: <c>display Surface quit</c>.</exception>
-        public Surface Screen => Display.GetSurface() ?? throw new SdlError("display Surface quit");
+        /// <exception cref="SdlError">Thrown after the context's display quit, with pygame's message: <c>display Surface quit</c>.</exception>
+        public Surface Screen => Context.Display.GetSurface() ?? throw new SdlError("display Surface quit");
 
         /// <summary>The relevant keys held down now (<c>pressed_keys</c>), as the events gave them.</summary>
         public ISet<object?> PressedKeys { get; }
