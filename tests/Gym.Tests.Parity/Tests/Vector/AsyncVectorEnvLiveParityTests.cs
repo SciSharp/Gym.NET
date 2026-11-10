@@ -88,39 +88,24 @@ namespace Gym.Tests.Parity.Tests.Vector {
         }
 
         /// <summary>
-        ///     A full reset right after an episode ended, under <c>NEXT_STEP</c>: with shared memory the reset clears the
-        ///     pending autoreset; without it Gymnasium's worker keeps it, so the next step resets that sub-env again with a
-        ///     reward of 0. Gym.NET reproduces both paths.
+        ///     A full reset right after an episode ended, under <c>NEXT_STEP</c>, clears the pending autoreset in both of
+        ///     Gym.NET's copy paths (DR-42): Gym.NET with and without shared memory is compared, call for call, with
+        ///     Gymnasium's shared-memory path, the one whose worker clears it. <see cref="ResetAfterAnEpisodeEnd_WithoutSharedMemory_DeviatesFromGymnasium"/>
+        ///     pins what Gymnasium's other path does instead.
         /// </summary>
-        /// <param name="sharedMemory">Whether the observations go through the shared buffer.</param>
+        /// <param name="sharedMemory">Whether Gym.NET's observations go through the shared buffer.</param>
+        /// <exception cref="ParityException">Thrown at the first difference.</exception>
         [TestMethod]
         [DataRow(true)]
         [DataRow(false)]
-        public void ResetAfterAnEpisodeEnd_KeepsGymnasiumsAutoreset(bool sharedMemory) {
+        public void ResetAfterAnEpisodeEnd_ClearsThePendingAutoreset_AsGymnasiumsSharedMemoryPath(bool sharedMemory) {
             RequireSpawn();
-            var vectorKwargs = new Dictionary<string, object?> { ["shared_memory"] = sharedMemory };
+            var vectorKwargs = new Dictionary<string, object?> { ["shared_memory"] = true };
             using PyRef python = PyRef.Of(() => Python.gymnasium.make_vec("CartPole-v1", 2, "async", vectorKwargs));
             try {
                 using VectorEnv<NDArray, NDArray> dotnet = MakeAsync<NDArray, NDArray>("CartPole-v1", 2, sharedMemory, "NextStep", "ThreadPool");
-                string label = $"CartPole-v1 x2 async (shared_memory={sharedMemory})";
-                ByteContract.AssertSame($"{label}: reset(seed=3)", Outcome.CapturePython(() => Python.gymnasium.Env.reset(python.Object, 3)), Outcome.Capture(() => ResetTuple(dotnet.Reset(3))));
-
-                // Push right until a cart falls: the episode ends with the pole down.
-                bool ended = false;
-                for (int i = 1; i <= 100 && !ended; i++) {
-                    using ParityAction push = ParityAction.Continuous(np.array(new long[] { 1, 1 }));
-                    bool[] flags = Array.Empty<bool>();
-                    ByteContract.AssertSame($"{label}: step([1, 1]) #{i}", Outcome.CapturePython(() => Python.gymnasium.Env.step(python.Object, push.PythonValue())),
-                        Outcome.Capture(() => {
-                            VectorStepResult<NDArray> result = dotnet.Step((NDArray)push.DotNet);
-                            using NDArray endedArray = np.logical_or(result.Terminations, result.Truncations);
-                            flags = endedArray.ToArray<bool>();
-                            return StepTuple(result);
-                        }));
-                    ended = flags.Any(flag => flag);
-                }
-
-                Assert.IsTrue(ended, "no episode ended within 100 pushes");
+                string label = $"CartPole-v1 x2 async (Gym.NET shared_memory={sharedMemory}, Gymnasium shared_memory=True)";
+                PushUntilAnEpisodeEnds(label, python, dotnet);
                 ByteContract.AssertSame($"{label}: reset(seed=4) after the end", Outcome.CapturePython(() => Python.gymnasium.Env.reset(python.Object, 4)),
                     Outcome.Capture(() => ResetTuple(dotnet.Reset(4))));
                 for (int i = 1; i <= 5; i++) {
@@ -131,6 +116,66 @@ namespace Gym.Tests.Parity.Tests.Vector {
             } finally {
                 Close(python);
             }
+        }
+
+        /// <summary>
+        ///     The deviation DR-42 documents, pinned: without shared memory, Gymnasium's worker keeps the pending autoreset
+        ///     across a full reset, so the first step after it resets each sub-env that had just ended a second time, with a
+        ///     reward of 0; Gym.NET's reset cleared it, so every sub-env steps normally (CartPole's reward 1). Everything up
+        ///     to that step is still compared call for call.
+        /// </summary>
+        /// <exception cref="ParityException">Thrown when the runs differ before the deviation, or either side's rewards are not the pinned ones.</exception>
+        [TestMethod]
+        public void ResetAfterAnEpisodeEnd_WithoutSharedMemory_DeviatesFromGymnasium() {
+            RequireSpawn();
+            var vectorKwargs = new Dictionary<string, object?> { ["shared_memory"] = false };
+            using PyRef python = PyRef.Of(() => Python.gymnasium.make_vec("CartPole-v1", 2, "async", vectorKwargs));
+            try {
+                using VectorEnv<NDArray, NDArray> dotnet = MakeAsync<NDArray, NDArray>("CartPole-v1", 2, false, "NextStep", "ThreadPool");
+                const string label = "CartPole-v1 x2 async (shared_memory=False)";
+                bool[] ended = PushUntilAnEpisodeEnds(label, python, dotnet);
+                ByteContract.AssertSame($"{label}: reset(seed=4) after the end", Outcome.CapturePython(() => Python.gymnasium.Env.reset(python.Object, 4)),
+                    Outcome.Capture(() => ResetTuple(dotnet.Reset(4))));
+
+                using ParityAction action = ParityAction.Continuous(np.array(new long[] { 0, 1 }));
+                ValueFacts pythonStep = Outcome.CapturePython(() => Python.gymnasium.Env.step(python.Object, action.PythonValue())).Expect($"{label}: Gymnasium's step after the reset");
+                ValueFacts dotnetStep = Outcome.Capture(() => StepTuple(dotnet.Step((NDArray)action.DotNet))).Expect($"{label}: Gym.NET's step after the reset");
+                // Gymnasium: 0 for each sub-env that ended at the last push (its kept autoreset fires), 1 for the others.
+                using NDArray gymnasiumRewards = np.array(ended.Select(flag => flag ? 0.0 : 1.0).ToArray());
+                using NDArray gymNetRewards = np.array(new[] { 1.0, 1.0 });
+                ByteContract.AssertSame($"{label}: Gymnasium's rewards after the reset keep the autoreset", pythonStep.Items[1], ValueFacts.Of(gymnasiumRewards));
+                ByteContract.AssertSame($"{label}: Gym.NET's rewards after the reset (DR-42)", ValueFacts.Of(gymNetRewards), dotnetStep.Items[1]);
+            } finally {
+                Close(python);
+            }
+        }
+
+        /// <summary>
+        ///     The shared prologue of the autoreset cells: a seeded reset, then both carts pushed right until one falls, every
+        ///     call compared whole.
+        /// </summary>
+        /// <param name="label">What runs, for the reports.</param>
+        /// <param name="python">Gymnasium's vector env.</param>
+        /// <param name="dotnet">Gym.NET's vector env.</param>
+        /// <returns>Which sub-envs ended at the last push.</returns>
+        /// <exception cref="ParityException">Thrown at the first difference.</exception>
+        /// <exception cref="AssertFailedException">Thrown when no episode ends within 100 pushes.</exception>
+        private static bool[] PushUntilAnEpisodeEnds(string label, PyRef python, VectorEnv<NDArray, NDArray> dotnet) {
+            ByteContract.AssertSame($"{label}: reset(seed=3)", Outcome.CapturePython(() => Python.gymnasium.Env.reset(python.Object, 3)), Outcome.Capture(() => ResetTuple(dotnet.Reset(3))));
+            bool[] flags = Array.Empty<bool>();
+            for (int i = 1; i <= 100 && !flags.Any(flag => flag); i++) {
+                using ParityAction push = ParityAction.Continuous(np.array(new long[] { 1, 1 }));
+                ByteContract.AssertSame($"{label}: step([1, 1]) #{i}", Outcome.CapturePython(() => Python.gymnasium.Env.step(python.Object, push.PythonValue())),
+                    Outcome.Capture(() => {
+                        VectorStepResult<NDArray> result = dotnet.Step((NDArray)push.DotNet);
+                        using NDArray endedArray = np.logical_or(result.Terminations, result.Truncations);
+                        flags = endedArray.ToArray<bool>();
+                        return StepTuple(result);
+                    }));
+            }
+
+            Assert.IsTrue(flags.Any(flag => flag), "no episode ended within 100 pushes");
+            return flags;
         }
 
         /// <summary>

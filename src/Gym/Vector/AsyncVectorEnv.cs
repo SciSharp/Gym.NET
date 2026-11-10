@@ -71,9 +71,11 @@ namespace Gym.Vector {
     ///     would drive Python's pipes); a sub-env function that throws makes the constructor throw that exception (Python's
     ///     parent sees its worker's pipe close); <c>close(terminate=True)</c> cannot kill a thread, so it stops waiting and lets
     ///     each worker close its sub-env as soon as the call it runs returns, and <see cref="IDisposable.Dispose"/> waits for
-    ///     that. Kept from Gymnasium on purpose: without shared memory a reset does not clear a <c>NEXT_STEP</c> worker's
-    ///     pending autoreset (the next step resets the sub-env again, with a reward of 0); a <c>Text</c> or <c>OneOf</c>
-    ///     shared buffer is read once, at construction; a <c>SAME_STEP</c> info puts <c>final_info</c> before
+    ///     that; a full reset clears a <c>NEXT_STEP</c> worker's pending autoreset in both copy paths (DR-42), where
+    ///     Gymnasium's worker clears it only with shared memory, so its next step without shared memory resets that sub-env
+    ///     a second time, with a reward of 0 (Gym.NET's sync and async envs agree in every sequence instead). Kept from
+    ///     Gymnasium on purpose: a <c>Text</c> or <c>OneOf</c> shared buffer is read once, at construction; a
+    ///     <c>SAME_STEP</c> info puts <c>final_info</c> before
     ///     <c>final_obs</c>; <c>reset_mask</c> leaves the flags of the unmasked sub-envs alone. As in
     ///     <see cref="SyncVectorEnv{TObs, TAct}"/>, a <c>reset_mask</c> stays in the caller's options dict, and
     ///     <see cref="VectorEnv{TObs, TAct}.NpRandom"/> and <see cref="VectorEnv{TObs, TAct}.NpRandomSeed"/> keep the base's
@@ -759,9 +761,12 @@ namespace Gym.Vector {
                             if (SharedMemory) {
                                 WriteShared(worker.Index, observation);
                                 observation = null;
-                                // Gymnasium clears the pending autoreset here, in the shared-memory branch only.
-                                worker.Autoreset = false;
                             }
+
+                            // A full reset ends any pending autoreset in both copy paths (DR-42). Gymnasium's worker clears it
+                            // only in its shared-memory branch, so without shared memory its next step would reset this
+                            // sub-env a second time with a reward of 0; Gym.NET deviates on purpose so sync and async agree.
+                            worker.Autoreset = false;
 
                             worker.Observation = observation;
                             // Released before the result is handed over, as Gymnasium releases before the blocking send.

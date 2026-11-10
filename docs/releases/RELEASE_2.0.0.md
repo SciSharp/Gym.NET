@@ -108,8 +108,9 @@ Each is documented on the member, and the parity suite pins it, so a change show
 - **`TimeAwareObservation`'s observations** are `object`s, since their type depends on `flatten`.
 - **`AsyncVectorEnv`'s workers are threads**, not processes: Gymnasium's `context`, `daemon` and custom `worker`
   arguments do not exist, and `close(terminate=True)` stops waiting instead of killing (each worker closes its sub-env as
-  soon as its current call returns). Kept from Gymnasium on purpose: without shared memory, a reset right after an
-  episode end leaves that sub-env's pending autoreset, as Gymnasium's worker does.
+  soon as its current call returns). A reset right after an episode end clears that sub-env's pending autoreset in
+  both copy paths (DR-42). Gymnasium's worker clears it only with shared memory, so without it Gymnasium's next step
+  resets the sub-env a second time, with a reward of 0; Gym.NET's sync and async envs agree in every sequence instead.
 - **`DictInfoToList`** returns its list of infos from its own `Step` and `Reset`; through `IVectorEnv` the infos stay a
   dict.
 - **`RecordVideo` writes PNG frames** into a folder per video by default; `FfmpegVideoWriter` writes Gymnasium's mp4.

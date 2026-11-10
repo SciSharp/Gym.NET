@@ -678,7 +678,9 @@ Specs: the port plan's §9 and §10; sources `vector` 3,113 lines and `wrappers`
 - **P6.9 The designs of 2026-11-10** (DESIGN_REVIEW rounds 11–14, asked once P6 and the coverage were done), each with
   its tests, parity cells and docs:
   - DR-42: a full reset clears the pending autoreset in both of `AsyncVectorEnv`'s copy paths (a documented
-    deviation).
+    deviation). *Done 2026-11-10: the worker clears it after every reset; a unit test holds async to sync across the
+    sequence in both paths, and the parity cells compare Gym.NET in both paths with Gymnasium's shared-memory path and
+    pin Gymnasium's kept autoreset without shared memory.*
   - DR-40: one owner per space, enforced when a second live env takes it.
   - DR-45: `get_keys_to_action` as a virtual method on `Env` with the presence hook, typed key combinations to actions.
   - DR-47: both viewers report the layout's keycode.

@@ -68,6 +68,40 @@ namespace Gym.Tests.Vector {
         }
 
         /// <summary>
+        ///     A full reset right after an episode ended clears the pending autoreset in both copy paths (DR-42): the async
+        ///     env's next steps equal the sync env's. Gymnasium's async env without shared memory keeps the pending autoreset
+        ///     and resets the ended sub-env a second time with a reward of 0; Gym.NET deviates on purpose.
+        /// </summary>
+        /// <param name="sharedMemory">Whether the observations go through the shared buffer.</param>
+        /// <exception cref="AssertFailedException">Thrown when no episode ends within 100 pushes, or a result differs from the sync env's.</exception>
+        [TestMethod]
+        [DataRow(true)]
+        [DataRow(false)]
+        public void FullResetAfterAnEpisodeEnd_ClearsThePendingAutoreset(bool sharedMemory) {
+            using VectorEnv<NDArray, NDArray> sync = MakeVec<NDArray, NDArray>("CartPole-v1", numEnvs: 2, vectorizationMode: "sync");
+            using VectorEnv<NDArray, NDArray> asynchronous = MakeVec<NDArray, NDArray>("CartPole-v1", numEnvs: 2, vectorizationMode: "async",
+                vectorKwargs: new Info { ["shared_memory"] = sharedMemory });
+            AssertSame("reset(seed=3)", sync.Reset(3), asynchronous.Reset(3));
+
+            // Push right until a cart falls, so a NEXT_STEP autoreset is pending when the full reset comes.
+            using NDArray push = np.array(new long[] { 1, 1 });
+            bool ended = false;
+            for (int step = 0; step < 100 && !ended; step++) {
+                VectorStepResult<NDArray> expected = sync.Step(push);
+                AssertSame($"push #{step}", expected, asynchronous.Step(push));
+                using NDArray endedArray = np.logical_or(expected.Terminations, expected.Truncations);
+                ended = np.any(endedArray);
+            }
+
+            Assert.IsTrue(ended, "no episode ended within 100 pushes");
+            AssertSame("reset(seed=4) after the episode end", sync.Reset(4), asynchronous.Reset(4));
+            using NDArray actions = np.array(new long[] { 0, 1 });
+            for (int step = 0; step < 5; step++)
+                AssertSame($"step #{step} after the reset", sync.Step(actions), asynchronous.Step(actions));
+            asynchronous.Close();
+        }
+
+        /// <summary>
         ///     <see cref="AsyncExecutionMode.DedicatedThreads"/> pins sub-env <c>i</c> to thread <c>i % threadCount</c>, and
         ///     <see cref="AsyncExecutionMode.ThreadPerEnv"/> gives each sub-env a thread of its own, for every call.
         /// </summary>
@@ -140,6 +174,19 @@ namespace Gym.Tests.Vector {
         /// <exception cref="AssertFailedException">Thrown when they differ.</exception>
         private static void AssertSame(string label, VectorResetResult<NDArray> expected, VectorResetResult<NDArray> actual) {
             Assert.IsTrue(EnvChecker.DataEquivalence(expected.Observations, actual.Observations, exact: true), $"{label}: observations");
+            Assert.IsTrue(EnvChecker.DataEquivalence(expected.Infos, actual.Infos, exact: true), $"{label}: infos");
+        }
+
+        /// <summary>Asserts two steps are equal exactly: observations, rewards, both flags and infos.</summary>
+        /// <param name="label">The comparison, for messages.</param>
+        /// <param name="expected">The sync env's.</param>
+        /// <param name="actual">The async env's.</param>
+        /// <exception cref="AssertFailedException">Thrown when they differ.</exception>
+        private static void AssertSame(string label, VectorStepResult<NDArray> expected, VectorStepResult<NDArray> actual) {
+            Assert.IsTrue(EnvChecker.DataEquivalence(expected.Observations, actual.Observations, exact: true), $"{label}: observations");
+            Assert.IsTrue(EnvChecker.DataEquivalence(expected.Rewards, actual.Rewards, exact: true), $"{label}: rewards");
+            Assert.IsTrue(EnvChecker.DataEquivalence(expected.Terminations, actual.Terminations, exact: true), $"{label}: terminations");
+            Assert.IsTrue(EnvChecker.DataEquivalence(expected.Truncations, actual.Truncations, exact: true), $"{label}: truncations");
             Assert.IsTrue(EnvChecker.DataEquivalence(expected.Infos, actual.Infos, exact: true), $"{label}: infos");
         }
 
