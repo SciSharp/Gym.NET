@@ -237,13 +237,14 @@ namespace Gym.Tests.Parity.Tests.Bridge {
         }
 
         /// <summary>
-        ///     Gymnasium's <c>check_env</c> on <c>make(id).unwrapped</c> for the classic-control envs of P4: Gym.NET's env built
-        ///     through the bridge passes exactly as Gymnasium's own (no error, the same warnings, such as Pendulum's advice on
-        ///     its unnormalised action space), every declared render mode made and checked; and Gym.NET's own
-        ///     <c>EnvChecker.CheckEnv</c> gives the same verdict.
+        ///     Gymnasium's <c>check_env</c> on <c>make(id).unwrapped</c> for the classic-control envs of P4 and CartPole-v0 (whose
+        ///     v1 twin has its own cells above): Gym.NET's env built through the bridge passes exactly as Gymnasium's own (no
+        ///     error, the same warnings, such as Pendulum's advice on its unnormalised action space), every declared render
+        ///     mode made and checked; and Gym.NET's own <c>EnvChecker.CheckEnv</c> gives the same verdict.
         /// </summary>
         /// <param name="id">The id.</param>
         [TestMethod]
+        [DataRow("CartPole-v0")]
         [DataRow("MountainCar-v0")]
         [DataRow("MountainCarContinuous-v0")]
         [DataRow("Pendulum-v1")]
@@ -271,14 +272,15 @@ namespace Gym.Tests.Parity.Tests.Bridge {
         }
 
         /// <summary>
-        ///     Gymnasium's <c>check_environments_match</c> finds Gym.NET's classic-control envs of P4 equal to its own over two
-        ///     seeds of 200 sampled steps, in both orders. Pendulum's and Acrobot's frames are compared too; MountainCar's are
-        ///     not (its hill's joints are the open P7 gap), so both MountainCars run without a render mode, where both sides
-        ///     render <c>None</c>. The tool compares reward types, so the bridge returns Pendulum's as the <c>np.float64</c>
-        ///     Gymnasium's does (<see cref="BridgeReward"/>).
+        ///     Gymnasium's <c>check_environments_match</c> finds Gym.NET's classic-control envs of P4 and CartPole-v0 equal to its
+        ///     own over two seeds of 200 sampled steps, in both orders. CartPole's, Pendulum's and Acrobot's frames are compared
+        ///     too; MountainCar's are not (its hill's joints are the open P7 gap), so both MountainCars run without a render
+        ///     mode, where both sides render <c>None</c>. The tool compares reward types, so the bridge returns Pendulum's as
+        ///     the <c>np.float64</c> Gymnasium's does (<see cref="BridgeReward"/>).
         /// </summary>
         /// <param name="id">The id.</param>
         [TestMethod]
+        [DataRow("CartPole-v0")]
         [DataRow("MountainCar-v0")]
         [DataRow("MountainCarContinuous-v0")]
         [DataRow("Pendulum-v1")]

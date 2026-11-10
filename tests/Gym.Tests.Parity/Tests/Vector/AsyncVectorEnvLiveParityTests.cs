@@ -334,7 +334,7 @@ namespace Gym.Tests.Parity.Tests.Vector {
         ///     Names the session's interpreter as the one <c>multiprocessing</c> spawns, once per process; Inconclusive when the
         ///     session has only a library.
         /// </summary>
-        private static void RequireSpawn() {
+        internal static void RequireSpawn() {
             string? interpreter = GymPythonSession.Installation?.Interpreter;
             if (interpreter is null)
                 Assert.Inconclusive("Gymnasium's AsyncVectorEnv spawns worker processes, which needs the interpreter's path; this session found only a library (PYTHONNET_PYDLL).");
@@ -392,7 +392,7 @@ namespace Gym.Tests.Parity.Tests.Vector {
         /// <param name="steps">How many steps.</param>
         /// <param name="resetEnded">Whether ended sub-envs are reset through <c>reset_mask</c> after each step (<c>DISABLED</c> mode).</param>
         /// <exception cref="ParityException">Thrown at the first difference.</exception>
-        private static void Lockstep(string label, PyRef python, IVectorEnv dotnet, long? seed, int steps, bool resetEnded) {
+        internal static void Lockstep(string label, PyRef python, IVectorEnv dotnet, long? seed, int steps, bool resetEnded) {
             if (seed is { } given) {
                 ByteContract.AssertSame($"{label}: reset(seed={given})", Outcome.CapturePython(() => Python.gymnasium.Env.reset(python.Object, given)),
                     Outcome.Capture(() => ResetTuple(dotnet.Reset(given))));
@@ -429,7 +429,7 @@ namespace Gym.Tests.Parity.Tests.Vector {
 
         /// <summary>Closes Gymnasium's vector env (joining its worker processes); a failure to close is not the cell's verdict.</summary>
         /// <param name="python">The vector env.</param>
-        private static void Close(PyRef python) =>
+        internal static void Close(PyRef python) =>
             PythonRuntime.Run(() => {
                 try {
                     using PyObject _ = Python.gymnasium.vector.AsyncVectorEnv.close(python.Object, terminate: true);

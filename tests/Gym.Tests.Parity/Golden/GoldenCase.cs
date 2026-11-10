@@ -45,6 +45,18 @@ namespace Gym.Tests.Parity.Golden {
         public string? StateAttribute { get; init; }
 
         /// <summary>
+        ///     Whether the Python side keeps <c>make</c>'s wrapper stack (<c>TimeLimit</c>, <c>OrderEnforcing</c>,
+        ///     <c>PassiveEnvChecker</c>) instead of stepping the unwrapped env; <see cref="CreateDotNet"/> must then build
+        ///     Gym.NET's stack too (<c>Gymnasium.Make</c>).
+        /// </summary>
+        /// <remarks>
+        ///     For a case whose id differs from another only in its registration, such as CartPole-v0's 200-step limit: the
+        ///     unwrapped env would record CartPole-v1's dynamics again, while the stack records the truncation. The golden's
+        ///     header stores the flag only when it is set, so the goldens recorded before it existed stay current.
+        /// </remarks>
+        public bool ViaMake { get; init; }
+
+        /// <summary>
         ///     What makes the trajectory depend on the platform (<c>CartPole's cos/sin</c>), or <see langword="null"/>. Such a
         ///     case is strict only on the manifest's reference platform; elsewhere a replay divergence is reported Inconclusive
         ///     (port plan §14.9), because another libm may round one ulp differently.
@@ -63,9 +75,13 @@ namespace Gym.Tests.Parity.Golden {
         /// <summary>The render mode both sides are built with: <c>rgb_array</c> when frames are recorded, otherwise none.</summary>
         public string? RenderMode => FrameEvery > 0 ? "rgb_array" : null;
 
-        /// <summary>Makes the Python side, stepping its unwrapped env as the .NET counterparts do until <c>make</c> lands (P3).</summary>
+        /// <summary>
+        ///     Makes the Python side: the unwrapped env, as the cases recorded before P3's <c>make</c> step it, or
+        ///     <c>make</c>'s whole stack when <see cref="ViaMake"/> is set.
+        /// </summary>
         /// <returns>The live Gymnasium env; the caller disposes it.</returns>
-        public PyGymEnv CreatePython() => PyGymEnv.Make(EnvId, Kwargs, viaMake: false, renderMode: RenderMode);
+        /// <exception cref="global::Python.Runtime.PythonException">Thrown when <c>gymnasium.make</c> raises.</exception>
+        public PyGymEnv CreatePython() => PyGymEnv.Make(EnvId, Kwargs, viaMake: ViaMake, renderMode: RenderMode);
 
         /// <summary>The kwargs as the golden's header stores them: each value described, in the order given.</summary>
         /// <returns>The described kwargs.</returns>

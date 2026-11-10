@@ -47,6 +47,21 @@ namespace Gym.Tests.Parity.Golden {
                 PlatformDependence = "CartPole's cos/sin",
                 CreateDotNet = renderMode => new GymNetEnv(new CartPoleEnv(renderMode: renderMode)),
             },
+            // CartPole-v0 balanced through make's stack: the same class as v1, so the case records what only the
+            // registration gives, TimeLimit's truncation at step 200, with a frame every 50 steps.
+            new GoldenCase {
+                Suite = "classic_control",
+                Name = "CartPole-v0.policy.seed7",
+                EnvId = "CartPole-v0",
+                Seed = 7,
+                Actions = new GoldenActions.Policy("cartpole_balance"),
+                MaxSteps = 300,
+                FrameEvery = 50,
+                StateAttribute = "state",
+                PlatformDependence = "CartPole's cos/sin",
+                ViaMake = true,
+                CreateDotNet = renderMode => new GymNetEnv(Gymnasium.Make("CartPole-v0", new Dictionary<string, object?> { ["render_mode"] = renderMode })),
+            },
             // MountainCar-v0 driven to the flag by the momentum policy: the float64 state through the wall rule and
             // termination. No frames: the hill's joints are the open P7 gap.
             new GoldenCase {

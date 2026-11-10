@@ -54,12 +54,14 @@ namespace Gym.Tests.Parity.Tests.Registration {
         }
 
         /// <summary>
-        ///     The classic-control ids of P4: <c>str(make(id))</c> (the merged MountainCar prints as <c>Continuous_MountainCarEnv</c>
-        ///     in continuous mode) and the printed specs of the stack and of the unwrapped env, which leave out the kwargs that
-        ///     differ for <c>MountainCarContinuous-v0</c> (see <see cref="Spec_MountainCarContinuousKwargs_CarryContinuous_AsDr32Accepts"/>).
+        ///     The classic-control ids of P4 and CartPole-v0 (its 200-step limit and 195 threshold): <c>str(make(id))</c> (the
+        ///     merged MountainCar prints as <c>Continuous_MountainCarEnv</c> in continuous mode) and the printed specs of the
+        ///     stack and of the unwrapped env, which leave out the kwargs that differ for <c>MountainCarContinuous-v0</c> (see
+        ///     <see cref="Spec_MountainCarContinuousKwargs_CarryContinuous_AsDr32Accepts"/>).
         /// </summary>
         /// <param name="id">The id.</param>
         [TestMethod]
+        [DataRow("CartPole-v0")]
         [DataRow("MountainCar-v0")]
         [DataRow("MountainCarContinuous-v0")]
         [DataRow("Pendulum-v1")]

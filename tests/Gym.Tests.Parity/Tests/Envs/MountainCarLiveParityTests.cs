@@ -599,7 +599,7 @@ namespace Gym.Tests.Parity.Tests.Envs {
         /// <param name="id">The id.</param>
         /// <returns>One flag per pixel, row-major.</returns>
         /// <exception cref="AssertFailedException">Thrown when the gap is larger than the P7 report's 16 pixels allow for (64), which would hide more than the hill.</exception>
-        private static bool[] HillGap(string id) {
+        internal static bool[] HillGap(string id) {
             using PyGymEnv python = PyGymEnv.Make(id, renderMode: "rgb_array");
             MountainCarEnv dotnet = Create(id, "rgb_array");
             double[] parked = { 1.8, 0.0 };
@@ -631,7 +631,7 @@ namespace Gym.Tests.Parity.Tests.Envs {
         /// <param name="dotnet">Gym.NET's frame.</param>
         /// <param name="gap">The pixels to leave out, from <see cref="HillGap"/>.</param>
         /// <exception cref="ParityException">Thrown when any pixel outside the gap differs.</exception>
-        private static void AssertSameOutsideHillGap(string what, Frame python, Frame dotnet, bool[] gap) =>
+        internal static void AssertSameOutsideHillGap(string what, Frame python, Frame dotnet, bool[] gap) =>
             FrameDiff.AssertSame(what, Masked(python, gap), Masked(dotnet, gap), "frame outside the hill's P7 gap");
 
         /// <summary>

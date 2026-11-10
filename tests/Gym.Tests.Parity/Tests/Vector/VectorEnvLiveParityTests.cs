@@ -332,7 +332,7 @@ namespace Gym.Tests.Parity.Tests.Vector {
         /// <param name="stateAttribute">An attribute of the vector env compared after every step, or <see langword="null"/>.</param>
         /// <param name="framesEvery">Renders both every this many steps; 0 never.</param>
         /// <exception cref="ParityException">Thrown at the first difference.</exception>
-        private static void Lockstep(string label, PyRef python, IVectorEnv dotnet, long seed, int steps, bool float64Rewards = false, bool resetEnded = false,
+        internal static void Lockstep(string label, PyRef python, IVectorEnv dotnet, long seed, int steps, bool float64Rewards = false, bool resetEnded = false,
             string? stateAttribute = null, int framesEvery = 0) {
             ByteContract.AssertSame($"{label}: reset(seed={seed})", Outcome.CapturePython(() => Python.gymnasium.Env.reset(python.Object, seed)), Outcome.Capture(() => ResetTuple(dotnet.Reset(seed))));
             using PyRef pythonSpace = PyRef.Of(() => Python.gymnasium.Env.action_space(python.Object));
@@ -372,12 +372,12 @@ namespace Gym.Tests.Parity.Tests.Vector {
         /// <summary>A Gym.NET reset as the tuple Gymnasium returns.</summary>
         /// <param name="result">The reset.</param>
         /// <returns><c>(observations, infos)</c>.</returns>
-        private static object?[] ResetTuple(VectorResetResult<object?> result) => new[] { result.Observations, result.Infos };
+        internal static object?[] ResetTuple(VectorResetResult<object?> result) => new[] { result.Observations, result.Infos };
 
         /// <summary>A Gym.NET step as the tuple Gymnasium returns.</summary>
         /// <param name="result">The step.</param>
         /// <returns><c>(observations, rewards, terminations, truncations, infos)</c>.</returns>
-        private static object?[] StepTuple(VectorStepResult<object?> result) => new object?[] { result.Observations, result.Rewards, result.Terminations, result.Truncations, result.Infos };
+        internal static object?[] StepTuple(VectorStepResult<object?> result) => new object?[] { result.Observations, result.Rewards, result.Terminations, result.Truncations, result.Infos };
 
         /// <summary>Gym.NET's renders as the frames Gymnasium returns (a tuple or list of arrays), or <see langword="null"/>.</summary>
         /// <param name="renders">The renders.</param>

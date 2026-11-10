@@ -42,8 +42,10 @@ gives the same text. Line 1 is the header; every further line is a call or a fra
 
 **Header**: `format`, `suite`, `case`, `env_id`, `kwargs` (`[name, value]` pairs), `seed`, `actions` (the source's
 description), `replay_samples` (whether replay re-samples the action space), `max_steps`, `frame_every`,
-`state_attribute`, `gymnasium_commit`, `platform` (the runtime it was recorded on), `stack` (the versions of the
-manifest's keys at recording time: the per-file manifest of decision D15).
+`state_attribute`, `via_make` (present and `true` only for a case recorded through `make`'s wrapper stack rather than
+the unwrapped env, such as CartPole-v0's 200-step limit; absent otherwise), `gymnasium_commit`, `platform` (the runtime
+it was recorded on), `stack` (the versions of the manifest's keys at recording time: the per-file manifest of decision
+D15).
 
 **Call**: `call` (`reset(seed=0)`, `step #3: step(1)`), `step`, `action` (`null` for the reset), then either
 `result` (`observation`, for a step also `reward`, `terminated`, `truncated`, then `info`) or `raised` (`type` as

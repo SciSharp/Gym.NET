@@ -111,6 +111,26 @@ namespace Gym.Tests.Parity.Tests.Golden {
                 differences.ToList());
         }
 
+        /// <summary>
+        ///     A golden recorded through another stack than its case asks for (<see cref="GoldenCase.ViaMake"/>) is stale too:
+        ///     CartPole-v0's golden records <c>make</c>'s stack and CartPole-v1's the unwrapped env (its header has no
+        ///     <c>via_make</c>, as every golden recorded before the flag), and flipping either flag is reported.
+        /// </summary>
+        /// <exception cref="AssertFailedException">Thrown when a header misreads the flag or the difference goes unreported.</exception>
+        [TestMethod]
+        public void Header_ReportsAGoldenOfAnotherStack() {
+            GoldenCase viaMake = GoldenCatalog.Get("classic_control/CartPole-v0.policy.seed7");
+            GoldenHeader recorded = GoldenAssert.LoadCurrent(viaMake).Header;
+            Assert.IsTrue(recorded.ViaMake, "CartPole-v0's golden records make's stack.");
+            Assert.AreEqual(0, recorded.DifferencesFrom(viaMake).Count, "The committed golden records the catalog's case.");
+            CollectionAssert.AreEqual(new[] { "via make: recorded False, the catalog asks for True" }, (recorded with { ViaMake = false }).DifferencesFrom(viaMake).ToList());
+
+            GoldenCase unwrapped = GoldenCatalog.Get("classic_control/CartPole-v1.sampled.seed42");
+            GoldenHeader unwrappedHeader = GoldenAssert.LoadCurrent(unwrapped).Header;
+            Assert.IsFalse(unwrappedHeader.ViaMake, "A header without via_make reads as recorded through the unwrapped env.");
+            CollectionAssert.AreEqual(new[] { "via make: recorded True, the catalog asks for False" }, (unwrappedHeader with { ViaMake = true }).DifferencesFrom(unwrapped).ToList());
+        }
+
         /// <summary>The golden without its frames, for the reference transcriptions, which do not draw.</summary>
         /// <param name="golden">The golden.</param>
         /// <returns>The same header and calls.</returns>

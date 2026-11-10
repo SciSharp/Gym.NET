@@ -45,6 +45,13 @@ namespace Gym.Tests.Parity.Golden {
         /// <summary>The format tag of the first line; a reader refuses any other, so a format change cannot be misread.</summary>
         public const string Format = "gym.net-golden/1";
 
+        /// <summary>
+        ///     Whether the trajectory was recorded through <c>make</c>'s wrapper stack (<see cref="GoldenCase.ViaMake"/>).
+        ///     Stored as <c>via_make</c> only when set, so the goldens recorded before the flag existed read as unwrapped and
+        ///     stay byte-identical; the format tag therefore stays <see cref="Format"/>.
+        /// </summary>
+        public bool ViaMake { get; init; }
+
         /// <summary>The header a recording of <paramref name="case"/> on the current stack gets.</summary>
         /// <param name="case">The case.</param>
         /// <param name="gymnasiumCommit">The checked-out Gymnasium commit.</param>
@@ -54,7 +61,7 @@ namespace Gym.Tests.Parity.Golden {
         public static GoldenHeader For(GoldenCase @case, string gymnasiumCommit, string platform, IEnumerable<KeyValuePair<string, string>> stack) {
             return new GoldenHeader(@case.Suite, @case.Name, @case.EnvId, @case.DescribedKwargs(), @case.Seed, @case.Actions.Description,
                 @case.Actions.ReplaySamples, @case.MaxSteps, @case.FrameEvery, @case.StateAttribute, gymnasiumCommit, platform,
-                stack.OrderBy(entry => entry.Key, StringComparer.Ordinal).ToList());
+                stack.OrderBy(entry => entry.Key, StringComparer.Ordinal).ToList()) { ViaMake = @case.ViaMake };
         }
 
         /// <summary>
@@ -77,6 +84,7 @@ namespace Gym.Tests.Parity.Golden {
             Check("max steps", MaxSteps.ToString(CultureInfo.InvariantCulture), @case.MaxSteps.ToString(CultureInfo.InvariantCulture));
             Check("frame every", FrameEvery.ToString(CultureInfo.InvariantCulture), @case.FrameEvery.ToString(CultureInfo.InvariantCulture));
             Check("state attribute", StateAttribute ?? "none", @case.StateAttribute ?? "none");
+            Check("via make", ViaMake ? "True" : "False", @case.ViaMake ? "True" : "False");
             return differences;
         }
 
@@ -245,6 +253,9 @@ namespace Gym.Tests.Parity.Golden {
                 writer.WriteNull("state_attribute");
             else
                 writer.WriteString("state_attribute", h.StateAttribute);
+            // Written only when set: the goldens recorded through the unwrapped env keep their exact bytes.
+            if (h.ViaMake)
+                writer.WriteBoolean("via_make", true);
             writer.WriteString("gymnasium_commit", h.GymnasiumCommit);
             writer.WriteString("platform", h.Platform);
             writer.WriteStartObject("stack");
@@ -310,7 +321,10 @@ namespace Gym.Tests.Parity.Golden {
                 state.ValueKind == JsonValueKind.Null ? null : state.GetString(),
                 GoldenCodec.RequiredString(root, "gymnasium_commit"),
                 GoldenCodec.RequiredString(root, "platform"),
-                stack);
+                stack) {
+                // Absent in the goldens of unwrapped cases, which predate the flag.
+                ViaMake = root.TryGetProperty("via_make", out JsonElement viaMake) && viaMake.GetBoolean(),
+            };
         }
 
         /// <summary>Reads one entry line.</summary>

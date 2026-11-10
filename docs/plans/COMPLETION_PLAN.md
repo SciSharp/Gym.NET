@@ -664,6 +664,17 @@ Specs: the port plan's §9 and §10; sources `vector` 3,113 lines and `wrappers`
   `SyncVectorEnv(..., observation_mode="different")` failed over untyped envs. The test helper `assert_rng_equal` now
   compares NumSharp's `PCG64.State` field by field (the object has no value equality). The P6 exit holds: both suites
   green, async equal to sync in every execution mode; open: the BipedalWalker seed test (P8).
+- *Done 2026-11-10, parity coverage for every env (the maintainer's "then proceed adding parity coverage to every single
+  env"):* a coverage matrix of the twelve registered ids against every parity layer (`tests/Gym.Tests.Parity/CLAUDE.md`
+  §5.1) and its gaps filled. `EnvCoverageLiveParityTests` (78 cells) runs each id through `make_vec`'s sync vector env
+  under `NEXT_STEP` and `SAME_STEP`, through Gymnasium's own `AsyncVectorEnv` with and without shared memory, in
+  `human` mode (the frames shown per call, counted against pygame's display flips, and the frame on display pixel for
+  pixel) and in `rgb_array_list` mode, plus CartPole-v0's `make` stack through its truncation at 200. MountainCar's
+  frames are gated outside the hill's P7 gap, and the 4 whole-frame cells are `[OpenBugs("P7")]`. CartPole-v0, which
+  shares v1's class, gained its registration row, its reverse-bridge rows (`check_env`, `check_environments_match` with
+  frames) and a golden. Golden cases can now record `make`'s stack (`ViaMake`, an optional `via_make` header key, so
+  the older goldens keep their bytes). Every new gated cell passed on its first run: the coverage found no new
+  divergence.
 
 ### P8 Box2D
 
