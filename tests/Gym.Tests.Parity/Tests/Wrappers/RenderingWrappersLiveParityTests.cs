@@ -64,8 +64,12 @@ namespace Gym.Tests.Parity.Tests.Wrappers {
             result = None
             """;
 
-        /// <summary>The videos the stand-in recorded: <c>(name without .mp4, frames, float(fps))</c> each, in order.</summary>
-        private const string WrittenStatements = """
+        /// <summary>
+        ///     The videos the stand-in recorded: <c>(name without .mp4, frames, float(fps))</c> each, in order. Shared with the
+        ///     vector cells (<see cref="VectorWrappersLiveParityTests"/>), which compare it with
+        ///     <see cref="CapturingVideoWriter.Describe"/>.
+        /// </summary>
+        internal const string WrittenStatements = """
             import os, sys
             result = tuple((os.path.basename(path)[:-len(".mp4")], tuple(frames), float(fps))
                            for (path, frames, fps) in sys.modules["moviepy.video.io.ImageSequenceClip"].written)
@@ -364,8 +368,21 @@ namespace Gym.Tests.Parity.Tests.Wrappers {
                 Directory.Delete(folder, recursive: true);
         }
 
-        /// <summary>An <see cref="IVideoWriter"/> that keeps each video's name, frame copies and frame rate instead of encoding.</summary>
-        private sealed class CapturingVideoWriter : IVideoWriter, IDisposable {
+        /// <summary>
+        ///     Installs the moviepy stand-in (<see cref="MoviepyStub"/>) and clears what it recorded, so a cell reads only its
+        ///     own videos afterwards; the vector cells share it.
+        /// </summary>
+        /// <exception cref="PythonInteropException">Thrown when the stand-in cannot be installed.</exception>
+        internal static void InstallMoviepyStub() =>
+            PythonRuntime.Run(() => {
+                using PyObject _ = Python.evalStmts(MoviepyStub, "result");
+            });
+
+        /// <summary>
+        ///     An <see cref="IVideoWriter"/> that keeps each video's name, frame copies and frame rate instead of encoding; the
+        ///     vector cells share it. Dispose it to release the copies.
+        /// </summary>
+        internal sealed class CapturingVideoWriter : IVideoWriter, IDisposable {
             /// <summary>The videos written, in order.</summary>
             private readonly List<(string Name, NDArray[] Frames, double Fps)> _written = new();
 

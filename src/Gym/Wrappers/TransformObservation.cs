@@ -33,7 +33,7 @@ namespace Gym.Wrappers {
     ///     <para>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/wrappers/transform_observation.py#L42">gymnasium/wrappers/transform_observation.py</see>.</para>
     /// </remarks>
     [GymOptions]
-    public partial class TransformObservation<TWObs, TObs, TAct> : ObservationWrapper<TWObs, TObs, TAct>, IRecordConstructorArgs {
+    public partial class TransformObservation<TWObs, TObs, TAct> : ObservationWrapper<TWObs, TObs, TAct>, IRecordConstructorArgs, Vector.IVectorizableTransform {
         /// <summary>Wraps <paramref name="env"/>.</summary>
         /// <param name="env">The env.</param>
         /// <param name="func">The transformation; <see langword="null"/> fails at the first observation, as Python's <c>None</c> does when called.</param>
@@ -64,6 +64,18 @@ namespace Gym.Wrappers {
         /// <summary>The transformation (<c>func</c>).</summary>
         [PyName("func")]
         public Func<TObs, TWObs> Func { get; protected set; }
+
+        /// <summary><c>func(observation)</c> untyped, for the vector wrappers that apply this wrapper per sub-env.</summary>
+        /// <param name="value">The observation.</param>
+        /// <returns>The transformed observation.</returns>
+        /// <exception cref="TypeError">Thrown when there is no function, or the observation is not a <typeparamref name="TObs"/>.</exception>
+        object? Vector.IVectorizableTransform.ApplyFunc(object? value) {
+            if (Func is null)
+                throw new TypeError("'NoneType' object is not callable");
+            if (value is not TObs && value is not null)
+                throw new TypeError($"expected a {typeof(TObs).Name} observation, got {PyBuiltins.TypeRepr(value)}");
+            return Func((TObs)value!);
+        }
 
         /// <summary>Applies <see cref="Func"/> (<c>observation(observation)</c>).</summary>
         /// <param name="observation">The env's observation.</param>
@@ -320,7 +332,14 @@ namespace Gym.Wrappers {
             Shape = (long[])shape.Clone();
             SavedKwargs = RecordConstructorArgs.Record(new Info { ["shape"] = shapeTuple });
             var target = new Shape(Shape);
-            Func = observation => np.reshape(ObservationWrapperFunctions.AsArray(observation), target);
+            Func = observation => {
+                // The reshape is a view of its input, as NumPy's: a 0-d array made for a number observation stays alive
+                // through the view, so it cannot be released here, and the finalizer collects both together.
+#pragma warning disable NDW012
+                NDArray array = ObservationWrapperFunctions.AsArray(observation);
+#pragma warning restore NDW012
+                return np.reshape(array, target);
+            };
         }
 
         /// <summary>The new shape (<c>shape</c>).</summary>
@@ -684,15 +703,22 @@ namespace Gym.Wrappers {
         /// <param name="observation">The env's observation.</param>
         /// <returns>A new 0-d int64 array (the flat index) or <c>(n_dims,)</c> int64 array (one index per element).</returns>
         private NDArray Discretize(TObs observation) {
-            // np.clip(np.ravel(observation), low, high - 1e-8): the margin is a weak Python float, so it takes the box's dtype.
-            using NDArray flat = np.ravel(ObservationWrapperFunctions.AsArray(observation));
-            using NDArray upper = High - 1e-8;
-            using NDArray clipped = np.clip(flat, Low, upper);
             var indices = new long[NDims];
-            for (int i = 0; i < NDims; i++) {
-                using NDArray element = clipped[i];
-                using NDArray index = np.digitize(element, BinEdges[i]);
-                indices[i] = Convert.ToInt64(index.GetAtIndex(0));
+            NDArray array = ObservationWrapperFunctions.AsArray(observation);
+            try {
+                // np.clip(np.ravel(observation), low, high - 1e-8): the margin is a weak Python float, so it takes the box's dtype.
+                using NDArray flat = np.ravel(array);
+                using NDArray upper = High - 1e-8;
+                using NDArray clipped = np.clip(flat, Low, upper);
+                for (int i = 0; i < NDims; i++) {
+                    using NDArray element = clipped[i];
+                    using NDArray index = np.digitize(element, BinEdges[i]);
+                    indices[i] = Convert.ToInt64(index.GetAtIndex(0));
+                }
+            } finally {
+                // Only the 0-d array made for a number observation is this method's; the env's array stays its own.
+                if (!ReferenceEquals(array, observation))
+                    array.Dispose();
             }
 
             if (Multidiscrete)

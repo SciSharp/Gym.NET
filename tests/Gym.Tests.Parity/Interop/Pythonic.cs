@@ -739,10 +739,11 @@ namespace Gym.Tests.Parity {
             /// <param name="vectorization_mode"><c>"sync"</c>, <c>"vector_entry_point"</c>, <c>"async"</c>, or <see langword="null"/> for the spec's default.</param>
             /// <param name="vector_kwargs">The vector env's constructor arguments in Python spelling, or <see langword="null"/>; values converted by <see cref="Oracle.PyConvert.ToPython"/>.</param>
             /// <param name="kwargs">The env's constructor arguments in Python spelling, or <see langword="null"/>.</param>
+            /// <param name="wrappers">A Python list of functions applied to each sub-env (<c>wrappers=</c>), or <see langword="null"/>; stays owned by the caller.</param>
             /// <returns>A new owned reference to the vector env.</returns>
             /// <exception cref="PythonException">Thrown when <c>make_vec</c> raises.</exception>
             internal static PyObject make_vec(string id, long num_envs = 1, string? vectorization_mode = null, IReadOnlyDictionary<string, object?>? vector_kwargs = null,
-                IReadOnlyDictionary<string, object?>? kwargs = null) {
+                IReadOnlyDictionary<string, object?>? kwargs = null, PyObject? wrappers = null) {
                 using PyObject function = Module.GetAttr("make_vec");
                 using var name = new PyString(id);
                 using var arguments = Oracle.PyConvert.ToKwargs(kwargs);
@@ -752,6 +753,8 @@ namespace Gym.Tests.Parity {
                 arguments["vectorization_mode"] = mode;
                 using PyObject vectorArguments = vector_kwargs is null ? Oracle.PyConvert.ToPython(null) : (PyObject)Oracle.PyConvert.ToKwargs(vector_kwargs);
                 arguments["vector_kwargs"] = vectorArguments;
+                if (wrappers is not null)
+                    arguments["wrappers"] = wrappers;
                 return function.Invoke(new PyObject[] { name }, arguments);
             }
 
@@ -1271,6 +1274,209 @@ namespace Gym.Tests.Parity {
                     } finally {
                         foreach (PyObject item in ints)
                             item.Dispose();
+                    }
+                }
+
+                /// <summary><c>gymnasium.wrappers.vector</c>: the vector wrappers, each built over a vector env with keyword arguments.</summary>
+                internal static class vector {
+                    /// <summary>The cached module; never dispose it.</summary>
+                    private static PyObject VectorModule => PythonRuntime.Import("gymnasium.wrappers.vector");
+
+                    /// <summary><c>vector.TransformObservation(env, func, observation_space=..., single_observation_space=...)</c>.</summary>
+                    /// <param name="env">The vector env; the wrapper keeps its own reference.</param>
+                    /// <param name="func">The Python function of the batch; stays owned by the caller.</param>
+                    /// <param name="observation_space">The batched space, or <see langword="null"/>; stays owned by the caller.</param>
+                    /// <param name="single_observation_space">The single space, or <see langword="null"/>; stays owned by the caller.</param>
+                    /// <returns>A new owned reference to the wrapper.</returns>
+                    /// <exception cref="PythonException">Thrown when the constructor raises.</exception>
+                    internal static PyObject TransformObservation(PyObject env, PyObject func, PyObject? observation_space = null, PyObject? single_observation_space = null) =>
+                        ConstructVector("TransformObservation", env, ("func", func), ("observation_space", observation_space), ("single_observation_space", single_observation_space));
+
+                    /// <summary><c>vector.FilterObservation(env, filter_keys)</c>.</summary>
+                    /// <param name="env">The vector env; the wrapper keeps its own reference.</param>
+                    /// <param name="filter_keys">The keys or positions; a <see cref="PyObject"/> passes as it is, anything else is converted.</param>
+                    /// <returns>A new owned reference to the wrapper.</returns>
+                    /// <exception cref="PythonException">Thrown when the constructor raises.</exception>
+                    internal static PyObject FilterObservation(PyObject env, object filter_keys) => ConstructVector("FilterObservation", env, ("filter_keys", filter_keys));
+
+                    /// <summary><c>vector.FlattenObservation(env)</c>.</summary>
+                    /// <param name="env">The vector env; the wrapper keeps its own reference.</param>
+                    /// <returns>A new owned reference to the wrapper.</returns>
+                    /// <exception cref="PythonException">Thrown when the constructor raises.</exception>
+                    internal static PyObject FlattenObservation(PyObject env) => ConstructVector("FlattenObservation", env);
+
+                    /// <summary><c>vector.GrayscaleObservation(env, keep_dim=keep_dim)</c>.</summary>
+                    /// <param name="env">The vector env; the wrapper keeps its own reference.</param>
+                    /// <param name="keep_dim">Whether the channel axis is kept.</param>
+                    /// <returns>A new owned reference to the wrapper.</returns>
+                    /// <exception cref="PythonException">Thrown when the constructor raises.</exception>
+                    internal static PyObject GrayscaleObservation(PyObject env, bool keep_dim = false) => ConstructVector("GrayscaleObservation", env, ("keep_dim", keep_dim));
+
+                    /// <summary><c>vector.ResizeObservation(env, shape)</c>, the shape a Python tuple.</summary>
+                    /// <param name="env">The vector env; the wrapper keeps its own reference.</param>
+                    /// <param name="shape">The new <c>(height, width)</c>.</param>
+                    /// <returns>A new owned reference to the wrapper.</returns>
+                    /// <exception cref="PythonException">Thrown when the constructor raises.</exception>
+                    internal static PyObject ResizeObservation(PyObject env, long[] shape) {
+                        using PyObject tuple = TupleOf(shape);
+                        return ConstructVector("ResizeObservation", env, ("shape", tuple));
+                    }
+
+                    /// <summary><c>vector.ReshapeObservation(env, shape)</c>, the shape a Python tuple.</summary>
+                    /// <param name="env">The vector env; the wrapper keeps its own reference.</param>
+                    /// <param name="shape">The new single shape.</param>
+                    /// <returns>A new owned reference to the wrapper.</returns>
+                    /// <exception cref="PythonException">Thrown when the constructor raises.</exception>
+                    internal static PyObject ReshapeObservation(PyObject env, long[] shape) {
+                        using PyObject tuple = TupleOf(shape);
+                        return ConstructVector("ReshapeObservation", env, ("shape", tuple));
+                    }
+
+                    /// <summary><c>vector.RescaleObservation(env, min_obs, max_obs)</c>.</summary>
+                    /// <param name="env">The vector env; the wrapper keeps its own reference.</param>
+                    /// <param name="min_obs">The lower bound.</param>
+                    /// <param name="max_obs">The upper bound.</param>
+                    /// <returns>A new owned reference to the wrapper.</returns>
+                    /// <exception cref="PythonException">Thrown when the constructor raises.</exception>
+                    internal static PyObject RescaleObservation(PyObject env, object min_obs, object max_obs) =>
+                        ConstructVector("RescaleObservation", env, ("min_obs", min_obs), ("max_obs", max_obs));
+
+                    /// <summary><c>vector.DtypeObservation(env, dtype)</c>.</summary>
+                    /// <param name="env">The vector env; the wrapper keeps its own reference.</param>
+                    /// <param name="dtype">The dtype's name.</param>
+                    /// <returns>A new owned reference to the wrapper.</returns>
+                    /// <exception cref="PythonException">Thrown when the constructor raises.</exception>
+                    internal static PyObject DtypeObservation(PyObject env, string dtype) => ConstructVector("DtypeObservation", env, ("dtype", dtype));
+
+                    /// <summary><c>vector.TransformAction(env, func, action_space=..., single_action_space=...)</c>.</summary>
+                    /// <param name="env">The vector env; the wrapper keeps its own reference.</param>
+                    /// <param name="func">The Python function of the batch; stays owned by the caller.</param>
+                    /// <param name="action_space">The batched space, or <see langword="null"/>; stays owned by the caller.</param>
+                    /// <param name="single_action_space">The single space, or <see langword="null"/>; stays owned by the caller.</param>
+                    /// <returns>A new owned reference to the wrapper.</returns>
+                    /// <exception cref="PythonException">Thrown when the constructor raises.</exception>
+                    internal static PyObject TransformAction(PyObject env, PyObject func, PyObject? action_space = null, PyObject? single_action_space = null) =>
+                        ConstructVector("TransformAction", env, ("func", func), ("action_space", action_space), ("single_action_space", single_action_space));
+
+                    /// <summary><c>vector.ClipAction(env)</c>.</summary>
+                    /// <param name="env">The vector env; the wrapper keeps its own reference.</param>
+                    /// <returns>A new owned reference to the wrapper.</returns>
+                    /// <exception cref="PythonException">Thrown when the constructor raises.</exception>
+                    internal static PyObject ClipAction(PyObject env) => ConstructVector("ClipAction", env);
+
+                    /// <summary><c>vector.RescaleAction(env, min_action, max_action)</c>.</summary>
+                    /// <param name="env">The vector env; the wrapper keeps its own reference.</param>
+                    /// <param name="min_action">The lower bound.</param>
+                    /// <param name="max_action">The upper bound.</param>
+                    /// <returns>A new owned reference to the wrapper.</returns>
+                    /// <exception cref="PythonException">Thrown when the constructor raises.</exception>
+                    internal static PyObject RescaleAction(PyObject env, object min_action, object max_action) =>
+                        ConstructVector("RescaleAction", env, ("min_action", min_action), ("max_action", max_action));
+
+                    /// <summary><c>vector.TransformReward(env, func)</c>.</summary>
+                    /// <param name="env">The vector env; the wrapper keeps its own reference.</param>
+                    /// <param name="func">The Python function of the reward array; stays owned by the caller.</param>
+                    /// <returns>A new owned reference to the wrapper.</returns>
+                    /// <exception cref="PythonException">Thrown when the constructor raises.</exception>
+                    internal static PyObject TransformReward(PyObject env, PyObject func) => ConstructVector("TransformReward", env, ("func", func));
+
+                    /// <summary><c>vector.ClipReward(env, min_reward, max_reward)</c>.</summary>
+                    /// <param name="env">The vector env; the wrapper keeps its own reference.</param>
+                    /// <param name="min_reward">The lower bound, or <see langword="null"/>.</param>
+                    /// <param name="max_reward">The upper bound, or <see langword="null"/>.</param>
+                    /// <returns>A new owned reference to the wrapper.</returns>
+                    /// <exception cref="PythonException">Thrown when the constructor raises.</exception>
+                    internal static PyObject ClipReward(PyObject env, object? min_reward, object? max_reward) =>
+                        ConstructVector("ClipReward", env, ("min_reward", min_reward), ("max_reward", max_reward));
+
+                    /// <summary><c>vector.NormalizeObservation(env, epsilon=epsilon)</c>.</summary>
+                    /// <param name="env">The vector env; the wrapper keeps its own reference.</param>
+                    /// <param name="epsilon">The variance offset.</param>
+                    /// <returns>A new owned reference to the wrapper.</returns>
+                    /// <exception cref="PythonException">Thrown when the constructor raises.</exception>
+                    internal static PyObject NormalizeObservation(PyObject env, double epsilon = 1e-8) => ConstructVector("NormalizeObservation", env, ("epsilon", epsilon));
+
+                    /// <summary><c>vector.NormalizeReward(env, gamma=gamma, epsilon=epsilon)</c>.</summary>
+                    /// <param name="env">The vector env; the wrapper keeps its own reference.</param>
+                    /// <param name="gamma">The discount.</param>
+                    /// <param name="epsilon">The variance offset.</param>
+                    /// <returns>A new owned reference to the wrapper.</returns>
+                    /// <exception cref="PythonException">Thrown when the constructor raises.</exception>
+                    internal static PyObject NormalizeReward(PyObject env, double gamma = 0.99, double epsilon = 1e-8) =>
+                        ConstructVector("NormalizeReward", env, ("gamma", gamma), ("epsilon", epsilon));
+
+                    /// <summary><c>vector.RecordEpisodeStatistics(env, buffer_length=..., stats_key=...)</c>.</summary>
+                    /// <param name="env">The vector env; the wrapper keeps its own reference.</param>
+                    /// <param name="buffer_length">How many episodes the queues keep.</param>
+                    /// <param name="stats_key">The info key.</param>
+                    /// <returns>A new owned reference to the wrapper.</returns>
+                    /// <exception cref="PythonException">Thrown when the constructor raises.</exception>
+                    internal static PyObject RecordEpisodeStatistics(PyObject env, long buffer_length = 100, string stats_key = "episode") =>
+                        ConstructVector("RecordEpisodeStatistics", env, ("buffer_length", buffer_length), ("stats_key", stats_key));
+
+                    /// <summary><c>vector.DictInfoToList(env)</c>.</summary>
+                    /// <param name="env">The vector env; the wrapper keeps its own reference.</param>
+                    /// <returns>A new owned reference to the wrapper.</returns>
+                    /// <exception cref="PythonException">Thrown when the constructor raises.</exception>
+                    internal static PyObject DictInfoToList(PyObject env) => ConstructVector("DictInfoToList", env);
+
+                    /// <summary><c>vector.HumanRendering(env, screen_size=...)</c>.</summary>
+                    /// <param name="env">The vector env; the wrapper keeps its own reference.</param>
+                    /// <param name="screen_size">The window's <c>(width, height)</c>, or <see langword="null"/>.</param>
+                    /// <returns>A new owned reference to the wrapper.</returns>
+                    /// <exception cref="PythonException">Thrown when the constructor raises.</exception>
+                    internal static PyObject HumanRendering(PyObject env, long[]? screen_size = null) {
+                        using PyObject? size = screen_size is null ? null : TupleOf(screen_size);
+                        return ConstructVector("HumanRendering", env, ("screen_size", size));
+                    }
+
+                    /// <summary><c>vector.RecordVideo(env, video_folder, video_aspect_ratio=..., record_first_only=..., episode_trigger=..., step_trigger=..., video_length=...)</c>.</summary>
+                    /// <param name="env">The vector env; the wrapper keeps its own reference.</param>
+                    /// <param name="video_folder">The folder.</param>
+                    /// <param name="video_aspect_ratio">The mosaic's aspect.</param>
+                    /// <param name="record_first_only">Whether only the first sub-env is recorded.</param>
+                    /// <param name="episode_trigger">A Python function, or <see langword="null"/>; stays owned by the caller.</param>
+                    /// <param name="step_trigger">A Python function, or <see langword="null"/>; stays owned by the caller.</param>
+                    /// <param name="video_length">The frames per video, 0 for whole episodes.</param>
+                    /// <returns>A new owned reference to the wrapper.</returns>
+                    /// <exception cref="PythonException">Thrown when the constructor raises.</exception>
+                    internal static PyObject RecordVideo(PyObject env, string video_folder, long[] video_aspect_ratio, bool record_first_only, PyObject? episode_trigger,
+                        PyObject? step_trigger, long video_length = 0) {
+                        using PyObject ratio = TupleOf(video_aspect_ratio);
+                        return ConstructVector("RecordVideo", env, ("video_folder", video_folder), ("video_aspect_ratio", ratio), ("record_first_only", record_first_only),
+                            ("episode_trigger", episode_trigger), ("step_trigger", step_trigger), ("video_length", video_length));
+                    }
+
+                    /// <summary>
+                    ///     Calls a class of <c>gymnasium.wrappers.vector</c> with the env and keyword arguments: a <see cref="PyObject"/>
+                    ///     value is passed as it is (and stays the caller's), anything else is converted and released after the call.
+                    /// </summary>
+                    /// <param name="name">The class name.</param>
+                    /// <param name="env">The vector env; the wrapper keeps its own reference.</param>
+                    /// <param name="kwargs">The keyword arguments, in order.</param>
+                    /// <returns>A new owned reference to the wrapper.</returns>
+                    /// <exception cref="PythonException">Thrown when the constructor raises.</exception>
+                    private static PyObject ConstructVector(string name, PyObject env, params (string Key, object? Value)[] kwargs) {
+                        using PyObject constructor = VectorModule.GetAttr(name);
+                        using var arguments = new PyDict();
+                        var converted = new List<PyObject>();
+                        try {
+                            foreach ((string key, object? value) in kwargs) {
+                                if (value is PyObject given) {
+                                    arguments[key] = given;
+                                    continue;
+                                }
+
+                                PyObject owned = Oracle.PyConvert.ToPython(value);
+                                converted.Add(owned);
+                                arguments[key] = owned;
+                            }
+
+                            return constructor.Invoke(new[] { env }, arguments);
+                        } finally {
+                            foreach (PyObject owned in converted)
+                                owned.Dispose();
+                        }
                     }
                 }
 

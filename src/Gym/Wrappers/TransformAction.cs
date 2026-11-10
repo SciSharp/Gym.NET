@@ -24,7 +24,7 @@ namespace Gym.Wrappers {
     ///     <para>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/wrappers/transform_action.py#L26">gymnasium/wrappers/transform_action.py</see>.</para>
     /// </remarks>
     [GymOptions]
-    public partial class TransformAction<TObs, TWAct, TAct> : ActionWrapper<TObs, TWAct, TAct>, IRecordConstructorArgs {
+    public partial class TransformAction<TObs, TWAct, TAct> : ActionWrapper<TObs, TWAct, TAct>, IRecordConstructorArgs, Vector.IVectorizableTransform {
         /// <summary>Wraps <paramref name="env"/>.</summary>
         /// <param name="env">The env.</param>
         /// <param name="func">The transformation; <see langword="null"/> fails at the first step, as Python's <c>None</c> does when called.</param>
@@ -55,6 +55,18 @@ namespace Gym.Wrappers {
         /// <summary>The transformation (<c>func</c>).</summary>
         [PyName("func")]
         public Func<TWAct, TAct> Func { get; protected set; }
+
+        /// <summary><c>func(action)</c> untyped, for the vector wrappers that apply this wrapper per sub-env.</summary>
+        /// <param name="value">The action.</param>
+        /// <returns>The transformed action.</returns>
+        /// <exception cref="TypeError">Thrown when there is no function, or the action is not a <typeparamref name="TWAct"/>.</exception>
+        object? Vector.IVectorizableTransform.ApplyFunc(object? value) {
+            if (Func is null)
+                throw new TypeError("'NoneType' object is not callable");
+            if (value is not TWAct && value is not null)
+                throw new TypeError($"expected a {typeof(TWAct).Name} action, got {PyBuiltins.TypeRepr(value)}");
+            return Func((TWAct)value!);
+        }
 
         /// <summary>Applies <see cref="Func"/> (<c>action(action)</c>).</summary>
         /// <param name="action">The wrapper's action.</param>

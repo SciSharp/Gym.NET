@@ -199,6 +199,24 @@ Effects of approved designs that only showed up in code. None changes a design; 
   is typed by the env's observation type, which the stacks of an array, `Dict` or `Tuple` space share; a space whose
   stack is another type (`Text`, `Graph`, `Sequence`, `OneOf` stack into tuples) needs the untyped form. The vector
   utils (`batch_space`, `iterate`, `concatenate`, `create_empty_array`) unview `ObjectSpace` as the space utils do.
+- **DR-24, the vector wrappers** (found in P6.6, 2026-11-10): `[PyName]` now also goes on a class, and
+  `PyAttributes.PyTypeName` reads it without inheritance, so `ClipRewardVector` prints and is found as `ClipReward` while a
+  class derived from it keeps its own name unless it declares one. The vectorizing wrappers build the single-env wrapper
+  over a stand-in env holding the sub-envs' single space (Python's `_SingleEnv`) and apply its function to each sub-env's
+  element through an internal untyped view of it (`IVectorizableTransform`, implemented by the transform wrappers). The
+  stand-in is untyped, so an open generic class closes over `object` (`typeof(ClipAction<,>)`), and a space argument whose
+  elements are of another type is passed as an `ObjectSpace` view (a `Dict` action space for `TransformAction<,,>`):
+  `PyKwargs` binds by Python name and does not view spaces itself. `DictInfoToList` returns Gymnasium's list of infos from
+  its own `Step` and `Reset`, which hide the base ones (`new`): through `IVectorEnv` or a `VectorEnv` reference the infos
+  stay a dict, since `VectorStepResult.Infos` is one, so it belongs outermost, as in Gymnasium. The vector
+  `NormalizeObservation` and `NormalizeReward` keep Gymnasium's float32 statistics and float32 accumulated returns,
+  updated with NumPy 2's promotions (the discounted return computed in float64 through the integer `1 - terminated`, then
+  stored as float32). The vector `HumanRendering` resizes each sub-env's frame with `Cv2.Resize(INTER_LINEAR)` (DR-23)
+  into one mosaic shown through the viewer factory (DR-20), kept as `LastMosaic` in pygame's `(width, height, 3)`
+  layout; the vector `RecordVideo` writes through `IVideoWriter` as the single-env one does (DR-25). The parity cells
+  leave `RecordEpisodeStatistics`' `t` (wall-clock time) out on both sides. The unit tests of `RecordVideo` over ten
+  CartPoles take about 100 s per framework: each recorded step renders ten frames and `PngVideoWriter` writes their
+  3000 × 800 mosaic (two rows of five) as a PNG.
 - **DR-34's generated docs** (found in P10.4, 2026-11-09): an options record copies each constructor `<param>` onto its
   property, and a `<paramref>` inside it is a broken reference on a property (CS1734 wherever documentation is generated,
   so in a consumer's build too). The generator now turns it into a `<see cref>` to the sibling property, or `<c>` text for

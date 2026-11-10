@@ -457,7 +457,7 @@ namespace Gym.Wrappers {
                 throw new ValueError($"Unexpected `padding_type`, expected 'reset', 'zero' or a custom observation space, actual value: {PyBuiltins.Repr(paddingType)} not an instance of env observation ({_envSpace})");
             }
 
-            Space batched = Vector.VectorUtils.BatchSpace(_envSpace, checked((int)stackSize));
+            Space batched = Gym.Vector.VectorUtils.BatchSpace(_envSpace, checked((int)stackSize));
             try {
                 ObservationSpace = ObservationWrapperFunctions.Typed<TObs>(batched);
             } catch {
@@ -471,7 +471,7 @@ namespace Gym.Wrappers {
             PaddingType = mode;
             for (long i = 0; i < stackSize; i++)
                 ObsQueue.AddLast(PaddingValue);
-            _stackedObs = Vector.VectorUtils.CreateEmptyArray(_envSpace, checked((int)stackSize));
+            _stackedObs = Gym.Vector.VectorUtils.CreateEmptyArray(_envSpace, checked((int)stackSize));
         }
 
         /// <summary>The recorded constructor arguments, <c>{'stack_size': 3, 'padding_type': 'reset'}</c> (Python's <c>_saved_kwargs</c>).</summary>
@@ -545,7 +545,7 @@ namespace Gym.Wrappers {
         /// <summary><c>deepcopy(concatenate(env.observation_space, obs_queue, stacked_obs))</c>.</summary>
         /// <returns>A new stack the caller owns.</returns>
         private TObs Stacked() {
-            object? concatenated = Vector.VectorUtils.Concatenate(_envSpace, ObsQueue, _stackedObs);
+            object? concatenated = Gym.Vector.VectorUtils.Concatenate(_envSpace, ObsQueue, _stackedObs);
             return (TObs)PyCopy.DeepCopy(concatenated)!;
         }
 

@@ -37,6 +37,10 @@ refs/Gym.NET/
 │   │   │                          #   TransformObservation.cs: TransformObservation and its 9 subclasses (Filter, Flatten, Grayscale, Resize, Reshape,
 │   │   │                          #   Rescale, Dtype, AddRender, Discretize); TransformAction.cs, TransformReward.cs; WrapperFunctions(.Spaces).cs:
 │   │   │                          #   RunningMeanStd, update_mean_var_count_from_moments, create_zero_array, rescale_box
+│   │   │   └── Vector/            # The vector wrappers (DR-24: `...Vector` names, [PyName] = Gymnasium's): VectorizeTransform.cs (Transform*Vector,
+│   │   │                          #   VectorizeTransform{Observation,Action,Reward} and their Filter/Flatten/Grayscale/Resize/Reshape/Rescale/Dtype/Clip
+│   │   │                          #   twins), StatefulVector.cs (NormalizeObservation/NormalizeReward), CommonVector.cs (RecordEpisodeStatistics),
+│   │   │                          #   DictInfoToList.cs, RenderingVector.cs (HumanRendering, RecordVideo)
 │   │   ├── Legacy/                # [Obsolete] pre-0.26 API: Step, ILegacyEnv, LegacyEnvAdapter, VecEnv family
 │   │   ├── Internal/              # Dict (legacy info type), CircularQueue, Dynamic/Merging/Reflection helpers
 │   │   ├── Utils/                 # Seeding (PCG64), PyBuiltins, PyMath (F3), PyAttributes, PyEquality, PyCopy, PyKwargs (Python kwargs binding), PyJson, Deque,

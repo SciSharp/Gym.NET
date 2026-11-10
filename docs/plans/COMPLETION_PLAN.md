@@ -611,6 +611,17 @@ Specs: the port plan's §9 and §10; sources `vector` 3,113 lines and `wrappers`
   `gymnasium.utils.save_video` as `Video.SaveVideo`/`Video.CappedCubicVideoSchedule`; 21 parity cells (frames, videos,
   clips, schedule) and `test_record_video.py`, `test_human_rendering.py`, `test_white_noise_rendering.py` and
   `tests/utils/test_save_video.py` mirrored.
+- *Done 2026-11-10, P6.6 (DR-24):* the vector wrappers in `Gym.Wrappers.Vector`, each carrying Gymnasium's name in
+  `[PyName]`: `TransformObservationVector` and `VectorizeTransformObservation` with the seven vectorized observation
+  transforms (`Filter`, `Flatten`, `Grayscale`, `Resize`, `Reshape`, `Rescale`, `Dtype`), `TransformActionVector` and
+  `VectorizeTransformAction` with `ClipActionVector` and `RescaleActionVector`, `TransformRewardVector` and
+  `VectorizeTransformReward` with `ClipRewardVector`, `NormalizeObservationVector`, `NormalizeRewardVector`,
+  `RecordEpisodeStatisticsVector`, `DictInfoToList`, `HumanRenderingVector` and `RecordVideoVector`. 26 parity cells
+  (`VectorWrappersLiveParityTests`: sync vector envs in lockstep across episode ends, both autoreset modes, the
+  statistics afterwards, CartPole's frames through `AddRenderObservation`, `HumanRendering`'s grid, the videos over the
+  moviepy stand-in) and `tests/wrappers/vector` mirrored (65 tests gated; CarRacing's cases `[OpenBugs("P8")]`, Ant's
+  `[OpenBugs("P9")]`, the async case `[OpenBugs("P6.2")]`; `test_array_conversion.py` is JAX/PyTorch); inventory −22
+  names.
 
 ### P8 Box2D
 

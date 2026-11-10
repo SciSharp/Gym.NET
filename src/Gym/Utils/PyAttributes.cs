@@ -12,9 +12,15 @@ namespace Gym.Utils {
     ///     Names a property or field by the Python attribute it stands for, where the default mapping (the snake_case form
     ///     of the C# name) would not give it: <c>[PyName("_disable_render_order_enforcing")]</c>. A non-public member takes
     ///     part in Python attribute access only when it carries this attribute. On a constructor parameter it is the keyword
-    ///     <c>make</c> binds to it (<see cref="PyKwargs.Construct"/>), for the rare kwarg snake_case cannot spell.
+    ///     <c>make</c> binds to it (<see cref="PyKwargs.Construct"/>), for the rare kwarg snake_case cannot spell. On a class it
+    ///     is the name Python prints for it (DR-24): the vector wrappers renamed for unique class names
+    ///     (<c>NormalizeObservationVector</c>) keep Gymnasium's (<c>NormalizeObservation</c>) in <c>repr</c> and messages.
     /// </summary>
-    [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field | AttributeTargets.Parameter, AllowMultiple = false, Inherited = true)]
+    /// <remarks>
+    ///     An overriding property inherits its base's name (<c>Inherited</c>), but a class's name is read from the class
+    ///     itself only (<see cref="PyAttributes.PyTypeName"/>): a subclass prints its own name, as a Python subclass does.
+    /// </remarks>
+    [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field | AttributeTargets.Parameter | AttributeTargets.Class, AllowMultiple = false, Inherited = true)]
     public sealed class PyNameAttribute : Attribute {
         /// <summary>Maps the member to <paramref name="name"/>.</summary>
         /// <param name="name">The Python attribute name, spelled exactly as in the Gymnasium source.</param>
@@ -176,12 +182,16 @@ namespace Gym.Utils {
         }
 
         /// <summary>
-        ///     The name Python prints for a class: the .NET type name without the generic arity (<c>TimeLimit`2</c> is
-        ///     <c>TimeLimit</c>), which is also what <c>Wrapper.class_name()</c> returns.
+        ///     The name Python prints for a class: its <see cref="PyNameAttribute"/> when it has one (a class renamed for a
+        ///     unique name, DR-24), else the .NET type name without the generic arity (<c>TimeLimit`2</c> is
+        ///     <c>TimeLimit</c>); also what <c>Wrapper.class_name()</c> returns.
         /// </summary>
         /// <param name="type">The type.</param>
         /// <returns>The class name.</returns>
         public static string PyTypeName(Type type) {
+            // A closed generic type carries its definition's attributes, so one lookup covers both forms.
+            if (type.GetCustomAttributes(typeof(PyNameAttribute), inherit: false) is [PyNameAttribute declared, ..])
+                return declared.Name;
             string name = type.Name;
             int tick = name.IndexOf('`');
             return tick < 0 ? name : name.Substring(0, tick);

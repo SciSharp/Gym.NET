@@ -125,28 +125,6 @@ gymnasium.wrappers.numpy_to_torch.NumpyToTorch                                  
 gymnasium.wrappers.numpy_to_torch.numpy_to_torch                                         n/a: JAX/PyTorch
 gymnasium.wrappers.numpy_to_torch.torch_to_numpy                                         n/a: JAX/PyTorch
 gymnasium.wrappers.vector.array_conversion.ArrayConversion                               n/a: JAX/PyTorch
-gymnasium.wrappers.vector.common.RecordEpisodeStatistics                                 P6 vector wrappers, deferred in this run
-gymnasium.wrappers.vector.dict_info_to_list.DictInfoToList                               P6 vector wrappers, deferred in this run
 gymnasium.wrappers.vector.jax_to_numpy.JaxToNumpy                                        n/a: JAX/PyTorch
 gymnasium.wrappers.vector.jax_to_torch.JaxToTorch                                        n/a: JAX/PyTorch
 gymnasium.wrappers.vector.numpy_to_torch.NumpyToTorch                                    n/a: JAX/PyTorch
-gymnasium.wrappers.vector.rendering.HumanRendering                                       P6 vector wrappers, deferred in this run
-gymnasium.wrappers.vector.rendering.RecordVideo                                          P6 vector wrappers, deferred in this run
-gymnasium.wrappers.vector.stateful_observation.NormalizeObservation                      P6 vector wrappers, deferred in this run
-gymnasium.wrappers.vector.stateful_reward.NormalizeReward                                P6 vector wrappers, deferred in this run
-gymnasium.wrappers.vector.vectorize_action.ClipAction                                    P6 vector wrappers, deferred in this run
-gymnasium.wrappers.vector.vectorize_action.RescaleAction                                 P6 vector wrappers, deferred in this run
-gymnasium.wrappers.vector.vectorize_action.TransformAction                               P6 vector wrappers, deferred in this run
-gymnasium.wrappers.vector.vectorize_action.VectorizeTransformAction                      P6 vector wrappers, deferred in this run
-gymnasium.wrappers.vector.vectorize_observation.DtypeObservation                         P6 vector wrappers, deferred in this run
-gymnasium.wrappers.vector.vectorize_observation.FilterObservation                        P6 vector wrappers, deferred in this run
-gymnasium.wrappers.vector.vectorize_observation.FlattenObservation                       P6 vector wrappers, deferred in this run
-gymnasium.wrappers.vector.vectorize_observation.GrayscaleObservation                     P6 vector wrappers, deferred in this run
-gymnasium.wrappers.vector.vectorize_observation.RescaleObservation                       P6 vector wrappers, deferred in this run
-gymnasium.wrappers.vector.vectorize_observation.ReshapeObservation                       P6 vector wrappers, deferred in this run
-gymnasium.wrappers.vector.vectorize_observation.ResizeObservation                        P6 vector wrappers, deferred in this run
-gymnasium.wrappers.vector.vectorize_observation.TransformObservation                     P6 vector wrappers, deferred in this run
-gymnasium.wrappers.vector.vectorize_observation.VectorizeTransformObservation            P6 vector wrappers, deferred in this run
-gymnasium.wrappers.vector.vectorize_reward.ClipReward                                    P6 vector wrappers, deferred in this run
-gymnasium.wrappers.vector.vectorize_reward.TransformReward                               P6 vector wrappers, deferred in this run
-gymnasium.wrappers.vector.vectorize_reward.VectorizeTransformReward                      P6 vector wrappers, deferred in this run

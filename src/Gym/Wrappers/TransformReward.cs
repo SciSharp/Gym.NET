@@ -17,7 +17,7 @@ namespace Gym.Wrappers {
     ///     <para>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/wrappers/transform_reward.py#L21">gymnasium/wrappers/transform_reward.py</see>.</para>
     /// </remarks>
     [GymOptions]
-    public partial class TransformReward<TObs, TAct> : RewardWrapper<TObs, TAct>, IRecordConstructorArgs {
+    public partial class TransformReward<TObs, TAct> : RewardWrapper<TObs, TAct>, IRecordConstructorArgs, Vector.IVectorizableTransform {
         /// <summary>Wraps <paramref name="env"/>.</summary>
         /// <param name="env">The env.</param>
         /// <param name="func">The transformation; <see langword="null"/> fails at the first step, as Python's <c>None</c> does when called.</param>
@@ -42,6 +42,16 @@ namespace Gym.Wrappers {
         /// <summary>The transformation (<c>func</c>).</summary>
         [PyName("func")]
         public Func<double, double> Func { get; protected set; }
+
+        /// <summary><c>func(reward)</c> untyped, for the vector wrappers that apply this wrapper per sub-env.</summary>
+        /// <param name="value">The reward, a number.</param>
+        /// <returns>The transformed reward, a boxed <see cref="double"/>.</returns>
+        /// <exception cref="TypeError">Thrown when there is no function, or the reward is not a number.</exception>
+        object? Vector.IVectorizableTransform.ApplyFunc(object? value) {
+            if (Func is null)
+                throw new TypeError("'NoneType' object is not callable");
+            return Func(PyBuiltins.Float(value));
+        }
 
         /// <summary>Applies <see cref="Func"/> (<c>reward(reward)</c>).</summary>
         /// <param name="reward">The env's reward.</param>
