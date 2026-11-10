@@ -22,8 +22,8 @@
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
     <AllowedOutputExtensionsInPackageBuildOutputFolder>$(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb</AllowedOutputExtensionsInPackageBuildOutputFolder>
     <!-- The XML documentation goes into the package next to the assembly, so consumers' IntelliSense shows Gym.NET's docs
-         (P10.4). Members of the pre-2.0 code without docs (Gym.Internal, the 0.2 LunarLander, the viewers' XAML classes)
-         raise CS1591 warnings, which the build tolerates (DR-05). -->
+         (P10.4). Members of the pre-2.0 code without docs (Gym.Internal, the viewers' XAML classes) raise CS1591 warnings,
+         which the build tolerates (DR-05). -->
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <AssemblyVersion>2.0.0.0</AssemblyVersion>
     <FileVersion>2.0.0.0</FileVersion>
@@ -36,12 +36,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Aether.Physics2D" Version="1.6.1" />
-    <!-- SixLabors stays on its last Apache-2.0 releases (ImageSharp 2.1.x, Drawing 1.0.x, Fonts 1.0.x). Newer majors ship
-         under the Six Labors Split License and fail Release builds without a Six Labors license key. -->
+    <!-- SixLabors stays on its last Apache-2.0 release (ImageSharp 2.1.x). Newer majors ship under the Six Labors Split
+         License and fail Release builds without a Six Labors license key. The human window hands the viewers ImageSharp
+         images. (Aether.Physics2D, ImageSharp.Drawing and SixLabors.Fonts went with the 0.2 LunarLander in P8.5.) -->
     <PackageReference Include="SixLabors.ImageSharp" Version="2.1.13" />
-    <PackageReference Include="SixLabors.ImageSharp.Drawing" Version="1.0.0" />
-    <PackageReference Include="SixLabors.Fonts" Version="1.0.1" />
     <PackageReference Include="JetBrains.Annotations" Version="2026.2.0" PrivateAssets="all" />
   </ItemGroup>
 

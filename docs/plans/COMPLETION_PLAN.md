@@ -908,6 +908,18 @@ Specs: the port plan's §5.6 and §11.3; sources 2,979 lines.
   live pygame and SDL_ttf's shaded layout (DR-27), after the font-data license check; coordinate with PR #13.
 - **P8.5** Delete the Aether LunarLander (D10) and the `Aether.Physics2D`, `ImageSharp.Drawing` and `Fonts`
   references in `Gym.Environments`; B-17…B-30 close.
+  *Done 2026-11-11 (ahead of P8.4, which it does not depend on):*
+  - `src/Gym.Environments/Envs/Aether` (the 0.2 `LunarLanderEnv` and `LunarLanderDiscreteActions`) is deleted, and so
+    are the three package references; `Gym.Environments` keeps `SixLabors.ImageSharp` for the human window's images.
+  - The tests that used it moved to the Box2D env. `tests/Gym.Tests/Envs/Box2D/LunarLanderEnvironment.cs` lands it with
+    Gymnasium's heuristic in every viewer (WinForms, Avalonia, two Avalonia windows at once, headless). It also pins
+    Gymnasium's eight heuristic landings (four seeds, both modes: steps and the float64 total's bits, recorded from
+    `refs/Gymnasium`) exactly, without Python, in every configuration; the human-mode run of seed 1000 lands on the
+    same total, so rendering's particles leave the landing alone. `ConcurrencyTests`, `SeedTests` and `DiscreteTests`
+    use the Box2D env or a local enum. `GymnasiumRngParityTests` pins the new env's draws, which are Gymnasium's order
+    (terrain, push, wind indices only with wind, two dispersions per step).
+  - B-17…B-30 and B-37 are marked closed in the port plan's defect table. The migration guide maps the 0.2 env to
+    LunarLander-v3, and the release notes list the removal among the breaking changes.
 - **Exit:** engine goldens; L3 and L4 for all five ids; no `[OpenBugs]` cell left in the suite.
 
 ### P9 MuJoCo (postponed out of 2.0, DR-35)

@@ -12,7 +12,7 @@
        restore. The maintainer chose to suppress them and keep 2.1.13.
 
        Why none of them applies to Gym.NET: Gym.NET builds images from pixel buffers for the human viewers and the legacy
-       Render(), draws the Aether LunarLander with ImageSharp.Drawing, writes PNG artifacts in the parity suite, and decodes
+       Render(), writes PNG artifacts in the parity suite and the RecordVideo wrapper's frame folders, and decodes
        only the PNG assets copied from Gymnasium (step P7.4). It never encodes TIFF, never reads BigTIFF, never runs
        HistogramEqualization, and never decodes an untrusted image, which is the only way to reach the ICC-profile parser.
 

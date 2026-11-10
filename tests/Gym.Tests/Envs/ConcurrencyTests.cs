@@ -3,7 +3,7 @@ using System;
 using System.Linq;
 using System.Threading;
 using Gym.Environments;
-using Gym.Environments.Envs.Aether;
+using Gym.Environments.Envs.Box2D;
 using Gym.Environments.Envs.Classic;
 using Gym.Envs;
 using Gym.Spaces;
@@ -108,11 +108,11 @@ namespace Gym.Tests.Envs {
                 throw new AggregateException(thrown);
         }
 
-        /// <summary>Runs 500 steps of an unseeded discrete LunarLander, resetting whenever an episode ends.</summary>
+        /// <summary>Runs 500 steps of an unseeded discrete LunarLander (each on its own Box2D world), resetting whenever an episode ends.</summary>
         /// <param name="start">Released once every thread is ready, so the threads overlap.</param>
         private static void RunLunarLander(Barrier start)
         {
-            var env = new LunarLanderEnv(NullEnvViewer.Factory);
+            using var env = new LunarLanderEnv();
             start.SignalAndWait();
             // LunarLander's observations are fresh arrays every step, so this loop owns and releases them.
             env.Reset().Observation.Dispose();

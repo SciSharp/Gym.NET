@@ -43,6 +43,9 @@ In short:
 - Seeds select Gymnasium's random streams, so seeded runs give Gymnasium's numbers, not 0.2's.
 - NumSharp 0.80.0 replaces NumSharp.Lite 0.1.12; `Discrete` samples are 0-d int64 arrays.
 - The baselines-style vector types (`IVecEnv`, `VecEnv`, `DummyVecEnv`, `VecEnvWrapper`) moved to `Gym.Legacy`.
+- The 0.2 `LunarLanderEnv` (Aether physics, `Gym.Environments.Envs.Aether`) and its `LunarLanderDiscreteActions` are
+  gone, with the Aether.Physics2D, ImageSharp.Drawing and SixLabors.Fonts dependencies; Gymnasium's LunarLander-v3 on
+  Gym.NET's Box2D replaces it (`Gym.Environments.Envs.Box2D.LunarLanderEnv`).
 
 `Gym.Legacy.LegacyEnvAdapter` runs any 2.0 env behind the 0.2 interface for code that cannot move yet. Everything in
 `Gym.Legacy` is `[Obsolete]` and is removed in 3.0.
@@ -144,8 +147,6 @@ Each has a test that asserts Gymnasium's answer and fails until the gap closes (
   message is NumSharp's `"AssertionError"` instead of Python's empty one (NumSharp gap N-1).
 - **`NotImplementedError` and `ImportError`** are `Gym.Exceptions` types until NumSharp defines them, and NumSharp's
   exceptions take no inner exception yet (N-3).
-- **The 0.2 `LunarLanderEnv`** (Aether physics) is still in Gym.NET.Environments, on the 2.0 API, but it is not
-  Gymnasium's LunarLander and is not registered. Gymnasium's Box2D environments replace it in P8.
 
 ## Not in 2.0 yet
 

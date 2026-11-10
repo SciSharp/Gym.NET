@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using Gym.Environments.Envs.Aether;
 using Gym.Spaces;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using NumSharp;
@@ -19,6 +18,9 @@ namespace Gym.Tests.Spaces {
         /// <summary>An enum backed by <see cref="ulong"/>, with a member above <see cref="long.MaxValue"/>.</summary>
         private enum ULongAction : ulong { Two = 2, Huge = ulong.MaxValue }
 
+        /// <summary>An enum backed by <see cref="int"/>, as the 0.2 API's action enums were (LunarLander's main engine was 2).</summary>
+        private enum IntAction { FireMainEngine = 2 }
+
         /// <summary>
         ///     Every integer width, <see cref="bool"/> (a Python int subclass) and enum members convert to the value they
         ///     denote, whichever type boxed them.
@@ -30,7 +32,7 @@ namespace Gym.Tests.Spaces {
                 (3, 3L), (3L, 3L), ((short)3, 3L), ((sbyte)-3, -3L), ((byte)3, 3L), ((ushort)3, 3L), (3u, 3L), (3ul, 3L),
                 (long.MinValue, long.MinValue), ((ulong)long.MaxValue, long.MaxValue),
                 (true, 1L), (false, 0L),
-                (ByteAction.Three, 3L), (ULongAction.Two, 2L), (LunarLanderDiscreteActions.FireMainEngine, 2L),
+                (ByteAction.Three, 3L), (ULongAction.Two, 2L), (IntAction.FireMainEngine, 2L),
             };
             foreach (var (action, expected) in cases)
                 Assert.AreEqual(expected, Discrete.ToInt64(action), $"{action} ({action.GetType().Name})");

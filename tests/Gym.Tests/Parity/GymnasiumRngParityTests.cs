@@ -4,7 +4,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using Gym.Environments;
-using Gym.Environments.Envs.Aether;
+using Gym.Environments.Envs.Box2D;
 using Gym.Environments.Envs.Classic;
 using Gym.Spaces;
 using Gym.Utils;
@@ -19,9 +19,9 @@ namespace Gym.Tests.Parity {
     /// </summary>
     /// <remarks>
     ///     Both sides draw from NumPy's <c>Generator(PCG64(SeedSequence(seed)))</c>: Gymnasium through
-    ///     <c>seeding.np_random</c>, Gym.NET through <see cref="Seeding.NpRandom"/> and NumSharp's implementation of the generator. What
-    ///     the golden does not cover yet: CartPole's dynamics (float32 constants, P4), LunarLander (another physics engine
-    ///     and draw order, P8), and the spaces Gym.NET does not have.
+    ///     <c>seeding.np_random</c>, Gym.NET through <see cref="Seeding.NpRandom"/> and NumSharp's implementation of the generator. The
+    ///     envs' own values (CartPole's dynamics, LunarLander's terrain and engines) are compared with Gymnasium live by the
+    ///     parity suite; here LunarLander's draw pattern is pinned without Python.
     /// </remarks>
     [TestClass]
     public class GymnasiumRngParityTests {
@@ -52,40 +52,43 @@ namespace Gym.Tests.Parity {
         }
 
         /// <summary>
-        ///     The real <see cref="LunarLanderEnv"/> consumes exactly the draws its code is written to make: two
-        ///     <c>integers(-9999, 9999)</c> in the constructor, then 2 + 12 <c>uniform</c> in <see cref="LunarLanderEnv.Reset"/>
-        ///     and two per step for the zero step and 20 more. Afterwards its generator's complete PCG64 state equals that of a
-        ///     generator that made those draws by hand. A draw added, removed or reordered by kind fails it.
+        ///     The real <see cref="LunarLanderEnv"/> consumes exactly Gymnasium's draws: in <see cref="LunarLanderEnv.Reset"/> the
+        ///     12 terrain heights (one <c>uniform</c> of size 12), the push's two <c>uniform</c>, with wind the two
+        ///     <c>integers(-9999, 9999)</c> indices, then two dispersion <c>uniform</c> per step for the reset's no-op step and
+        ///     20 more. Afterwards its generator's complete PCG64 state equals that of a generator that made those draws by
+        ///     hand. A draw added, removed or reordered by kind fails it.
         /// </summary>
-        /// <remarks>
-        ///     LunarLander is not compared with Gymnasium's values: Gymnasium draws the terrain before the force and the wind in
-        ///     reset (B-17, B-18), and its physics is Box2D, not Aether.
-        /// </remarks>
+        /// <param name="enableWind">Whether the reset also draws the wind and torque indices.</param>
         [TestMethod]
-        public void LunarLander_ConsumesExactlyItsDrawPattern()
+        [DataRow(false)]
+        [DataRow(true)]
+        public void LunarLander_ConsumesExactlyItsDrawPattern(bool enableWind)
         {
             foreach (long seed in Seeds)
             {
-                var envGenerator = Seeding.NpRandom(seed).Rng;
-                var env = new LunarLanderEnv(NullEnvViewer.Factory, random_state: envGenerator);
-                // The zero step inside Reset is the first of the 21 dispersion pairs; 20 explicit steps make the rest.
-                env.Reset().Observation.Dispose();
+                using var env = new LunarLanderEnv(enableWind: enableWind);
+                // The no-op step inside Reset makes the first of the 21 dispersion pairs; 20 explicit steps make the rest.
+                env.Reset(seed).Observation.Dispose();
                 for (int i = 0; i < 20; i++)
-                    env.Step((long) LunarLanderDiscreteActions.Nothing).Observation.Dispose();
+                {
+                    using NDArray noop = NDArray.Scalar(0L);
+                    env.Step(noop).Observation.Dispose();
+                }
 
                 var replayed = Seeding.NpRandom(seed).Rng;
-                // LunarLanderEnv computes VIEWPORT_H / SCALE in float32 (VIEWPORT_H = 400) and halves it in float32.
-                float h = 400 / LunarLanderEnv.SCALE;
+                replayed.uniform(0.0, LunarLanderEnv.ViewportH / LunarLanderEnv.Scale / 2, new Shape(12)).Dispose();
                 for (int i = 0; i < 2; i++)
-                    replayed.integers(-9999, 9999).Dispose();
-                for (int i = 0; i < 2; i++)
-                    replayed.uniform(-LunarLanderEnv.INITIAL_RANDOM, LunarLanderEnv.INITIAL_RANDOM).Dispose();
-                for (int i = 0; i < 12; i++)
-                    replayed.uniform(0f, h / 2f).Dispose();
-                for (int i = 0; i < 42; i++)
-                    replayed.uniform(-1f, 1f).Dispose();
+                    replayed.uniform(-LunarLanderEnv.InitialRandom, LunarLanderEnv.InitialRandom).Dispose();
+                if (enableWind)
+                {
+                    for (int i = 0; i < 2; i++)
+                        replayed.integers(-9999, 9999).Dispose();
+                }
 
-                var envState = ((PCG64) envGenerator.bit_generator).state;
+                for (int i = 0; i < 42; i++)
+                    replayed.uniform(-1.0, 1.0).Dispose();
+
+                var envState = ((PCG64) env.NpRandom.bit_generator).state;
                 var replayedState = ((PCG64) replayed.bit_generator).state;
                 Assert.AreEqual(replayedState.state, envState.state, $"Seed {seed}: the env's PCG64 state differs.");
                 Assert.AreEqual(replayedState.inc, envState.inc, $"Seed {seed}: the env's PCG64 increment differs.");

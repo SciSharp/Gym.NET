@@ -3,7 +3,7 @@ using System.Globalization;
 using System.Linq;
 using System.Numerics;
 using Gym.Environments;
-using Gym.Environments.Envs.Aether;
+using Gym.Environments.Envs.Box2D;
 using Gym.Environments.Envs.Classic;
 using Gym.Exceptions;
 using Gym.Spaces;
@@ -94,7 +94,8 @@ namespace Gym.Tests.Utils {
 
                 new Box(-1f, 1f, new Shape(2), np.float32, seed: seed).Seed(seed);
                 AssertSameReset(seed);
-                new LunarLanderEnv(NullEnvViewer.Factory, random_state: Seeding.NpRandom(0).Rng).Reset(seed: seed).Observation.Dispose();
+                using (var lander = new LunarLanderEnv())
+                    lander.Reset(seed: seed).Observation.Dispose();
             }
 
             AssertSameReset(BigInteger.Pow(2, 100) + 7);
@@ -109,7 +110,7 @@ namespace Gym.Tests.Utils {
                 AssertSeedRejected(() => new Discrete(4).Seed(seed), seed);
                 AssertSeedRejected(() => new Box(-1f, 1f, new Shape(2), np.float32).Seed(seed), seed);
                 AssertSeedRejected(() => new CartPoleEnv().Reset(seed: seed), seed);
-                AssertSeedRejected(() => new LunarLanderEnv(NullEnvViewer.Factory, random_state: Seeding.NpRandom(0).Rng).Reset(seed: seed), seed);
+                AssertSeedRejected(() => new LunarLanderEnv().Reset(seed: seed), seed);
             }
         }
 
@@ -130,29 +131,28 @@ namespace Gym.Tests.Utils {
         }
 
         /// <summary>
-        ///     A seeded reset gives LunarLander a new generator, as Gymnasium's <c>super().reset(seed=seed)</c> does: an action
-        ///     space created with the constructor's <c>random_state</c> keeps drawing from that generator, whose next sample is
-        ///     what it would have been without the reset. (Before the core-API work, <c>Seed(s)</c> reseeded the shared
-        ///     generator in place, which Gymnasium never does.)
+        ///     A seeded reset gives LunarLander a new generator, as Gymnasium's <c>super().reset(seed=seed)</c> does: a generator
+        ///     assigned to the env before (<c>env.np_random = generator</c>) is left as it was, and its next draw is what it
+        ///     would have been without the reset. (Before the core-API work, <c>Seed(s)</c> reseeded the shared generator in
+        ///     place, which Gymnasium never does.)
         /// </summary>
         [TestMethod]
         public void LunarLanderSeededReset_ReplacesOnlyTheEnvsGenerator()
         {
             var shared = Seeding.NpRandom(1).Rng;
-            var env = new LunarLanderEnv(NullEnvViewer.Factory, random_state: shared);
-            // The constructor draws the wind and turbulence phases from the shared generator (B-18); the twin makes the same draws.
-            var twinGenerator = Seeding.NpRandom(1).Rng;
-            twinGenerator.integers(-9999, 9999).Dispose();
-            twinGenerator.integers(-9999, 9999).Dispose();
-            var twin = new Discrete(4, seed: twinGenerator);
+            using var env = new LunarLanderEnv();
+            env.NpRandom = shared;
+            Assert.AreEqual(new BigInteger(-1), env.NpRandomSeed, "An assigned generator's seed is unknown.");
+            var twin = Seeding.NpRandom(1).Rng;
 
             env.Reset(seed: 7).Observation.Dispose();
 
             Assert.AreEqual(new BigInteger(7), env.NpRandomSeed);
             Assert.AreNotSame(shared, env.NpRandom);
-            using NDArray fromShared = env.ActionSpace.Sample();
-            using NDArray fromTwin = twin.Sample();
-            Assert.AreEqual((long) fromTwin, (long) fromShared);
+            // The reset drew its terrain, push and dispersions from its own new generator, none from the shared one.
+            using NDArray fromShared = shared.random();
+            using NDArray fromTwin = twin.random();
+            Assert.AreEqual(fromTwin.GetAtIndex<double>(0), fromShared.GetAtIndex<double>(0));
         }
 
         /// <summary>Two CartPoles reset with <paramref name="seed"/> start from the same state.</summary>

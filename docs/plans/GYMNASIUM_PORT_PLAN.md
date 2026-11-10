@@ -1203,27 +1203,27 @@ gated cell of the live parity suite (`tests/Gym.Tests.Parity`, `CartPoleLivePari
 | B-14 | `CartPoleEnv.cs:139` | Action validation is `Debug.Assert` only; Release treats any non-1 action as "push left" | Source read | P4; **fixed** 2026-09-25: `AssertionError` with Python's message (`GymNet_InvalidActions_RaiseGymnasiumsAssertion`) |
 | B-15 | `CartPoleEnv.cs:49` | Unseeded `RandomState()` fallback | A.3 | P4; **fixed** 2026-09-25 (`c141717`): a per-instance entropy-seeded PCG64 generator, created lazily since P1 as Gymnasium's (`NpRandomSeed_MatchesGymnasium`) |
 | B-16 | `CartPoleEnv.cs:115`–`121` | Wrong colours; 1.07–1.14% of pixels differ | A.9 | P7; **fixed** 2026-09-25: rendered with `Gym.Rendering`'s SDL_gfx port, pixel-identical at every tested state (`GymNet_Frame*`) |
-| B-17 | `src/Gym.Environments/Envs/Aether/LunarLanderEnv.cs:496` vs `:505`–`508` | Reset draws force before terrain (Gymnasium: terrain first) | Source read | P8 |
-| B-18 | `LunarLanderEnv.cs:409`–`410` | Wind indices drawn in the constructor, even without wind | Source read | P8 |
-| B-19 | `LunarLanderEnv.cs:412`–`413` | v2 observation bounds; 9.5% of random-play observations fall outside | A.8 | P8 |
-| B-20 | `LunarLanderEnv.cs:417`, `:618` | Continuous action space is 0-d; `Step(Sample())` throws `OverflowException` | A.8 | P8 |
-| B-21 | `LunarLanderEnv.cs:526`–`531` | Terrain smoothing uses 0 where Python's `height[-1]` wraps | Source read | P8 |
-| B-22 | `LunarLanderEnv.cs:259`–`277` | Legs are a quarter of Gymnasium's area and start ≈ 1.33 m from their joint anchors | Source read | P8 |
-| B-23 | `LunarLanderEnv.cs:316`–`329` | Contact listener clears leg flags on every new contact; crash contact not sticky | Source read | P8 |
-| B-24 | `LunarLanderEnv.cs:762` | No left-edge termination (`x > 1` vs `abs(x) >= 1`) | Source read | P8 |
-| B-25 | `LunarLanderEnv.cs:658`, `:703` | Particles created even when nothing renders | Source read | P8 |
-| B-26 | `LunarLanderEnv.cs:600` | Continuous actions cast to float32 (Gymnasium: float64) | Source read | P8 |
-| B-27 | `LunarLanderEnv.cs:402`, `:406` | Throws `WarningException` where Gymnasium warns | A.8 | P8 |
-| B-28 | `LunarLanderEnv.cs:155`–`164` | FPS, viewport and engine geometry are public mutable fields | A.3 | P8 |
-| B-29 | `LunarLanderEnv.cs:384`–`387` | Falls back to the global `np.random`; a second env perturbs the first | A.8 | P8 |
-| B-30 | `LunarLanderEnv.cs:806` | `p.RenderColor != null` on a struct is always true (`CS8073`) | A.12 | P8 |
+| B-17 | `src/Gym.Environments/Envs/Aether/LunarLanderEnv.cs:496` vs `:505`–`508` | Reset draws force before terrain (Gymnasium: terrain first) | Source read | P8; **closed** 2026-11-11 (P8.5): the Aether env is deleted; P8.2's `LunarLanderEnv` draws the terrain first, as Gymnasium (the parity resets compare the generator) |
+| B-18 | `LunarLanderEnv.cs:409`–`410` | Wind indices drawn in the constructor, even without wind | Source read | P8; **closed** 2026-11-11 (P8.5): the Aether env is deleted; the wind indices are drawn in `reset`, and only with `enable_wind` |
+| B-19 | `LunarLanderEnv.cs:412`–`413` | v2 observation bounds; 9.5% of random-play observations fall outside | A.8 | P8; **closed** 2026-11-11 (P8.5): the Aether env is deleted; v3's bounds (`GymNet_Spaces_MatchGymnasium`) |
+| B-20 | `LunarLanderEnv.cs:417`, `:618` | Continuous action space is 0-d; `Step(Sample())` throws `OverflowException` | A.8 | P8; **closed** 2026-11-11 (P8.5): the Aether env is deleted; `Box(-1, 1, (2,), float32)` |
+| B-21 | `LunarLanderEnv.cs:526`–`531` | Terrain smoothing uses 0 where Python's `height[-1]` wraps | Source read | P8; **closed** 2026-11-11 (P8.5): the Aether env is deleted; Python's `height[-1]` wrap is kept |
+| B-22 | `LunarLanderEnv.cs:259`–`277` | Legs are a quarter of Gymnasium's area and start ≈ 1.33 m from their joint anchors | Source read | P8; **closed** 2026-11-11 (P8.5): the Aether env is deleted; Gymnasium's leg boxes and anchors |
+| B-23 | `LunarLanderEnv.cs:316`–`329` | Contact listener clears leg flags on every new contact; crash contact not sticky | Source read | P8; **closed** 2026-11-11 (P8.5): the Aether env is deleted; Gymnasium's `ContactDetector`, private and nested (DR-28) |
+| B-24 | `LunarLanderEnv.cs:762` | No left-edge termination (`x > 1` vs `abs(x) >= 1`) | Source read | P8; **closed** 2026-11-11 (P8.5): the Aether env is deleted; `abs(state[0]) >= 1.0` ends the episode on both sides |
+| B-25 | `LunarLanderEnv.cs:658`, `:703` | Particles created even when nothing renders | Source read | P8; **closed** 2026-11-11 (P8.5): the Aether env is deleted; particles exist only with a render mode |
+| B-26 | `LunarLanderEnv.cs:600` | Continuous actions cast to float32 (Gymnasium: float64) | Source read | P8; **closed** 2026-11-11 (P8.5): the Aether env is deleted; the throttles are clipped in float64 |
+| B-27 | `LunarLanderEnv.cs:402`, `:406` | Throws `WarningException` where Gymnasium warns | A.8 | P8; **closed** 2026-11-11 (P8.5): the Aether env is deleted; `gymnasium.logger` warnings through `Logger.Warn` |
+| B-28 | `LunarLanderEnv.cs:155`–`164` | FPS, viewport and engine geometry are public mutable fields | A.3 | P8; **closed** 2026-11-11 (P8.5): the Aether env is deleted; constants are `const` members |
+| B-29 | `LunarLanderEnv.cs:384`–`387` | Falls back to the global `np.random`; a second env perturbs the first | A.8 | P8; **closed** 2026-11-11 (P8.5): the Aether env is deleted; the env's own generator (`np_random`) |
+| B-30 | `LunarLanderEnv.cs:806` | `p.RenderColor != null` on a struct is always true (`CS8073`) | A.12 | P8; **closed** 2026-11-11 (P8.5): the Aether env is deleted; the code is gone |
 | B-31 | `src/Gym/Envs/Env.cs:34` | `Unwrapped` is protected; no wrapper attribute access | Source read | P1; **fixed** 2026-09-25: public `Unwrapped` and the attribute protocol on Python names (`TestGetSetWrapperAttr`, `WrapperAttributes_MatchGymnasium`) |
 | B-32 | `Env.cs:56`–`59` | `GoalEnv.Reset()` returns `null` | Source read | P1 (deleted); **fixed** 2026-09-25: `GoalEnv` deleted |
 | B-33 | `src/Gym/Envs/VecEnvWrapper.cs:22`–`24` | `Step(int)` sends the same action to every sub-env | Source read | P6 (deleted); moved to `Gym.Legacy` (`[Obsolete]`) by P1 |
 | B-34 | `src/Gym/Internal/Threading/DistributedThread.cs:114`–`137`, `DistributedQueuedTaskScheduler.cs:194` | `Thread.Abort`/`ResetAbort`/compressed stack throw on .NET 5+ | A.12 | P1 (deleted); **fixed** 2026-09-25: `Internal/Threading` deleted, `StepAsync` is a `ValueTask` member that completes on the calling thread (`StepAsync_CompletesWithTheStep`) |
 | B-35 | `CartPoleEnv.cs:83`–`88`, `LunarLanderEnv.cs:779`–`784` | Viewer creation blocks on async inside `lock (this)` | A.3 | P7 |
 | B-36 | `examples/ReinforcementLearning/*` | Doesn't build (`NU1201`) | A.12 | P10 |
-| B-37 | `tests/Gym.Tests/Envs/Aether/LunarLanderEnvironment.cs:65` | The only determinism assertion runs in Debug builds only | Source read | P0 |
+| B-37 | `tests/Gym.Tests/Envs/Aether/LunarLanderEnvironment.cs:65` | The only determinism assertion runs in Debug builds only | Source read | P0; **closed** 2026-11-11 (P8.5): the Aether env is deleted; the file is gone; `tests/Gym.Tests/Envs/Box2D/LunarLanderEnvironment.cs` asserts Gymnasium's eight heuristic landings exactly in every configuration |
 | B-38 | Repository | No CI; no nullable annotations; 16 warning codes; vulnerable transitive packages through Avalonia 0.10.22 | A.12 | P0 |
 
 ---

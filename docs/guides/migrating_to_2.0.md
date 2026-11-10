@@ -133,6 +133,18 @@ Everything in `Gym.Legacy` is `[Obsolete]`, with the replacement named in the wa
 
 ## LunarLander
 
-The `LunarLanderEnv` of 0.2 (Aether physics) is still in Gym.NET.Environments, on the 2.0 API, but it is not
-Gymnasium's LunarLander and is not registered: `Gymnasium.Make("LunarLander-v3")` raises `NameNotFound`. Gymnasium's
-Box2D environments arrive with Gym.NET's Box2D engine, which replaces it.
+The `LunarLanderEnv` of 0.2 (`Gym.Environments.Envs.Aether`, Aether physics) is gone, with its
+`LunarLanderDiscreteActions` enum and the Aether.Physics2D, ImageSharp.Drawing and SixLabors.Fonts dependencies. Its
+replacement is Gymnasium's LunarLander on Gym.NET's Box2D engine: `Gymnasium.Make("LunarLander-v3")` or
+`Gymnasium.Make("LunarLanderContinuous-v3")`, or `Gym.Environments.Envs.Box2D.LunarLanderEnv` built directly.
+
+| 0.2 | 2.0 |
+|---|---|
+| `new LunarLanderEnv(viewerFactory, random_state: rng, continuous: c, render_mode: m)` | `new LunarLanderEnv(renderMode: m, continuous: c, viewerFactory: f)`; seed through `Reset(seed)`, or assign `env.NpRandom` |
+| `(int)LunarLanderDiscreteActions.FireMainEngine` | the action `2` (0 nothing, 1 left engine, 2 main engine, 3 right engine), as Gymnasium's |
+| `env.ContinuousMode` | `env.Continuous` |
+| `LunarLanderEnv.SCALE`, `INITIAL_RANDOM`, ... (mutable fields) | `LunarLanderEnv.Scale`, `InitialRandom`, ... (constants) |
+| v2 observation bounds, a 0-d continuous action space | v3's bounds, `Box(-1, 1, (2,), float32)` |
+
+The episodes differ from 0.2's: the physics is Box2D 2.3.0, bit for bit as Gymnasium's pybox2d, and the draws follow
+Gymnasium's order, so `reset(seed)` gives Gymnasium's episode.
