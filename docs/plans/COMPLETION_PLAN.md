@@ -740,8 +740,32 @@ Specs: the port plan's §9 and §10; sources `vector` 3,113 lines and `wrappers`
       seven-argument delegate given by Python name fails the binding. New tests cover the pipe, a wrapped default worker
       equal to sync, a worker in charge of its sub-env, `daemon`, the dying worker and a sub-env's error. A parity cell
       runs Gymnasium's own custom-worker path (`worker=_async_worker`) in lockstep with Gym.NET's pipe workers.*
-  - DR-46: OpenCV's float32 resize paths.
-  - DR-39: ScottPlot figures in the two viewer packages.
+  - DR-46: OpenCV's float32 resize paths. *Done 2026-11-10:*
+    - Measured first, as the design asked, on the pinned `cv2` (IPP 2022.2.0, AVX2). float32 `INTER_AREA` is the same
+      with IPP and optimizations on or off (400 cases). float32 `INTER_LINEAR` goes to Intel IPP by default and differs
+      from OpenCV's own kernel in 255 of 400 cases, by up to 4.4e-4. OpenCV's own kernel does not depend on the SIMD
+      dispatch: the wheels' SSE baseline has no fused multiply-add.
+    - `Cv2.Resize` takes float32. Its float overloads are the area-fast mean, `resizeArea_<float, float>` (copied out
+      unrounded) and the float bilinear kernel. The 2×2 vector kernel of 1 or 4 channels sums pairwise over whole groups
+      of four outputs, the generic loop in order, in groups of four, which only floats can tell apart.
+    - IPP's bilinear is not published, and ten candidate formulas reproduced at most two thirds of its outputs. So
+      Gym.NET gives OpenCV's own kernel, gated against `cv2` with IPP off (1,250 random cases, bit for bit), and
+      `[OpenBugs("DR-46-IPP")]` pins the gap against default `cv2`. This is a reading for the maintainer (DESIGN_REVIEW's
+      list).*
+  - DR-39: ScottPlot figures in the two viewer packages. *Done 2026-11-10:*
+    - `Gym.NET.Rendering.Avalonia` ships `AvaloniaPlotFigure` (ScottPlot.Avalonia 5.1.59, built for Avalonia 12), and
+      `Gym.NET.Rendering.WinForm` ships `WinFormPlotFigure` (ScottPlot.WinForms 5.1.59). Each is an `IPlotFigure` with
+      one plot per row (ScottPlot's `Rows` multiplot), a `Subplots()` maker for `PlayPlot` and its ScottPlot control
+      exposed for styling.
+    - The Avalonia window lives on the shared Avalonia UI thread, through a start helper factored out of
+      `StaticAvaloniaApp.Run`. The Windows Forms form runs on an STA thread of its own, as `WinFormEnvViewer` does. Both
+      open at the first pause and draw nothing more once the user closes them.
+    - The `IPlotAxes` adapter is one source file, `src/Shared/ScottPlotAxes.cs`, compiled into both packages. It
+      handles titles, marker-only scatters in matplotlib's base colors, removal, `set_xlim` with the y range refitted,
+      and every edit under the plot's `Sync` lock. The core gains no dependency.
+    - Tests: the adapter headless on plain plots (titles, colors, points, removal, limits, a `PlayPlot` run, a rendered
+      image), and each window figure under `PlayPlot` (`*AvaloniaEnv`, `*WinFormEnv`: they open windows, so they run
+      on a desktop).*
   - DR-37 (P7): `aaline`/`aalines` translated from pygame-ce's `draw.c`. *Done 2026-11-10, inside `Gym.Rendering` (the
     maintainer's choice):*
     - `src/Gym.Rendering/Draw.Aaline.cs` translates `aaline`, `aalines`, `draw_aaline` and `get_antialiased_color`

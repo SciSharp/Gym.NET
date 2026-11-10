@@ -165,9 +165,10 @@ Agreement.
 
 `src/Gym/Utils/Cv2.cs` is a C# translation of part of `modules/imgproc/src/resize.cpp` from
 [OpenCV](https://github.com/opencv/opencv) 4.13.0 (decision DR-23), the library behind `cv2.resize`, which Gymnasium's
-`ResizeObservation` calls. It is an altered version, marked as such in the file: translated to C#, reduced to the 8-bit
-area (`INTER_AREA`) and bilinear (`INTER_LINEAR`) paths, single-threaded, without OpenCV's SIMD, IPP and OpenCL code
-(whose results for these paths equal the scalar code's). OpenCV 4.5 and later are licensed under the Apache License 2.0,
+`ResizeObservation` calls. It is an altered version, marked as such in the file: translated to C#, reduced to the uint8
+and float32 area (`INTER_AREA`) and bilinear (`INTER_LINEAR`) paths, single-threaded, without OpenCV's IPP and OpenCL
+code; the SIMD kernels' order of summation is kept where it changes float results (the float32 2×2 area mean). Intel
+IPP's float32 bilinear, which the wheels use by default, is not translated (it is not published). OpenCV 4.5 and later are licensed under the Apache License 2.0,
 the license of Gym.NET itself (see [LICENSE](LICENSE)); the file `resize.cpp` carries this notice:
 
 ```
@@ -204,8 +205,8 @@ or tort (including negligence or otherwise) arising in any way out of
 the use of this software, even if advised of the possibility of such damage.
 ```
 
-The translation is verified byte for byte against live `cv2` 4.13.0 by the parity suite
-(`tests/Gym.Tests.Parity/Tests/Utils/Cv2ResizeLiveParityTests.cs`).
+The translation is verified bit for bit against live `cv2` 4.13.0 by the parity suite
+(`tests/Gym.Tests.Parity/Tests/Utils/Cv2ResizeLiveParityTests.cs`; float32 `INTER_LINEAR` with IPP switched off).
 
 ---
 

@@ -82,7 +82,9 @@ In short:
   a window from the viewer factory; the Avalonia and WinForms viewers report keys, their close button and resizes, and
   headless runs are driven by events posted to `Gym.Rendering.EventQueue`, as Gymnasium's tests post them.
   `Play.RunAsync` awaits a game, on a thread of its own for a window and on the thread pool headless; a
-  `PygameContext` gives a game its own display and event queue, so two games can run at once.
+  `PygameContext` gives a game its own display and event queue, so two games can run at once. `PlayPlot`'s charts get
+  titles, ticks and labels from ScottPlot in the viewer packages (`AvaloniaPlotFigure.Subplots()`,
+  `WinFormPlotFigure.Subplots()`); the core's plain `PlotFigure` needs no chart library.
 - **Environments** (all registered for `Gymnasium.Make`, each with `rgb_array` frames equal to Gymnasium's, `ansi` text
   for toy_text, and `human` mode):
 
@@ -130,6 +132,11 @@ Each is documented on the member, and the parity suite pins it, so a change show
 ## Known gaps
 
 Each has a test that asserts Gymnasium's answer and fails until the gap closes (`[OpenBugs]`):
+
+- **`Cv2.Resize` of float32 images with `INTER_LINEAR`** gives OpenCV's own bilinear kernel, what `cv2` computes with
+  `cv2.ipp.setUseIPP(False)` or on a build without Intel IPP. The `cv2` wheels hand that case to IPP by default, whose
+  algorithm is not published, and its results differ by a few units in the last place (DR-46). uint8 images, which
+  Gymnasium's wrappers use, and float32 `INTER_AREA` are exact either way.
 
 - **A bare `assert`'s message**: where Gymnasium fails a message-less `assert` (Taxi's `decode` beyond the grid,
   Blackjack's refused actions, `render()` without a render mode or spec), Gym.NET raises `AssertionError` too, but its

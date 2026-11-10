@@ -4,9 +4,9 @@ using NumSharp;
 
 namespace Gym.Utils {
     /// <summary>
-    ///     OpenCV's <c>cv2.resize</c> for 8-bit images, byte for byte: <see cref="InterArea"/>, the interpolation Gymnasium's
-    ///     <c>ResizeObservation</c> uses, and <see cref="InterLinear"/>, the default the vector <c>HumanRendering</c> uses.
-    ///     Use it wherever Gymnasium calls <c>cv2.resize</c>; Gym.NET carries no native OpenCV.
+    ///     OpenCV's <c>cv2.resize</c> for uint8 and float32 images, bit for bit: <see cref="InterArea"/>, the interpolation
+    ///     Gymnasium's <c>ResizeObservation</c> uses, and <see cref="InterLinear"/>, the default the vector
+    ///     <c>HumanRendering</c> uses. Use it wherever Gymnasium calls <c>cv2.resize</c>; Gym.NET carries no native OpenCV.
     /// </summary>
     /// <remarks>
     ///     <para>
@@ -19,10 +19,19 @@ namespace Gym.Utils {
     ///     the bytes equal the pinned <c>cv2</c>'s, which the parity suite checks against live OpenCV.
     ///     </para>
     ///     <para>
-    ///     Only uint8 images are supported (Gymnasium's callers require uint8); OpenCV's float32 paths are not translated.
+    ///     uint8 and float32 images are supported (DR-46; Gymnasium's own callers require uint8). The float32 paths are
+    ///     OpenCV's float instantiations of the same kernels: the area-fast mean (its 2×2 vector kernel for 1 or 4 channels
+    ///     summing pairwise over whole groups of four outputs, the generic sum in groups of four, OpenCV's unrolling), the
+    ///     general area decimation copied out unrounded, and the float bilinear kernel. Footgun, float32
+    ///     <see cref="InterLinear"/> only: the <c>cv2</c> wheels hand it to Intel IPP when IPP is on (the default, measured
+    ///     on 2026-11-10: 255 of 400 random cases differ from OpenCV's own kernel, by up to 4.4e-4), and IPP's algorithm is
+    ///     not published; this method gives OpenCV's own result, what <c>cv2</c> computes with <c>cv2.ipp.setUseIPP(False)</c>
+    ///     or on a build without IPP. <see cref="InterArea"/> is the same either way.
+    ///     </para>
+    ///     <para>
     ///     Like <c>cv2</c>, a single-channel image comes back two-dimensional, whether it was given as <c>(H, W)</c> or
     ///     <c>(H, W, 1)</c>. Each call allocates its result and a few tables; it is single-threaded, where OpenCV splits
-    ///     rows across threads (which does not change its bytes).
+    ///     rows across threads (which does not change its results).
     ///     </para>
     ///     <para>
     ///     Third-party notice: OpenCV is © Intel Corporation, Willow Garage Inc., Itseez Inc. and contributors, licensed
@@ -47,25 +56,25 @@ namespace Gym.Utils {
         private const double DblEpsilon = 2.220446049250313E-16;
 
         /// <summary>
-        ///     <c>cv2.resize(src, dsize, interpolation=interpolation)</c> for a uint8 image: a new <c>(height, width)</c> or
-        ///     <c>(height, width, channels)</c> image.
+        ///     <c>cv2.resize(src, dsize, interpolation=interpolation)</c> for a uint8 or float32 image: a new
+        ///     <c>(height, width)</c> or <c>(height, width, channels)</c> image of the same dtype.
         /// </summary>
-        /// <param name="src">The image, <c>(H, W)</c> or <c>(H, W, C)</c> uint8, of any layout; it is not changed.</param>
+        /// <param name="src">The image, <c>(H, W)</c> or <c>(H, W, C)</c> uint8 or float32, of any layout; it is not changed.</param>
         /// <param name="dsize">The target size, OpenCV's order: <c>(width, height)</c>.</param>
         /// <param name="interpolation"><see cref="InterArea"/> or <see cref="InterLinear"/>.</param>
-        /// <returns>A new uint8 array the caller owns; two-dimensional for a single channel, as <c>cv2</c> returns it.</returns>
+        /// <returns>A new array of <paramref name="src"/>'s dtype the caller owns; two-dimensional for a single channel, as <c>cv2</c> returns it.</returns>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="src"/> is <see langword="null"/>.</exception>
         /// <exception cref="NotSupportedException">
-        ///     Thrown for a dtype other than uint8, an interpolation other than the two, or more than 4 channels on the general
-        ///     area path (OpenCV's <c>cn &lt;= 4</c> assertion).
+        ///     Thrown for a dtype other than uint8 and float32, an interpolation other than the two, or more than 4 channels on
+        ///     the general area path (OpenCV's <c>cn &lt;= 4</c> assertion).
         /// </exception>
         /// <exception cref="ValueError">Thrown for an image that is not 2-D or 3-D or is empty, or a target size that is not positive.</exception>
         /// <remarks>Reference: <see href="https://github.com/opencv/opencv/blob/4.13.0/modules/imgproc/src/resize.cpp#L4201">modules/imgproc/src/resize.cpp (cv::resize)</see>.</remarks>
         public static NDArray Resize(NDArray src, (int Width, int Height) dsize, int interpolation = InterLinear) {
             if (src is null)
                 throw new ArgumentNullException(nameof(src));
-            if (src.typecode != NPTypeCode.Byte)
-                throw new NotSupportedException($"Cv2.Resize supports uint8 images only, got {src.dtype.name}");
+            if (src.typecode is not (NPTypeCode.Byte or NPTypeCode.Single))
+                throw new NotSupportedException($"Cv2.Resize supports uint8 and float32 images only, got {src.dtype.name}");
             if (interpolation != InterLinear && interpolation != InterArea)
                 throw new NotSupportedException($"Cv2.Resize supports INTER_LINEAR (1) and INTER_AREA (3) only, got {interpolation}");
             if (src.ndim is not (2 or 3))
@@ -79,17 +88,28 @@ namespace Gym.Utils {
             if (width <= 0 || height <= 0)
                 throw new ValueError($"Cv2.Resize expects a positive target size, got ({width}, {height})");
 
+            double invScaleX = (double)width / srcWidth, invScaleY = (double)height / srcHeight;
+            // cv2 hands a one-channel Mat back as (H, W), even for an (H, W, 1) input.
+            Shape shape = channels == 1 ? new Shape(height, width) : new Shape(height, width, channels);
+            if (src.typecode == NPTypeCode.Single) {
+                // The float32 instantiations of the same kernels (DR-46); a same-size resize is OpenCV's plain copy.
+                float[] floats = src.ToArray<float>();
+                var floatResult = new float[checked(height * width * channels)];
+                if (width == srcWidth && height == srcHeight)
+                    Array.Copy(floats, floatResult, floatResult.Length);
+                else
+                    ResizeCore(floats, srcWidth, srcHeight, channels, floatResult, width, height, invScaleX, invScaleY, interpolation);
+                return new NDArray(floatResult, shape);
+            }
+
             // The image's bytes in C order, whatever its layout; OpenCV reads a Mat the same way.
             byte[] source = src.ToArray<byte>();
             var result = new byte[checked(height * width * channels)];
-            double invScaleX = (double)width / srcWidth, invScaleY = (double)height / srcHeight;
             if (width == srcWidth && height == srcHeight)
                 Buffer.BlockCopy(source, 0, result, 0, result.Length);
             else
                 ResizeCore(source, srcWidth, srcHeight, channels, result, width, height, invScaleX, invScaleY, interpolation);
 
-            // cv2 hands a one-channel Mat back as (H, W), even for an (H, W, 1) input.
-            Shape shape = channels == 1 ? new Shape(height, width) : new Shape(height, width, channels);
             return new NDArray(result, shape);
         }
 
@@ -441,6 +461,337 @@ namespace Gym.Utils {
 
             for (; dx < width; dx++)
                 row[dx] = src[sRow + xofs[dx]] * CoefScale;
+        }
+
+        /// <summary>OpenCV's <c>hal::resize</c> for float32 images: the kernel choice of the uint8 overload, with the float kernels.</summary>
+        /// <param name="src">The source floats, C order.</param>
+        /// <param name="srcWidth">The source width in pixels.</param>
+        /// <param name="srcHeight">The source height.</param>
+        /// <param name="cn">The channels.</param>
+        /// <param name="dst">The destination floats, written.</param>
+        /// <param name="dstWidth">The destination width.</param>
+        /// <param name="dstHeight">The destination height.</param>
+        /// <param name="invScaleX"><c>dstWidth / srcWidth</c>.</param>
+        /// <param name="invScaleY"><c>dstHeight / srcHeight</c>.</param>
+        /// <param name="interpolation">The interpolation.</param>
+        /// <exception cref="NotSupportedException">Thrown for more than 4 channels on the general area path.</exception>
+        /// <remarks>Reference: <see href="https://github.com/opencv/opencv/blob/4.13.0/modules/imgproc/src/resize.cpp#L3826">modules/imgproc/src/resize.cpp (hal::resize)</see>.</remarks>
+        private static void ResizeCore(float[] src, int srcWidth, int srcHeight, int cn, float[] dst, int dstWidth, int dstHeight,
+            double invScaleX, double invScaleY, int interpolation) {
+            double scaleX = 1.0 / invScaleX, scaleY = 1.0 / invScaleY;
+            int iscaleX = CvRound(scaleX), iscaleY = CvRound(scaleY);
+            bool isAreaFast = Math.Abs(scaleX - iscaleX) < DblEpsilon && Math.Abs(scaleY - iscaleY) < DblEpsilon;
+
+            // In case of scale_x && scale_y is equal to 2, INTER_AREA (fast) also is equal to INTER_LINEAR.
+            if (interpolation == InterLinear && isAreaFast && iscaleX == 2 && iscaleY == 2)
+                interpolation = InterArea;
+
+            if (interpolation == InterArea && scaleX >= 1 && scaleY >= 1) {
+                if (isAreaFast) {
+                    AreaFast(src, srcWidth, srcHeight, cn, dst, dstWidth, dstHeight, iscaleX, iscaleY);
+                    return;
+                }
+
+                if (cn > 4)
+                    throw new NotSupportedException("error: (-215:Assertion failed) func != 0 && cn <= 4 in function 'cv::hal::resize'");
+                Area(src, srcWidth, srcHeight, cn, dst, dstWidth, dstHeight, scaleX, scaleY);
+                return;
+            }
+
+            Linear(src, srcWidth, srcHeight, cn, dst, dstWidth, dstHeight, scaleX, scaleY, invScaleX, invScaleY, interpolation == InterArea);
+        }
+
+        /// <summary>
+        ///     OpenCV's <c>resizeAreaFast_&lt;float, float, ResizeAreaFastVec_SIMD_32f&gt;</c>: the mean of each
+        ///     <c>scaleX × scaleY</c> block in float32. Two orders of summation, as OpenCV's kernels run them: for 2×2 blocks
+        ///     of 1 or 4 channels, the 128-bit vector kernel takes whole groups of four outputs and sums each block pairwise,
+        ///     <c>((a + b) + (c + d)) * 0.25f</c>; every other output (that kernel's tail, the other blocks and channel counts)
+        ///     takes the generic loop, unrolled by four, <c>sum += ((a + b) + c) + d</c>, then <c>sum * (1.f / area)</c>.
+        ///     Blocks cut by the image's edge are the mean of the pixels they hold (NaN for none, OpenCV's <c>0 / 0</c>).
+        /// </summary>
+        /// <param name="src">The source floats.</param>
+        /// <param name="srcWidth">The source width.</param>
+        /// <param name="srcHeight">The source height.</param>
+        /// <param name="cn">The channels.</param>
+        /// <param name="dst">The destination floats.</param>
+        /// <param name="dstWidth">The destination width.</param>
+        /// <param name="dstHeight">The destination height.</param>
+        /// <param name="scaleX">The integer horizontal factor.</param>
+        /// <param name="scaleY">The integer vertical factor.</param>
+        /// <remarks>
+        ///     The four-lane grouping is the <c>cv2</c> wheels' x86 baseline (SSE, <c>CV_SIMD_WIDTH</c> 16), which the parity
+        ///     suite pins on its corpus. Reference: <see href="https://github.com/opencv/opencv/blob/4.13.0/modules/imgproc/src/resize.cpp#L2857">modules/imgproc/src/resize.cpp (ResizeAreaFastVec_SIMD_32f)</see>
+        ///     and <see href="https://github.com/opencv/opencv/blob/4.13.0/modules/imgproc/src/resize.cpp#L2975">resizeAreaFast_Invoker</see>.
+        /// </remarks>
+        private static void AreaFast(float[] src, int srcWidth, int srcHeight, int cn, float[] dst, int dstWidth, int dstHeight, int scaleX, int scaleY) {
+            int area = scaleX * scaleY;
+            float scale = 1f / area;
+            int srcStep = srcWidth * cn;
+            var ofs = new int[area];
+            for (int sy = 0, k = 0; sy < scaleY; sy++) {
+                for (int sx = 0; sx < scaleX; sx++)
+                    ofs[k++] = sy * srcStep + sx * cn;
+            }
+
+            int dwidth = dstWidth * cn, swidth = srcWidth * cn;
+            var xofs = new int[dwidth];
+            for (int dx = 0; dx < dstWidth; dx++) {
+                int j = dx * cn, sx = scaleX * j;
+                for (int k = 0; k < cn; k++)
+                    xofs[j + k] = sx + k;
+            }
+
+            int dwidth1 = srcWidth / scaleX * cn;
+            bool fastMode = scaleX == 2 && scaleY == 2 && (cn == 1 || cn == 4);
+            for (int dy = 0; dy < dstHeight; dy++) {
+                int dRow = dy * dwidth, sy0 = dy * scaleY;
+                int w = sy0 + scaleY <= srcHeight ? dwidth1 : 0;
+                if (sy0 >= srcHeight) {
+                    Array.Clear(dst, dRow, dwidth);
+                    continue;
+                }
+
+                int sRow = sy0 * srcStep, dx = 0;
+                if (fastMode) {
+                    // The vector kernel's loop, `dx <= w - 4` by fours: its outputs are elementwise, so they are computed one
+                    // by one here, over the same whole groups; the tail goes to the generic loop below.
+                    int next = sRow + srcStep, grouped = w / 4 * 4;
+                    for (; dx < grouped; dx++) {
+                        int s, n, step;
+                        if (cn == 1) {
+                            // v_load_deinterleave: output dx takes the even and odd pixels 2dx and 2dx + 1 of both rows.
+                            s = sRow + 2 * dx;
+                            n = next + 2 * dx;
+                            step = 1;
+                        } else {
+                            // Four channels: output float dx is channel dx % 4 of pixel dx / 4, from pixels 2(dx / 4) and 2(dx / 4) + 1.
+                            int pixelFloat = dx / 4 * 8 + dx % 4;
+                            s = sRow + pixelFloat;
+                            n = next + pixelFloat;
+                            step = 4;
+                        }
+
+                        dst[dRow + dx] = ((src[s] + src[s + step]) + (src[n] + src[n + step])) * 0.25f;
+                    }
+                }
+
+                for (; dx < w; dx++) {
+                    int s = sRow + xofs[dx], k = 0;
+                    float sum = 0f;
+                    // CV_ENABLE_UNROLLED: four samples summed left to right, then added to the sum, then the rest one by one.
+                    for (; k <= area - 4; k += 4)
+                        sum += src[s + ofs[k]] + src[s + ofs[k + 1]] + src[s + ofs[k + 2]] + src[s + ofs[k + 3]];
+                    for (; k < area; k++)
+                        sum += src[s + ofs[k]];
+                    dst[dRow + dx] = sum * scale;
+                }
+
+                for (; dx < dwidth; dx++) {
+                    float sum = 0f;
+                    int count = 0, sx0 = xofs[dx];
+                    for (int sy = 0; sy < scaleY; sy++) {
+                        if (sy0 + sy >= srcHeight)
+                            break;
+                        int s = (sy0 + sy) * srcStep + sx0;
+                        for (int sx = 0; sx < scaleX * cn; sx += cn) {
+                            if (sx0 + sx >= swidth)
+                                break;
+                            sum += src[s + sx];
+                            count++;
+                        }
+                    }
+
+                    // (float)sum / count: a float division, NaN for a block with no pixels.
+                    dst[dRow + dx] = sum / count;
+                }
+            }
+        }
+
+        /// <summary>
+        ///     OpenCV's <c>resizeArea_&lt;float, float&gt;</c>: the uint8 overload's area-weighted means, accumulated in float32
+        ///     row by row the same way, and copied out as they are (<c>inter_area::saturate_store</c> for <c>T == WT</c>).
+        /// </summary>
+        /// <param name="src">The source floats.</param>
+        /// <param name="srcWidth">The source width.</param>
+        /// <param name="srcHeight">The source height.</param>
+        /// <param name="cn">The channels, at most 4.</param>
+        /// <param name="dst">The destination floats.</param>
+        /// <param name="dstWidth">The destination width.</param>
+        /// <param name="dstHeight">The destination height.</param>
+        /// <param name="scaleX">The horizontal factor, at least 1.</param>
+        /// <param name="scaleY">The vertical factor, at least 1.</param>
+        /// <exception cref="InvalidOperationException">Thrown when the vertical table skips a destination row (OpenCV's assertion; cannot happen for factors of at least 1).</exception>
+        /// <remarks>Reference: <see href="https://github.com/opencv/opencv/blob/4.13.0/modules/imgproc/src/resize.cpp#L3183">modules/imgproc/src/resize.cpp (ResizeArea_Invoker)</see>.</remarks>
+        private static void Area(float[] src, int srcWidth, int srcHeight, int cn, float[] dst, int dstWidth, int dstHeight, double scaleX, double scaleY) {
+            var xtab = new DecimateAlpha[srcWidth * 2];
+            var ytab = new DecimateAlpha[srcHeight * 2];
+            int xtabSize = ComputeResizeAreaTab(srcWidth, dstWidth, cn, scaleX, xtab);
+            int ytabSize = ComputeResizeAreaTab(srcHeight, dstHeight, 1, scaleY, ytab);
+
+            var tabofs = new int[dstHeight + 1];
+            int dy = 0;
+            for (int k = 0; k < ytabSize; k++) {
+                if (k == 0 || ytab[k].Di != ytab[k - 1].Di) {
+                    if (ytab[k].Di != dy)
+                        throw new InvalidOperationException("Assertion failed: ytab[k].di == dy");
+                    tabofs[dy++] = k;
+                }
+            }
+
+            tabofs[dy] = ytabSize;
+
+            int dwidth = dstWidth * cn, srcStep = srcWidth * cn;
+            var buf = new float[dwidth];
+            var sum = new float[dwidth];
+            // One stripe, as in the uint8 overload: a stripe's first rows add to zero, which changes no float (the buffers
+            // start at +0 and never hold -0).
+            int jStart = tabofs[0], jEnd = tabofs[dstHeight], prevDy = ytab[jStart].Di;
+            for (int j = jStart; j < jEnd; j++) {
+                float beta = ytab[j].Alpha;
+                int rowDy = ytab[j].Di, sRow = ytab[j].Si * srcStep;
+                Array.Clear(buf, 0, dwidth);
+                for (int k = 0; k < xtabSize; k++) {
+                    int sxn = xtab[k].Si, dxn = xtab[k].Di;
+                    float alpha = xtab[k].Alpha;
+                    for (int c = 0; c < cn; c++)
+                        buf[dxn + c] = buf[dxn + c] + src[sRow + sxn + c] * alpha;
+                }
+
+                if (rowDy != prevDy) {
+                    Array.Copy(sum, 0, dst, prevDy * dwidth, dwidth);
+                    for (int dx = 0; dx < dwidth; dx++)
+                        sum[dx] = beta * buf[dx];
+                    prevDy = rowDy;
+                } else {
+                    for (int dx = 0; dx < dwidth; dx++)
+                        sum[dx] = sum[dx] + beta * buf[dx];
+                }
+            }
+
+            Array.Copy(sum, 0, dst, prevDy * dwidth, dwidth);
+        }
+
+        /// <summary>
+        ///     OpenCV's float bilinear <c>resizeGeneric_</c> (<c>HResizeLinear&lt;float, float, float, 1&gt;</c> and
+        ///     <c>VResizeLinear&lt;float, float, float&gt;</c>), with <c>INTER_AREA</c>'s coefficients when
+        ///     <paramref name="areaMode"/>: float weights <c>1 - f</c> and <c>f</c>, each row blended horizontally
+        ///     <c>S[x]·a0 + S[x + cn]·a1</c>, then the two rows <c>r0·b0 + r1·b1</c>, all in float32 with no fused
+        ///     multiply-add (the wheels' SSE baseline has none), so the vector and scalar kernels agree.
+        /// </summary>
+        /// <param name="src">The source floats.</param>
+        /// <param name="srcWidth">The source width.</param>
+        /// <param name="srcHeight">The source height.</param>
+        /// <param name="cn">The channels.</param>
+        /// <param name="dst">The destination floats.</param>
+        /// <param name="dstWidth">The destination width.</param>
+        /// <param name="dstHeight">The destination height.</param>
+        /// <param name="scaleX">The horizontal factor, <c>srcWidth / dstWidth</c>.</param>
+        /// <param name="scaleY">The vertical factor.</param>
+        /// <param name="invScaleX">Its inverse.</param>
+        /// <param name="invScaleY">Its inverse.</param>
+        /// <param name="areaMode">Whether the coefficients are <c>INTER_AREA</c>'s emulation rather than bilinear's.</param>
+        /// <remarks>Reference: <see href="https://github.com/opencv/opencv/blob/4.13.0/modules/imgproc/src/resize.cpp#L1877">modules/imgproc/src/resize.cpp (HResizeLinear, VResizeLinear)</see>.</remarks>
+        private static void Linear(float[] src, int srcWidth, int srcHeight, int cn, float[] dst, int dstWidth, int dstHeight,
+            double scaleX, double scaleY, double invScaleX, double invScaleY, bool areaMode) {
+            const int ksize = 2, ksize2 = ksize / 2;
+            int xmax = dstWidth, width = dstWidth * cn;
+            var xofs = new int[width];
+            var alpha = new float[width * ksize];
+            var yofs = new int[dstHeight];
+            var beta = new float[dstHeight * ksize];
+
+            for (int dx = 0; dx < dstWidth; dx++) {
+                float fx;
+                int sx;
+                if (!areaMode) {
+                    fx = (float)((dx + 0.5) * scaleX - 0.5);
+                    sx = CvFloor(fx);
+                    fx -= sx;
+                } else {
+                    sx = CvFloor(dx * scaleX);
+                    fx = (float)(dx + 1 - (sx + 1) * invScaleX);
+                    fx = fx <= 0 ? 0f : fx - CvFloor(fx);
+                }
+
+                if (sx < ksize2 - 1 && sx < 0) {
+                    fx = 0;
+                    sx = 0;
+                }
+
+                if (sx + ksize2 >= srcWidth) {
+                    xmax = Math.Min(xmax, dx);
+                    if (sx >= srcWidth - 1) {
+                        fx = 0;
+                        sx = srcWidth - 1;
+                    }
+                }
+
+                for (int k = 0; k < cn; k++)
+                    xofs[dx * cn + k] = sx * cn + k;
+
+                int b = dx * cn * ksize;
+                alpha[b] = 1f - fx;
+                alpha[b + 1] = fx;
+                for (int k = ksize; k < cn * ksize; k++)
+                    alpha[b + k] = alpha[b + k - ksize];
+            }
+
+            for (int dy = 0; dy < dstHeight; dy++) {
+                float fy;
+                int sy;
+                if (!areaMode) {
+                    fy = (float)((dy + 0.5) * scaleY - 0.5);
+                    sy = CvFloor(fy);
+                    fy -= sy;
+                } else {
+                    sy = CvFloor(dy * scaleY);
+                    fy = (float)(dy + 1 - (sy + 1) * invScaleY);
+                    fy = fy <= 0 ? 0f : fy - CvFloor(fy);
+                }
+
+                // Not clamped: the rows are clipped when read, the weights kept (an edge row blends with itself).
+                yofs[dy] = sy;
+                beta[dy * ksize] = 1f - fy;
+                beta[dy * ksize + 1] = fy;
+            }
+
+            int xmaxCn = xmax * cn, srcStep = srcWidth * cn;
+            var row0 = new float[width];
+            var row1 = new float[width];
+            for (int dy = 0; dy < dstHeight; dy++) {
+                int sy0 = yofs[dy];
+                HResize(src, Clip(sy0, 0, srcHeight) * srcStep, row0, xofs, alpha, width, xmaxCn, cn);
+                HResize(src, Clip(sy0 + 1, 0, srcHeight) * srcStep, row1, xofs, alpha, width, xmaxCn, cn);
+
+                float b0 = beta[dy * ksize], b1 = beta[dy * ksize + 1];
+                int dRow = dy * width;
+                for (int x = 0; x < width; x++)
+                    dst[dRow + x] = row0[x] * b0 + row1[x] * b1;
+            }
+        }
+
+        /// <summary>
+        ///     OpenCV's <c>HResizeLinear&lt;float, float, float, 1&gt;</c>: one source row blended horizontally, two taps up
+        ///     to <paramref name="xmax"/>, the edge pixel alone (times one) past it.
+        /// </summary>
+        /// <param name="src">The source floats.</param>
+        /// <param name="sRow">The row's first float.</param>
+        /// <param name="row">The destination row, written.</param>
+        /// <param name="xofs">Each destination element's first source element.</param>
+        /// <param name="alpha">The two weights of each destination element.</param>
+        /// <param name="width">The destination row length, in elements.</param>
+        /// <param name="xmax">The first element whose second tap would be past the edge.</param>
+        /// <param name="cn">The channels: the second tap is <paramref name="cn"/> elements on.</param>
+        /// <remarks>Reference: <see href="https://github.com/opencv/opencv/blob/4.13.0/modules/imgproc/src/resize.cpp#L1877">modules/imgproc/src/resize.cpp (HResizeLinear)</see>.</remarks>
+        private static void HResize(float[] src, int sRow, float[] row, int[] xofs, float[] alpha, int width, int xmax, int cn) {
+            int dx = 0;
+            for (; dx < xmax; dx++) {
+                int sx = sRow + xofs[dx];
+                row[dx] = src[sx] * alpha[dx * 2] + src[sx + cn] * alpha[dx * 2 + 1];
+            }
+
+            for (; dx < width; dx++)
+                row[dx] = src[sRow + xofs[dx]];
         }
 
         /// <summary>Writes a row of float sums as bytes (<c>inter_area::saturate_store</c>): rounded half to even, clamped.</summary>

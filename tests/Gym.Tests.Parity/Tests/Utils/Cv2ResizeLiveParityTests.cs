@@ -10,9 +10,9 @@ using Python.Runtime;
 
 namespace Gym.Tests.Parity.Tests.Utils {
     /// <summary>
-    ///     <see cref="Cv2.Resize"/> against live OpenCV's <c>cv2.resize</c> (decision DR-23), byte for byte: random uint8
-    ///     images of 1 to 5 channels (one channel as <c>(H, W)</c> and as <c>(H, W, 1)</c>), through each kernel OpenCV picks
-    ///     by the scales.
+    ///     <see cref="Cv2.Resize"/> against live OpenCV's <c>cv2.resize</c> (decisions DR-23 and DR-46), bit for bit: random
+    ///     uint8 and float32 images of 1 to 5 channels (one channel as <c>(H, W)</c> and as <c>(H, W, 1)</c>), through each
+    ///     kernel OpenCV picks by the scales.
     /// </summary>
     /// <remarks>
     ///     The kernels and what each case exercises: the integer-factor area average (the 2×2 kernel's round-half-up for 1,
@@ -56,6 +56,49 @@ namespace Gym.Tests.Parity.Tests.Utils {
             }
         }
 
+        /// <summary>
+        ///     The float32 kernels (DR-46) through the same families as <see cref="Resize_MatchesOpenCv"/>: random float32 images
+        ///     of 1 to 5 channels, values from -300 to 300, every float compared bit for bit. <c>INTER_LINEAR</c> is compared with
+        ///     OpenCV's own kernel, IPP switched off for the cell (the wheels hand float32 bilinear to Intel IPP by default,
+        ///     whose results differ: <see cref="Resize_Float32_Linear_MatchesDefaultOpenCv"/>); <c>INTER_AREA</c> does not depend
+        ///     on IPP (measured).
+        /// </summary>
+        /// <param name="family">The kernel family, as in <see cref="Resize_MatchesOpenCv"/>.</param>
+        /// <param name="seed">The case generator's seed.</param>
+        [TestMethod]
+        [DataRow("area-fast", 11)]
+        [DataRow("area", 12)]
+        [DataRow("area-up", 13)]
+        [DataRow("linear", 14)]
+        [DataRow("linear-half", 15)]
+        public void Resize_Float32_MatchesOpenCv(string family, int seed) {
+            bool ippBefore = PythonRuntime.Run(() => Python.cv2.ipp.useIPP());
+            PythonRuntime.Run(() => Python.cv2.ipp.setUseIPP(false));
+            try {
+                AssertFloat32Cases(family, seed, 250);
+            } finally {
+                PythonRuntime.Run(() => Python.cv2.ipp.setUseIPP(ippBefore));
+            }
+        }
+
+        /// <summary>
+        ///     Float32 <c>INTER_LINEAR</c> against the wheels' default, IPP on. Open: Intel IPP's bilinear is not published, and
+        ///     no float32 formula tried reproduces it (the best matched two thirds of its outputs); Gym.NET gives OpenCV's own
+        ///     kernel, what <c>cv2</c> computes without IPP. The gap is up to about 4.4e-4 (a few dozen units in the last place
+        ///     at 255), on most cases; DR-46's measurement, reported to the maintainer.
+        /// </summary>
+        [TestMethod]
+        [OpenBugs("DR-46-IPP")]
+        public void Resize_Float32_Linear_MatchesDefaultOpenCv() {
+            bool ippBefore = PythonRuntime.Run(() => Python.cv2.ipp.useIPP());
+            PythonRuntime.Run(() => Python.cv2.ipp.setUseIPP(true));
+            try {
+                AssertFloat32Cases("linear", 16, 100);
+            } finally {
+                PythonRuntime.Run(() => Python.cv2.ipp.setUseIPP(ippBefore));
+            }
+        }
+
         /// <summary>Gymnasium's real inputs: CartPole's 600 × 400 frame and Atari-sized frames shrunk to 84 × 84 and 64 × 64, by area.</summary>
         /// <param name="srcWidth">The frame's width.</param>
         /// <param name="srcHeight">The frame's height.</param>
@@ -95,6 +138,35 @@ namespace Gym.Tests.Parity.Tests.Utils {
             StringAssert.Contains(python.Raised!.Message, "(-215:Assertion failed) func != 0 && cn <= 4 in function 'cv::hal::resize'");
             var refusal = Assert.ThrowsExactly<NotSupportedException>(() => Cv2.Resize(image, (3, 9), Cv2.InterArea));
             StringAssert.Contains(python.Raised.Message, refusal.Message);
+        }
+
+        /// <summary>
+        ///     Random float32 cases of one kernel family, each image and target size compared with <c>cv2.resize</c> as it is
+        ///     configured now (the caller sets IPP).
+        /// </summary>
+        /// <param name="family">The kernel family.</param>
+        /// <param name="seed">The case generator's seed.</param>
+        /// <param name="count">How many cases.</param>
+        /// <exception cref="Gym.Tests.Parity.Pair.ParityException">Thrown at the first case that differs.</exception>
+        private static void AssertFloat32Cases(string family, int seed, int count) {
+            var rng = new Random(20261110 + seed);
+            for (int i = 0; i < count; i++) {
+                int channels = rng.Next(1, family == "area" ? 5 : 6);
+                bool channelAxis = channels > 1 || rng.Next(2) == 0;
+                (int srcWidth, int srcHeight, int width, int height) = Sizes(rng, family);
+                int interpolation = family.StartsWith("area", StringComparison.Ordinal) ? Cv2.InterArea : Cv2.InterLinear;
+
+                var floats = new float[srcWidth * srcHeight * channels];
+                for (int j = 0; j < floats.Length; j++)
+                    floats[j] = (float)(rng.NextDouble() * 600 - 300);
+                using NDArray image = new NDArray(floats, channelAxis ? new Shape(srcHeight, srcWidth, channels) : new Shape(srcHeight, srcWidth));
+                string label = $"cv2.resize({image.dtype.name}{FormatShape(image)}, ({width}, {height}), interpolation={interpolation}) #{i}";
+                Outcome python = Outcome.CapturePython(() => {
+                    using PyObject source = image.ToNumpyCopy();
+                    return Python.cv2.resize(source, width, height, interpolation);
+                });
+                ByteContract.AssertSame(label, python, Outcome.Capture(() => Cv2.Resize(image, (width, height), interpolation)));
+            }
         }
 
         /// <summary>The source and target sizes of one random case of a family.</summary>

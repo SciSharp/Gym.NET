@@ -184,6 +184,11 @@ built until then:
    execution modes. Each custom worker runs on a thread of its own, whatever the mode, as each of Gymnasium's runs in a
    process of its own, and the built-in workers keep their executors. Python's pipe errors map to `EndOfStreamException`
    (`EOFError`, which NumSharp lacks) and NumSharp's `OSError` (a broken pipe), and values cross the pipe by reference.
+9. DR-46's measurement (added when it was implemented): the `cv2` wheels hand float32 `INTER_LINEAR` to Intel IPP by
+   default, and IPP's results differ from OpenCV's own kernel (255 of 400 cases, a few units in the last place), while
+   float32 `INTER_AREA` does not depend on IPP. IPP's bilinear is not published, so `Cv2.Resize` gives OpenCV's own
+   kernel, exact against `cv2` with IPP off, and the gap against default `cv2` is an open cell. To decide: keep that
+   reference, or try harder to reproduce IPP's arithmetic black-box.
 
 Three answers were recorded in the reading below; a correction from the maintainer replaces the row before the step that depends on it starts:
 

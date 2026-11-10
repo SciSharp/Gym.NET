@@ -17,7 +17,9 @@ pygame-ce==2.5.8
 box2d==2.3.10
 # The oracle of Gym.Utils.Cv2 and ResizeObservation (decision DR-23: OpenCV's area resize ported, proven byte for byte).
 # Gymnasium's extra "other" asks for opencv-python>=3.0; the headless build is the same cv2 without GUI libraries. Its
-# INTER_AREA and INTER_LINEAR results do not depend on IPP or on the CPU's SIMD (measured over 231 cases, 2026-11-10).
+# uint8 INTER_AREA and INTER_LINEAR results do not depend on IPP or on the CPU's SIMD (measured over 231 cases, 2026-11-10),
+# nor do its float32 INTER_AREA results; float32 INTER_LINEAR goes to Intel IPP when IPP is on, the default, and differs
+# from OpenCV's own kernel in 255 of 400 cases (DR-46, measured 2026-11-10), so those cells switch IPP off.
 opencv-python-headless==4.13.0.92
 # Gymnasium's own runtime dependencies (pyproject.toml, "dependencies"). cloudpickle and typing-extensions are the
 # versions on the reference machine. farama-notifications is not installed there (gymnasium/__init__.py imports it

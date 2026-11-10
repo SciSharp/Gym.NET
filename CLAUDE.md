@@ -46,7 +46,8 @@ refs/Gym.NET/
 │   │   ├── Internal/              # Dict (legacy info type), CircularQueue, Dynamic/Merging/Reflection helpers
 │   │   ├── Utils/                 # Seeding (PCG64), PyBuiltins, PyMath (F3), PyAttributes, PyEquality, PyCopy, PyKwargs (Python kwargs binding), PyJson, Deque,
 │   │   │                          # PassiveChecker, EnvChecker (check_env, data_equivalence), EnvMatch, StepApiCompatibility, RecordConstructorArgs, Warnings,
-│   │   │                          # Cv2 (OpenCV's 8-bit cv2.resize, INTER_AREA and INTER_LINEAR, byte for byte; DR-23), Video (save_video; PNG/ffmpeg writers),
+│   │   │                          # Cv2 (OpenCV's uint8 and float32 cv2.resize, INTER_AREA and INTER_LINEAR, bit for bit; DR-23, DR-46: float32 bilinear is
+│   │   │                          # OpenCV's own kernel, not IPP's), Video (save_video; PNG/ffmpeg writers),
 │   │   │                          # Performance (benchmark_step/vector_step/init/render; DR-36)
 │   │   ├── Experimental/Functional/ # FuncEnv (Gymnasium's functional protocol, no JAX; DR-36)
 │   │   ├── Gymnasium.cs           # The `gymnasium` facade: Make, MakeVec, Spec, Register, Registry, PprintRegistry, HumanViewerFactory (DR-20)
@@ -73,8 +74,11 @@ refs/Gym.NET/
 │   │   ├── GymEnvironments.cs     # Register(): the built-in ids, from a module initializer (DR-12; GYMNET_DISABLE_ENV_REGISTRATION disarms it, DR-14)
 │   │   └── buildTransitive/       # Gym.NET.Environments.targets: the app-side registration initializer (DR-17)
 │   │
-│   ├── Gym.Rendering.Avalonia/    # Cross-platform GUI rendering (AvaloniaEnvViewer, StaticAvaloniaApp); keyboard input for play (IInteractiveEnvViewer)
-│   └── Gym.Rendering.WinForm/     # Windows Forms GUI rendering (WinFormEnvViewer); keyboard input for play (IInteractiveEnvViewer)
+│   ├── Gym.Rendering.Avalonia/    # Cross-platform GUI rendering (AvaloniaEnvViewer, StaticAvaloniaApp); keyboard input for play (IInteractiveEnvViewer);
+│   │                              #   AvaloniaPlotFigure, PlayPlot's ScottPlot figure (DR-39)
+│   ├── Gym.Rendering.WinForm/     # Windows Forms GUI rendering (WinFormEnvViewer); keyboard input for play (IInteractiveEnvViewer);
+│   │                              #   WinFormPlotFigure, PlayPlot's ScottPlot figure (DR-39)
+│   └── Shared/                    # ScottPlotAxes.cs: the IPlotAxes adapter both viewer packages compile (DR-39)
 │
 ├── tests/
 │   ├── Gym.Tests/                 # MSTest test suite for environments, spaces, and multi-instance concurrency

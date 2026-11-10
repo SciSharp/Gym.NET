@@ -3357,8 +3357,31 @@ namespace Gym.Tests.Parity {
                 }
             }
 
+            /// <summary><c>cv2.ipp</c>: whether OpenCV hands the calls it can to Intel IPP (process-wide, on by default in the wheels).</summary>
+            internal static class ipp {
+                /// <summary><c>cv2.ipp.useIPP()</c>.</summary>
+                /// <returns>Whether IPP is in use.</returns>
+                /// <exception cref="PythonException">Thrown when the call fails.</exception>
+                internal static bool useIPP() {
+                    using PyObject module = Module.GetAttr("ipp");
+                    using PyObject function = module.GetAttr("useIPP");
+                    using PyObject result = function.Invoke();
+                    return result.As<bool>();
+                }
+
+                /// <summary><c>cv2.ipp.setUseIPP(flag)</c>: switches IPP for every later call in the process.</summary>
+                /// <param name="flag">Whether to use IPP.</param>
+                /// <exception cref="PythonException">Thrown when the call fails.</exception>
+                internal static void setUseIPP(bool flag) {
+                    using PyObject module = Module.GetAttr("ipp");
+                    using PyObject function = module.GetAttr("setUseIPP");
+                    using PyObject value = flag.ToPython();
+                    using PyObject _ = function.Invoke(value);
+                }
+            }
+
             /// <summary><c>cv2.resize(src, dsize, interpolation=interpolation)</c>.</summary>
-            /// <param name="src">The image, a NumPy uint8 array; stays owned by the caller.</param>
+            /// <param name="src">The image, a NumPy uint8 or float32 array; stays owned by the caller.</param>
             /// <param name="width">The target width (<c>dsize[0]</c>).</param>
             /// <param name="height">The target height (<c>dsize[1]</c>).</param>
             /// <param name="interpolation"><see cref="INTER_AREA"/> or <see cref="INTER_LINEAR"/>.</param>
