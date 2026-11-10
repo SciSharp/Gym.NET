@@ -456,7 +456,8 @@ Specs: the port plan's §5.5 and Appendix E. pygame-ce calls at v1.4.0:
     uses `>`). Its two-point case reads one float past its buffer, so pygame's own drawing there varies between runs:
     Gym.NET takes that float as 0, and the corpus accepts either outcome for those polylines.*
   - *Deferred to P8 (box2d only): `polygon`, `circle`, `lines`, `aaline` beyond MountainCar, `smoothscale` growing, rect
-    widths above 1; `font`.*
+    widths above 1; `font`. `polygon` (filled and width 1), filled `circle` and width-1 `lines` landed with P8.2
+    (2026-11-11, see there).*
 - **Exit:** every primitive above is pixel-exact on its random corpus.
 
 ### P4 classic_control
@@ -829,6 +830,48 @@ Specs: the port plan's §5.6 and §11.3; sources 2,979 lines.
     `lib/<tfm>/` of Gym.NET.Environments, with no package dependency of its own.*
 - **P8.2** LunarLander-v3 and LunarLanderContinuous-v3 as `LunarLanderEnv` (DR-32, `[PyName("LunarLander")]`), with
   `heuristic` and a private nested `ContactDetector` (DR-28); the 8 LunarLander `[OpenBugs]` cells turn green.
+  *Done 2026-11-11:*
+  - The rasterizer's box2d primitives first, derived black-box from live pygame-ce 2.5.8 with probe scripts, no pygame
+    source read (D4), in `src/Gym.Rendering/Draw.Polygon.cs`:
+    - `Draw.Polygon` filled. Vertices are truncated toward zero. Four or more vertices fill by scanline: each crossing is
+      the upper end's x plus `(row - y) * dx / dy`, the product in wrapping int32 and the division in float32, rounded
+      down and up in turn in the order the edges are met (edge `i - 1 → i`), so the starting vertex matters; then
+      sorted, filled pairwise, and the inner horizontal edges drawn alone. Three points take pygame's own triangle path:
+      a stable sort by row, float32 slopes `dx / (dy + 1e-17)`, truncated products, and a flat triangle whose first two
+      points coincide spanning to its third. Exact on 7,500 random polygons of 4 to 8 vertices, 20,000 triangles and
+      3,000 more with coordinates to ±3e6.
+    - `Draw.Circle` filled: the centre and radius truncated, a midpoint walk over one octant filling four spans per step
+      around the pixel corner. Exact on every radius 0–300 and 3,000 random circles.
+    - `Draw.Lines` at width 1, the union of its segments' `draw.line` (a closed polyline of two points draws one segment),
+      and `Draw.Polygon(width=1)` through it.
+    - Float coordinates convert as pygame's C code converts them (`PyInt`: NaN, the infinities and out-of-range values
+      become `INT_MIN`), `Draw.Line(double…)` included, which used to raise `ValueError` for non-finite coordinates.
+      Lines are stepped only across the surface, from the error term's closed form, where pygame walks all two billion
+      steps to an `INT_MIN` endpoint (minutes per line). So those cases are pinned by a unit test of pygame's recorded
+      pixels, and the live corpora use million-pixel endpoints.
+    - Parity cells: 900 filled polygons, 200 outlines and 200 polylines, 40 far lines, 361 circles, the refusals' texts.
+  - `src/Gym.Environments/Envs/Box2D/LunarLanderEnv.cs` (namespace `Gym.Environments.Envs.Box2D`): Gymnasium's
+    `LunarLander` on `Gym.Box2D` in Gymnasium's order of calls and draws. That covers the new world per reset, the
+    terrain from 12 heights (Python's `height[-1]` at the first chunk), the hull's push, the wind indices, and the legs
+    on motorized, limited joints. Also the reset's no-op step, the engines' dispersed impulses, and particles that only
+    exist when a render mode is set. The flags are redrawn once per drawn fixture, as in Gymnasium. The heuristic computes
+    in float32 as NumPy does on a float32 observation, and its continuous action promotes to float64 after touchdown.
+    Gymnasium's body attributes (`legs[i].ground_contact`, `particles[i].ttl`, the colours) live beside the bodies. The
+    module's `heuristic`, `demo_heuristic_lander` and the refusing `LunarLanderContinuous` are `LunarLanderEnv.Heuristic`,
+    `DemoHeuristicLander` and `LunarLanderContinuousEnv`. Both ids are registered, between Acrobot-v1 and Blackjack-v1 as
+    in Gymnasium.
+  - Parity: the env's own suite (`LunarLanderLiveParityTests`, 37 gated): resets, heuristic episodes through the landing
+    and past it, sampled episodes, wind and turbulence, two gravities, frames along heuristic and sampled episodes, every
+    continuous action form (a 0-d action fails as NumPy's scalar does, `invalid index to scalar variable.`), the refused
+    discrete actions, the constructor's assertion and warnings, render before reset, the heuristic on 2,000
+    observations, spaces, metadata, both `make` stacks, `LunarLanderContinuous()`. The step before a reset is open
+    (N-1). Also: registration (`str(make)`, the specs with the int threshold `200` printing `200.0` as Taxi-v4's `8`
+    does), Gymnasium's `check_env` and `check_environments_match` through the reverse bridge (`BridgeReward` gained the
+    box2d rewards' type, an `np.float64` or the terminal int ±100), a golden per id, and the coverage cells (sync and
+    async vector, human, `rgb_array_list`).
+  - `tests/Gym.Tests/Gymnasium/Envs/TestEnvImplementation.cs` mirrors Gymnasium's `test_env_implementation.py`. Its
+    CarRacing tests are open until P8.4, and `test_bipedal_walker_hardcore_creation` joins in P8.3. The inventory lists
+    four fewer missing names.
 - **P8.3** BipedalWalker-v3 and BipedalWalkerHardcore-v3 as `BipedalWalkerEnv` (lidar ray casts), with its own private
   `ContactDetector`.
 - **P8.4** CarRacing-v3 as `CarRacingEnv` with `car_dynamics`; its score text drawn from glyph data recorded once from

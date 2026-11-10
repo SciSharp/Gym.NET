@@ -20,7 +20,7 @@ It replaces 0.2's API, which followed gym before 0.26, with Gymnasium's.
 |---|---|
 | Gym.NET | The env contract, wrappers, spaces, registry (`Gymnasium.Make`, `MakeVec`), vector envs, checkers, seeding, errors; `Gym.Legacy` |
 | Gym.NET.Rendering (new) | The rasterizer `rgb_array` frames are drawn with, equal to pygame-ce's pixels; licensed `Apache-2.0 AND LGPL-2.0-or-later` (below) |
-| Gym.NET.Environments | classic_control and toy_text, CartPole's vector env, their registration; inside it, `Gym.Box2D`: Box2D 2.3.0 in managed C#, bit for bit as pybox2d 2.3.10, with pybox2d's surface (zlib notices in THIRD-PARTY-NOTICES.md) |
+| Gym.NET.Environments | classic_control, toy_text and box2d (LunarLander so far), CartPole's vector env, their registration; inside it, `Gym.Box2D`: Box2D 2.3.0 in managed C#, bit for bit as pybox2d 2.3.10, with pybox2d's surface (zlib notices in THIRD-PARTY-NOTICES.md) |
 | Gym.NET.Rendering.Avalonia | A window for `human` mode on Avalonia 12 (Windows, Linux, macOS), and `PlayPlot`'s live charts on ScottPlot (`AvaloniaPlotFigure`) |
 | Gym.NET.Rendering.WinForm | The same on Windows Forms (`WinFormPlotFigure`) |
 
@@ -91,10 +91,11 @@ In short:
   | Family | Ids |
   |---|---|
   | classic_control | CartPole-v0, CartPole-v1 (and its vector env), MountainCar-v0, MountainCarContinuous-v0, Pendulum-v1, Acrobot-v1 |
+  | box2d | LunarLander-v3, LunarLanderContinuous-v3 (on `Gym.Box2D`, Box2D 2.3.0 in managed C#; BipedalWalker and CarRacing to come) |
   | toy_text | FrozenLake-v1, FrozenLake8x8-v1, CliffWalking-v1, CliffWalkingSlippery-v1, Taxi-v4, Blackjack-v1 |
 
 - **Rendering**: `Gym.Rendering`, a rasterizer with pygame's semantics (SDL_gfx's `gfxdraw` primitives, `draw.line`,
-  `draw.rect`, alpha blitting, `transform.flip`/`scale`/`smoothscale`, `image.load`), and the `human` viewers, chosen
+  `draw.rect`, `draw.polygon`, `draw.circle`, `draw.lines`, alpha blitting, `transform.flip`/`scale`/`smoothscale`, `image.load`), and the `human` viewers, chosen
   once with `Gymnasium.HumanViewerFactory`.
 
 ## Differences from Gymnasium, by design

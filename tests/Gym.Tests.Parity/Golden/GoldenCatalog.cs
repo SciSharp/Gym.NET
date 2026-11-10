@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Gym.Environments.Envs.Box2D;
 using Gym.Environments.Envs.Classic;
 using Gym.Environments.Envs.ToyText;
 using Gym.Tests.Parity.Pair;
@@ -192,6 +193,33 @@ namespace Gym.Tests.Parity.Golden {
                 MaxSteps = 20,
                 FrameEvery = 1,
                 CreateDotNet = renderMode => new GymNetEnv(new BlackjackEnv(renderMode: renderMode, sab: true)),
+            },
+            // The box2d envs run on Gym.NET's managed Box2D, whose rotations call the C runtime's sinf/cosf, so their goldens
+            // are strict on the reference platform only. LunarLander-v3 landed by Gymnasium's heuristic, a frame every 10
+            // steps: the terrain draws, the push, the engines' dispersed impulses and particles, the legs' contacts, and the
+            // +100 when the lander falls asleep.
+            new GoldenCase {
+                Suite = "box2d",
+                Name = "LunarLander-v3.heuristic.seed0",
+                EnvId = "LunarLander-v3",
+                Seed = 0,
+                Actions = new GoldenActions.Policy("lunar_lander_heuristic"),
+                MaxSteps = 1000,
+                FrameEvery = 10,
+                PlatformDependence = "Box2D's sinf/cosf and LunarLander's sin/cos",
+                CreateDotNet = renderMode => new GymNetEnv(new LunarLanderEnv(renderMode: renderMode)),
+            },
+            // LunarLanderContinuous-v3 (registered continuous=True) under the heuristic's throttles, a frame every 10 steps.
+            new GoldenCase {
+                Suite = "box2d",
+                Name = "LunarLanderContinuous-v3.heuristic.seed3",
+                EnvId = "LunarLanderContinuous-v3",
+                Seed = 3,
+                Actions = new GoldenActions.Policy("lunar_lander_heuristic"),
+                MaxSteps = 1000,
+                FrameEvery = 10,
+                PlatformDependence = "Box2D's sinf/cosf and LunarLander's sin/cos",
+                CreateDotNet = renderMode => new GymNetEnv(new LunarLanderEnv(renderMode: renderMode, continuous: true)),
             },
         }.ToDictionary(c => c.Key, StringComparer.Ordinal);
 

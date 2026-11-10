@@ -26,7 +26,7 @@ namespace Gym.Tests.Parity.Tests.Envs {
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///     The ids are the twelve Gym.NET registers; the suite's coverage matrix (<c>tests/Gym.Tests.Parity/CLAUDE.md</c> §5)
+    ///     The ids are every one Gym.NET registers; the suite's coverage matrix (<c>tests/Gym.Tests.Parity/CLAUDE.md</c> §5)
     ///     names the cells each id has. Every id's frames are compared whole, MountainCar's two included since their hill's
     ///     anti-aliased polyline is drawn by pygame's own algorithm (DR-37).
     ///     </para>
@@ -44,6 +44,7 @@ namespace Gym.Tests.Parity.Tests.Envs {
         /// <summary>Every id Gym.NET registers, in Gymnasium's registration order.</summary>
         private static readonly string[] Ids = {
             "CartPole-v0", "CartPole-v1", "MountainCar-v0", "MountainCarContinuous-v0", "Pendulum-v1", "Acrobot-v1",
+            "LunarLander-v3", "LunarLanderContinuous-v3",
             "FrozenLake-v1", "FrozenLake8x8-v1", "CliffWalking-v1", "CliffWalkingSlippery-v1", "Taxi-v4", "Blackjack-v1",
         };
 
@@ -113,7 +114,7 @@ namespace Gym.Tests.Parity.Tests.Envs {
         /// <summary>Every id with shared memory on and off.</summary>
         public static IEnumerable<object[]> IdsAndSharedMemory => from id in Ids from sharedMemory in new[] { true, false } select new object[] { id, sharedMemory };
 
-        /// <summary>Every id, one per row, for the cells that take the id alone; all twelve render pixel for pixel.</summary>
+        /// <summary>Every id, one per row, for the cells that take the id alone; all render pixel for pixel.</summary>
         public static IEnumerable<object[]> EveryId => Ids.Select(id => new object[] { id });
 
         /// <summary>
@@ -321,11 +322,12 @@ namespace Gym.Tests.Parity.Tests.Envs {
             Outcome.Release(reset.Info);
         }
 
-        /// <summary>Pins a classic-control id's cells to the reference platform (their cos/sin come from the C runtime).</summary>
+        /// <summary>Pins a classic-control or box2d id's cells to the reference platform (their cos/sin, and Box2D's sinf/cosf, come from the C runtime).</summary>
         /// <param name="id">The env.</param>
         private void SkipClassicOffReferencePlatform(string id) {
-            if (!IsToyText(id))
-                SkipOffReferencePlatform("the classic envs' cos/sin");
+            if (IsToyText(id))
+                return;
+            SkipOffReferencePlatform(id.StartsWith("LunarLander", StringComparison.Ordinal) ? "Box2D's sinf/cosf" : "the classic envs' cos/sin");
         }
 
         /// <summary>Whether an id is one of toy_text's: no transcendental math, and 4 frames per second in human mode.</summary>

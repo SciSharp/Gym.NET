@@ -388,3 +388,14 @@ Effects of approved designs that only showed up in code. None changes a design; 
     the call's.
   - Box2D's `b2Assert` raises `AssertionError` with C++'s stringified condition (`#A`), as pybox2d compiles it; where C#
     spells the condition differently, the call passes C++'s text (44 conditions).
+- **DR-32 and DR-28 on LunarLander** (P8.2, 2026-11-11):
+  - Gymnasium hangs attributes on its Box2D bodies (`legs[i].ground_contact`, `legs[i].joint`, `particles[i].ttl`, the
+    colours). `b2Body` has no attribute bag, so `LunarLanderEnv` keeps them beside the bodies, exposed as
+    `LegGroundContact`, `LegJoints` and `ParticleTtl`.
+  - Rewards are float64 as everywhere (Gymnasium's are an `np.float64`, and the int -100/+100 on termination). The
+    registered threshold `200` prints `200.0` in the spec, as Taxi-v4's `8` does.
+  - `heuristic` returns DR-08's 0-d int64 array where Python returns an `int`.
+- **D4's rasterizer and non-finite coordinates** (P8.2, 2026-11-11): pygame's C code converts a NaN, infinite or
+  out-of-range coordinate to `INT_MIN` and draws the visible part. P7's `Draw.Line(double…)` raised `ValueError` there
+  instead; it now converts as pygame does, like the new `Polygon`, `Circle` and `Lines`. `Aaline`/`Aalines` (DR-37's
+  translation) still refuse non-finite coordinates; pygame draws nothing for them.

@@ -3,14 +3,17 @@ using NumSharp;
 
 namespace Gym.Rendering {
     /// <summary>
-    ///     The <c>pygame.draw</c> functions Gymnasium's envs call: <c>line</c> (Acrobot), <see cref="Rect"/>
-    ///     (FrozenLake) and <see cref="Aalines"/> (MountainCar's hill), on surfaces without per-pixel alpha.
+    ///     The <c>pygame.draw</c> functions Gymnasium's envs call: <c>line</c> (Acrobot, BipedalWalker's lidar), <see cref="Rect"/>
+    ///     (FrozenLake), <see cref="Aalines"/> and <see cref="Aaline"/> (MountainCar's hill, LunarLander, BipedalWalker), and
+    ///     for the box2d envs <see cref="Polygon"/>, <see cref="Circle"/> and <see cref="Lines"/>, on surfaces without per-pixel
+    ///     alpha.
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///     <c>line</c> and <see cref="Rect"/> are Gym.NET's own implementations of pygame's behaviour (decision D4: derived
-    ///     from live pygame-ce 2.5.8's output, none of its source read), pixel-exact on thousands of random lines and
-    ///     rectangles, clipping included.
+    ///     <c>line</c>, <see cref="Rect"/>, <see cref="Polygon"/>, <see cref="Circle"/> and <see cref="Lines"/> are Gym.NET's
+    ///     own implementations of pygame's behaviour (decision D4: derived from live pygame-ce 2.5.8's output, none of its
+    ///     source read), pixel-exact on thousands of random shapes each, clipping included. Float coordinates convert as
+    ///     pygame's C code converts them (<see cref="PyInt"/>).
     ///     </para>
     ///     <para>
     ///     <see cref="Aaline"/> and <see cref="Aalines"/> are the exception (decision DR-37): D4's black-box model of them did
@@ -78,8 +81,9 @@ namespace Gym.Rendering {
         }
 
         /// <summary>
-        ///     <c>pygame.draw.line(surface, color, start_pos, end_pos)</c> with float endpoints (as Acrobot passes them): each
-        ///     coordinate is truncated toward zero, as pygame does, then drawn as <see cref="Line(Surface, Color, long, long, long, long)"/>.
+        ///     <c>pygame.draw.line(surface, color, start_pos, end_pos)</c> with float endpoints (as Acrobot and the box2d envs
+        ///     pass them): each coordinate converted as pygame's C code converts it (<see cref="PyInt"/>: truncated toward zero),
+        ///     then drawn as <see cref="Line(Surface, Color, long, long, long, long)"/> draws it.
         /// </summary>
         /// <param name="surface">The surface, without per-pixel alpha.</param>
         /// <param name="color">The colour; its alpha is ignored.</param>
@@ -89,9 +93,14 @@ namespace Gym.Rendering {
         /// <param name="y1">The end row.</param>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="surface"/> is <see langword="null"/>.</exception>
         /// <exception cref="NotSupportedException">Thrown for a surface with per-pixel alpha (not modelled).</exception>
-        /// <exception cref="ValueError">Thrown for a coordinate that is NaN or infinite, which has no integer to truncate to.</exception>
+        /// <remarks>
+        ///     A NaN, infinite or out-of-range coordinate becomes <c>int.MinValue</c>, as in pygame, which then draws the visible
+        ///     part of a line to a point two billion pixels away (measured: <c>line((nan, 3), (10, 10))</c> lights row 10 from
+        ///     column 0 to 10). Only the surface's steps are walked, so such a line costs no more than any other.
+        /// </remarks>
         public static void Line(Surface surface, Color color, double x0, double y0, double x1, double y1) {
-            Line(surface, color, Truncate(x0), Truncate(y0), Truncate(x1), Truncate(y1));
+            RequireOpaque(surface);
+            ClippedLine(surface, color.Mapped, PyInt(x0), PyInt(y0), PyInt(x1), PyInt(y1));
         }
 
         /// <summary>
@@ -159,15 +168,6 @@ namespace Gym.Rendering {
                 throw new ArgumentNullException(nameof(surface));
             if (surface.HasAlpha)
                 throw new NotSupportedException("Drawing on a surface with per-pixel alpha is not modelled: no Gymnasium env does it.");
-        }
-
-        /// <summary>Python's <c>int()</c> of a float coordinate: truncation toward zero.</summary>
-        /// <param name="value">The coordinate.</param>
-        /// <returns>The integer.</returns>
-        /// <exception cref="ValueError">Thrown for NaN or an infinity.</exception>
-        private static long Truncate(double value) {
-            RequireFinite(value);
-            return (long)Math.Truncate(value);
         }
 
         /// <summary>Refuses a coordinate with no position on a surface.</summary>

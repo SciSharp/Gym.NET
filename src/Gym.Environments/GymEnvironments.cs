@@ -3,6 +3,7 @@ using System;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
 using System.Threading;
+using Gym.Environments.Envs.Box2D;
 using Gym.Environments.Envs.Classic;
 using Gym.Environments.Envs.ToyText;
 using Gym.Envs;
@@ -72,6 +73,14 @@ namespace Gym.Environments {
                 kwargs: new MountainCarEnvOptions { Continuous = true });
             EnvRegistry.Register("Pendulum-v1", typeof(PendulumEnv), maxEpisodeSteps: 200);
             EnvRegistry.Register("Acrobot-v1", typeof(AcrobotEnv), rewardThreshold: -100.0, maxEpisodeSteps: 500);
+
+            // Box2d
+            // ----------------------------------------
+
+            EnvRegistry.Register("LunarLander-v3", typeof(LunarLanderEnv), maxEpisodeSteps: 1000, rewardThreshold: 200);
+            // The same class with continuous=True, as Gymnasium registers it (no DR-32 deviation here).
+            EnvRegistry.Register("LunarLanderContinuous-v3", typeof(LunarLanderEnv), kwargs: new LunarLanderEnvOptions { Continuous = true },
+                maxEpisodeSteps: 1000, rewardThreshold: 200);
 
             // Toy Text
             // ----------------------------------------

@@ -16,10 +16,6 @@ gymnasium.envs.box2d.car_racing.CarRacing                                       
 gymnasium.envs.box2d.car_racing.FrictionDetector                                         P8 box2d
 gymnasium.envs.box2d.car_racing.register_input                                           P8 box2d
 gymnasium.envs.box2d.lunar_lander.ContactDetector                                        by design: a private nested class of LunarLanderEnv (DR-28)
-gymnasium.envs.box2d.lunar_lander.LunarLander                                            P8 box2d
-gymnasium.envs.box2d.lunar_lander.LunarLanderContinuous                                  P8 box2d
-gymnasium.envs.box2d.lunar_lander.demo_heuristic_lander                                  P8 box2d
-gymnasium.envs.box2d.lunar_lander.heuristic                                              P8 box2d
 gymnasium.envs.classic_control.continuous_mountain_car.Continuous_MountainCarEnv         by design: merged into MountainCarEnv(continuous) (DR-32)
 gymnasium.envs.functional_jax_env.FunctionalJaxEnv                                       n/a: JAX functional envs
 gymnasium.envs.functional_jax_env.FunctionalJaxVectorEnv                                 n/a: JAX functional envs

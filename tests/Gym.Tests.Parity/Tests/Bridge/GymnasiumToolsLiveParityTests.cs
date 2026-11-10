@@ -378,6 +378,67 @@ namespace Gym.Tests.Parity.Tests.Bridge {
         }
 
         /// <summary>
+        ///     Gymnasium's <c>check_env</c> on <c>make(id).unwrapped</c> for the box2d envs of P8: Gym.NET's env built through the
+        ///     bridge passes exactly as Gymnasium's own (no error, the same warnings), every declared render mode made and
+        ///     checked (human into a headless viewer); and Gym.NET's own <c>EnvChecker.CheckEnv</c> gives the same verdict.
+        /// </summary>
+        /// <param name="id">The id.</param>
+        [TestMethod]
+        [DataRow("LunarLander-v3")]
+        [DataRow("LunarLanderContinuous-v3")]
+        public void CheckEnv_PassesGymNetsBox2DEnvs_AsGymnasiumsOwn(string id) {
+            SkipOffReferencePlatform("Box2D's sinf/cosf");
+            IEnvironmentViewerFactoryDelegate? previous = Gymnasium.HumanViewerFactory;
+            // check_env makes the env in human mode too; Gym.NET's renders into a headless viewer, as pygame does under SDL's dummy driver.
+            Gymnasium.HumanViewerFactory = NullEnvViewer.Factory;
+            try {
+                using var bridge = new ReverseBridge();
+                using PyRef python = PyRef.Of(() => MadeUnwrapped(Python.gymnasium.make(id)));
+                using PyRef shim = PyRef.Of(() => {
+                    using PyObject spec = bridge.Spec(Gymnasium.Spec(id), reward: BridgeReward.NumpyFloat64OrTerminalInt);
+                    return MadeUnwrapped(Python.gymnasium.make(spec));
+                });
+                using IEnv dotnet = Gymnasium.Make(id);
+                string label = $"check_env(make({PyBuiltins.Repr(id)}).unwrapped)";
+                Outcome expected = ExpectPassed(label, GymnasiumCheckEnv(python.Object));
+                ByteContract.AssertSame($"{label}: Gymnasium's tool on Gym.NET's env", expected, ReverseBridge.AsBridgedSide(GymnasiumCheckEnv(shim.Object)));
+                ByteContract.AssertSame($"{label}: Gym.NET's tool", expected, GymNetCheckEnv(dotnet.Unwrapped));
+            } finally {
+                Gymnasium.HumanViewerFactory = previous;
+            }
+        }
+
+        /// <summary>
+        ///     Gymnasium's <c>check_environments_match</c> finds Gym.NET's box2d envs of P8 equal to its own over two seeds of 200
+        ///     sampled steps, in both orders, <c>rgb_array</c> frames included (the exhaust particles too). The tool compares
+        ///     reward types, so the bridge returns Gymnasium's: an <c>np.float64</c>, and the int -100 or +100 on termination.
+        /// </summary>
+        /// <param name="id">The id.</param>
+        [TestMethod]
+        [DataRow("LunarLander-v3")]
+        [DataRow("LunarLanderContinuous-v3")]
+        public void CheckEnvironmentsMatch_GymNetsBox2DEnvs_AsGymnasiumsOwn(string id) {
+            SkipOffReferencePlatform("Box2D's sinf/cosf");
+            using var bridge = new ReverseBridge();
+            foreach (long seed in new long[] { 0, 123 }) {
+                using PyRef python = PyRef.Of(() => Python.gymnasium.make(id, render_mode: "rgb_array"));
+                using PyRef twin = PyRef.Of(() => Python.gymnasium.make(id, render_mode: "rgb_array"));
+                using PyRef shim = PyRef.Of(() => {
+                    using PyObject spec = bridge.Spec(Gymnasium.Spec(id), reward: BridgeReward.NumpyFloat64OrTerminalInt);
+                    return Python.gymnasium.make(spec, render_mode: "rgb_array");
+                });
+                Outcome expected = Outcome.CapturePython(() => Python.gymnasium.utils.env_match.check_environments_match(python.Object, twin.Object, 200, seed));
+                // The reference must pass, or two equal failures would pass the comparison.
+                expected.Expect($"check_environments_match({id}: gymnasium, gymnasium, 200, seed={seed})");
+                ByteContract.AssertSame($"check_environments_match({id}: gymnasium, gym.net, 200, seed={seed})", expected,
+                    ReverseBridge.AsBridgedSide(Outcome.CapturePython(() => Python.gymnasium.utils.env_match.check_environments_match(python.Object, shim.Object, 200, seed))));
+                // Gymnasium samples from env_a's action space, so the other order samples from the bridge's mirror.
+                ByteContract.AssertSame($"check_environments_match({id}: gym.net, gymnasium, 200, seed={seed})", expected,
+                    ReverseBridge.AsBridgedSide(Outcome.CapturePython(() => Python.gymnasium.utils.env_match.check_environments_match(shim.Object, python.Object, 200, seed))));
+            }
+        }
+
+        /// <summary>
         ///     The Python type of a toy_text env's reward in Gymnasium: Blackjack's <c>float</c> (<c>-1.0</c>, <c>cmp</c>'s
         ///     result), the tables' <c>int</c> (FrozenLake's default schedule <c>(1, 0, 0)</c>, CliffWalking's and Taxi's).
         /// </summary>

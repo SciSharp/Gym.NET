@@ -146,6 +146,10 @@ namespace Gym.Tests.Parity.Bridge {
                         using PyObject reward = _reward switch {
                             BridgeReward.NumpyFloat64 => Python.numpy.float64(result.Reward),
                             BridgeReward.Int => new PyInt(checked((long)result.Reward)),
+                            // LunarLander's and BipedalWalker's terminal -100/+100 are Python int literals.
+                            BridgeReward.NumpyFloat64OrTerminalInt => result.Terminated && Math.Abs(result.Reward) == 100
+                                ? new PyInt((long)result.Reward)
+                                : Python.numpy.float64(result.Reward),
                             _ => new PyFloat(result.Reward),
                         };
                         using PyObject terminated = result.Terminated.ToPython();
@@ -532,6 +536,12 @@ namespace Gym.Tests.Parity.Bridge {
 
         /// <summary>A Python <c>int</c>: the toy_text tables' rewards (FrozenLake's schedule, CliffWalking's and Taxi's -1, -10, -100, 20).</summary>
         Int,
+
+        /// <summary>
+        ///     A NumPy <c>np.float64</c> (the shaping differences of the box2d envs), except a terminal -100 or +100, which
+        ///     LunarLander and BipedalWalker assign as Python <c>int</c> literals (BipedalWalker's finish keeps its float).
+        /// </summary>
+        NumpyFloat64OrTerminalInt,
     }
 
     /// <summary>

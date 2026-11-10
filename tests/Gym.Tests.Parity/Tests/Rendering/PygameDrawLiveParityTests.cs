@@ -353,6 +353,213 @@ namespace Gym.Tests.Parity.Tests.Rendering {
             AssertCases("draw.aaline", cases, minimumDrawnShare: 0.8);
         }
 
+        /// <summary>
+        ///     <c>draw.polygon</c> filled (width 0), the box2d envs' terrain, hulls and flags: 500 polygons of 4 to 8 vertices
+        ///     (convex, star-shaped and self-intersecting, thin slivers, rows with horizontal edges inside, far off the surface,
+        ///     float vertices truncated toward zero) and 400 triangles, which pygame fills on a path of their own (flat ones and
+        ///     ones with tied rows included), any colour and alpha.
+        /// </summary>
+        [TestMethod]
+        public void Polygon_Filled_MatchesPygame() {
+            var rng = new Random(20261112);
+            var cases = new List<DrawCase>();
+            for (int i = 0; i < 900; i++) {
+                (double X, double Y)[] points = RandomPolygon(rng, i < 500 ? rng.Next(4, 9) : 3, i);
+                (int R, int G, int B, int A) color = RandomColor(rng);
+                cases.Add(new DrawCase($"polygon({color}, [{string.Join(", ", points.Select(p => $"({p.X:R}, {p.Y:R})"))}])",
+                    surface => Python.pygame.draw.polygon(surface, color, points, 0),
+                    surface => Draw.Polygon(surface, ToColor(color), points)));
+            }
+
+            AssertCases("draw.polygon", cases);
+        }
+
+        /// <summary>
+        ///     <c>draw.polygon</c> with a width (BipedalWalker's outlines) and <c>draw.lines</c> (BipedalWalker's flag): 200
+        ///     outlines at width 1 (pygame's closed polyline), 200 open and closed polylines of 2 to 7 points, closed two-point
+        ///     ones (one segment only), widths 0 and -1 (nothing), and endpoints millions of pixels away, which Gym.NET steps
+        ///     only across the surface from the error term's closed form while pygame walks every pixel.
+        /// </summary>
+        /// <remarks>
+        ///     NaN, infinite and out-of-range endpoints (pygame's <c>INT_MIN</c>) are left out on purpose: pygame walks every one
+        ///     of a line's two billion steps to the surface, minutes per line (measured), so they cannot run in a gate. The
+        ///     conversion they rely on is the circles' (NaN centres in <see cref="Circle_Filled_MatchesPygame"/>), and the
+        ///     stepping from far away is these million-pixel endpoints'.
+        /// </remarks>
+        [TestMethod]
+        public void PolygonOutlineAndLines_MatchPygame() {
+            var rng = new Random(20261113);
+            var cases = new List<DrawCase>();
+            for (int i = 0; i < 200; i++) {
+                (double X, double Y)[] points = RandomPolygon(rng, rng.Next(3, 8), i);
+                (int R, int G, int B, int A) color = RandomColor(rng);
+                long width = i % 20 == 0 ? -1 : 1;
+                cases.Add(new DrawCase($"polygon({color}, {points.Length} points, width={width})",
+                    surface => Python.pygame.draw.polygon(surface, color, points, width),
+                    surface => Draw.Polygon(surface, ToColor(color), points, (int)width)));
+            }
+
+            for (int i = 0; i < 200; i++) {
+                int count = i % 10 == 0 ? 2 : rng.Next(2, 8);
+                var points = new (double X, double Y)[count];
+                for (int k = 0; k < count; k++)
+                    points[k] = (rng.NextDouble() * (Width + 40) - 20, rng.NextDouble() * (Height + 40) - 20);
+                if (i % 25 == 3)
+                    points[rng.Next(count)] = (i % 2 == 0 ? -2.5e6 - rng.NextDouble() : 3.1e6 + rng.NextDouble(), rng.NextDouble() * Height);
+                if (i % 25 == 7)
+                    points[rng.Next(count)] = (rng.NextDouble() * Width, -1.7e6 - rng.NextDouble());
+                bool closed = i % 3 == 0;
+                long width = i % 40 == 5 ? 0 : 1;
+                (int R, int G, int B, int A) color = RandomColor(rng);
+                cases.Add(new DrawCase($"lines({color}, closed={closed}, [{string.Join(", ", points.Select(p => $"({p.X:R}, {p.Y:R})"))}], width={width})",
+                    surface => Python.pygame.draw.lines(surface, color, closed, points, width),
+                    surface => Draw.Lines(surface, ToColor(color), closed, points, (int)width)));
+            }
+
+            for (int i = 0; i < 40; i++) {
+                // Both endpoints far off on one axis each: the closed form starts the walk deep into a long line.
+                double x0 = i % 2 == 0 ? -2.2e6 - rng.NextDouble() : rng.NextDouble() * Width, y0 = rng.NextDouble() * Height;
+                double x1 = rng.NextDouble() * Width, y1 = i % 4 < 2 ? 2.4e6 + rng.NextDouble() : -2.9e6 - rng.NextDouble();
+                (int R, int G, int B, int A) color = RandomColor(rng);
+                cases.Add(new DrawCase($"line({color}, ({x0:R}, {y0:R}), ({x1:R}, {y1:R}))",
+                    surface => Python.pygame.draw.line(surface, color, (x0, y0), (x1, y1)),
+                    surface => Draw.Line(surface, ToColor(color), x0, y0, x1, y1)));
+            }
+
+            AssertCases("draw.polygon/lines", cases);
+        }
+
+        /// <summary>
+        ///     <c>draw.circle</c> filled (LunarLander's particles): every radius from 0 to 60 around a fractional centre, and 300
+        ///     random circles across and around the surface's edges with fractional radii (truncated) and NaN centres or radii
+        ///     (pygame's <c>INT_MIN</c>: nothing), plus widths -1 (nothing).
+        /// </summary>
+        [TestMethod]
+        public void Circle_Filled_MatchesPygame() {
+            var rng = new Random(20261114);
+            var cases = new List<DrawCase>();
+            for (int r = 0; r <= 60; r++) {
+                (double X, double Y) center = (31.7, 23.2);
+                double radius = r + (r % 3 == 0 ? 0.0 : rng.NextDouble());
+                (int R, int G, int B, int A) color = RandomColor(rng);
+                cases.Add(new DrawCase($"circle({color}, {center}, {radius:R})",
+                    surface => Python.pygame.draw.circle(surface, color, center, radius, 0),
+                    surface => Draw.Circle(surface, ToColor(color), center.X, center.Y, radius)));
+            }
+
+            for (int i = 0; i < 300; i++) {
+                // Centres around and just beyond the edges, so most discs show while many are clipped (a few lie wholly off).
+                (double X, double Y) center = (rng.NextDouble() * (Width + 40) - 20, rng.NextDouble() * (Height + 40) - 20);
+                double radius = i % 3 == 0 ? rng.NextDouble() * 4 : rng.NextDouble() * 40;
+                if (i % 50 == 1)
+                    center = (double.NaN, center.Y);
+                if (i % 50 == 2)
+                    radius = double.NaN;
+                long width = i % 30 == 4 ? -1 : 0;
+                (int R, int G, int B, int A) color = RandomColor(rng);
+                cases.Add(new DrawCase($"circle({color}, ({center.X:R}, {center.Y:R}), {radius:R}, width={width})",
+                    surface => Python.pygame.draw.circle(surface, color, center, radius, width),
+                    surface => Draw.Circle(surface, ToColor(color), center.X, center.Y, radius, (int)width)));
+            }
+
+            AssertCases("draw.circle", cases);
+        }
+
+        /// <summary>
+        ///     The new primitives' refusals, with pygame's types and messages: a filled polygon of fewer than 3 points, an
+        ///     outline or a polyline of fewer than 2 (checked before the width).
+        /// </summary>
+        [TestMethod]
+        public void PolygonAndLines_TooFewPoints_RaiseAsPygame() {
+            (string What, Func<PyObject> Python, Func<object?> DotNet)[] cases = {
+                ("polygon of 2 points", () => DrawOnFreshSurface(s => Python.pygame.draw.polygon(s, (1, 2, 3, 255), new[] { (0.0, 0.0), (5.0, 5.0) }, 0)),
+                    () => DrawDotNet(s => Draw.Polygon(s, new Color(1, 2, 3), new[] { (0.0, 0.0), (5.0, 5.0) }))),
+                ("polygon outline of 1 point", () => DrawOnFreshSurface(s => Python.pygame.draw.polygon(s, (1, 2, 3, 255), new[] { (0.0, 0.0) }, -1)),
+                    () => DrawDotNet(s => Draw.Polygon(s, new Color(1, 2, 3), new[] { (0.0, 0.0) }, -1))),
+                ("lines of 1 point", () => DrawOnFreshSurface(s => Python.pygame.draw.lines(s, (1, 2, 3, 255), false, new[] { (0.0, 0.0) }, 0)),
+                    () => DrawDotNet(s => Draw.Lines(s, new Color(1, 2, 3), false, new[] { (0.0, 0.0) }, 0))),
+            };
+            foreach ((string what, Func<PyObject> python, Func<object?> dotnet) in cases)
+                ByteContract.AssertSame(what, Outcome.CapturePython(python), Outcome.Capture(dotnet));
+        }
+
+        /// <summary>Draws on a fresh pygame surface and returns <c>None</c>, so an outcome compares the call's exception alone.</summary>
+        /// <param name="draw">The drawing; runs under the GIL.</param>
+        /// <returns>A new owned <c>None</c>.</returns>
+        /// <exception cref="PythonException">Thrown when drawing raises.</exception>
+        private static PyObject DrawOnFreshSurface(Action<PyObject> draw) {
+            using PyObject surface = Python.pygame.Surface(Width, Height);
+            draw(surface);
+            return PyConvert.ToPython(null);
+        }
+
+        /// <summary>Draws on a fresh Gym.Rendering surface and returns <see langword="null"/>, the counterpart of <see cref="DrawOnFreshSurface"/>.</summary>
+        /// <param name="draw">The drawing.</param>
+        /// <returns><see langword="null"/>.</returns>
+        private static object? DrawDotNet(Action<Surface> draw) {
+            draw(new Surface(Width, Height));
+            return null;
+        }
+
+        /// <summary>
+        ///     A random polygon for the fill and outline corpora, varied by the case's index: integer vertices, big ones
+        ///     reaching far off the surface, thin slivers, rows shared by several vertices (horizontal edges), star shapes, a
+        ///     flat one, or plain random floats around the surface.
+        /// </summary>
+        /// <param name="rng">The generator.</param>
+        /// <param name="count">The number of vertices.</param>
+        /// <param name="index">The case's index, which picks the kind.</param>
+        /// <returns>The vertices.</returns>
+        private static (double X, double Y)[] RandomPolygon(Random rng, int count, int index) {
+            var points = new (double X, double Y)[count];
+            double Uniform(double low, double high) => low + rng.NextDouble() * (high - low);
+            switch (index % 7) {
+                case 0:
+                    for (int k = 0; k < count; k++)
+                        points[k] = (rng.Next(-10, Width + 10), rng.Next(-10, Height + 10));
+                    break;
+                case 1:
+                    for (int k = 0; k < count; k++)
+                        points[k] = (Uniform(-80, Width + 80), Uniform(-80, Height + 80));
+                    break;
+                case 2: {
+                    double y = Uniform(-5, Height + 5);
+                    for (int k = 0; k < count; k++)
+                        points[k] = (Uniform(-10, Width + 10), y + Uniform(-1.5, 1.5));
+                    break;
+                }
+
+                case 3: {
+                    int[] rows = { rng.Next(-5, Height + 5), rng.Next(-5, Height + 5), rng.Next(-5, Height + 5) };
+                    for (int k = 0; k < count; k++)
+                        points[k] = (Uniform(-10, Width + 10), rows[rng.Next(rows.Length)] + new[] { 0.0, 0.25, 0.75 }[rng.Next(3)]);
+                    break;
+                }
+
+                case 4: {
+                    double cx = Uniform(-10, Width + 10), cy = Uniform(-10, Height + 10), radius = Uniform(1, 40);
+                    double[] angles = Enumerable.Range(0, count).Select(_ => Uniform(0, 2 * Math.PI)).OrderBy(a => a).ToArray();
+                    for (int k = 0; k < count; k++)
+                        points[k] = (cx + Math.Cos(angles[k]) * radius * Uniform(0.3, 1), cy + Math.Sin(angles[k]) * radius * Uniform(0.3, 1));
+                    break;
+                }
+
+                case 5: {
+                    double y = Uniform(-2, Height + 2);
+                    for (int k = 0; k < count; k++)
+                        points[k] = (Uniform(-10, Width + 10), y + Uniform(0, 0.9));
+                    break;
+                }
+
+                default:
+                    for (int k = 0; k < count; k++)
+                        points[k] = (Uniform(-10, Width + 10), Uniform(-10, Height + 10));
+                    break;
+            }
+
+            return points;
+        }
+
         /// <summary>The Gymnasium envs folder of the pinned submodule, where the PNG assets live.</summary>
         /// <exception cref="AssertInconclusiveException">Thrown when the session found no checkout (no submodule to read assets from).</exception>
         private static string GymnasiumEnvs => GymPythonSession.Repository?.GymnasiumPackage is { } package

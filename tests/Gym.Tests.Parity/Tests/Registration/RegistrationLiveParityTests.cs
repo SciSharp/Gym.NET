@@ -133,6 +133,47 @@ namespace Gym.Tests.Parity.Tests.Registration {
         }
 
         /// <summary>
+        ///     The box2d ids of P8: <c>str(make(id))</c> is Gymnasium's (<c>LunarLander</c>'s class name, DR-32), and so are the
+        ///     printed specs of the stack and of the unwrapped env except the threshold, which Gymnasium registers as an int
+        ///     (<c>200</c>) and Gym.NET's float64 thresholds print as <c>200.0</c>, as for Taxi-v4
+        ///     (<see cref="Spec_TaxiRewardThreshold_IsFloat64"/>). LunarLanderContinuous-v3's kwargs are Gymnasium's own,
+        ///     <c>{'continuous': True}</c> (one class in both libraries).
+        /// </summary>
+        /// <param name="id">The id.</param>
+        /// <param name="threshold">Gymnasium's int threshold.</param>
+        [TestMethod]
+        [DataRow("LunarLander-v3", 200)]
+        [DataRow("LunarLanderContinuous-v3", 200)]
+        public void Make_Box2D_StackAndSpecs_MatchGymnasium(string id, int threshold) {
+            using PyRef python = PyRef.Of(() => Python.gymnasium.make(id));
+            using IEnv dotnet = Gymnasium.Make(id);
+            ByteContract.AssertSame($"str(make('{id}'))", Outcome.CapturePython(() => Python.builtins.str(python.Object)), Outcome.Returned(ValueFacts.FromText(dotnet.ToString()!)));
+
+            string intLine = $"\nreward_threshold={threshold}\n", floatLine = $"\nreward_threshold={threshold}.0\n";
+            foreach (bool unwrapped in new[] { false, true }) {
+                ValueFacts printed = Outcome.CapturePython(() => {
+                    if (!unwrapped) {
+                        using PyObject stackSpec = Python.gymnasium.Env.spec(python.Object);
+                        return Python.gymnasium.envs.registration.EnvSpec.pprint(stackSpec);
+                    }
+
+                    using PyObject env = Python.gymnasium.Env.unwrapped(python.Object);
+                    using PyObject spec = Python.gymnasium.Env.spec(env);
+                    return Python.gymnasium.envs.registration.EnvSpec.pprint(spec);
+                }).Expect($"{id}: spec.pprint()");
+                StringAssert.Contains(printed.Text, intLine, $"Gymnasium's {id} registers an int threshold.");
+                EnvSpec spec = (unwrapped ? dotnet.Unwrapped.Spec : dotnet.Spec)!;
+                Assert.AreEqual(printed.Text!.Replace(intLine, floatLine, StringComparison.Ordinal), spec.Pprint(disablePrint: true),
+                    $"{id}: Gym.NET's spec{(unwrapped ? " of the unwrapped env" : "")} prints Gymnasium's text with the threshold as a float64.");
+            }
+
+            ByteContract.AssertSame($"spec('{id}').kwargs", Outcome.CapturePython(() => {
+                using PyObject spec = Python.gymnasium.spec(id);
+                return Python.gymnasium.envs.registration.EnvSpec.kwargs(spec);
+            }), Outcome.Returned(ValueFacts.Of(Gymnasium.Spec(id).Kwargs)));
+        }
+
+        /// <summary>
         ///     DR-32's accepted deviation, pinned so it cannot drift: <c>MountainCarContinuous-v0</c>'s <c>EnvSpec.kwargs</c> is
         ///     empty in Gymnasium (its entry point is a class of its own) and <c>{'continuous': True}</c> in Gym.NET (one class
         ///     for both MountainCars); <c>MountainCar-v0</c>'s are equal (empty).

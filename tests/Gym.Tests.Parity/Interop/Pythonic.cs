@@ -3082,6 +3082,35 @@ namespace Gym.Tests.Parity {
                 internal static void aalines(PyObject surface, (int R, int G, int B, int A) color, bool closed, IReadOnlyList<(double X, double Y)> points) =>
                     Call("aalines", surface, color, closed, points.Select(point => (object?)point).ToList());
 
+                /// <summary><c>draw.polygon(surface, color, points, width)</c>.</summary>
+                /// <param name="surface">The surface; stays owned by the caller.</param>
+                /// <param name="color">The colour as <c>(r, g, b, a)</c>.</param>
+                /// <param name="points">The vertices, crossed as a list of <c>(x, y)</c> float tuples.</param>
+                /// <param name="width">0 fills, a positive width outlines, a negative one draws nothing.</param>
+                /// <exception cref="PythonException">Thrown when drawing raises (too few points).</exception>
+                internal static void polygon(PyObject surface, (int R, int G, int B, int A) color, IReadOnlyList<(double X, double Y)> points, long width) =>
+                    Call("polygon", surface, color, points.Select(point => (object?)point).ToList(), width);
+
+                /// <summary><c>draw.circle(surface, color, center, radius, width)</c>.</summary>
+                /// <param name="surface">The surface; stays owned by the caller.</param>
+                /// <param name="color">The colour as <c>(r, g, b, a)</c>.</param>
+                /// <param name="center">The centre as an <c>(x, y)</c> float tuple.</param>
+                /// <param name="radius">The radius.</param>
+                /// <param name="width">0 fills, a negative width draws nothing.</param>
+                /// <exception cref="PythonException">Thrown when drawing raises.</exception>
+                internal static void circle(PyObject surface, (int R, int G, int B, int A) color, (double X, double Y) center, double radius, long width) =>
+                    Call("circle", surface, color, center, radius, width);
+
+                /// <summary><c>draw.lines(surface, color, closed, points, width)</c>.</summary>
+                /// <param name="surface">The surface; stays owned by the caller.</param>
+                /// <param name="color">The colour as <c>(r, g, b, a)</c>.</param>
+                /// <param name="closed">Whether the last point joins the first.</param>
+                /// <param name="points">The points, crossed as a list of <c>(x, y)</c> float tuples.</param>
+                /// <param name="width">The line width; below 1 draws nothing.</param>
+                /// <exception cref="PythonException">Thrown when drawing raises (too few points).</exception>
+                internal static void lines(PyObject surface, (int R, int G, int B, int A) color, bool closed, IReadOnlyList<(double X, double Y)> points, long width) =>
+                    Call("lines", surface, color, closed, points.Select(point => (object?)point).ToList(), width);
+
                 /// <summary>Calls a draw function with the surface, the colour and arguments converted by <see cref="Oracle.PyConvert.ToPython"/>.</summary>
                 /// <param name="name">The function.</param>
                 /// <param name="surface">The surface; stays owned by the caller.</param>
