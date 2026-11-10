@@ -27,8 +27,8 @@ namespace Gym.Tests.Parity.Tests.Envs {
     /// <remarks>
     ///     <para>
     ///     The ids are the twelve Gym.NET registers; the suite's coverage matrix (<c>tests/Gym.Tests.Parity/CLAUDE.md</c> §5)
-    ///     names the cells each id has. MountainCar's frames keep their open P7 gap (16 hill pixels): its frame cells come
-    ///     twice, gated outside the gap (the mask of <c>MountainCarLiveParityTests</c>) and <c>[OpenBugs("P7")]</c> whole.
+    ///     names the cells each id has. Every id's frames are compared whole, MountainCar's two included since their hill's
+    ///     anti-aliased polyline is drawn by pygame's own algorithm (DR-37).
     ///     </para>
     ///     <para>
     ///     Human mode renders into pygame's display under SDL's dummy driver on the Python side and into a recording viewer
@@ -113,11 +113,8 @@ namespace Gym.Tests.Parity.Tests.Envs {
         /// <summary>Every id with shared memory on and off.</summary>
         public static IEnumerable<object[]> IdsAndSharedMemory => from id in Ids from sharedMemory in new[] { true, false } select new object[] { id, sharedMemory };
 
-        /// <summary>The ids whose frames are pixel-exact: all but MountainCar's two (P7).</summary>
-        public static IEnumerable<object[]> PixelExactIds => Ids.Where(id => !IsMountainCar(id)).Select(id => new object[] { id });
-
-        /// <summary>MountainCar's two ids, whose hill is the open P7 gap.</summary>
-        public static IEnumerable<object[]> MountainCarIds => Ids.Where(IsMountainCar).Select(id => new object[] { id });
+        /// <summary>Every id, one per row, for the cells that take the id alone; all twelve render pixel for pixel.</summary>
+        public static IEnumerable<object[]> EveryId => Ids.Select(id => new object[] { id });
 
         /// <summary>
         ///     <c>make_vec(id, 3, "sync")</c> in lockstep with <c>Gymnasium.MakeVec</c> for 220 steps of the batched action
@@ -167,29 +164,8 @@ namespace Gym.Tests.Parity.Tests.Envs {
         /// <param name="id">The env.</param>
         /// <exception cref="ParityException">Thrown at the first difference.</exception>
         [TestMethod]
-        [DynamicData(nameof(PixelExactIds))]
-        public void HumanMode_EveryEnv_FramesMatchPygame(string id) => AssertHumanFrames(id, gap: null);
-
-        /// <summary>
-        ///     The human frames of MountainCar's two ids, as <see cref="HumanMode_EveryEnv_FramesMatchPygame"/> compares them,
-        ///     pixel for pixel everywhere but the hill's P7 gap.
-        /// </summary>
-        /// <param name="id">The env.</param>
-        /// <exception cref="ParityException">Thrown at the first difference outside the gap.</exception>
-        [TestMethod]
-        [DynamicData(nameof(MountainCarIds))]
-        public void HumanMode_MountainCar_FramesMatchPygameOutsideTheHillGap(string id) {
-            SkipClassicOffReferencePlatform(id);
-            AssertHumanFrames(id, MountainCarLiveParityTests.HillGap(id));
-        }
-
-        /// <summary>The human frames of MountainCar's two ids, whole. Open: the hill's joints (P7), as in its own whole-frame cells.</summary>
-        /// <param name="id">The env.</param>
-        /// <exception cref="ParityException">Thrown at the first difference.</exception>
-        [TestMethod]
-        [DynamicData(nameof(MountainCarIds))]
-        [OpenBugs("P7")]
-        public void HumanMode_MountainCar_WholeFramesMatchPygame(string id) => AssertHumanFrames(id, gap: null);
+        [DynamicData(nameof(EveryId))]
+        public void HumanMode_EveryEnv_FramesMatchPygame(string id) => AssertHumanFrames(id);
 
         /// <summary>
         ///     <c>render_mode="rgb_array_list"</c> (<c>make</c>'s <c>RenderCollection</c>): the frames collected since the reset
@@ -199,29 +175,8 @@ namespace Gym.Tests.Parity.Tests.Envs {
         /// <param name="id">The env.</param>
         /// <exception cref="ParityException">Thrown at the first difference.</exception>
         [TestMethod]
-        [DynamicData(nameof(PixelExactIds))]
-        public void RgbArrayList_EveryEnv_MatchesGymnasium(string id) => AssertFrameLists(id, gap: null);
-
-        /// <summary>
-        ///     The <c>rgb_array_list</c> frames of MountainCar's two ids, as <see cref="RgbArrayList_EveryEnv_MatchesGymnasium"/>
-        ///     compares them, pixel for pixel everywhere but the hill's P7 gap.
-        /// </summary>
-        /// <param name="id">The env.</param>
-        /// <exception cref="ParityException">Thrown at the first difference outside the gap.</exception>
-        [TestMethod]
-        [DynamicData(nameof(MountainCarIds))]
-        public void RgbArrayList_MountainCar_MatchesGymnasiumOutsideTheHillGap(string id) {
-            SkipClassicOffReferencePlatform(id);
-            AssertFrameLists(id, MountainCarLiveParityTests.HillGap(id));
-        }
-
-        /// <summary>The <c>rgb_array_list</c> frames of MountainCar's two ids, whole. Open: the hill's joints (P7).</summary>
-        /// <param name="id">The env.</param>
-        /// <exception cref="ParityException">Thrown at the first difference.</exception>
-        [TestMethod]
-        [DynamicData(nameof(MountainCarIds))]
-        [OpenBugs("P7")]
-        public void RgbArrayList_MountainCar_WholeFramesMatchGymnasium(string id) => AssertFrameLists(id, gap: null);
+        [DynamicData(nameof(EveryId))]
+        public void RgbArrayList_EveryEnv_MatchesGymnasium(string id) => AssertFrameLists(id);
 
         /// <summary>
         ///     CartPole-v0's <c>make</c> stack against Gym.NET's for a whole episode of the balancing policy: every transition
@@ -247,10 +202,9 @@ namespace Gym.Tests.Parity.Tests.Envs {
         ///     frame on display pixel for pixel (with PNG artifacts on a difference).
         /// </summary>
         /// <param name="id">The env.</param>
-        /// <param name="gap">The pixels to leave out of every frame (MountainCar's hill, P7), or <see langword="null"/> for whole frames.</param>
         /// <exception cref="ParityException">Thrown at the first difference.</exception>
         /// <exception cref="AssertFailedException">Thrown when Gymnasium's side raises, or Gym.NET's showed no frame by a grab.</exception>
-        private void AssertHumanFrames(string id, bool[]? gap) {
+        private void AssertHumanFrames(string id) {
             SkipClassicOffReferencePlatform(id);
             const long seed = 3;
             // Both sides pace human frames at render_fps: toy_text's 4 frames per second make each call cost a quarter second.
@@ -295,7 +249,7 @@ namespace Gym.Tests.Parity.Tests.Envs {
             ByteContract.AssertSame($"{id}: the calls made in human mode", python.Items[0], ValueFacts.Of(calls));
             ByteContract.AssertSame($"{id}: the frames shown by the end of each call", python.Items[1], ValueFacts.Of(counts));
             for (int i = 0; i < frames.Count; i++)
-                AssertFrame($"{id}: the human frame after {calls[i]}", Frame.FromFacts(python.Items[2].Items[i]), frames[i], gap, "human render");
+                FrameDiff.AssertSame($"{id}: the human frame after {calls[i]}", Frame.FromFacts(python.Items[2].Items[i]), frames[i], "human render");
         }
 
         /// <summary>
@@ -304,10 +258,9 @@ namespace Gym.Tests.Parity.Tests.Envs {
         ///     frame pixel for pixel (with PNG artifacts on a difference).
         /// </summary>
         /// <param name="id">The env.</param>
-        /// <param name="gap">The pixels to leave out of every frame (MountainCar's hill, P7), or <see langword="null"/> for whole frames.</param>
         /// <exception cref="ParityException">Thrown at the first difference.</exception>
         /// <exception cref="AssertFailedException">Thrown when either side raises.</exception>
-        private void AssertFrameLists(string id, bool[]? gap) {
+        private void AssertFrameLists(string id) {
             SkipClassicOffReferencePlatform(id);
             const long seed = 9;
             ValueFacts python = Outcome.CapturePython(() => {
@@ -345,24 +298,10 @@ namespace Gym.Tests.Parity.Tests.Envs {
                 ValueFacts.Of(dotnet.Items.Select(list => (long)list.Items.Count).ToArray()));
             for (int render = 0; render < python.Items.Count; render++) {
                 for (int frame = 0; frame < python.Items[render].Items.Count; frame++) {
-                    AssertFrame($"{what}: render #{render + 1}, frame #{frame + 1}", Frame.FromFacts(python.Items[render].Items[frame]),
-                        Frame.FromFacts(dotnet.Items[render].Items[frame]), gap, "rgb_array_list frame");
+                    FrameDiff.AssertSame($"{what}: render #{render + 1}, frame #{frame + 1}", Frame.FromFacts(python.Items[render].Items[frame]),
+                        Frame.FromFacts(dotnet.Items[render].Items[frame]), "rgb_array_list frame");
                 }
             }
-        }
-
-        /// <summary>Compares two frames pixel for pixel, whole or outside a gap.</summary>
-        /// <param name="what">What was rendered, for the report.</param>
-        /// <param name="python">Gymnasium's frame.</param>
-        /// <param name="dotnet">Gym.NET's frame.</param>
-        /// <param name="gap">The pixels to leave out, or <see langword="null"/> for the whole frame.</param>
-        /// <param name="case">The report's case line for a whole-frame comparison.</param>
-        /// <exception cref="ParityException">Thrown when a compared pixel differs, after writing the artifacts.</exception>
-        private static void AssertFrame(string what, Frame python, Frame dotnet, bool[]? gap, string @case) {
-            if (gap is null)
-                FrameDiff.AssertSame(what, python, dotnet, @case);
-            else
-                MountainCarLiveParityTests.AssertSameOutsideHillGap(what, python, dotnet, gap);
         }
 
         /// <summary>
@@ -395,11 +334,6 @@ namespace Gym.Tests.Parity.Tests.Envs {
         private static bool IsToyText(string id) =>
             id.StartsWith("FrozenLake", StringComparison.Ordinal) || id.StartsWith("CliffWalking", StringComparison.Ordinal) || id.StartsWith("Taxi", StringComparison.Ordinal)
             || id.StartsWith("Blackjack", StringComparison.Ordinal);
-
-        /// <summary>Whether an id is one of MountainCar's two.</summary>
-        /// <param name="id">The env.</param>
-        /// <returns><see langword="true"/> for MountainCar-v0 and MountainCarContinuous-v0.</returns>
-        private static bool IsMountainCar(string id) => id.StartsWith("MountainCar", StringComparison.Ordinal);
 
         /// <summary>
         ///     A viewer that keeps the last frame it was shown and counts the frames, so a cell can compare what a human-mode

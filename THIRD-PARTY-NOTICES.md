@@ -1,7 +1,9 @@
 # Third-party notices
 
-Gym.NET is licensed under the Apache License 2.0 (see [LICENSE](LICENSE)). Parts of it follow third-party source code or
-carry third-party files; they are listed below with the notices their licenses require. The port plan's §4.3
+Gym.NET is licensed under the Apache License 2.0 (see [LICENSE](LICENSE)), except one file translated from pygame-ce,
+which keeps pygame-ce's LGPL and makes the `Gym.NET.Rendering` package `Apache-2.0 AND LGPL-2.0-or-later` (see its
+section below). Parts of Gym.NET follow third-party source code or carry third-party files; they are listed below with
+the notices their licenses require. The port plan's §4.3
 ([docs/plans/GYMNASIUM_PORT_PLAN.md](docs/plans/GYMNASIUM_PORT_PLAN.md)) keeps this list in step with the code.
 
 ---
@@ -207,16 +209,57 @@ The translation is verified byte for byte against live `cv2` 4.13.0 by the parit
 
 ---
 
+## pygame-ce 2.5.8: `draw.aaline` and `draw.aalines` (LGPL-2.0-or-later)
+
+`src/Gym.Rendering/Draw.Aaline.cs` is a C# translation of the functions `aaline`, `aalines`, `draw_aaline`,
+`get_antialiased_color` and `set_and_check_rect` of `src_c/draw.c` from
+[pygame-ce](https://github.com/pygame-community/pygame-ce) 2.5.8 (decision DR-37 of
+[docs/plans/DESIGN_REVIEW.md](docs/plans/DESIGN_REVIEW.md)). It is an altered version, marked as such in the file with
+the date of the change (2026-11-10): translated from C to C#, reduced to width 1 on 32-bit surfaces without per-pixel
+alpha, without pygame's drawn-area bookkeeping and deprecated `blend` argument, and refusing NaN and infinite
+coordinates.
+
+That file keeps its source's license, the GNU Library General Public License, version 2 or (at your option) any later
+version. The `Gym.NET.Rendering` package, which compiles it, is therefore licensed `Apache-2.0 AND LGPL-2.0-or-later`;
+every other Gym.NET package stays Apache-2.0. The complete corresponding source is this repository. The license text:
+<https://www.gnu.org/licenses/old-licenses/lgpl-2.0.html> (SPDX `LGPL-2.0-or-later`).
+
+```
+pygame-ce - Python Game Library
+Copyright (C) 2000-2001  Pete Shinners
+
+This library is free software; you can redistribute it and/or
+modify it under the terms of the GNU Library General Public
+License as published by the Free Software Foundation; either
+version 2 of the License, or (at your option) any later version.
+
+This library is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+Library General Public License for more details.
+
+You should have received a copy of the GNU Library General Public
+License along with this library; if not, write to the Free
+Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+```
+
+The translation is verified pixel for pixel against live pygame-ce by the parity suite
+(`tests/Gym.Tests.Parity/Tests/Rendering/PygameDrawLiveParityTests.cs`, and MountainCar's frames in
+`tests/Gym.Tests.Parity/Tests/Envs`).
+
+---
+
 ## pygame-ce (behaviour reference only)
 
-`src/Gym.Rendering` reproduces the observable behaviour of [pygame-ce](https://github.com/pygame-community/pygame-ce)
-2.5.8 (LGPL-2.1). None of pygame-ce's own source code is copied, and the implementations are Gym.NET's own:
+Beyond the translation above, `src/Gym.Rendering` reproduces the observable behaviour of
+[pygame-ce](https://github.com/pygame-community/pygame-ce) 2.5.8 (LGPL-2.1). None of pygame-ce's own source code is
+copied there, and the implementations are Gym.NET's own:
 
 - the argument conversion of `pygame.gfxdraw`, `Surface.fill`/`blit`, `transform.flip`, `surfarray` and
   `math.Vector2.rotate_rad`, established by reading pygame-ce's source and documentation and by probing it;
-- `draw.line`, `draw.rect`, `draw.aaline`/`aalines`, per-pixel alpha and its blit, `transform.scale`,
-  `transform.smoothscale` and `image.load`/`frombytes`, derived from pygame-ce's output alone, with none of its source
-  read (decision D4 of the completion plan).
+- `draw.line`, `draw.rect`, per-pixel alpha and its blit, `transform.scale`, `transform.smoothscale` and
+  `image.load`/`frombytes`, derived from pygame-ce's output alone, with none of its source read (decision D4 of the
+  completion plan).
 
 Everything is verified pixel for pixel and bit for bit against live pygame-ce by the parity suite
-(`tests/Gym.Tests.Parity/Tests/Rendering`); `draw.aaline`/`aalines` are the documented exception.
+(`tests/Gym.Tests.Parity/Tests/Rendering`).

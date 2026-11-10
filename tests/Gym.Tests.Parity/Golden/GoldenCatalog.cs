@@ -63,7 +63,7 @@ namespace Gym.Tests.Parity.Golden {
                 CreateDotNet = renderMode => new GymNetEnv(Gymnasium.Make("CartPole-v0", new Dictionary<string, object?> { ["render_mode"] = renderMode })),
             },
             // MountainCar-v0 driven to the flag by the momentum policy: the float64 state through the wall rule and
-            // termination. No frames: the hill's joints are the open P7 gap.
+            // termination, with a frame every 20 steps (the hill's anti-aliased polyline is pygame's own since DR-37).
             new GoldenCase {
                 Suite = "classic_control",
                 Name = "MountainCar-v0.momentum.seed0",
@@ -71,12 +71,13 @@ namespace Gym.Tests.Parity.Golden {
                 Seed = 0,
                 Actions = new GoldenActions.Policy("mountaincar_momentum"),
                 MaxSteps = 200,
+                FrameEvery = 20,
                 StateAttribute = "state",
                 PlatformDependence = "MountainCar's cos",
                 CreateDotNet = renderMode => new GymNetEnv(new MountainCarEnv(renderMode: renderMode)),
             },
             // MountainCarContinuous-v0 under seeded float32 forces: the NEP 50 float32 arithmetic of every step, checked
-            // without Python, and Box sampling in the replay. No frames (P7).
+            // without Python, and Box sampling in the replay, with a frame every 30 steps (the car's float32 position).
             new GoldenCase {
                 Suite = "classic_control",
                 Name = "MountainCarContinuous-v0.sampled.seed42",
@@ -84,6 +85,7 @@ namespace Gym.Tests.Parity.Golden {
                 Seed = 42,
                 Actions = new GoldenActions.Sampled(42),
                 MaxSteps = 300,
+                FrameEvery = 30,
                 StateAttribute = "state",
                 PlatformDependence = "MountainCar's cos",
                 CreateDotNet = renderMode => new GymNetEnv(new MountainCarEnv(renderMode: renderMode, continuous: true)),

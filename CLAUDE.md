@@ -54,8 +54,10 @@ refs/Gym.NET/
 │   │   └── Exceptions/            # Every gymnasium.error class (Error, ResetNeeded, ...), AssertionError, NotImplementedError, ImportError; legacy InvalidActionError etc.
 │   │
 │   ├── Gym.SourceGenerators/      # Roslyn generator (DR-13, DR-34): <Class>Options records of [GymOptions] envs/wrappers; [GymTuple]/[GymDict] records
-│   ├── Gym.Rendering/             # pygame-compatible rasterizer: Surface (opaque or per-pixel alpha), GfxDraw (SDL_gfx 2.0.26 port), Draw (line, rect, aaline/aalines),
-│   │   │                          #   Transform (flip, scale, smoothscale), ImageIO (image.load/frombytes), SurfArray (incl. make_surface), Vector2;
+│   ├── Gym.Rendering/             # pygame-compatible rasterizer: Surface (opaque or per-pixel alpha), GfxDraw (SDL_gfx 2.0.26 port), Draw (line, rect;
+│   │   │                          #   aaline/aalines in Draw.Aaline.cs, translated from pygame-ce's draw.c under its LGPL-2.0-or-later, DR-37: the
+│   │   │                          #   package is Apache-2.0 AND LGPL-2.0-or-later), Transform (flip, scale, smoothscale), ImageIO (image.load/frombytes),
+│   │   │                          #   SurfArray (incl. make_surface), Vector2;
 │   │   │                          #   pygame's display and event queue (Display, EventQueue, Event, EventType, KeyCode), process-wide like pygame's
 │   │   └── Utils/                 # namespace Gym.Utils: Play (play, display_arr), PlayableGame, MissingKeysToAction, PlayPlot (IPlotFigure, PlotFigure); DR-36
 │   ├── Gym.Environments/          # Concrete environment implementations

@@ -40,9 +40,8 @@ namespace Gym.Environments.Envs.Classic {
     ///     <c>get_keys_to_action</c> exists in discrete mode only, as in Gymnasium (<see cref="GetKeysToAction"/>).
     ///     </para>
     ///     <para>
-    ///     Rendering is Gymnasium's (gfxdraw car, wheels and flag, pixel for pixel) except the hill, drawn with
-    ///     <see cref="Draw.Aalines"/>, which is not yet pixel-exact with pygame (P7, reported to the maintainer): frames can
-    ///     differ from Gymnasium's by single pixels along the hill. Human mode renders into the window from
+    ///     Rendering is Gymnasium's, pixel for pixel: the gfxdraw car, wheels and flag, and the hill, drawn with
+    ///     <see cref="Draw.Aalines"/> (pygame-ce's own algorithm, DR-37). Human mode renders into the window from
     ///     <c>viewer_factory</c> or <c>Gymnasium.HumanViewerFactory</c> (DR-20), paced at 30 frames per second.
     ///     </para>
     ///     <para>

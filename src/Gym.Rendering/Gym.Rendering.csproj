@@ -2,7 +2,9 @@
 
   <!-- The pygame-compatible rasterizer of the Gymnasium port (port plan section 5.5, workstream F5): a Surface with pygame's
        semantics and the drawing primitives Gymnasium's envs render with, reproduced pixel for pixel. The gfxdraw
-       primitives are a C# port of SDL_gfx 2.0.26 (zlib, see SdlGfx/SdlGfxPrimitives.cs and THIRD-PARTY-NOTICES.md). -->
+       primitives are a C# port of SDL_gfx 2.0.26 (zlib, see SdlGfx/SdlGfxPrimitives.cs and THIRD-PARTY-NOTICES.md).
+       draw.aaline/aalines (Draw.Aaline.cs) are translated from pygame-ce 2.5.8's src_c/draw.c (decision DR-37) and keep
+       its license, the GNU Library GPL version 2 or later, so the package's license expression names both licenses. -->
   <PropertyGroup>
     <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
     <LangVersion>latest</LangVersion>
@@ -18,9 +20,9 @@
     <Authors>Eli Belash</Authors>
     <Company>SciSharp STACK</Company>
     <Product>Gym.NET.Rendering</Product>
-    <Description>The software rasterizer Gym.NET's environments draw their rgb_array frames with, pixel for pixel as pygame-ce draws Gymnasium's: a Surface with pygame's semantics, SDL_gfx 2.0.26's gfxdraw primitives in C#, draw.line and draw.rect, alpha blitting, transform.flip/scale/smoothscale, image loading, surfarray and Vector2.</Description>
+    <Description>The software rasterizer Gym.NET's environments draw their rgb_array frames with, pixel for pixel as pygame-ce draws Gymnasium's: a Surface with pygame's semantics, SDL_gfx 2.0.26's gfxdraw primitives in C#, draw.line and draw.rect, draw.aaline and draw.aalines translated from pygame-ce (LGPL-2.0-or-later), alpha blitting, transform.flip/scale/smoothscale, image loading, surfarray and Vector2.</Description>
     <Copyright>2019-2026 © SciSharp STACK Team</Copyright>
-    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+    <PackageLicenseExpression>Apache-2.0 AND LGPL-2.0-or-later</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/SciSharp/Gym.NET</PackageProjectUrl>
     <PackageIcon>icon.png</PackageIcon>
     <PackageReadmeFile>README.md</PackageReadmeFile>

@@ -8,9 +8,10 @@ using NumSharp;
 namespace Gym.Tests.Rendering {
     /// <summary>
     ///     The P7 additions to <c>Gym.Rendering</c>, checked without pygame: per-pixel-alpha surfaces, the alpha blit, nearest
-    ///     and smooth scaling, <c>draw.line</c> and <c>draw.rect</c>, <c>image.frombytes</c> and <c>image.load</c>, and what is
-    ///     refused. Where a value is pinned it is pygame-ce 2.5.8's own output, observed while the behaviour was derived; the
-    ///     random corpora against live pygame are the parity suite's (<c>PygameDrawLiveParityTests</c>).
+    ///     and smooth scaling, <c>draw.line</c> and <c>draw.rect</c>, the overflow and two-point quirks of the anti-aliased
+    ///     lines (DR-37), <c>image.frombytes</c> and <c>image.load</c>, and what is refused. Where a value is pinned it is
+    ///     pygame-ce 2.5.8's own output, observed while the behaviour was derived; the random corpora against live pygame are
+    ///     the parity suite's (<c>PygameDrawLiveParityTests</c>).
     /// </summary>
     [TestClass]
     public class PygameImageAndDrawTests {
@@ -118,6 +119,38 @@ namespace Gym.Tests.Rendering {
             Assert.AreEqual(0, Lit(64, 48, surface => Draw.Rect(surface, new Color(255, 255, 255), 2, 2, 5, 4, -1)));
         }
 
+        /// <summary>
+        ///     <c>draw.aaline</c> from <c>(-0.5, 10.75)</c> to <c>(40, 10.75)</c>: the start truncates to column 0, so the first
+        ///     endpoint's coverage there is <c>0.75 × 1.5 = 1.125</c> and the blend leaves 0..255; pygame keeps the low byte of
+        ///     the truncated int, 225 for black on white and 30 for white on black, where a saturating cast would give 0 and 255.
+        ///     Every value is pygame-ce 2.5.8's own pixel. Pinned on both target frameworks because a direct float-to-byte cast
+        ///     saturates from .NET 9 on.
+        /// </summary>
+        [TestMethod]
+        public void Aaline_CoverageAboveOne_KeepsTheLowByteAsPygame() {
+            var blackOnWhite = new Surface(64, 64);
+            blackOnWhite.Fill(new Color(255, 255, 255));
+            Draw.Aaline(blackOnWhite, new Color(0, 0, 0), -0.5, 10.75, 40.0, 10.75);
+            AssertGrey(blackOnWhite, (0, 11, 225), (0, 10, 159), (1, 11, 63), (1, 10, 191));
+
+            var whiteOnBlack = new Surface(64, 64);
+            Draw.Aaline(whiteOnBlack, new Color(255, 255, 255), -0.5, 10.75, 40.0, 10.75);
+            AssertGrey(whiteOnBlack, (0, 11, 30), (0, 10, 95), (1, 11, 191), (1, 10, 63));
+        }
+
+        /// <summary>
+        ///     <c>draw.aalines</c> through the same two points blends the segment twice, pygame's two-point quirk: as the first
+        ///     segment with its start endpoint and as the last with its end endpoint, each leaving the other endpoint out because
+        ///     the end point is not whole. Column 0 becomes 56 and 119, column 1 15 and 143: pygame-ce 2.5.8's own pixels.
+        /// </summary>
+        [TestMethod]
+        public void Aalines_TwoPoints_BlendTheSegmentTwiceAsPygame() {
+            var surface = new Surface(64, 64);
+            surface.Fill(new Color(255, 255, 255));
+            Draw.Aalines(surface, new Color(0, 0, 0), false, new[] { (-0.5, 10.75), (40.0, 10.75) });
+            AssertGrey(surface, (0, 11, 56), (0, 10, 119), (1, 11, 15), (1, 10, 143));
+        }
+
         /// <summary><c>image.frombytes</c>: row-major pixels, RGBA with alpha and RGB without, and pygame's error messages.</summary>
         [TestMethod]
         public void FromBytes_LaysOutPixels_AndChecksItsArguments() {
@@ -176,6 +209,15 @@ namespace Gym.Tests.Rendering {
             }
 
             return lit;
+        }
+
+        /// <summary>Requires grey pixels: each <c>(x, y)</c> must hold <c>(grey, grey, grey)</c>, the value pygame left there.</summary>
+        /// <param name="surface">The surface drawn on.</param>
+        /// <param name="pixels">The pixels and the grey each must hold.</param>
+        /// <exception cref="AssertFailedException">Thrown at the first pixel that holds another colour.</exception>
+        private static void AssertGrey(Surface surface, params (int X, int Y, byte Grey)[] pixels) {
+            foreach ((int x, int y, byte grey) in pixels)
+                Assert.AreEqual(new Color(grey, grey, grey), surface.GetAt(x, y), $"pixel ({x}, {y})");
         }
 
         /// <summary>Finds a file by its path relative to the repository root, walking up from the test's directory.</summary>

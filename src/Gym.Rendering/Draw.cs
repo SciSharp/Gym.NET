@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Generic;
 using NumSharp;
 
 namespace Gym.Rendering {
@@ -9,21 +8,24 @@ namespace Gym.Rendering {
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///     These are Gym.NET's own implementations of pygame's behaviour (decision D4: no pygame code is used), each derived
-    ///     from live pygame-ce 2.5.8 and proven against it on random corpora in the parity suite. <c>line</c> and
-    ///     <see cref="Rect"/> are pixel-exact (thousands of random lines and rectangles, clipping included).
-    ///     <see cref="Aaline"/> and <see cref="Aalines"/> are not yet: the single-segment model reproduces all but about one
-    ///     drawn pixel in ten thousand (each off by one), and the rule pygame applies where segments join is not settled, so
-    ///     MountainCar's frames differ near the hill's vertices. That gap is open in the parity suite and was reported to the
-    ///     maintainer, as D4 requires for a primitive that does not converge.
+    ///     <c>line</c> and <see cref="Rect"/> are Gym.NET's own implementations of pygame's behaviour (decision D4: derived
+    ///     from live pygame-ce 2.5.8's output, none of its source read), pixel-exact on thousands of random lines and
+    ///     rectangles, clipping included.
+    ///     </para>
+    ///     <para>
+    ///     <see cref="Aaline"/> and <see cref="Aalines"/> are the exception (decision DR-37): D4's black-box model of them did
+    ///     not converge where segments join, so they are translated from pygame-ce 2.5.8's <c>src_c/draw.c</c>, statement for
+    ///     statement in float32, and MountainCar's frames match pygame's pixel for pixel. That translation lives in its own
+    ///     file, <c>Draw.Aaline.cs</c>, under its source's license (LGPL-2.0-or-later, see THIRD-PARTY-NOTICES.md), which makes
+    ///     the Gym.NET.Rendering package <c>Apache-2.0 AND LGPL-2.0-or-later</c>.
     ///     </para>
     ///     <para>
     ///     The colour is written as the surface maps it: its alpha is dropped on a surface without per-pixel alpha (no
     ///     blending, as pygame's <c>draw</c> functions on such a surface), except where anti-aliasing weights a pixel.
     ///     </para>
-    ///     <para>Reference: <see href="https://github.com/pygame-community/pygame-ce/blob/2.5.8/src_c/draw.c">src_c/draw.c</see> (pygame-ce 2.5.8; behaviour only).</para>
+    ///     <para>Reference: <see href="https://github.com/pygame-community/pygame-ce/blob/2.5.8/src_c/draw.c">src_c/draw.c</see> (pygame-ce 2.5.8).</para>
     /// </remarks>
-    public static class Draw {
+    public static partial class Draw {
         /// <summary>
         ///     <c>pygame.draw.line(surface, color, start_pos, end_pos)</c> with integer endpoints and width 1: every pixel of the
         ///     line from <c>(x0, y0)</c> to <c>(x1, y1)</c>, both ends included, clipped to the surface.
@@ -136,169 +138,6 @@ namespace Gym.Rendering {
                 Put(surface, x, row, mapped);
                 Put(surface, x + width - 1, row, mapped);
             }
-        }
-
-        /// <summary>
-        ///     <c>pygame.draw.aaline(surface, color, start_pos, end_pos)</c>: an anti-aliased line between float endpoints,
-        ///     each pixel blended with the colour by the line's coverage of it. Not yet pixel-exact with pygame (see the class
-        ///     remarks).
-        /// </summary>
-        /// <param name="surface">The surface, without per-pixel alpha.</param>
-        /// <param name="color">The colour; its alpha is ignored (coverage alone weights the blend).</param>
-        /// <param name="x0">The start column; pixel centres are at whole coordinates.</param>
-        /// <param name="y0">The start row.</param>
-        /// <param name="x1">The end column.</param>
-        /// <param name="y1">The end row.</param>
-        /// <exception cref="ArgumentNullException">Thrown when <paramref name="surface"/> is <see langword="null"/>.</exception>
-        /// <exception cref="NotSupportedException">Thrown for a surface with per-pixel alpha (not modelled).</exception>
-        /// <exception cref="ValueError">Thrown for a coordinate that is NaN or infinite.</exception>
-        /// <remarks>
-        ///     The model, measured against pygame-ce 2.5.8: coordinates in float32; the line steps along its longer axis in
-        ///     increasing order; each column splits its coverage between the two pixels around the line, <c>1 - f</c> and
-        ///     <c>f</c> for the fractional part <c>f</c> of the other coordinate, which is accumulated by repeated float32
-        ///     addition of the slope; the first column <c>floor(x0)</c> is weighted <c>1 - frac(x0)</c> and the last
-        ///     <c>floor(x1) + 1</c> by <c>frac(x1)</c>; a pixel becomes <c>trunc(b * colour + (1 - b) * old)</c>. A zero-length
-        ///     line sets its rounded pixel.
-        /// </remarks>
-        public static void Aaline(Surface surface, Color color, double x0, double y0, double x1, double y1) {
-            RequireOpaque(surface);
-            AalineSegment(surface, color, x0, y0, x1, y1, skipStartColumn: false, skipEndColumn: false);
-        }
-
-        /// <summary>
-        ///     <c>pygame.draw.aalines(surface, color, closed, points)</c>: anti-aliased segments through the points, closed
-        ///     back to the first when <paramref name="closed"/>. Not yet pixel-exact with pygame near the vertices (see the
-        ///     class remarks).
-        /// </summary>
-        /// <param name="surface">The surface, without per-pixel alpha.</param>
-        /// <param name="color">The colour; its alpha is ignored.</param>
-        /// <param name="closed">Whether a segment joins the last point back to the first.</param>
-        /// <param name="points">At least 2 points, as <c>(x, y)</c> floats.</param>
-        /// <exception cref="ArgumentNullException">Thrown when <paramref name="surface"/> or <paramref name="points"/> is <see langword="null"/>.</exception>
-        /// <exception cref="ValueError">Thrown for fewer than 2 points, with pygame's message, or a NaN or infinite coordinate.</exception>
-        /// <exception cref="NotSupportedException">Thrown for a surface with per-pixel alpha (not modelled).</exception>
-        /// <remarks>
-        ///     <para>
-        ///     Each segment is drawn as <see cref="Aaline"/> draws it, except that both segments meeting at a joint leave out
-        ///     their partial column there (the column at the joint's major coordinate weighted by its fraction), so a joint is
-        ///     covered once by the two segments' full-weight columns. Measured against pygame-ce 2.5.8 this is exact along
-        ///     smooth polylines whose segments run the same way (MountainCar's hill: 16 differing pixels per frame, against 196
-        ///     when only one segment left its column out), but it is still not pygame's rule.
-        ///     </para>
-        ///     <para>
-        ///     What the measurements show of the rest (P7, reported to the maintainer): pygame's <c>aalines</c> is not
-        ///     <c>aaline</c> segment by segment; a 2-point open <c>aalines</c> blends the segment's interior twice (its end
-        ///     columns once), and joints between segments drawn against their major axis, or turning sharply, follow another
-        ///     rule.
-        ///     </para>
-        /// </remarks>
-        public static void Aalines(Surface surface, Color color, bool closed, IReadOnlyList<(double X, double Y)> points) {
-            RequireOpaque(surface);
-            if (points is null)
-                throw new ArgumentNullException(nameof(points));
-            if (points.Count < 2)
-                throw new ValueError("points argument must contain 2 or more points");
-            int segments = closed ? points.Count : points.Count - 1;
-            for (int i = 0; i < segments; i++) {
-                (double ax, double ay) = points[i];
-                (double bx, double by) = points[(i + 1) % points.Count];
-                // Every point but an open polyline's two ends is a joint, and both segments meeting there leave out their
-                // partial column at it.
-                bool startJoint = i > 0 || closed;
-                bool endJoint = i < points.Count - 2 || closed;
-                AalineSegment(surface, color, ax, ay, bx, by, skipStartColumn: startJoint, skipEndColumn: endJoint);
-            }
-        }
-
-        /// <summary>
-        ///     One anti-aliased segment (the model in <see cref="Aaline"/>'s remarks), optionally without its partial column at
-        ///     the start point or at the end point (the points as given, before the segment is put in increasing order).
-        /// </summary>
-        /// <param name="surface">The surface, without per-pixel alpha.</param>
-        /// <param name="color">The colour.</param>
-        /// <param name="x0">The start column.</param>
-        /// <param name="y0">The start row.</param>
-        /// <param name="x1">The end column.</param>
-        /// <param name="y1">The end row.</param>
-        /// <param name="skipStartColumn">Leave out the partial column at (<paramref name="x0"/>, <paramref name="y0"/>).</param>
-        /// <param name="skipEndColumn">Leave out the partial column at (<paramref name="x1"/>, <paramref name="y1"/>).</param>
-        /// <exception cref="ValueError">Thrown for a coordinate that is NaN or infinite.</exception>
-        private static void AalineSegment(Surface surface, Color color, double x0, double y0, double x1, double y1, bool skipStartColumn, bool skipEndColumn) {
-            RequireFinite(x0);
-            RequireFinite(y0);
-            RequireFinite(x1);
-            RequireFinite(y1);
-            float fx0 = (float)x0, fy0 = (float)y0, fx1 = (float)x1, fy1 = (float)y1;
-            float dx = fx1 - fx0, dy = fy1 - fy0;
-            if (MathF.Abs(dx) < 0.0001f && MathF.Abs(dy) < 0.0001f) {
-                // A segment of no length is its rounded point, at full strength.
-                Put(surface, (long)MathF.Floor(fx0 + 0.5f), (long)MathF.Floor(fy0 + 0.5f), color.Mapped);
-                return;
-            }
-
-            bool steep = MathF.Abs(dx) < MathF.Abs(dy);
-            if (steep) {
-                (fx0, fy0) = (fy0, fx0);
-                (fx1, fy1) = (fy1, fx1);
-                (dx, dy) = (dy, dx);
-            }
-
-            if (fx0 > fx1) {
-                (fx0, fx1) = (fx1, fx0);
-                (fy0, fy1) = (fy1, fy0);
-                dx = -dx;
-                dy = -dy;
-                // The skips belong to the points, which have just changed places.
-                (skipStartColumn, skipEndColumn) = (skipEndColumn, skipStartColumn);
-            }
-
-            float slope = dy / dx;
-            long first = (long)MathF.Floor(fx0), last = (long)MathF.Floor(fx1) + 1;
-            float startY = fy0 + slope * ((float)first - fx0);
-            if (!skipStartColumn)
-                Column(surface, color, steep, first, startY, 1f - (fx0 - first));
-            // The interior y is accumulated by float32 addition, step by step: its rounding is part of what is matched.
-            float y = startY + slope;
-            for (long column = first + 1; column < last; column++) {
-                Column(surface, color, steep, column, y, 1f);
-                y += slope;
-            }
-
-            if (!skipEndColumn)
-                Column(surface, color, steep, last, fy1 + slope * ((float)last - fx1), fx1 - (last - 1));
-        }
-
-        /// <summary>One column of an anti-aliased segment: the two pixels around <paramref name="y"/>, weighted by <paramref name="weight"/>.</summary>
-        /// <param name="surface">The surface.</param>
-        /// <param name="color">The colour.</param>
-        /// <param name="steep">Whether the major axis is y (coordinates are swapped back when plotting).</param>
-        /// <param name="column">The major coordinate.</param>
-        /// <param name="y">The minor coordinate of the line at that column.</param>
-        /// <param name="weight">The column's coverage along the major axis (1 inside the segment, less at its ends).</param>
-        private static void Column(Surface surface, Color color, bool steep, long column, float y, float weight) {
-            float floor = MathF.Floor(y);
-            float fraction = y - floor;
-            long row = (long)floor;
-            Blend(surface, color, steep ? row : column, steep ? column : row, weight * (1f - fraction));
-            Blend(surface, color, steep ? row + 1 : column, steep ? column : row + 1, weight * fraction);
-        }
-
-        /// <summary>Blends one pixel with the colour by coverage <paramref name="brightness"/>: <c>trunc(b * c + (1 - b) * old)</c> per channel, in float32.</summary>
-        /// <param name="surface">The surface.</param>
-        /// <param name="color">The colour.</param>
-        /// <param name="x">The column; off-surface pixels are skipped.</param>
-        /// <param name="y">The row.</param>
-        /// <param name="brightness">The coverage; nothing is drawn unless it is positive.</param>
-        private static void Blend(Surface surface, Color color, long x, long y, float brightness) {
-            if (brightness <= 0f || x < 0 || x >= surface.Width || y < 0 || y >= surface.Height)
-                return;
-            int index = (int)(y * surface.Width + x);
-            uint old = surface.Pixels[index];
-            float keep = 1f - brightness;
-            uint r = (uint)(brightness * color.R + keep * ((old >> 16) & 0xFF));
-            uint g = (uint)(brightness * color.G + keep * ((old >> 8) & 0xFF));
-            uint b = (uint)(brightness * color.B + keep * (old & 0xFF));
-            surface.Pixels[index] = (r << 16) | (g << 8) | b;
         }
 
         /// <summary>Writes one pixel when it lies on the surface.</summary>

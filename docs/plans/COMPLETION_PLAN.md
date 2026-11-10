@@ -121,7 +121,7 @@ Gymnasium.
 |---|---|---|---|
 | D2 | Gymnasium pin | **Re-pin to v1.4.0 now** | R0.4, before any further port |
 | D3 | NumSharp consumption | **NuGet 0.80.0 by default; `-p:NumSharpSource=Submodule` kept** for co-developing NumSharp fixes, with `refs/NumSharp` at `v0.80.0` | R0.1 |
-| D4 | pygame `draw.*` (LGPL-2.1) | **Gym.NET's own implementations**, proven pixel-exact against live pygame-ce by the parity suite; no LGPL code enters Gym.NET | P7 |
+| D4 | pygame `draw.*` (LGPL-2.1) | **Gym.NET's own implementations**, proven pixel-exact against live pygame-ce by the parity suite; no LGPL code enters Gym.NET. *Amended 2026-11-10 by DR-37: `draw.aaline`/`aalines` alone are translated from pygame-ce's `draw.c` and keep its LGPL, inside `Gym.Rendering`* | P7 |
 | D5 | Box2D | **Managed C# port of the Box2D 2.3.x core** that `box2d==2.3.10` compiles, float32, C++ operation order kept, proven by engine goldens first | P8 |
 | D10 | The Aether LunarLander | Removed when LunarLander-v3 lands in P8, which is before 2.0 (follows from D21) | P8.5 |
 | D18 | ImageSharp advisories | **Suppress the five advisories and keep ImageSharp 2.1.13** | R0.2; consumers of the packages still see the advisories in their own restores (§8) |
@@ -447,6 +447,14 @@ Specs: the port plan's §5.5 and Appendix E. pygame-ce calls at v1.4.0:
     segment (a 2-point open `aalines` blends the segment's interior twice and its end columns once, 251 of 300 cases
     exact under that model), and joints between segments drawn against their major axis, or turning sharply, follow
     another rule still.*
+    *Closed 2026-11-10 by DR-37: the maintainer allowed reading `draw.c` for these two functions, and their translation
+    (`Draw.Aaline.cs`, LGPL-2.0-or-later, inside `Gym.Rendering`) is pixel-exact on the corpora and on MountainCar's
+    frames. What the model had missed: `draw_aaline` truncates its start with `(int)` (not `floor`), clips one pixel wider
+    than the surface, accumulates from the truncated start, and its blend keeps the low byte of the truncated int when a
+    start in (-1, 0) pushes the coverage above 1; `aalines` disables a segment's endpoint columns where the end point is
+    not whole and draws an extra pixel where steepness changes, with two quirks kept (the first test reads `pts[1]` and
+    uses `>`). Its two-point case reads one float past its buffer, so pygame's own drawing there varies between runs:
+    Gym.NET takes that float as 0, and the corpus accepts either outcome for those polylines.*
   - *Deferred to P8 (box2d only): `polygon`, `circle`, `lines`, `aaline` beyond MountainCar, `smoothscale` growing, rect
     widths above 1; `font`.*
 - **Exit:** every primitive above is pixel-exact on its random corpus.
@@ -485,9 +493,9 @@ Specs: the port plan's §11.1; sources 2,028 lines.
     (`PyGymEnv.GetStateValues`).*
   - *Parity: 41 MountainCar cells (both modes), 19 Pendulum, 22 Acrobot, 8 reverse-bridge cells (Gymnasium's
     `check_env` and `check_environments_match` on all four ids), 5 registration cells, and 4 goldens (with frames for
-    Pendulum and Acrobot), all passing; inventory ratchet −7 names. MountainCar's whole frames are `[OpenBugs("P7")]`
-    (16 hill pixels per frame); gated cells compare every pixel outside the hill's measured gap, so the car, wheels and
-    flag are pixel-exact. The bridge returns Pendulum's reward as the `np.float64` Gymnasium's does
+    Pendulum and Acrobot), all passing; inventory ratchet −7 names. MountainCar's whole frames were `[OpenBugs("P7")]`
+    (16 hill pixels per frame) until DR-37 closed the gap on 2026-11-10; gated cells compared every pixel outside the
+    hill's measured gap until then. The bridge returns Pendulum's reward as the `np.float64` Gymnasium's does
     (`BridgeReward`), since `check_environments_match` compares types.*
   - *Deferred: `MountainCarEnv.get_keys_to_action` arrives with `utils.play` (DR-36); Gymnasium's construction-time
     `low`/`high` (`low_state`/`high_state`) attributes are read from the observation space instead; RLPy's unused
@@ -670,7 +678,8 @@ Specs: the port plan's §9 and §10; sources `vector` 3,113 lines and `wrappers`
   under `NEXT_STEP` and `SAME_STEP`, through Gymnasium's own `AsyncVectorEnv` with and without shared memory, in
   `human` mode (the frames shown per call, counted against pygame's display flips, and the frame on display pixel for
   pixel) and in `rgb_array_list` mode, plus CartPole-v0's `make` stack through its truncation at 200. MountainCar's
-  frames are gated outside the hill's P7 gap, and the 4 whole-frame cells are `[OpenBugs("P7")]`. CartPole-v0, which
+  frames were gated outside the hill's P7 gap, with 4 whole-frame cells `[OpenBugs("P7")]`, until DR-37 (below) made
+  them whole like every other id's. CartPole-v0, which
   shares v1's class, gained its registration row, its reverse-bridge rows (`check_env`, `check_environments_match` with
   frames) and a golden. Golden cases can now record `make`'s stack (`ViaMake`, an optional `via_make` header key, so
   the older goldens keep their bytes). Every new gated cell passed on its first run: the coverage found no new
@@ -712,8 +721,17 @@ Specs: the port plan's §9 and §10; sources `vector` 3,113 lines and `wrappers`
   - DR-38: the public `worker` delegate, `daemon` and `context`.
   - DR-46: OpenCV's float32 resize paths.
   - DR-39: ScottPlot figures in the two viewer packages.
-  - DR-37 (P7): `aaline`/`aalines` translated from pygame-ce's `draw.c`. Where the LGPL-derived code lives goes to the
-    maintainer before it lands.
+  - DR-37 (P7): `aaline`/`aalines` translated from pygame-ce's `draw.c`. *Done 2026-11-10, inside `Gym.Rendering` (the
+    maintainer's choice):*
+    - `src/Gym.Rendering/Draw.Aaline.cs` translates `aaline`, `aalines`, `draw_aaline` and `get_antialiased_color`
+      statement for statement in float32, under pygame-ce's LGPL notice and a dated change notice. The package is
+      `Apache-2.0 AND LGPL-2.0-or-later`, and THIRD-PARTY-NOTICES carries the notice.
+    - The 2 corpus cells and MountainCar's 8 whole-frame cells are gates. New cells: starts in (-1, 0), where pygame's
+      blend wraps, and zero-length segments. Two headless unit tests pin pygame's pixels for the wrap and for the
+      two-point quirk.
+    - The hill-gap mask and its 4 masked twin cells are gone. MountainCar joined the coverage cells' pixel-exact ids,
+      and `check_environments_match` renders it. Its two goldens record frames.
+    - pygame's two-point `aalines` reads memory it does not own: see the P7 notes above.*
   - Deferred: `DictInfoToList`'s result shape (composition over NumSharp's `ConcurrentOrderedDictionary`, to design).
   - Last: remind the maintainer of the readings listed under DESIGN_REVIEW's "Interpretations to confirm".
 
@@ -797,7 +815,8 @@ designs for that time are:
     property, pinned by `GymRecordsTests.OptionsRecord_DocumentationLinksTheOtherOptions` (shown to fail with the defect
     planted). Three crefs to `np.array_equal` fixed. The other documentation warnings are in pre-2.0 code
     (`Gym.Internal`, the 0.2 LunarLander, the viewers): CS1591 and about a dozen broken crefs, tolerated (DR-05).*
-  - *Not done: P10.5. Before it: P8, the deferred part of P6 (69 inventory names) and the `aaline` decision (D4); the
+  - *Not done: P10.5. Before it: P8 and the deferred part of P6 (69 inventory names; the `aaline` decision, D4, was
+    taken and implemented on 2026-11-10 as DR-37); the
     exit's inventory check is unmet until then (69 P6 and 12 P8 names besides MuJoCo's 33, `AtariPreprocessing` and the
     n/a and by-design entries).*
 

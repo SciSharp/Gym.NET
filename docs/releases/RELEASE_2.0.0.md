@@ -5,8 +5,6 @@
 >
 > - **P8, the Box2D environments** (LunarLander-v3, LunarLanderContinuous-v3, BipedalWalker-v3,
 >   BipedalWalkerHardcore-v3, CarRacing-v3), which the approved 2.0 scope includes (D21).
-> - **The maintainer's decision on `draw.aaline`/`aalines`** (P7, D4), which decides whether MountainCar's frames become
->   pixel-exact.
 > - The exit check: the inventory's list of missing names holds only MuJoCo's names and `AtariPreprocessing`.
 >
 > Update this page when any of these lands; the numbers under "Verification" are those of the preparing commit.
@@ -21,12 +19,15 @@ It replaces 0.2's API, which followed gym before 0.26, with Gymnasium's.
 | Package | Contents |
 |---|---|
 | Gym.NET | The env contract, wrappers, spaces, registry (`Gymnasium.Make`, `MakeVec`), vector envs, checkers, seeding, errors; `Gym.Legacy` |
-| Gym.NET.Rendering (new) | The rasterizer `rgb_array` frames are drawn with, equal to pygame-ce's pixels |
+| Gym.NET.Rendering (new) | The rasterizer `rgb_array` frames are drawn with, equal to pygame-ce's pixels; licensed `Apache-2.0 AND LGPL-2.0-or-later` (below) |
 | Gym.NET.Environments | classic_control and toy_text, CartPole's vector env, their registration |
 | Gym.NET.Rendering.Avalonia | A window for `human` mode on Avalonia 12 (Windows, Linux, macOS) |
 | Gym.NET.Rendering.WinForm | The same on Windows Forms |
 
-All target .NET 8 and .NET 10, and depend on NumSharp 0.80.0.
+All target .NET 8 and .NET 10, and depend on NumSharp 0.80.0. All are Apache-2.0 except Gym.NET.Rendering, which is
+`Apache-2.0 AND LGPL-2.0-or-later`: its `draw.aaline`/`aalines` (MountainCar's hill) are translated from pygame-ce's
+`draw.c` and keep pygame-ce's license, the GNU Library GPL version 2 or later (decision DR-37; the notice is in
+THIRD-PARTY-NOTICES.md).
 
 ## Breaking changes
 
@@ -114,6 +115,9 @@ Each is documented on the member, and the parity suite pins it, so a change show
 - **`DictInfoToList`** returns its list of infos from its own `Step` and `Reset`; through `IVectorEnv` the infos stay a
   dict.
 - **`RecordVideo` writes PNG frames** into a folder per video by default; `FfmpegVideoWriter` writes Gymnasium's mp4.
+- **`Draw.Aalines` with two points**: pygame-ce reads one float past its buffer there, so for a steep segment ending off
+  a whole pixel its drawing varies from run to run, by one blend of the end column. Gym.NET takes that float as 0, what a
+  fresh interpreter usually holds there. No Gymnasium env draws a two-point polyline.
 - **Exceptions**: Python's built-in exceptions are NumSharp's types; `OverflowError` and `ZeroDivisionError` are .NET's
   `OverflowException` and `DivideByZeroException`.
 - **The reference platform is Windows x64.** Where Gymnasium's float64 arithmetic goes through the C runtime (CartPole's
@@ -123,9 +127,6 @@ Each is documented on the member, and the parity suite pins it, so a change show
 
 Each has a test that asserts Gymnasium's answer and fails until the gap closes (`[OpenBugs]`):
 
-- **MountainCar's frames** (MountainCar-v0, MountainCarContinuous-v0) differ from Gymnasium's in 16 pixels at the joints
-  of the hill, drawn with `draw.aalines`, whose antialiasing Gym.NET reproduces to about one pixel in ten thousand (P7).
-  The car, wheels and flag are exact.
 - **A bare `assert`'s message**: where Gymnasium fails a message-less `assert` (Taxi's `decode` beyond the grid,
   Blackjack's refused actions, `render()` without a render mode or spec), Gym.NET raises `AssertionError` too, but its
   message is NumSharp's `"AssertionError"` instead of Python's empty one (NumSharp gap N-1).

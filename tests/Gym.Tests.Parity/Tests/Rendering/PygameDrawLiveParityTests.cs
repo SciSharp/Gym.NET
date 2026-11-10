@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using Gym.Rendering;
 using Gym.Tests.Parity.Frames;
 using Gym.Tests.Parity.Interop;
@@ -22,8 +23,9 @@ namespace Gym.Tests.Parity.Tests.Rendering {
     ///     what proves them, every pixel and every alpha byte.
     /// </summary>
     /// <remarks>
-    ///     <c>draw.aaline</c> and <c>draw.aalines</c> have not converged (the class remarks of <see cref="Draw"/>): their cells
-    ///     are open, reported to the maintainer as D4 requires.
+    ///     <c>draw.aaline</c> and <c>draw.aalines</c> are the exception to D4 (decision DR-37): D4's black-box model of them did
+    ///     not converge, so they are translated from pygame-ce's <c>src_c/draw.c</c> (the class remarks of <see cref="Draw"/>),
+    ///     and their cells here hold the translation to pygame's pixels, its quirks included.
     /// </remarks>
     [TestClass]
     public sealed class PygameDrawLiveParityTests : ParityTestBase {
@@ -250,11 +252,10 @@ namespace Gym.Tests.Parity.Tests.Rendering {
         }
 
         /// <summary>
-        ///     <c>draw.aaline</c> on 300 random segments, any colour, over varied backgrounds. Open: the model leaves about one
-        ///     drawn pixel in ten thousand off by one (D4, reported to the maintainer).
+        ///     <c>draw.aaline</c> on 300 random segments, any colour, over varied backgrounds, most of them clipped by the
+        ///     surface's edges.
         /// </summary>
         [TestMethod]
-        [OpenBugs("P7")]
         public void Aaline_MatchesPygame() {
             var rng = new Random(20261115);
             var cases = new List<DrawCase>();
@@ -271,25 +272,85 @@ namespace Gym.Tests.Parity.Tests.Rendering {
         }
 
         /// <summary>
-        ///     <c>draw.aalines</c> on 150 random polylines of 2 to 6 points, open and closed. Open: pygame's rule where segments
-        ///     join is not settled (D4, reported to the maintainer).
+        ///     <c>draw.aalines</c> on 150 random polylines of 2 to 6 points, open and closed: the endpoints pygame leaves out
+        ///     where a segment ends off a whole pixel, the extra pixel where steepness changes, and the 23 two-point polylines,
+        ///     whose first test reads the float past pygame's buffer. Where that float decides (a steep segment ending off a
+        ///     whole pixel), the interpreter may hold anything there, and pygame's drawing changes from run to run (fresh
+        ///     interpreters included), so either of its two outcomes passes and the report counts the cases that took the one
+        ///     Gym.NET does not draw (0, Gym.NET's value for that float, is <c>Draw.Aalines</c>' convention).
         /// </summary>
         [TestMethod]
-        [OpenBugs("P7")]
         public void Aalines_MatchesPygame() {
-            var rng = new Random(20261116);
             var cases = new List<DrawCase>();
-            for (int i = 0; i < 150; i++) {
-                int count = rng.Next(2, 7);
-                var points = Enumerable.Range(0, count).Select(_ => (rng.NextDouble() * (Width + 20) - 10, rng.NextDouble() * (Height + 20) - 10)).ToArray();
-                bool closed = i % 2 == 1;
+            foreach (((int R, int G, int B, int A) color, bool closed, (double X, double Y)[] points) in AalinesCorpus())
+                cases.Add(AalinesCase(color, closed, points));
+
+            int alternatives = AssertCases("draw.aalines", cases);
+            TestContext.WriteLine($"draw.aalines: {cases.Count} polylines identical, {alternatives} of them as pygame's other outcome of its read past the buffer.");
+        }
+
+        /// <summary>
+        ///     Segments and polylines whose start lies in (-1, 0) on their major axis, both ways round: pygame truncates the
+        ///     start to pixel 0, so the first endpoint's coverage exceeds 1 and the blend leaves 0..255, and pygame's cast keeps
+        ///     the low byte of the truncated int (200 segments, 100 open polylines of 2 to 4 points, random colours over the
+        ///     varied backgrounds).
+        /// </summary>
+        [TestMethod]
+        public void Aaline_StartLeftOfPixelZero_WrapsAsPygame() {
+            var rng = new Random(20261110);
+            var segments = new List<DrawCase>();
+            for (int i = 0; i < 200; i++) {
+                // The major axis is x for even cases and y for odd ones; the start is in (-1, 0] on it, and the minor extent
+                // stays below the major one so the segment keeps that axis.
+                bool steep = i % 2 == 1;
+                double start = -rng.NextDouble(), end = rng.NextDouble() * 50 + 5;
+                double from = rng.NextDouble() * 40 + 10, to = from + (rng.NextDouble() * 2 - 1) * (end - start) * 0.9;
+                (double x0, double y0, double x1, double y1) = steep ? (from, start, to, end) : (start, from, end, to);
+                if (i % 4 >= 2)
+                    (x0, y0, x1, y1) = (x1, y1, x0, y0);
                 (int R, int G, int B, int A) color = RandomColor(rng);
-                cases.Add(new DrawCase($"aalines({color}, closed={closed}, [{string.Join(", ", points.Select(p => $"({p.Item1:R}, {p.Item2:R})"))}])",
-                    surface => Python.pygame.draw.aalines(surface, color, closed, points),
-                    surface => Draw.Aalines(surface, ToColor(color), closed, points)));
+                segments.Add(new DrawCase($"aaline({color}, ({x0:R}, {y0:R}), ({x1:R}, {y1:R}))",
+                    surface => Python.pygame.draw.aaline(surface, color, (x0, y0), (x1, y1)),
+                    surface => Draw.Aaline(surface, ToColor(color), x0, y0, x1, y1)));
             }
 
-            AssertCases("draw.aalines", cases);
+            AssertCases("draw.aaline", segments);
+
+            var polylines = new List<DrawCase>();
+            for (int i = 0; i < 100; i++) {
+                var points = new List<(double X, double Y)> { (-rng.NextDouble(), rng.NextDouble() * 40 + 10) };
+                int count = rng.Next(2, 5);
+                while (points.Count < count)
+                    points.Add((rng.NextDouble() * (Width - 4) + 2, rng.NextDouble() * (Height - 4) + 2));
+                (int R, int G, int B, int A) color = RandomColor(rng);
+                polylines.Add(AalinesCase(color, false, points.ToArray()));
+            }
+
+            AssertCases("draw.aalines", polylines);
+        }
+
+        /// <summary>
+        ///     Segments shorter than pygame's 0.0001 in both directions, and of no length at all: one pixel, the start rounded
+        ///     half up (<c>floor(v + 0.5)</c> in double), set to the colour at full strength, nothing when it is off the surface
+        ///     (60 random starts across and around the surface, half of them on half-pixel coordinates).
+        /// </summary>
+        [TestMethod]
+        public void Aaline_ZeroLength_SetsTheRoundedPixelAsPygame() {
+            var rng = new Random(20261111);
+            var cases = new List<DrawCase>();
+            for (int i = 0; i < 60; i++) {
+                double x0 = rng.NextDouble() * (Width + 4) - 2, y0 = rng.NextDouble() * (Height + 4) - 2;
+                if (i % 2 == 1)
+                    (x0, y0) = (Math.Floor(x0) + 0.5, Math.Floor(y0) + 0.5);
+                double x1 = x0 + (i % 3 == 0 ? 0.0 : (rng.NextDouble() * 2 - 1) * 0.00009);
+                double y1 = y0 + (i % 3 == 0 ? 0.0 : (rng.NextDouble() * 2 - 1) * 0.00009);
+                (int R, int G, int B, int A) color = RandomColor(rng);
+                cases.Add(new DrawCase($"aaline({color}, ({x0:R}, {y0:R}), ({x1:R}, {y1:R}))",
+                    surface => Python.pygame.draw.aaline(surface, color, (x0, y0), (x1, y1)),
+                    surface => Draw.Aaline(surface, ToColor(color), x0, y0, x1, y1)));
+            }
+
+            AssertCases("draw.aaline", cases, minimumDrawnShare: 0.8);
         }
 
         /// <summary>The Gymnasium envs folder of the pinned submodule, where the PNG assets live.</summary>
@@ -302,38 +363,107 @@ namespace Gym.Tests.Parity.Tests.Rendering {
         /// <param name="Description">The call in pygame's spelling.</param>
         /// <param name="Python">Draws on a pygame surface; runs under the GIL.</param>
         /// <param name="DotNet">Draws on a Gym.Rendering surface.</param>
-        private sealed record DrawCase(string Description, Action<PyObject> Python, Action<Surface> DotNet);
+        /// <param name="Alternatives">
+        ///     Gym.NET's drawings of pygame's other outcomes where pygame's own is undefined (a read of memory it does not own),
+        ///     any of which pygame's frame may equal; <see langword="null"/> for a defined drawing, which must be
+        ///     <paramref name="DotNet"/>'s.
+        /// </param>
+        private sealed record DrawCase(string Description, Action<PyObject> Python, Action<Surface> DotNet, IReadOnlyList<Action<Surface>>? Alternatives = null);
 
         /// <summary>
-        ///     Draws each case on a fresh frame on both sides, over a background of its own, and requires identical frames
-        ///     (artifacts are written for the first that differs).
+        ///     Draws each case on a fresh frame on both sides, over a background of its own (<see cref="Background"/>), and
+        ///     requires identical frames (artifacts are written for the first that differs). A case with alternatives also
+        ///     passes when pygame's frame is one of them.
         /// </summary>
         /// <param name="family">The primitive family, for reports.</param>
         /// <param name="cases">The drawings.</param>
         /// <param name="minimumDrawnShare">The share of cases that must change a pixel on pygame's side, so the comparison is not vacuous.</param>
-        /// <exception cref="ParityException">Thrown at the first case whose frames differ.</exception>
+        /// <returns>How many cases passed as one of their alternatives rather than as Gym.NET's own drawing.</returns>
+        /// <exception cref="ParityException">Thrown at the first case whose frames differ (from Gym.NET's own drawing, when no alternative matched either).</exception>
         /// <exception cref="AssertFailedException">Thrown when too few cases drew anything on pygame's side.</exception>
-        private static void AssertCases(string family, IReadOnlyList<DrawCase> cases, double minimumDrawnShare = 0.5) {
-            int drawn = 0;
+        private static int AssertCases(string family, IReadOnlyList<DrawCase> cases, double minimumDrawnShare = 0.5) {
+            int drawn = 0, alternatives = 0;
             for (int index = 0; index < cases.Count; index++) {
                 DrawCase drawing = cases[index];
-                // A varied background makes anti-aliased weights visible in every channel.
-                (int R, int G, int B) fill = ((index * 37) % 256, (index * 91 + 50) % 256, (index * 53 + 200) % 256);
+                (int R, int G, int B) fill = Background(index);
                 Frame python = PythonRuntime.Run(() => {
                     using PyObject surface = Python.pygame.Surface(Width, Height);
                     Python.pygame.surface.Surface.fill(surface, fill);
                     drawing.Python(surface);
                     return PythonFrame(surface);
                 });
-                var dotnet = new Surface(Width, Height);
-                dotnet.Fill(new Color((byte)fill.R, (byte)fill.G, (byte)fill.B));
-                drawing.DotNet(dotnet);
-                FrameDiff.AssertSame($"{family} #{index}: {drawing.Description} on {fill}", python, new Frame(Height, Width, dotnet.ToRgbBytes()), $"pygame.{family}");
+                Frame dotnet = Drawn(drawing.DotNet, fill);
+                // An undefined drawing passes as any outcome pygame can produce; a failure still reports Gym.NET's own.
+                if (drawing.Alternatives is { } others && !python.Rgb.AsSpan().SequenceEqual(dotnet.Rgb)
+                    && others.Any(other => python.Rgb.AsSpan().SequenceEqual(Drawn(other, fill).Rgb)))
+                    alternatives++;
+                else
+                    FrameDiff.AssertSame($"{family} #{index}: {drawing.Description} on {fill}", python, dotnet, $"pygame.{family}");
                 if (ChangesBackground(python, fill))
                     drawn++;
             }
 
             Assert.IsTrue(drawn >= minimumDrawnShare * cases.Count, $"{family}: only {drawn} of {cases.Count} cases drew anything on pygame's surface, so the comparison proves little.");
+            return alternatives;
+        }
+
+        /// <summary>The background a case is drawn over: varied, so anti-aliased weights show in every channel.</summary>
+        /// <param name="index">The case's position in its corpus.</param>
+        /// <returns>The fill colour.</returns>
+        private static (int R, int G, int B) Background(int index) => ((index * 37) % 256, (index * 91 + 50) % 256, (index * 53 + 200) % 256);
+
+        /// <summary>Gym.NET's frame of one drawing over a background.</summary>
+        /// <param name="draw">The drawing.</param>
+        /// <param name="fill">The background.</param>
+        /// <returns>The frame.</returns>
+        private static Frame Drawn(Action<Surface> draw, (int R, int G, int B) fill) {
+            var surface = new Surface(Width, Height);
+            surface.Fill(new Color((byte)fill.R, (byte)fill.G, (byte)fill.B));
+            draw(surface);
+            return new Frame(Height, Width, surface.ToRgbBytes());
+        }
+
+        /// <summary>
+        ///     The polylines of <see cref="Aalines_MatchesPygame"/>: 150 of 2 to 6 points around the surface (seed 20261116),
+        ///     open and closed in turn, in random colours.
+        /// </summary>
+        /// <returns>Each polyline's colour, closure and points, in corpus order.</returns>
+        private static IEnumerable<((int R, int G, int B, int A) Color, bool Closed, (double X, double Y)[] Points)> AalinesCorpus() {
+            var rng = new Random(20261116);
+            for (int i = 0; i < 150; i++) {
+                int count = rng.Next(2, 7);
+                (double X, double Y)[] points = Enumerable.Range(0, count).Select(_ => (rng.NextDouble() * (Width + 20) - 10, rng.NextDouble() * (Height + 20) - 10)).ToArray();
+                bool closed = i % 2 == 1;
+                (int R, int G, int B, int A) color = RandomColor(rng);
+                yield return (color, closed, points);
+            }
+        }
+
+        /// <summary>
+        ///     One <c>draw.aalines</c> case; a two-point polyline also carries pygame's two outcomes of its read past the buffer
+        ///     (its first test false, and true), drawn through <c>Draw</c>'s private seam <c>DrawAalines</c> by reflection.
+        /// </summary>
+        /// <param name="color">The colour.</param>
+        /// <param name="closed">Whether the polyline is closed.</param>
+        /// <param name="points">The points.</param>
+        /// <returns>The case.</returns>
+        /// <exception cref="AssertFailedException">Thrown when the seam is missing (renamed or retyped in <c>Draw.Aaline.cs</c>).</exception>
+        private static DrawCase AalinesCase((int R, int G, int B, int A) color, bool closed, (double X, double Y)[] points) {
+            string description = $"aalines({color}, closed={(closed ? "True" : "False")}, [{string.Join(", ", points.Select(p => $"({p.X:R}, {p.Y:R})"))}])";
+            List<Action<Surface>>? alternatives = null;
+            if (points.Length == 2) {
+                MethodInfo seam = typeof(Draw).GetMethod("DrawAalines", BindingFlags.NonPublic | BindingFlags.Static)
+                                  ?? throw new AssertFailedException("Draw.DrawAalines, the seam for the float pygame reads past its buffer, is missing.");
+                // NaN makes pygame's first test false and an infinity makes it true: the two outcomes its memory can give.
+                alternatives = new[] { float.NaN, float.PositiveInfinity }
+                    .Select(pastTheBuffer => (Action<Surface>)(surface => seam.Invoke(null, new object[] { surface, ToColor(color), closed, points, pastTheBuffer })))
+                    .ToList();
+            }
+
+            return new DrawCase(description,
+                surface => Python.pygame.draw.aalines(surface, color, closed, points),
+                surface => Draw.Aalines(surface, ToColor(color), closed, points),
+                alternatives);
         }
 
         /// <summary>Requires a pygame surface's RGBA bytes to equal a Gym.Rendering surface's, naming the first differing pixel.</summary>

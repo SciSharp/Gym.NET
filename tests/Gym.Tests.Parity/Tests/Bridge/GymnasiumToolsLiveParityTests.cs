@@ -273,10 +273,9 @@ namespace Gym.Tests.Parity.Tests.Bridge {
 
         /// <summary>
         ///     Gymnasium's <c>check_environments_match</c> finds Gym.NET's classic-control envs of P4 and CartPole-v0 equal to its
-        ///     own over two seeds of 200 sampled steps, in both orders. CartPole's, Pendulum's and Acrobot's frames are compared
-        ///     too; MountainCar's are not (its hill's joints are the open P7 gap), so both MountainCars run without a render
-        ///     mode, where both sides render <c>None</c>. The tool compares reward types, so the bridge returns Pendulum's as
-        ///     the <c>np.float64</c> Gymnasium's does (<see cref="BridgeReward"/>).
+        ///     own over two seeds of 200 sampled steps, in both orders, every env's <c>rgb_array</c> frames included (the tool
+        ///     compares each step's render). The tool compares reward types, so the bridge returns Pendulum's as the
+        ///     <c>np.float64</c> Gymnasium's does (<see cref="BridgeReward"/>).
         /// </summary>
         /// <param name="id">The id.</param>
         [TestMethod]
@@ -287,7 +286,7 @@ namespace Gym.Tests.Parity.Tests.Bridge {
         [DataRow("Acrobot-v1")]
         public void CheckEnvironmentsMatch_GymNetsClassicEnvs_AsGymnasiumsOwn(string id) {
             SkipOffReferencePlatform("the classic envs' cos/sin");
-            string? renderMode = id.StartsWith("MountainCar", StringComparison.Ordinal) ? null : "rgb_array";
+            const string renderMode = "rgb_array";
             // Pendulum's reward is an np.float64 (-costs of NumPy scalars); the others' are Python floats.
             BridgeReward reward = id == "Pendulum-v1" ? BridgeReward.NumpyFloat64 : BridgeReward.Float;
             using var bridge = new ReverseBridge();

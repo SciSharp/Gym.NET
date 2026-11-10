@@ -361,7 +361,6 @@ namespace Gym.Tests.Parity.Tests.Envs {
         [DataRow(ContinuousId)]
         public void GymNet_MalformedStates_RaiseLikeGymnasium(string id) {
             SkipOffReferencePlatform("MountainCar's cos");
-            bool[] gap = HillGap(id);
             foreach (double[]? state in new[] { null, new[] { 0.1 }, new[] { -0.5, 0.01, 0.3 }, Array.Empty<double>() }) {
                 using PyGymEnv python = PyGymEnv.Make(id, renderMode: "rgb_array");
                 MountainCarEnv dotnet = Create(id, "rgb_array");
@@ -385,7 +384,7 @@ namespace Gym.Tests.Parity.Tests.Envs {
                     ByteContract.AssertSame($"{id}: step from state {what}", pythonStep.ToOutcome(), dotnetStep.ToOutcome());
                 }
 
-                AssertRenderSameOutsideHillGap($"{id}: render() at state {what}", python.TryRender(), RenderOutcome.Capture(() => RenderGymNet(dotnet)), gap);
+                RenderOutcome.AssertSame($"{id}: render() at state {what}", python.TryRender(), RenderOutcome.Capture(() => RenderGymNet(dotnet)));
             }
         }
 
@@ -404,12 +403,12 @@ namespace Gym.Tests.Parity.Tests.Envs {
         }
 
         /// <summary>
-        ///     Whole frames along episodes of the momentum policy (a frame every 7 steps and after the reset). Open: the hill's
-        ///     anti-aliased polyline differs from pygame's at a few of its joints (P7, 16 pixels per frame).
+        ///     Whole frames along episodes of the momentum policy (a frame every 7 steps and after the reset): the hill's
+        ///     anti-aliased polyline (pygame's own algorithm since DR-37), the car, its wheels and the flag at every position on
+        ///     the way to the flag, in both modes (float32 coordinates in continuous mode).
         /// </summary>
         /// <param name="id">The id.</param>
         [TestMethod]
-        [OpenBugs("P7")]
         [DataRow(DiscreteId)]
         [DataRow(ContinuousId)]
         public void GymNet_FramesAlongEpisodes_MatchGymnasium(string id) {
@@ -420,12 +419,11 @@ namespace Gym.Tests.Parity.Tests.Envs {
         }
 
         /// <summary>
-        ///     Whole frames at each of <see cref="InjectedStates"/>, on both ids. Open: the hill's joints (P7), as in
-        ///     <see cref="GymNet_FramesAlongEpisodes_MatchGymnasium"/>.
+        ///     Whole frames at each of <see cref="InjectedStates"/>, on both ids: the car against both walls, at the flags, and
+        ///     NaN's pygame error.
         /// </summary>
         /// <param name="id">The id.</param>
         [TestMethod]
-        [OpenBugs("P7")]
         [DataRow(DiscreteId)]
         [DataRow(ContinuousId)]
         public void GymNet_FramesAtInjectedStates_MatchGymnasium(string id) {
@@ -437,56 +435,6 @@ namespace Gym.Tests.Parity.Tests.Envs {
                 dotnet.State = (double[])state.Clone();
                 string what = $"{id}: render() at state [{string.Join(", ", state.Select(v => PyBuiltins.FloatRepr(v)))}]";
                 RenderOutcome.AssertSame(what, python.TryRender(), RenderOutcome.Capture(() => RenderGymNet(dotnet)));
-            }
-        }
-
-        /// <summary>
-        ///     The frames of <see cref="GymNet_FramesAlongEpisodes_MatchGymnasium"/> pixel for pixel everywhere but the hill's
-        ///     known gap (<see cref="HillGap"/>): the car, its wheels and the flag at every position on the way to the flag, in
-        ///     both modes (float32 coordinates in continuous mode).
-        /// </summary>
-        /// <param name="id">The id.</param>
-        [TestMethod]
-        [DataRow(DiscreteId)]
-        [DataRow(ContinuousId)]
-        public void GymNet_FramesAlongEpisodes_MatchGymnasiumOutsideTheHillGap(string id) {
-            SkipOffReferencePlatform("MountainCar's cos/sin");
-            bool[] gap = HillGap(id);
-            using GymPair pair = Pair(id, "rgb_array");
-            IActionSource policy = Momentum(id);
-            pair.Reset(0);
-            AssertSameOutsideHillGap($"{id}: after reset", pair.Python.Render(), pair.DotNet.Render(), gap);
-            int frames = 1;
-            while (pair.StepsTaken < 999 && !pair.Ended) {
-                using (ParityAction action = policy.Next(pair))
-                    pair.Step(action);
-                if (pair.StepsTaken % 7 != 0 && !pair.Ended)
-                    continue;
-                AssertSameOutsideHillGap($"{id}: after step {pair.StepsTaken}", pair.Python.Render(), pair.DotNet.Render(), gap);
-                frames++;
-            }
-
-            TestContext.WriteLine($"{id}: {frames} frames identical outside the hill's {gap.Count(g => g)} gap pixels, through step {pair.StepsTaken}");
-        }
-
-        /// <summary>
-        ///     <c>render()</c> at each of <see cref="InjectedStates"/> everywhere but the hill's known gap: the car against both
-        ///     walls, at the flags, and NaN's pygame error, on both ids.
-        /// </summary>
-        /// <param name="id">The id.</param>
-        [TestMethod]
-        [DataRow(DiscreteId)]
-        [DataRow(ContinuousId)]
-        public void GymNet_FramesAtInjectedStates_MatchGymnasiumOutsideTheHillGap(string id) {
-            SkipOffReferencePlatform("MountainCar's cos/sin");
-            bool[] gap = HillGap(id);
-            foreach (double[] state in InjectedStates) {
-                using PyGymEnv python = PyGymEnv.Make(id, renderMode: "rgb_array");
-                MountainCarEnv dotnet = Create(id, "rgb_array");
-                python.SetAttribute("state", state);
-                dotnet.State = (double[])state.Clone();
-                string what = $"{id}: render() at state [{string.Join(", ", state.Select(v => PyBuiltins.FloatRepr(v)))}]";
-                AssertRenderSameOutsideHillGap(what, python.TryRender(), RenderOutcome.Capture(() => RenderGymNet(dotnet)), gap);
             }
         }
 
@@ -589,82 +537,6 @@ namespace Gym.Tests.Parity.Tests.Envs {
                 return ValueFacts.NoneValue();
             using NDArray values = np.array(state);
             return ValueFacts.Of(values);
-        }
-
-        /// <summary>
-        ///     The pixels where Gym.NET's hill is not yet pygame's (P7): both sides draw the scene with the car parked off-screen
-        ///     (position 1.8, right of the window), and every pixel that differs is in the gap. The hill depends on neither the
-        ///     state nor the mode, so these are the only pixels its gap can reach in any frame.
-        /// </summary>
-        /// <param name="id">The id.</param>
-        /// <returns>One flag per pixel, row-major.</returns>
-        /// <exception cref="AssertFailedException">Thrown when the gap is larger than the P7 report's 16 pixels allow for (64), which would hide more than the hill.</exception>
-        internal static bool[] HillGap(string id) {
-            using PyGymEnv python = PyGymEnv.Make(id, renderMode: "rgb_array");
-            MountainCarEnv dotnet = Create(id, "rgb_array");
-            double[] parked = { 1.8, 0.0 };
-            python.SetAttribute("state", parked);
-            dotnet.State = (double[])parked.Clone();
-            Frame pythonFrame = python.Render();
-            Frame dotnetFrame = RenderGymNet(dotnet) ?? throw new AssertFailedException("Gym.NET rendered nothing for the parked car.");
-            Assert.AreEqual(pythonFrame.Height * pythonFrame.Width, dotnetFrame.Height * dotnetFrame.Width, "Both sides render frames of one size.");
-            var gap = new bool[pythonFrame.Height * pythonFrame.Width];
-            int count = 0;
-            for (int pixel = 0; pixel < gap.Length; pixel++) {
-                int at = pixel * 3;
-                gap[pixel] = pythonFrame.Rgb[at] != dotnetFrame.Rgb[at] || pythonFrame.Rgb[at + 1] != dotnetFrame.Rgb[at + 1] || pythonFrame.Rgb[at + 2] != dotnetFrame.Rgb[at + 2];
-                if (gap[pixel])
-                    count++;
-            }
-
-            // A guard on the mask itself: a gap beyond the hill's few joint pixels would hide real differences.
-            Assert.IsTrue(count <= 64, $"The hill's gap is {count} pixels; P7 left 16, so something beyond the hill differs.");
-            return gap;
-        }
-
-        /// <summary>
-        ///     Compares two frames exactly (<see cref="FrameDiff.AssertSame"/>) after blanking the hill gap's pixels to black on
-        ///     both sides; every other pixel must be identical.
-        /// </summary>
-        /// <param name="what">What was rendered, for the report.</param>
-        /// <param name="python">Gymnasium's frame.</param>
-        /// <param name="dotnet">Gym.NET's frame.</param>
-        /// <param name="gap">The pixels to leave out, from <see cref="HillGap"/>.</param>
-        /// <exception cref="ParityException">Thrown when any pixel outside the gap differs.</exception>
-        internal static void AssertSameOutsideHillGap(string what, Frame python, Frame dotnet, bool[] gap) =>
-            FrameDiff.AssertSame(what, Masked(python, gap), Masked(dotnet, gap), "frame outside the hill's P7 gap");
-
-        /// <summary>
-        ///     Compares two render outcomes: frames by <see cref="AssertSameOutsideHillGap"/>, anything else (an exception,
-        ///     <c>None</c>) exactly.
-        /// </summary>
-        /// <param name="what">What was rendered, for the report.</param>
-        /// <param name="python">Gymnasium's outcome.</param>
-        /// <param name="dotnet">Gym.NET's outcome.</param>
-        /// <param name="gap">The pixels to leave out of frame comparisons.</param>
-        /// <exception cref="ParityException">Thrown when the outcomes differ.</exception>
-        private static void AssertRenderSameOutsideHillGap(string what, RenderOutcome python, RenderOutcome dotnet, bool[] gap) {
-            if (python.Frame is { } pythonFrame && dotnet.Frame is { } dotnetFrame)
-                AssertSameOutsideHillGap(what, pythonFrame, dotnetFrame, gap);
-            else
-                RenderOutcome.AssertSame(what, python, dotnet);
-        }
-
-        /// <summary>A copy of a frame with the gap's pixels set to black.</summary>
-        /// <param name="frame">The frame; not modified.</param>
-        /// <param name="gap">The pixels to blank.</param>
-        /// <returns>The copy.</returns>
-        private static Frame Masked(Frame frame, bool[] gap) {
-            byte[] rgb = (byte[])frame.Rgb.Clone();
-            for (int pixel = 0; pixel < gap.Length && pixel * 3 < rgb.Length; pixel++) {
-                if (!gap[pixel])
-                    continue;
-                rgb[pixel * 3] = 0;
-                rgb[pixel * 3 + 1] = 0;
-                rgb[pixel * 3 + 2] = 0;
-            }
-
-            return new Frame(frame.Height, frame.Width, rgb);
         }
 
         /// <summary>Gym.NET's <c>render()</c> of an <c>rgb_array</c> env as a frame, or <see langword="null"/> when it returned <c>None</c>.</summary>

@@ -95,5 +95,7 @@ input, you can suppress them; the release notes list the five advisories and the
 
 ## License
 
-Apache-2.0. Gymnasium's environment assets are used under Gymnasium's MIT license; see
+Apache-2.0, except the `Gym.NET.Rendering` package, which is `Apache-2.0 AND LGPL-2.0-or-later`: its anti-aliased line
+drawing (`draw.aaline`/`aalines`, which MountainCar's hill uses) is translated from pygame-ce and keeps pygame-ce's
+license. Gymnasium's environment assets are used under Gymnasium's MIT license; see
 [THIRD-PARTY-NOTICES.md](https://github.com/SciSharp/Gym.NET/blob/master/THIRD-PARTY-NOTICES.md).
