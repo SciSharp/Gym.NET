@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Numerics;
 using System.Threading;
@@ -18,7 +19,9 @@ namespace Gym.Tests.Vector {
     /// <summary>
     ///     Gym.NET's own contract for <see cref="AsyncVectorEnv{TObs, TAct}"/> (DR-22), beyond Gymnasium's tests: every
     ///     execution mode gives <see cref="SyncVectorEnv{TObs, TAct}"/>'s results bit for bit, and each mode runs a sub-env's
-    ///     calls where it promises (the pool, a pinned thread, a thread of its own, a dedicated thread for a window).
+    ///     calls where it promises (the pool, a pinned thread, a thread of its own, a dedicated thread for a window); a custom
+    ///     <see cref="AsyncVectorWorker"/> (DR-38) is in charge of its sub-env on a thread of its own, and wrapping the
+    ///     default worker changes nothing.
     /// </summary>
     [TestClass]
     public class AsyncVectorEnvTests {
@@ -165,6 +168,116 @@ namespace Gym.Tests.Vector {
             envs.StepAsync(envs.ActionSpace.Sample());
             envs.Dispose();
             CollectionAssert.AreEquivalent(new[] { 0, 1, 2 }, closed.ToArray());
+        }
+
+        /// <summary>
+        ///     A custom worker that is the default one (<see cref="AsyncVectorEnv.AsyncWorker"/> through the pipe, DR-38) gives
+        ///     the sync env's every result, bit for bit, in both copy paths and autoreset modes: the pipe workers run the same
+        ///     loop body as the built-in ones.
+        /// </summary>
+        /// <param name="autoreset">The autoreset mode's value.</param>
+        /// <param name="sharedMemory">Whether the observations go through the shared buffer.</param>
+        [TestMethod]
+        [DataRow("NextStep", true)]
+        [DataRow("NextStep", false)]
+        [DataRow("SameStep", true)]
+        [DataRow("SameStep", false)]
+        public void CustomWorker_WrappingTheDefault_EqualsSync(string autoreset, bool sharedMemory) {
+            using VectorEnv<NDArray, NDArray> sync = MakeVec<NDArray, NDArray>("CartPole-v1", numEnvs: 3, vectorizationMode: "sync",
+                vectorKwargs: new Info { ["autoreset_mode"] = autoreset });
+            using VectorEnv<NDArray, NDArray> asynchronous = MakeVec<NDArray, NDArray>("CartPole-v1", numEnvs: 3, vectorizationMode: "async",
+                vectorKwargs: new Info { ["autoreset_mode"] = autoreset, ["shared_memory"] = sharedMemory, ["worker"] = (AsyncVectorWorker)AsyncVectorEnv.AsyncWorker });
+
+            AssertSame("reset", sync.Reset(7), asynchronous.Reset(7));
+            sync.ActionSpace.Seed(7);
+            for (int step = 0; step < 150; step++) {
+                using NDArray actions = sync.ActionSpace.Sample();
+                AssertSame($"step {step}", sync.Step(actions), asynchronous.Step(actions));
+            }
+
+            asynchronous.Close();
+        }
+
+        /// <summary>
+        ///     A custom worker decides how its sub-env runs (here, a sub-env of its own making that pays a reward of 2), on a
+        ///     thread named as Gymnasium names its processes; with <c>daemon</c> off the threads are foreground threads,
+        ///     <c>context</c> is kept, and closing waits for every worker to end.
+        /// </summary>
+        [TestMethod]
+        public void CustomWorker_RunsItsSubEnv_OnAThreadOfItsOwn() {
+            var threads = new ConcurrentDictionary<int, Thread>();
+
+            void PayingWorker(int index, Func<IEnv> envFn, PipeConnection pipe, PipeConnection parentPipe, object? sharedMemory,
+                ConcurrentQueue<AsyncWorkerError> errorQueue, AutoresetMode autoresetMode, SemaphoreSlim? semaphore) {
+                threads[index] = Thread.CurrentThread;
+                // The worker builds what it serves: the given function's env is replaced by one that pays 2 per step.
+                AsyncVectorEnv.AsyncWorker(index, () => new GenericTestEnv(stepFunc: (self, _) =>
+                    new StepResult<object?>(self.ObservationSpace.Sample(), 2.0, false, false, new Info())), pipe, parentPipe, sharedMemory, errorQueue, autoresetMode, semaphore);
+            }
+
+            var envs = new AsyncVectorEnv(Enumerable.Range(0, 3).Select(_ => (Func<IEnv>)(() => new GenericTestEnv())).ToArray(),
+                context: "spawn", daemon: false, worker: PayingWorker);
+            Assert.AreEqual("spawn", envs.Context);
+            Assert.IsFalse(envs.Daemon);
+            Assert.IsNotNull(envs.WorkerFunction);
+            envs.Reset(seed: 0);
+            VectorStepResult<object?> step = envs.Step(envs.ActionSpace.Sample());
+            CollectionAssert.AreEqual(new[] { 2.0, 2.0, 2.0 }, ((NDArray)step.Rewards).ToArray<double>());
+
+            Assert.AreEqual(3, threads.Count);
+            foreach ((int index, Thread thread) in threads) {
+                Assert.AreEqual($"Worker<AsyncVectorEnv>-{index}", thread.Name);
+                Assert.IsFalse(thread.IsBackground, "daemon=False makes the worker threads foreground threads.");
+            }
+
+            envs.Close();
+            Assert.IsTrue(threads.Values.All(thread => !thread.IsAlive), "Closing waits for every worker to end.");
+            envs.Dispose();
+        }
+
+        /// <summary>
+        ///     A custom worker that dies before answering (here, sub-env 1's worker throws once it has read its first command)
+        ///     leaves the constructor's receive at the end of the stream, as Python's parent sees <c>EOFError</c>, with the
+        ///     worker's exception as the inner one; the other workers are shut down. (A worker that dies before the first
+        ///     command arrives makes that send fail instead, a broken pipe carrying the exception, as in Python; reading the
+        ///     command first keeps this test on the one outcome.)
+        /// </summary>
+        [TestMethod]
+        public void CustomWorker_ThatDies_EndsTheStream_CarryingItsException() {
+            var threads = new ConcurrentBag<Thread>();
+
+            void DyingWorker(int index, Func<IEnv> envFn, PipeConnection pipe, PipeConnection parentPipe, object? sharedMemory,
+                ConcurrentQueue<AsyncWorkerError> errorQueue, AutoresetMode autoresetMode, SemaphoreSlim? semaphore) {
+                threads.Add(Thread.CurrentThread);
+                if (index == 1) {
+                    pipe.Recv();
+                    throw new InvalidOperationException("worker 1 failed to start");
+                }
+
+                AsyncVectorEnv.AsyncWorker(index, envFn, pipe, parentPipe, sharedMemory, errorQueue, autoresetMode, semaphore);
+            }
+
+            var error = Assert.ThrowsExactly<EndOfStreamException>(() =>
+                new AsyncVectorEnv(Enumerable.Range(0, 3).Select(_ => (Func<IEnv>)(() => new GenericTestEnv())).ToArray(), worker: DyingWorker));
+            Assert.IsInstanceOfType<InvalidOperationException>(error.InnerException);
+            Assert.AreEqual("worker 1 failed to start", error.InnerException!.Message);
+            Assert.IsTrue(threads.All(thread => !thread.IsAlive), "The failed constructor ended every worker.");
+        }
+
+        /// <summary>
+        ///     A sub-env that raises under the default worker over the pipe follows Gymnasium's protocol: the step rethrows its
+        ///     exception as it was thrown, and a later call to that sub-env finds its pipe dropped.
+        /// </summary>
+        [TestMethod]
+        public void CustomWorker_SubEnvError_FollowsGymnasiumsProtocol() {
+            Func<IEnv>[] envFns = Enumerable.Range(0, 2).Select(index => (Func<IEnv>)(() => new GenericTestEnv(stepFunc: (self, _) => index == 1
+                ? throw new InvalidOperationException("sub-env 1 fell over")
+                : new StepResult<object?>(self.ObservationSpace.Sample(), 0.0, false, false, new Info())))).ToArray();
+            using var envs = new AsyncVectorEnv(envFns, worker: AsyncVectorEnv.AsyncWorker);
+            envs.Reset(seed: 0);
+            Assert.AreEqual("sub-env 1 fell over", Assert.ThrowsExactly<InvalidOperationException>(() => envs.Step(envs.ActionSpace.Sample())).Message);
+            Assert.AreEqual("'NoneType' object has no attribute 'send'", Assert.ThrowsExactly<AttributeError>(() => envs.Step(envs.ActionSpace.Sample())).Message);
+            envs.Close();
         }
 
         /// <summary>Asserts two resets are equal exactly.</summary>

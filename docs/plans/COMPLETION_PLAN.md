@@ -728,7 +728,18 @@ Specs: the port plan's §9 and §10; sources `vector` 3,113 lines and `wrappers`
     - Tests: two contexts side by side, the factory order, `Run` in a context, both `RunAsync` placements, cancellation
       on each, failures through the task, two games at once and `TickAsync`. The play parity scenarios and refusals
       also run through `RunAsync`.*
-  - DR-38: the public `worker` delegate, `daemon` and `context`.
+  - DR-38: the public `worker` delegate, `daemon` and `context`. *Done 2026-11-10:*
+    - `AsyncVectorWorker` is a delegate with Gymnasium's eight arguments over `PipeConnection`, the counterpart of
+      Python's `Connection` (two ends, a handle per thread, an end open while any handle is, `EOFError` as
+      `EndOfStreamException`, a broken pipe as NumSharp's `OSError`). `AsyncWorkerError` is the error queue's item.
+      `AsyncVectorEnv.AsyncWorker` is the default worker loop, public, and the built-in executors run the same command
+      core (`AsyncWorkerCommands`).
+    - A custom worker runs on a thread of its own, with handles of its own on both ends, whatever the execution mode (a
+      reading to confirm). `daemon` sets the dedicated threads' `IsBackground`; `context` is kept and chooses nothing.
+    - Gymnasium's two custom-worker tests are ported and no longer open: the arity check is the delegate's type, and a
+      seven-argument delegate given by Python name fails the binding. New tests cover the pipe, a wrapped default worker
+      equal to sync, a worker in charge of its sub-env, `daemon`, the dying worker and a sub-env's error. A parity cell
+      runs Gymnasium's own custom-worker path (`worker=_async_worker`) in lockstep with Gym.NET's pipe workers.*
   - DR-46: OpenCV's float32 resize paths.
   - DR-39: ScottPlot figures in the two viewer packages.
   - DR-37 (P7): `aaline`/`aalines` translated from pygame-ce's `draw.c`. *Done 2026-11-10, inside `Gym.Rendering` (the

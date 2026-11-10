@@ -4,6 +4,7 @@ using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Numerics;
 using System.Runtime.CompilerServices;
@@ -66,10 +67,13 @@ namespace Gym.Vector {
     ///     until the matching wait.
     ///     </para>
     ///     <para>
-    ///     Deviations, each where Python's processes have no thread counterpart: Gymnasium's <c>context</c>, <c>daemon</c> and
-    ///     custom <c>worker</c> arguments do not exist (threads have no start method or daemon flag, and a worker function
-    ///     would drive Python's pipes); a sub-env function that throws makes the constructor throw that exception (Python's
-    ///     parent sees its worker's pipe close); <c>close(terminate=True)</c> cannot kill a thread, so it stops waiting and lets
+    ///     Deviations, each where Python's processes have no thread counterpart: <c>context</c> is accepted and has nothing
+    ///     to choose (threads have no start method); <c>daemon</c> decides whether the dedicated threads are background
+    ///     threads (pool threads always are); a custom <c>worker</c> (<see cref="AsyncVectorWorker"/>, DR-38) runs on a thread
+    ///     of its own over a <see cref="PipeConnection"/> pair, whatever the execution mode; a sub-env function that throws
+    ///     makes the constructor throw that exception (Python's parent sees its worker's pipe close), except under a custom
+    ///     worker, where the parent's receive reports the end of the stream as Python's does
+    ///     (<see cref="EndOfStreamException"/>, carrying the exception); <c>close(terminate=True)</c> cannot kill a thread, so it stops waiting and lets
     ///     each worker close its sub-env as soon as the call it runs returns, and <see cref="IDisposable.Dispose"/> waits for
     ///     that; a full reset clears a <c>NEXT_STEP</c> worker's pending autoreset in both copy paths (DR-42), where
     ///     Gymnasium's worker clears it only with shared memory, so its next step without shared memory resets that sub-env
@@ -85,25 +89,25 @@ namespace Gym.Vector {
     /// </remarks>
     public class AsyncVectorEnv<TObs, TAct> : VectorEnv<TObs, TAct> {
         /// <summary>The worker command that resets the sub-env.</summary>
-        private const string ResetCommand = "reset";
+        private const string ResetCommand = AsyncWorkerCommands.Reset;
 
         /// <summary>The worker command that answers a masked-out reset with the last observation.</summary>
-        private const string ResetNoopCommand = "reset-noop";
+        private const string ResetNoopCommand = AsyncWorkerCommands.ResetNoop;
 
         /// <summary>The worker command that steps (or autoresets) the sub-env.</summary>
-        private const string StepCommand = "step";
+        private const string StepCommand = AsyncWorkerCommands.Step;
 
         /// <summary>The worker command that closes the sub-env and ends the worker.</summary>
-        private const string CloseCommand = "close";
+        private const string CloseCommand = AsyncWorkerCommands.Close;
 
         /// <summary>The worker command that reads or calls a sub-env member by its Python name.</summary>
-        private const string CallCommand = "_call";
+        private const string CallCommand = AsyncWorkerCommands.Call;
 
         /// <summary>The worker command that sets a sub-env attribute through its wrappers.</summary>
-        private const string SetAttrCommand = "_setattr";
+        private const string SetAttrCommand = AsyncWorkerCommands.SetAttr;
 
         /// <summary>The worker command that compares the sub-env's spaces with the batch's.</summary>
-        private const string CheckSpacesCommand = "_check_spaces";
+        private const string CheckSpacesCommand = AsyncWorkerCommands.CheckSpaces;
 
         /// <summary>The single action space batched, untyped: what <c>iterate</c> splits the actions with.</summary>
         private readonly Space _batchedActionSpace;
@@ -120,14 +124,11 @@ namespace Gym.Vector {
         /// <summary>The permits of <see cref="MaxConcurrency"/>, or <see langword="null"/> for no limit; shared by every worker.</summary>
         private readonly SemaphoreSlim? _semaphore;
 
-        /// <summary>The failures reported by the workers, in the order they failed (Python's <c>error_queue</c>).</summary>
-        private readonly ConcurrentQueue<WorkerError> _errorQueue = new();
+        /// <summary>The failures reported by the workers, in the order they failed (Python's <c>error_queue</c>); a custom worker is handed it.</summary>
+        private readonly ConcurrentQueue<AsyncWorkerError> _errorQueue = new();
 
         /// <summary>The shared observation buffer (Python's <c>_obs_buffer</c>), or <see langword="null"/> without <see cref="SharedMemory"/>.</summary>
         private readonly object? _sharedMemory;
-
-        /// <summary>Serializes the workers' writes into <see cref="_sharedMemory"/>: each writes a disjoint slot, but making the slot views touches the buffer's shared bookkeeping.</summary>
-        private readonly object _sharedMemoryGate = new();
 
         /// <summary>The spaces this env made (copies of the first sub-env's, and the other sub-envs' in <c>"different"</c> mode); disposed with it.</summary>
         private readonly List<Space> _ownedSpaces = new();
@@ -161,6 +162,18 @@ namespace Gym.Vector {
         /// <param name="maxConcurrency">How many sub-envs may run <c>reset</c> or <c>step</c> at once: a positive integer (any .NET integer or a 0-d integer array), or <see langword="null"/> for no limit.</param>
         /// <param name="executionMode">Where the calls run (DR-22); <see cref="AsyncExecutionMode.ThreadPool"/> by default.</param>
         /// <param name="threadCount">The number of threads of <see cref="AsyncExecutionMode.DedicatedThreads"/> (default <see cref="Environment.ProcessorCount"/>); refused in the other modes.</param>
+        /// <param name="context">Gymnasium's <c>multiprocessing</c> start method (<c>"spawn"</c>, <c>"fork"</c>, ...): accepted and kept, with nothing to choose, since the workers are threads.</param>
+        /// <param name="daemon">
+        ///     Whether the dedicated threads (of <see cref="AsyncExecutionMode.DedicatedThreads"/>, <see cref="AsyncExecutionMode.ThreadPerEnv"/>,
+        ///     a thread-bound sub-env, a custom worker) are background threads, which never keep the process alive (the
+        ///     default, as Gymnasium's daemon processes); <see langword="false"/> makes them foreground threads the process
+        ///     waits for. Pool threads are background threads either way.
+        /// </param>
+        /// <param name="worker">
+        ///     A custom worker (DR-38) to serve each sub-env instead of the built-in one, on a thread of its own over a pipe,
+        ///     whatever <paramref name="executionMode"/> says; usually a wrapper around <see cref="AsyncVectorEnv.AsyncWorker"/>.
+        ///     <see langword="null"/> (the default) keeps the built-in workers of <paramref name="executionMode"/>.
+        /// </param>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="envFns"/> is <see langword="null"/>.</exception>
         /// <exception cref="ValueError">
         ///     Thrown for an unknown autoreset or observation mode, a <paramref name="maxConcurrency"/> that is not a positive
@@ -170,9 +183,12 @@ namespace Gym.Vector {
         /// <exception cref="IndexError">Thrown when there are no sub-envs (<c>list index out of range</c>).</exception>
         /// <exception cref="TypeError">Thrown when a pair observation mode holds something else than spaces, a batched space's elements are not <typeparamref name="TObs"/>/<typeparamref name="TAct"/>, or a shared buffer is asked for a <c>Graph</c> or <c>Sequence</c> space.</exception>
         /// <exception cref="RuntimeError">Thrown when a sub-env's spaces do not fit the batch, with Gymnasium's messages.</exception>
+        /// <exception cref="EndOfStreamException">Thrown under a custom worker that ended without answering (a sub-env function that throws, carried as the inner exception), as Python's parent sees <c>EOFError</c>.</exception>
+        /// <exception cref="OSError">Thrown under a custom worker that ended before the first command reached it (<c>Broken pipe</c>, Python's <c>BrokenPipeError</c>), carrying its exception likewise.</exception>
         /// <exception cref="Exception">Whatever a sub-env function throws, rethrown after the other workers were shut down.</exception>
         public AsyncVectorEnv(IEnumerable<Func<IEnv>> envFns, bool sharedMemory = true, bool copy = true, object? observationMode = null, object? autoresetMode = null,
-            object? maxConcurrency = null, AsyncExecutionMode executionMode = AsyncExecutionMode.ThreadPool, int? threadCount = null) {
+            object? maxConcurrency = null, AsyncExecutionMode executionMode = AsyncExecutionMode.ThreadPool, int? threadCount = null, string? context = null,
+            bool daemon = true, AsyncVectorWorker? worker = null) {
             if (envFns is null)
                 throw new ArgumentNullException(nameof(envFns));
             EnvFns = envFns.ToArray();
@@ -183,6 +199,9 @@ namespace Gym.Vector {
             MaxConcurrency = CheckMaxConcurrency(maxConcurrency);
             ExecutionMode = executionMode;
             ThreadCount = CheckThreadCount(executionMode, threadCount);
+            Context = context;
+            Daemon = daemon;
+            WorkerFunction = worker;
             NumEnvs = EnvFns.Count;
             if (EnvFns.Count == 0)
                 throw new IndexError("list index out of range");
@@ -217,7 +236,8 @@ namespace Gym.Vector {
 
                 // A shared semaphore to limit the number of environments executing at any one time.
                 _semaphore = MaxConcurrency is { } permits ? new SemaphoreSlim(permits, permits) : null;
-                _workers = Enumerable.Range(0, NumEnvs).Select(index => new Worker(index, ExecutorFor(index))).ToArray();
+                // A custom worker serves its sub-env over a pipe on a thread of its own; the built-in one through an executor.
+                _workers = Enumerable.Range(0, NumEnvs).Select(index => worker is null ? new Worker(index, ExecutorFor(index)) : new Worker(index)).ToArray();
                 StartWorkers();
                 _state = AsyncState.Default;
                 CheckSpaces();
@@ -252,6 +272,16 @@ namespace Gym.Vector {
 
         /// <summary>The number of dedicated threads in <see cref="AsyncExecutionMode.DedicatedThreads"/> mode, or <see langword="null"/> in the other modes.</summary>
         public int? ThreadCount { get; }
+
+        /// <summary>The start method given (<c>context</c>), kept with nothing to choose: the workers are threads.</summary>
+        public string? Context { get; }
+
+        /// <summary>Whether the dedicated threads are background threads (<c>daemon</c>); pool threads always are.</summary>
+        public bool Daemon { get; }
+
+        /// <summary>The custom worker serving each sub-env (<c>worker</c>, DR-38), or <see langword="null"/> for the built-in workers.</summary>
+        [PyName("worker")]
+        public AsyncVectorWorker? WorkerFunction { get; }
 
         /// <summary>The pending call (Python's <c>_state</c>): <see cref="AsyncState.Default"/> when none.</summary>
         public AsyncState State => _state;
@@ -340,7 +370,7 @@ namespace Gym.Vector {
                 throw new TimeoutException($"The call to `reset_wait` has timed out after {PyBuiltins.Str(timeout)} second(s).");
             }
 
-            Message[] messages = _workers.Select(worker => Recv(worker)).ToArray();
+            AsyncWorkerMessage[] messages = _workers.Select(worker => Recv(worker)).ToArray();
             RaiseIfErrors(messages.Select(message => message.Success).ToArray());
 
             var infos = new Info();
@@ -421,7 +451,7 @@ namespace Gym.Vector {
             var infos = new Info();
             var successes = new bool[NumEnvs];
             for (int envIdx = 0; envIdx < NumEnvs; envIdx++) {
-                Message message = Recv(_workers[envIdx]);
+                AsyncWorkerMessage message = Recv(_workers[envIdx]);
                 successes[envIdx] = message.Success;
                 if (!message.Success)
                     continue;
@@ -488,7 +518,7 @@ namespace Gym.Vector {
                 throw new TimeoutException($"The call to `call_wait` has timed out after {PyBuiltins.Str(timeout)} second(s).");
             }
 
-            Message[] messages = _workers.Select(worker => Recv(worker)).ToArray();
+            AsyncWorkerMessage[] messages = _workers.Select(worker => Recv(worker)).ToArray();
             RaiseIfErrors(messages.Select(message => message.Success).ToArray());
             _state = AsyncState.Default;
             return messages.Select(message => message.Value).ToArray();
@@ -650,7 +680,13 @@ namespace Gym.Vector {
                     if (worker.Detached || worker.ClosePosted)
                         continue;
                     worker.ClosePosted = true;
-                    _closing.Add(worker.Executor.Post(() => Run(worker, CloseCommand, null)));
+                    if (worker.ParentPipe is { } pipe) {
+                        // A custom worker closes its sub-env once it reads the close; disposal joins its thread.
+                        TrySendClose(worker, pipe);
+                        continue;
+                    }
+
+                    _closing.Add(worker.Executor!.Post(() => Run(worker, CloseCommand, null)));
                 }
             } else {
                 foreach (Worker worker in _workers) {
@@ -662,8 +698,14 @@ namespace Gym.Vector {
                 foreach (Worker worker in _workers) {
                     if (worker.Detached)
                         continue;
-                    while (worker.Pipe.Count > 0)
+                    while ((worker.ParentPipe is null ? worker.Pipe.Count : worker.Pending) > 0)
                         Recv(worker);
+                }
+
+                // pipe.close() and process.join() for the custom workers, which have ended their loops by now.
+                foreach (Worker worker in _workers) {
+                    worker.ParentPipe?.Close();
+                    worker.Thread?.Join();
                 }
             }
 
@@ -680,13 +722,18 @@ namespace Gym.Vector {
         /// </summary>
         /// <exception cref="Exception">The lowest-indexed sub-env function's exception, when one throws.</exception>
         private void StartWorkers() {
-            Task<Message>[] started = _workers.Select(worker => worker.Executor.Post(() => {
+            if (WorkerFunction is { } custom) {
+                StartCustomWorkers(custom);
+                return;
+            }
+
+            Task<AsyncWorkerMessage>[] started = _workers.Select(worker => worker.Executor!.Post(() => {
                 // env = env_fn(): the worker builds its own sub-env, on its own thread.
-                worker.Env = EnvFns[worker.Index]();
-                return new Message(null, true);
+                worker.State.Env = EnvFns[worker.Index]();
+                return new AsyncWorkerMessage(null, true);
             })).ToArray();
             Exception? failure = null;
-            foreach (Task<Message> start in started) {
+            foreach (Task<AsyncWorkerMessage> start in started) {
                 try {
                     start.GetAwaiter().GetResult();
                 } catch (Exception e) {
@@ -703,8 +750,43 @@ namespace Gym.Vector {
                 return;
             foreach (Worker worker in _workers) {
                 // Created on a pool thread, the env has opened no window yet: windows open at the first human render.
-                if (worker.Env!.RenderMode is "human")
+                if (worker.State.Env!.RenderMode is "human")
                     worker.Executor = NewThread($"Worker<{PyAttributes.PyTypeName(GetType())}>-{worker.Index}");
+            }
+        }
+
+        /// <summary>
+        ///     Starts one thread per sub-env running <paramref name="custom"/>, as Gymnasium starts one process per sub-env:
+        ///     each gets a pipe to the parent and handles of its own on both ends, and the parent then closes its copy of the
+        ///     worker's end. The sub-envs are built by the workers, so a failure shows at the first receive.
+        /// </summary>
+        /// <param name="custom">The custom worker.</param>
+        private void StartCustomWorkers(AsyncVectorWorker custom) {
+            foreach (Worker worker in _workers) {
+                (PipeConnection parentPipe, PipeConnection childPipe) = PipeConnection.Pipe();
+                // A process inherits handles of its own on both ends; so does the worker thread, so its closes are its own.
+                PipeConnection workerPipe = childPipe.Duplicate(), workerParentPipe = parentPipe.Duplicate();
+                int index = worker.Index;
+                Func<IEnv> envFn = EnvFns[index];
+                var thread = new Thread(() => {
+                    try {
+                        custom(index, envFn, workerPipe, workerParentPipe, _sharedMemory, _errorQueue, AutoresetMode, _semaphore);
+                    } catch (Exception e) {
+                        // What a process would print as its traceback on dying: kept for the parent's end-of-stream report.
+                        worker.Escaped = e;
+                    } finally {
+                        // A process's handles close when it exits; a thread's must be closed for it.
+                        workerPipe.Close();
+                        workerParentPipe.Close();
+                    }
+                }) {
+                    IsBackground = Daemon,
+                    Name = $"Worker<{PyAttributes.PyTypeName(GetType())}>-{index}",
+                };
+                worker.ParentPipe = parentPipe;
+                worker.Thread = thread;
+                thread.Start();
+                childPipe.Close();
             }
         }
 
@@ -718,7 +800,7 @@ namespace Gym.Vector {
             AssertIsRunning();
             foreach (Worker worker in _workers)
                 Send(worker, CheckSpacesCommand, (ObservationMode, SingleObservationSpace, SingleActionSpace));
-            Message[] messages = _workers.Select(worker => Recv(worker)).ToArray();
+            AsyncWorkerMessage[] messages = _workers.Select(worker => Recv(worker)).ToArray();
             RaiseIfErrors(messages.Select(message => message.Success).ToArray());
             bool[][] results = messages.Select(message => (bool[])message.Value!).ToArray();
 
@@ -733,183 +815,44 @@ namespace Gym.Vector {
         }
 
         /// <summary>
-        ///     One worker command, run on the worker's thread (Python's <c>_async_worker</c> loop body): its result as the
-        ///     message the parent receives. An exception ends the worker: it is queued with its trace, the sub-env is closed,
-        ///     and the message reports the failure.
+        ///     One worker command, run on the worker's executor: the shared worker core (<see cref="AsyncWorkerCommands.Run"/>,
+        ///     Gymnasium's <c>_async_worker</c> loop body) with this env's buffer, mode, permits and error queue. The shared
+        ///     buffer is written with the batch's single observation space.
         /// </summary>
         /// <param name="worker">The worker.</param>
         /// <param name="command">The command.</param>
         /// <param name="data">The command's data.</param>
         /// <returns>The message: the result and <see langword="true"/>, or <see langword="null"/> and <see langword="false"/> after an error.</returns>
-        private Message Run(Worker worker, string command, object? data) {
-            if (worker.Exited) {
-                // The worker ended earlier (an error or a close): its pipe has nothing more to say.
-                _errorQueue.Enqueue(new WorkerError(worker.Index, new RuntimeError($"Worker-{worker.Index} has already ended"), $"Worker-{worker.Index} has already ended\n"));
-                return new Message(null, false);
-            }
-
-            bool permitHeld = _semaphore is not null && command is ResetCommand or StepCommand;
-            try {
-                if (permitHeld)
-                    _semaphore!.Wait();
-                try {
-                    IEnv env = worker.Env!;
-                    switch (command) {
-                        case ResetCommand: {
-                            (BigInteger? seed, IReadOnlyDictionary<string, object?>? options) = ((BigInteger?, IReadOnlyDictionary<string, object?>?))data!;
-                            (object? observation, Info info) = env.Reset(seed, options);
-                            if (SharedMemory) {
-                                WriteShared(worker.Index, observation);
-                                observation = null;
-                            }
-
-                            // A full reset ends any pending autoreset in both copy paths (DR-42). Gymnasium's worker clears it
-                            // only in its shared-memory branch, so without shared memory its next step would reset this
-                            // sub-env a second time with a reward of 0; Gym.NET deviates on purpose so sync and async agree.
-                            worker.Autoreset = false;
-
-                            worker.Observation = observation;
-                            // Released before the result is handed over, as Gymnasium releases before the blocking send.
-                            if (permitHeld) {
-                                permitHeld = false;
-                                _semaphore!.Release();
-                            }
-
-                            return new Message(new object?[] { observation, info }, true);
-                        }
-                        case ResetNoopCommand:
-                            return new Message(new object?[] { worker.Observation, new Info() }, true);
-                        case StepCommand:
-                            return new Message(StepOne(worker, env, data, ref permitHeld), true);
-                        case CloseCommand:
-                            worker.Exited = true;
-                            CloseEnv(worker);
-                            return new Message(null, true);
-                        case CallCommand: {
-                            (string name, object?[] args) = ((string, object?[]))data!;
-                            if (name is ResetCommand or StepCommand or CloseCommand or SetAttrCommand or CheckSpacesCommand)
-                                throw new ValueError($"Trying to call function `{name}` with `call`, use `{name}` directly instead.");
-                            return new Message(SyncVectorEnv<TObs, TAct>.CallOne(env, name, args), true);
-                        }
-                        case SetAttrCommand: {
-                            (string name, object? value) = ((string, object?))data!;
-                            env.SetWrapperAttr(name, value);
-                            return new Message(null, true);
-                        }
-                        case CheckSpacesCommand: {
-                            (object observationMode, Space singleObservationSpace, Space singleActionSpace) = ((object, Space, Space))data!;
-                            bool sameObservation = observationMode is "same"
-                                ? Equals(ObjectSpace.Unview(singleObservationSpace), ObjectSpace.Unview(env.ObservationSpace))
-                                : SpaceUtils.IsSpaceDtypeShapeEquiv(ObjectSpace.Unview(singleObservationSpace)!, ObjectSpace.Unview(env.ObservationSpace)!);
-                            bool sameAction = Equals(ObjectSpace.Unview(singleActionSpace), ObjectSpace.Unview(env.ActionSpace));
-                            return new Message(new[] { sameObservation, sameAction }, true);
-                        }
-                        default:
-                            throw new RuntimeError($"Received unknown command `{command}`. Must be one of [`reset`, `step`, `close`, `_call`, `_setattr`, `_check_spaces`].");
-                    }
-                } finally {
-                    if (permitHeld)
-                        _semaphore!.Release();
-                }
-            } catch (Exception e) {
-                // error_queue.put((index, type, value, trace)); pipe.send((None, False)); the worker ends, closing its env.
-                _errorQueue.Enqueue(new WorkerError(worker.Index, e, e + "\n"));
-                worker.Exited = true;
-                CloseEnv(worker);
-                return new Message(null, false);
-            }
-        }
-
-        /// <summary>A <c>step</c> command by the autoreset mode (the worker's <c>"step"</c> branch), its observation written to the shared buffer when there is one.</summary>
-        /// <param name="worker">The worker.</param>
-        /// <param name="env">Its sub-env.</param>
-        /// <param name="action">The sub-env's action.</param>
-        /// <param name="permitHeld">Whether the worker holds a concurrency permit; released (and cleared) before the result is returned.</param>
-        /// <returns><c>(observation, reward, terminated, truncated, info)</c>, the observation <see langword="null"/> when it went to the shared buffer.</returns>
-        /// <exception cref="AssertionError">Thrown in <c>DISABLED</c> mode with a pending autoreset (Gymnasium's bare <c>assert</c>; it never holds one).</exception>
-        private object?[] StepOne(Worker worker, IEnv env, object? action, ref bool permitHeld) {
-            object? observation;
-            double reward;
-            bool terminated, truncated;
-            Info info;
-            if (ReferenceEquals(AutoresetMode, Gym.Vector.AutoresetMode.NextStep)) {
-                if (worker.Autoreset) {
-                    // The episode ended at the previous step: reset now, ignoring the action, with a reward of 0.
-                    (observation, info) = env.Reset();
-                    reward = 0;
-                    terminated = false;
-                    truncated = false;
-                } else {
-                    (observation, reward, terminated, truncated, info) = env.Step(action);
-                }
-
-                worker.Autoreset = terminated || truncated;
-            } else if (ReferenceEquals(AutoresetMode, Gym.Vector.AutoresetMode.SameStep)) {
-                (observation, reward, terminated, truncated, info) = env.Step(action);
-                if (terminated || truncated) {
-                    (object? resetObservation, Info resetInfo) = env.Reset();
-                    // {"final_info": info, "final_obs": observation, **reset_info}: in that key order.
-                    var merged = new Info { ["final_info"] = info, ["final_obs"] = observation };
-                    foreach (KeyValuePair<string, object?> entry in resetInfo)
-                        merged[entry.Key] = entry.Value;
-                    info = merged;
-                    observation = resetObservation;
-                }
-            } else {
-                if (worker.Autoreset)
-                    throw new AssertionError("");
-                (observation, reward, terminated, truncated, info) = env.Step(action);
-            }
-
-            if (SharedMemory) {
-                WriteShared(worker.Index, observation);
-                observation = null;
-            }
-
-            worker.Observation = observation;
-            if (permitHeld) {
-                permitHeld = false;
-                _semaphore!.Release();
-            }
-
-            return new object?[] { observation, reward, terminated, truncated, info };
-        }
-
-        /// <summary>Writes a sub-env's observation into its slot of the shared buffer, one writer at a time.</summary>
-        /// <param name="index">The sub-env.</param>
-        /// <param name="observation">Its observation; read, not kept.</param>
-        private void WriteShared(int index, object? observation) {
-            lock (_sharedMemoryGate)
-                VectorUtils.WriteToSharedMemory(SingleObservationSpace, index, observation, _sharedMemory!);
-        }
-
-        /// <summary>The worker's <c>finally: env.close()</c>, then the env's disposal: the worker built it and owns it.</summary>
-        /// <param name="worker">The worker.</param>
-        private static void CloseEnv(Worker worker) {
-            IEnv? env = worker.Env;
-            worker.Env = null;
-            if (env is null)
-                return;
-            try {
-                env.Close();
-                env.Dispose();
-            } catch (Exception) {
-                // A failing close in Gymnasium's worker ends a process nobody listens to; here it must not end the worker's
-                // thread, and the sub-env is unusable either way.
-            }
-        }
+        private AsyncWorkerMessage Run(Worker worker, string command, object? data) =>
+            AsyncWorkerCommands.Run(worker.State, command, data, SingleObservationSpace, _sharedMemory, AutoresetMode, _semaphore, _errorQueue);
 
         /// <summary>Sends a command to a worker (<c>pipe.send((command, data))</c>): its result queues in the worker's pipe, in order.</summary>
         /// <param name="worker">The worker.</param>
         /// <param name="command">The command.</param>
         /// <param name="data">Its data.</param>
         /// <exception cref="AttributeError">Thrown when the worker ended with an error earlier: Python's pipe is <c>None</c> then.</exception>
+        /// <exception cref="OSError">
+        ///     Thrown when a custom worker's pipe is broken (the worker ended), as Python's <c>send</c> fails with
+        ///     <c>BrokenPipeError</c>; what escaped the worker, if anything, is the inner exception.
+        /// </exception>
         private void Send(Worker worker, string command, object? data) {
             if (worker.Detached)
                 throw new AttributeError("'NoneType' object has no attribute 'send'");
             if (command is CloseCommand)
                 worker.ClosePosted = true;
-            worker.Pipe.Enqueue(worker.Executor.Post(() => Run(worker, command, data)));
+            if (worker.ParentPipe is { } pipe) {
+                try {
+                    pipe.Send((command, data));
+                } catch (OSError e) when (worker.Escaped is { } escaped) {
+                    // A worker that died before this send closed its end; the pipe's lock orders its last writes first.
+                    throw new OSError(e.Message, escaped);
+                }
+
+                worker.Pending++;
+                return;
+            }
+
+            worker.Pipe.Enqueue(worker.Executor!.Post(() => Run(worker, command, data)));
         }
 
         /// <summary>Receives a worker's oldest pending result (<c>pipe.recv()</c>), waiting for it.</summary>
@@ -917,9 +860,27 @@ namespace Gym.Vector {
         /// <returns>The message.</returns>
         /// <exception cref="AttributeError">Thrown when the worker ended with an error earlier.</exception>
         /// <exception cref="InvalidOperationException">Thrown when nothing was sent to the worker (Python's <c>recv</c> would block forever).</exception>
-        private static Message Recv(Worker worker) {
+        /// <exception cref="EndOfStreamException">Thrown, as Python's <c>EOFError</c>, when a custom worker ended without answering; what escaped it, if anything, is the inner exception.</exception>
+        /// <exception cref="InvalidCastException">Thrown when a custom worker answered with something else than an <c>(object?, bool)</c> value tuple.</exception>
+        private static AsyncWorkerMessage Recv(Worker worker) {
             if (worker.Detached)
                 throw new AttributeError("'NoneType' object has no attribute 'recv'");
+            if (worker.ParentPipe is { } pipe) {
+                if (worker.Pending == 0)
+                    throw new InvalidOperationException($"Nothing was sent to Worker-{worker.Index}, so there is nothing to receive.");
+                object? received;
+                try {
+                    received = pipe.Recv();
+                } catch (EndOfStreamException e) when (worker.Escaped is { } escaped) {
+                    // The pipe's lock orders the worker's last writes before this receive, so Escaped is complete here.
+                    throw new EndOfStreamException(e.Message, escaped);
+                }
+
+                worker.Pending--;
+                (object? value, bool success) = ((object?, bool))received!;
+                return new AsyncWorkerMessage(value, success);
+            }
+
             if (worker.Pipe.Count == 0)
                 throw new InvalidOperationException($"Nothing was sent to Worker-{worker.Index}, so there is nothing to receive.");
             // The work runs on the pool or a worker thread and never needs the caller's context, so waiting here cannot deadlock.
@@ -943,6 +904,13 @@ namespace Gym.Vector {
                 double delta = Math.Max((double)(deadline - Stopwatch.GetTimestamp()) / Stopwatch.Frequency, 0);
                 if (worker.Detached)
                     return false;
+                if (worker.ParentPipe is { } pipe) {
+                    // A custom worker's pipe polls as Python's does; an ended worker counts as readable (its end of stream).
+                    if (!pipe.Poll(delta))
+                        return false;
+                    continue;
+                }
+
                 if (worker.Pipe.Count == 0) {
                     // pipe.poll(delta) waits the whole delta for data that was never asked for.
                     Thread.Sleep(TimeSpan.FromSeconds(delta));
@@ -969,7 +937,7 @@ namespace Gym.Vector {
 
             int numErrors = NumEnvs - successes.Count(success => success);
             for (int i = 0; i < numErrors; i++) {
-                if (!_errorQueue.TryDequeue(out WorkerError error))
+                if (!_errorQueue.TryDequeue(out AsyncWorkerError error))
                     throw new RuntimeError("A worker reported a failure without queuing its error.");
                 Logger.Error($"Received the following error from Worker-{error.Index} - Shutting it down");
                 Logger.Error(error.Trace);
@@ -1016,11 +984,26 @@ namespace Gym.Vector {
             }
         }
 
-        /// <summary>Starts a dedicated worker thread, remembered so closing ends it.</summary>
+        /// <summary>
+        ///     Sends a custom worker its close without waiting for the answer, when its pipe still takes it: a worker that already
+        ///     ended has nothing to close.
+        /// </summary>
+        /// <param name="worker">The worker.</param>
+        /// <param name="pipe">The parent's end of its pipe.</param>
+        private static void TrySendClose(Worker worker, PipeConnection pipe) {
+            try {
+                pipe.Send((CloseCommand, (object?)null));
+                worker.Pending++;
+            } catch (OSError) {
+                // The worker ended and closed its end: nothing listens, and nothing is left to close.
+            }
+        }
+
+        /// <summary>Starts a dedicated worker thread, remembered so closing ends it; a background thread unless <see cref="Daemon"/> is off.</summary>
         /// <param name="name">The thread's name.</param>
         /// <returns>The thread.</returns>
         private WorkerThread NewThread(string name) {
-            var thread = new WorkerThread(name);
+            var thread = new WorkerThread(name, Daemon);
             _threads.Add(thread);
             return thread;
         }
@@ -1036,7 +1019,19 @@ namespace Gym.Vector {
                 if (worker.Detached || worker.ClosePosted)
                     continue;
                 worker.ClosePosted = true;
-                _closing.Add(worker.Executor.Post(() => Run(worker, CloseCommand, null)));
+                if (worker.ParentPipe is { } pipe) {
+                    TrySendClose(worker, pipe);
+                    continue;
+                }
+
+                _closing.Add(worker.Executor!.Post(() => Run(worker, CloseCommand, null)));
+            }
+
+            // A custom worker reads its close (or the end of its pipe, once the parent's handle closes) and ends; its thread
+            // is waited for, as Gymnasium joins its processes.
+            foreach (Worker worker in _workers) {
+                worker.ParentPipe?.Close();
+                worker.Thread?.Join();
             }
 
             foreach (Task closing in _closing) {
@@ -1229,56 +1224,58 @@ namespace Gym.Vector {
             }
         }
 
-        /// <summary>A worker's answer (what Python's worker sends through its pipe): the result, and whether the command succeeded.</summary>
-        /// <param name="Value">The result, or <see langword="null"/>.</param>
-        /// <param name="Success">Whether the command succeeded.</param>
-        private readonly record struct Message(object? Value, bool Success);
-
-        /// <summary>A worker's failure, as Python's error queue holds it.</summary>
-        /// <param name="Index">The worker.</param>
-        /// <param name="Exception">The exception, rethrown as it was thrown.</param>
-        /// <param name="Trace">Its text with the .NET stack trace (Python's <c>traceback.format_exc()</c>), ending with a newline as Python's does.</param>
-        private readonly record struct WorkerError(int Index, Exception Exception, string Trace);
-
         /// <summary>
-        ///     One sub-env's worker (Python's worker process and the parent's end of its pipe): the sub-env and the state the
-        ///     worker loop keeps, touched only on the worker's executor, and the pipe, touched only by the caller's thread.
+        ///     One sub-env's worker (Python's worker process and the parent's end of its pipe). A built-in worker posts each
+        ///     command to its executor and keeps the worker loop's state (<see cref="State"/>, touched only on the executor) and
+        ///     the results in order (<see cref="Pipe"/>, touched only by the caller's thread); a custom worker (DR-38) runs on
+        ///     its own <see cref="Thread"/> and talks through <see cref="ParentPipe"/>.
         /// </summary>
         private sealed class Worker {
-            /// <summary>A worker for sub-env <paramref name="index"/>.</summary>
+            /// <summary>A built-in worker for sub-env <paramref name="index"/>.</summary>
             /// <param name="index">The sub-env.</param>
             /// <param name="executor">Where its commands run.</param>
             public Worker(int index, IWorkerExecutor executor) {
                 Index = index;
                 Executor = executor;
+                State = new AsyncWorkerState(index);
+            }
+
+            /// <summary>A custom worker's slot for sub-env <paramref name="index"/>; its pipe and thread are set when it starts.</summary>
+            /// <param name="index">The sub-env.</param>
+            public Worker(int index) {
+                Index = index;
+                State = new AsyncWorkerState(index);
             }
 
             /// <summary>The sub-env's index.</summary>
             public int Index { get; }
 
-            /// <summary>Where the commands run; replaced once, before any command, for a thread-bound sub-env in pool mode.</summary>
-            public IWorkerExecutor Executor { get; set; }
+            /// <summary>Where a built-in worker's commands run, replaced once, before any command, for a thread-bound sub-env in pool mode; <see langword="null"/> for a custom worker.</summary>
+            public IWorkerExecutor? Executor { get; set; }
 
-            /// <summary>The sub-env the worker built, or <see langword="null"/> once closed.</summary>
-            public IEnv? Env { get; set; }
+            /// <summary>The built-in worker loop's state (the sub-env, the pending autoreset, the last observation); unused by a custom worker, which keeps its own.</summary>
+            public AsyncWorkerState State { get; }
 
-            /// <summary>Whether the sub-env's episode ended and the next step resets it (the worker's <c>autoreset</c>).</summary>
-            public bool Autoreset { get; set; }
+            /// <summary>A built-in worker's results, oldest first (the pipe's unread messages).</summary>
+            public Queue<Task<AsyncWorkerMessage>> Pipe { get; } = new();
 
-            /// <summary>The last observation sent (the worker's <c>observation</c>), what a masked-out reset answers; <see langword="null"/> with shared memory.</summary>
-            public object? Observation { get; set; }
+            /// <summary>The parent's end of a custom worker's pipe, or <see langword="null"/> for a built-in worker.</summary>
+            public PipeConnection? ParentPipe { get; set; }
 
-            /// <summary>The results of the commands sent, oldest first (the pipe's unread messages).</summary>
-            public Queue<Task<Message>> Pipe { get; } = new();
+            /// <summary>The thread a custom worker runs on, or <see langword="null"/> for a built-in worker.</summary>
+            public Thread? Thread { get; set; }
+
+            /// <summary>The commands sent to a custom worker and not answered yet; read and written by the caller only.</summary>
+            public int Pending { get; set; }
+
+            /// <summary>What escaped a custom worker when it ended (its process's dying traceback), or <see langword="null"/>; written by its thread before its pipe closes.</summary>
+            public Exception? Escaped { get; set; }
 
             /// <summary>Whether the caller dropped the pipe after the worker failed (Python sets it to <c>None</c>).</summary>
             public bool Detached { get; set; }
 
             /// <summary>Whether the caller already sent the worker its close (through the pipe or, terminating, without waiting); read and written by the caller only.</summary>
             public bool ClosePosted { get; set; }
-
-            /// <summary>Whether the worker loop ended (a failure or a close); written and read on the worker's executor.</summary>
-            public bool Exited { get; set; }
         }
 
         /// <summary>Runs a worker's commands one after another and hands back each result.</summary>
@@ -1286,7 +1283,7 @@ namespace Gym.Vector {
             /// <summary>Queues a command after the ones already queued.</summary>
             /// <param name="work">The command; it does not throw (a worker reports failures as messages).</param>
             /// <returns>Its result, once it ran.</returns>
-            Task<Message> Post(Func<Message> work);
+            Task<AsyncWorkerMessage> Post(Func<AsyncWorkerMessage> work);
         }
 
         /// <summary>
@@ -1300,8 +1297,8 @@ namespace Gym.Vector {
             /// <summary>Queues a command after the previous one, on the thread pool.</summary>
             /// <param name="work">The command.</param>
             /// <returns>Its result.</returns>
-            public Task<Message> Post(Func<Message> work) {
-                Task<Message> next = _tail.ContinueWith(_ => work(), CancellationToken.None, TaskContinuationOptions.DenyChildAttach, TaskScheduler.Default);
+            public Task<AsyncWorkerMessage> Post(Func<AsyncWorkerMessage> work) {
+                Task<AsyncWorkerMessage> next = _tail.ContinueWith(_ => work(), CancellationToken.None, TaskContinuationOptions.DenyChildAttach, TaskScheduler.Default);
                 _tail = next;
                 return next;
             }
@@ -1317,9 +1314,9 @@ namespace Gym.Vector {
 
             /// <summary>Starts the thread.</summary>
             /// <param name="name">Its name, for debuggers.</param>
-            public WorkerThread(string name) {
-                // A background thread, as Gymnasium's daemon processes: it never keeps the process alive.
-                _thread = new Thread(Loop) { IsBackground = true, Name = name };
+            /// <param name="background">Whether it is a background thread (Gymnasium's <c>daemon</c>): one that never keeps the process alive.</param>
+            public WorkerThread(string name, bool background) {
+                _thread = new Thread(Loop) { IsBackground = background, Name = name };
                 _thread.Start();
             }
 
@@ -1327,8 +1324,8 @@ namespace Gym.Vector {
             /// <param name="work">The command.</param>
             /// <returns>Its result; completed off this thread, so a waiter never runs on it.</returns>
             /// <exception cref="InvalidOperationException">Thrown after <see cref="Complete"/>.</exception>
-            public Task<Message> Post(Func<Message> work) {
-                var completion = new TaskCompletionSource<Message>(TaskCreationOptions.RunContinuationsAsynchronously);
+            public Task<AsyncWorkerMessage> Post(Func<AsyncWorkerMessage> work) {
+                var completion = new TaskCompletionSource<AsyncWorkerMessage>(TaskCreationOptions.RunContinuationsAsynchronously);
                 _queue.Add(() => {
                     try {
                         completion.SetResult(work());
@@ -1375,13 +1372,44 @@ namespace Gym.Vector {
         /// <param name="maxConcurrency">How many sub-envs may run <c>reset</c> or <c>step</c> at once, or <see langword="null"/>.</param>
         /// <param name="executionMode">Where the calls run (DR-22).</param>
         /// <param name="threadCount">The number of threads of <see cref="AsyncExecutionMode.DedicatedThreads"/>.</param>
+        /// <param name="context">Gymnasium's start method: accepted and kept, with nothing to choose.</param>
+        /// <param name="daemon">Whether the dedicated threads are background threads (the default).</param>
+        /// <param name="worker">A custom worker serving each sub-env on a thread of its own (DR-38), or <see langword="null"/> for the built-in workers.</param>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="envFns"/> is <see langword="null"/>.</exception>
         /// <exception cref="ValueError">Thrown for an unknown mode, a bad <c>max_concurrency</c> or thread count, or a space with no shared layout.</exception>
         /// <exception cref="IndexError">Thrown when there are no sub-envs.</exception>
         /// <exception cref="TypeError">Thrown when a pair observation mode holds something else than spaces, or a <c>Graph</c>/<c>Sequence</c> space is shared.</exception>
         /// <exception cref="RuntimeError">Thrown when a sub-env's spaces do not fit the batch.</exception>
+        /// <exception cref="EndOfStreamException">Thrown under a custom worker that ended without answering.</exception>
         public AsyncVectorEnv(IEnumerable<Func<IEnv>> envFns, bool sharedMemory = true, bool copy = true, object? observationMode = null, object? autoresetMode = null,
-            object? maxConcurrency = null, AsyncExecutionMode executionMode = AsyncExecutionMode.ThreadPool, int? threadCount = null)
-            : base(envFns, sharedMemory, copy, observationMode, autoresetMode, maxConcurrency, executionMode, threadCount) { }
+            object? maxConcurrency = null, AsyncExecutionMode executionMode = AsyncExecutionMode.ThreadPool, int? threadCount = null, string? context = null,
+            bool daemon = true, AsyncVectorWorker? worker = null)
+            : base(envFns, sharedMemory, copy, observationMode, autoresetMode, maxConcurrency, executionMode, threadCount, context, daemon, worker) { }
+
+        /// <summary>
+        ///     The default worker (Gymnasium's <c>_async_worker</c>, DR-38), public so a custom <see cref="AsyncVectorWorker"/>
+        ///     can wrap it: builds the sub-env with <paramref name="envFn"/>, closes its handle on <paramref name="parentPipe"/>,
+        ///     then answers each <c>(command, data)</c> received on <paramref name="pipe"/> with <c>(result, success)</c>, in
+        ///     order, until a <c>close</c> or a failure; the sub-env is closed and disposed on the way out. The vector env's
+        ///     built-in workers run this same loop body through their executors.
+        /// </summary>
+        /// <param name="index">The sub-env's index.</param>
+        /// <param name="envFn">Builds the sub-env, which this worker owns.</param>
+        /// <param name="pipe">The worker's end of the pipe.</param>
+        /// <param name="parentPipe">The worker's handle on the parent's end, closed first, as Gymnasium's worker does.</param>
+        /// <param name="sharedMemory">The shared observation buffer to write into, or <see langword="null"/> to send observations through the pipe.</param>
+        /// <param name="errorQueue">Where a failure is reported before the <c>(null, false)</c> answer.</param>
+        /// <param name="autoresetMode">When an ended sub-env resets.</param>
+        /// <param name="semaphore">The concurrency permits held around <c>reset</c> and <c>step</c>, or <see langword="null"/>.</param>
+        /// <exception cref="Exception">
+        ///     What <paramref name="envFn"/> throws, before any answer (as in Gymnasium, where the process then dies and the
+        ///     parent sees the end of the pipe), or what answering through a broken pipe throws.
+        /// </exception>
+        /// <remarks>
+        ///     Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/vector/async_vector_env.py#L823">gymnasium/vector/async_vector_env.py</see>.
+        /// </remarks>
+        public static void AsyncWorker(int index, Func<IEnv> envFn, PipeConnection pipe, PipeConnection parentPipe, object? sharedMemory,
+            ConcurrentQueue<AsyncWorkerError> errorQueue, AutoresetMode autoresetMode, SemaphoreSlim? semaphore) =>
+            AsyncWorkerCommands.Serve(index, envFn, pipe, parentPipe, sharedMemory, errorQueue, autoresetMode, semaphore);
     }
 }

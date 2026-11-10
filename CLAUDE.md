@@ -30,7 +30,7 @@ refs/Gym.NET/
 │   │   ├── Observations/          # StepResult<TObs> (5-tuple), ResetResult<TObs>, DoneStepResult<TObs> (pre-0.26 4-tuple)
 │   │   ├── Vector/                # IVectorEnv, VectorEnv<TObs, TAct> (batched types, DR-21; _add_info), VectorStepResult/VectorResetResult, AutoresetMode,
 │   │   │                          #   SyncVectorEnv (typed, and untyped as SyncVectorEnv), AsyncVectorEnv (worker threads, AsyncExecutionMode, AsyncState;
-│   │   │                          #   DR-22), VectorWrapper family, VectorUtils (batch_space, concatenate, iterate, the shared-memory functions)
+│   │   │                          #   DR-22; custom workers: AsyncVectorWorker over PipeConnection, AsyncVectorEnv.AsyncWorker, DR-38), VectorWrapper family, VectorUtils (batch_space, concatenate, iterate, the shared-memory functions)
 │   │   ├── Wrappers/              # Common.cs: TimeLimit, OrderEnforcing, PassiveEnvChecker, Autoreset, RecordEpisodeStatistics;
 │   │   │                          #   Rendering.cs: RenderCollection, RecordVideo (IVideoWriter, DR-25), HumanRendering, AddWhiteNoise, ObstructView;
 │   │   │                          #   StatefulObservation.cs: TimeAwareObservation, NormalizeObservation, DelayObservation, FrameStackObservation,

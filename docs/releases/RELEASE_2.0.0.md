@@ -109,9 +109,11 @@ Each is documented on the member, and the parity suite pins it, so a change show
   of the sub-envs' (`GetAttr("np_random")` returns those); a `reset_mask` stays in the caller's options dictionary,
   where Python pops it.
 - **`TimeAwareObservation`'s observations** are `object`s, since their type depends on `flatten`.
-- **`AsyncVectorEnv`'s workers are threads**, not processes: Gymnasium's `context`, `daemon` and custom `worker`
-  arguments do not exist, and `close(terminate=True)` stops waiting instead of killing (each worker closes its sub-env as
-  soon as its current call returns). A reset right after an episode end clears that sub-env's pending autoreset in
+- **`AsyncVectorEnv`'s workers are threads**, not processes. `context` is accepted and has nothing to choose, and
+  `daemon` decides whether the worker threads are background threads. A custom `worker` is an `AsyncVectorWorker` with
+  Gymnasium's eight arguments; it runs on a thread of its own and talks through a `PipeConnection`, which passes values
+  by reference instead of pickling them (`AsyncVectorEnv.AsyncWorker` is the default one to wrap). `close(terminate=True)`
+  stops waiting instead of killing (each worker closes its sub-env as soon as its current call returns). A reset right after an episode end clears that sub-env's pending autoreset in
   both copy paths (DR-42). Gymnasium's worker clears it only with shared memory, so without it Gymnasium's next step
   resets the sub-env a second time, with a reward of 0; Gym.NET's sync and async envs agree in every sequence instead.
 - **`DictInfoToList`** returns its list of infos from its own `Step` and `Reset`; through `IVectorEnv` the infos stay a

@@ -65,6 +65,36 @@ namespace Gym.Tests.Parity.Tests.Vector {
         }
 
         /// <summary>
+        ///     A custom <c>worker</c> on both sides (DR-38), each side's default worker passed explicitly: Gymnasium's
+        ///     <c>_async_worker</c>, so its env takes the custom-worker path (the signature check, the process target), and
+        ///     Gym.NET's <see cref="AsyncVectorEnv.AsyncWorker"/>, so its sub-envs run on pipe workers of their own. CartPole in
+        ///     lockstep through 200 sampled steps across episode ends, every result compared whole, in both copy paths.
+        /// </summary>
+        /// <param name="sharedMemory">Whether the observations go through the shared buffer.</param>
+        [TestMethod]
+        [DataRow(true)]
+        [DataRow(false)]
+        public void CustomWorker_Lockstep_MatchesGymnasium(bool sharedMemory) {
+            RequireSpawn();
+            const string statements = """
+                import gymnasium as gym
+                from gymnasium.vector.async_vector_env import _async_worker
+                envs = gym.make_vec("CartPole-v1", 3, "async", vector_kwargs={"shared_memory": shared_memory, "worker": _async_worker})
+                """;
+            using PyRef python = PyRef.Of(() => {
+                using PyObject flag = PyConvert.ToPython(sharedMemory);
+                return Python.evalStmts(statements, "envs", ("shared_memory", flag));
+            });
+            try {
+                using VectorEnv<NDArray, NDArray> dotnet = Gymnasium.MakeVec<NDArray, NDArray>("CartPole-v1", numEnvs: 3, vectorizationMode: "async",
+                    vectorKwargs: new Info { ["shared_memory"] = sharedMemory, ["worker"] = (AsyncVectorWorker)AsyncVectorEnv.AsyncWorker });
+                Lockstep($"CartPole-v1 x3 async, custom worker (shared_memory={sharedMemory})", python, dotnet, 5, 200, resetEnded: false);
+            } finally {
+                Close(python);
+            }
+        }
+
+        /// <summary>
         ///     FrozenLake's int observations and float infos, and Blackjack's tuple observations, through 120 sampled steps in
         ///     both copy paths: the shared buffer's int64 and tuple layouts.
         /// </summary>

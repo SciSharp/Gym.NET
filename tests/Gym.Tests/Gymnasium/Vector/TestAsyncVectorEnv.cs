@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
@@ -25,8 +26,8 @@ namespace Gym.Tests.Gymnasium.Vector {
     ///     Two deliberate changes, both from threads replacing processes: a test that builds every sub-env from one shared
     ///     space builds a space per sub-env (a process gets a copy; threads would sample one generator at once), and the
     ///     sub-env errors' traces are .NET stack traces, so the trace lines are matched on the exception's text alone. The two
-    ///     custom-<c>worker</c> tests wait for the maintainer's answer on a worker contract for threads (there is no
-    ///     <c>worker</c> argument) and are <c>[OpenBugs("P6.2-worker")]</c>.
+    ///     custom-<c>worker</c> tests run over <see cref="AsyncVectorWorker"/> (DR-38), whose eight parameters make Gymnasium's
+    ///     arity check a compile-time fact.
     ///     </para>
     ///     <para>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/tests/vector/test_async_vector_env.py">tests/vector/test_async_vector_env.py</see>.</para>
     /// </remarks>
@@ -622,42 +623,46 @@ namespace Gym.Tests.Gymnasium.Vector {
         /// <summary>A custom <c>worker</c> not accepting the semaphore argument is refused up front.</summary>
         /// <param name="maxConcurrency">The limit, or 0 for none.</param>
         /// <remarks>
-        ///     Gym.NET's workers are threads with no <c>worker</c> argument: Gymnasium's worker function drives its pipes, and a
-        ///     contract for a thread worker is a question for the maintainer. Until then the argument is refused as unknown.
+        ///     Gymnasium checks a worker's arity when the env is built and raises <c>ValueError</c>; a worker here is an
+        ///     <see cref="AsyncVectorWorker"/>, so a C# worker missing the semaphore does not compile (DR-38). The test pins the
+        ///     delegate's eight parameters, and a seven-parameter delegate given by Python name is refused by the binding, with
+        ///     its <see cref="TypeError"/> naming <c>worker</c>, before any worker starts.
         ///     Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/tests/vector/test_async_vector_env.py#L589">tests/vector/test_async_vector_env.py (test_incompatible_custom_worker)</see>.
         /// </remarks>
         [TestMethod]
-        [OpenBugs("P6.2-worker")]
         [DataRow(0)]
         [DataRow(2)]
         public void TestIncompatibleCustomWorker(int maxConcurrency) {
-            static void CustomWorker(int index, Func<IEnv> envFn, object pipe, object parentPipe, object sharedMemory, object errorQueue, AutoresetMode autoresetMode) { }
+            static void CustomWorker(int index, Func<IEnv> envFn, PipeConnection pipe, PipeConnection parentPipe, object? sharedMemory,
+                ConcurrentQueue<AsyncWorkerError> errorQueue, AutoresetMode autoresetMode) { }
 
-            var error = Assert.ThrowsExactly<ValueError>(() => PyKwargs.Construct(typeof(AsyncVectorEnv), new Info {
+            Assert.AreEqual(8, typeof(AsyncVectorWorker).GetMethod("Invoke")!.GetParameters().Length, "Gymnasium's eight worker arguments.");
+            var error = Assert.ThrowsExactly<TypeError>(() => PyKwargs.Construct(typeof(AsyncVectorEnv), new Info {
                 ["env_fns"] = Enumerable.Range(0, 2).Select(_ => (Func<IEnv>)(() => new GenericTestEnv())).ToList(),
-                ["worker"] = (Action<int, Func<IEnv>, object, object, object, object, AutoresetMode>)CustomWorker,
+                ["worker"] = (Action<int, Func<IEnv>, PipeConnection, PipeConnection, object?, ConcurrentQueue<AsyncWorkerError>, AutoresetMode>)CustomWorker,
                 ["max_concurrency"] = maxConcurrency == 0 ? null : maxConcurrency,
             }));
-            StringAssert.Contains(error.Message, "A custom `worker` must accept 8 arguments");
+            StringAssert.Contains(error.Message, "argument 'worker' must be");
         }
 
         /// <summary>A custom <c>worker</c> with the expected signature works with and without <c>max_concurrency</c>.</summary>
         /// <param name="maxConcurrency">The limit, or 0 for none.</param>
         /// <remarks>
-        ///     Waits for the same answer as <see cref="TestIncompatibleCustomWorker"/>.
+        ///     The worker is Gymnasium's <c>custom_semaphore_worker</c>: the default worker, <see cref="AsyncVectorEnv.AsyncWorker"/>,
+        ///     called with every argument it was given.
         ///     Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/tests/vector/test_async_vector_env.py#L617">tests/vector/test_async_vector_env.py (test_custom_worker_with_semaphore)</see>.
         /// </remarks>
         [TestMethod]
-        [OpenBugs("P6.2-worker")]
         [DataRow(0)]
         [DataRow(2)]
         public void TestCustomWorkerWithSemaphore(int maxConcurrency) {
-            static void CustomSemaphoreWorker(int index, Func<IEnv> envFn, object pipe, object parentPipe, object sharedMemory, object errorQueue, AutoresetMode autoresetMode,
-                object? semaphore) { }
+            static void CustomSemaphoreWorker(int index, Func<IEnv> envFn, PipeConnection pipe, PipeConnection parentPipe, object? sharedMemory,
+                ConcurrentQueue<AsyncWorkerError> errorQueue, AutoresetMode autoresetMode, SemaphoreSlim? semaphore) =>
+                AsyncVectorEnv.AsyncWorker(index, envFn, pipe, parentPipe, sharedMemory, errorQueue, autoresetMode, semaphore);
 
             using var envs = (AsyncVectorEnv)PyKwargs.Construct(typeof(AsyncVectorEnv), new Info {
                 ["env_fns"] = Enumerable.Range(0, 4).Select(_ => (Func<IEnv>)(() => new GenericTestEnv())).ToList(),
-                ["worker"] = (Action<int, Func<IEnv>, object, object, object, object, AutoresetMode, object?>)CustomSemaphoreWorker,
+                ["worker"] = (AsyncVectorWorker)CustomSemaphoreWorker,
                 ["max_concurrency"] = maxConcurrency == 0 ? null : maxConcurrency,
             });
             try {

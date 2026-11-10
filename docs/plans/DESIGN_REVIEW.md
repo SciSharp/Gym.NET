@@ -180,6 +180,10 @@ built until then:
    dedicated background thread with blocking pacing, and a headless game runs on the thread pool with awaited pacing.
    That keeps the recommended option's thread for a person playing in a window, and the pool for what "renders
    nothing", as the maintainer's note put it.
+8. DR-38's custom worker (added when it was implemented): DR-38 does not say how a custom worker meets DR-22's
+   execution modes. Each custom worker runs on a thread of its own, whatever the mode, as each of Gymnasium's runs in a
+   process of its own, and the built-in workers keep their executors. Python's pipe errors map to `EndOfStreamException`
+   (`EOFError`, which NumSharp lacks) and NumSharp's `OSError` (a broken pipe), and values cross the pipe by reference.
 
 Three answers were recorded in the reading below; a correction from the maintainer replaces the row before the step that depends on it starts:
 
