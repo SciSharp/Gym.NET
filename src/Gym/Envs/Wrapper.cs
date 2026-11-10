@@ -180,13 +180,34 @@ namespace Gym.Envs {
             set => throw new AttributeError($"property '_np_random' of '{PyAttributes.PyTypeName(GetType())}' object has no setter");
         }
 
-        /// <summary>This wrapper's own action space (Python's <c>_action_space</c>), <see langword="null"/> to forward the env's; the wrapper owns it.</summary>
-        [PyName("_action_space")]
-        protected Space<TWAct>? WrapperActionSpace { get; set; }
+        /// <summary>The backing slot of <see cref="WrapperActionSpace"/>.</summary>
+        private Space<TWAct>? _wrapperActionSpace;
 
-        /// <summary>This wrapper's own observation space (Python's <c>_observation_space</c>), <see langword="null"/> to forward the env's; the wrapper owns it.</summary>
+        /// <summary>The backing slot of <see cref="WrapperObservationSpace"/>.</summary>
+        private Space<TWObs>? _wrapperObservationSpace;
+
+        /// <summary>
+        ///     This wrapper's own action space (Python's <c>_action_space</c>), <see langword="null"/> to forward the env's. The
+        ///     wrapper owns and disposes a space it is given (DR-40), except one an env beneath it already owns, such as the
+        ///     env's own space handed back: that one is referenced, never disposed here, so it is not released twice.
+        /// </summary>
+        /// <exception cref="InvalidOperationException">Thrown by the setter for a space an env outside this stack, not yet disposed, owns.</exception>
+        [PyName("_action_space")]
+        protected Space<TWAct>? WrapperActionSpace {
+            get => _wrapperActionSpace;
+            set => _wrapperActionSpace = Space.Assign(this, value, _wrapperActionSpace, _wrapperObservationSpace, "action_space", OwnedBeneath);
+        }
+
+        /// <summary>
+        ///     This wrapper's own observation space (Python's <c>_observation_space</c>), <see langword="null"/> to forward the
+        ///     env's; owned as <see cref="WrapperActionSpace"/> is.
+        /// </summary>
+        /// <exception cref="InvalidOperationException">Thrown by the setter for a space an env outside this stack, not yet disposed, owns.</exception>
         [PyName("_observation_space")]
-        protected Space<TWObs>? WrapperObservationSpace { get; set; }
+        protected Space<TWObs>? WrapperObservationSpace {
+            get => _wrapperObservationSpace;
+            set => _wrapperObservationSpace = Space.Assign(this, value, _wrapperObservationSpace, _wrapperActionSpace, "observation_space", OwnedBeneath);
+        }
 
         /// <summary>This wrapper's own metadata (Python's <c>_metadata</c>), <see langword="null"/> to forward the env's.</summary>
         [PyName("_metadata")]
@@ -236,9 +257,27 @@ namespace Gym.Envs {
             base.Dispose(disposing);
             if (!disposing)
                 return;
-            WrapperActionSpace?.Dispose();
-            WrapperObservationSpace?.Dispose();
+            // Only what this wrapper owns: a space passed through from an env beneath is that env's to release (DR-40).
+            if (WrapperActionSpace is { } actionSpace && actionSpace.IsOwnedBy(this))
+                actionSpace.Dispose();
+            if (WrapperObservationSpace is { } observationSpace && observationSpace.IsOwnedBy(this))
+                observationSpace.Dispose();
             Env.Dispose();
+        }
+
+        /// <summary>
+        ///     Whether an env beneath this wrapper (the env it wraps, or any layer down to the unwrapped env) owns
+        ///     <paramref name="space"/>, which makes the space a pass-through this wrapper references without owning (DR-40).
+        /// </summary>
+        /// <param name="space">The space assigned to this wrapper.</param>
+        /// <returns><see langword="true"/> when a lower layer owns it.</returns>
+        private bool OwnedBeneath(Space space) {
+            for (IEnv? env = Env; env is not null; env = (env as IWrapper)?.Env) {
+                if (space.IsOwnedBy(env))
+                    return true;
+            }
+
+            return false;
         }
 
         /// <summary>The error for forwarding an env space whose elements are not this wrapper's type.</summary>

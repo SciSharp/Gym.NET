@@ -80,18 +80,23 @@ namespace Gym.Vector {
             protected set => _numEnvs = value;
         }
 
-        /// <summary>The batched observation space (<c>observation_space</c>), typed by the batched observation type (DR-21).</summary>
+        /// <summary>
+        ///     The batched observation space (<c>observation_space</c>), typed by the batched observation type (DR-21). The vector
+        ///     env owns and disposes it, so the setter refuses a space another env not yet disposed owns (DR-40).
+        /// </summary>
         /// <exception cref="AttributeError">Thrown by the getter while unset.</exception>
+        /// <exception cref="InvalidOperationException">Thrown by the setter for a space another env not yet disposed owns.</exception>
         public virtual Space<TObs> ObservationSpace {
             get => _observationSpace ?? throw MissingAttribute("observation_space");
-            set => _observationSpace = value;
+            set => _observationSpace = Space.Assign(this, value, _observationSpace, _actionSpace, "observation_space");
         }
 
-        /// <summary>The batched action space (<c>action_space</c>), typed by the batched action type.</summary>
+        /// <summary>The batched action space (<c>action_space</c>), typed by the batched action type; owned as <see cref="ObservationSpace"/> is.</summary>
         /// <exception cref="AttributeError">Thrown by the getter while unset.</exception>
+        /// <exception cref="InvalidOperationException">Thrown by the setter for a space another env not yet disposed owns.</exception>
         public virtual Space<TAct> ActionSpace {
             get => _actionSpace ?? throw MissingAttribute("action_space");
-            set => _actionSpace = value;
+            set => _actionSpace = Space.Assign(this, value, _actionSpace, _observationSpace, "action_space");
         }
 
         /// <summary>One sub-env's observation space (<c>single_observation_space</c>), untyped: its elements may be of another type than the batch's.</summary>

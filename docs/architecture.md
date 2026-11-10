@@ -117,7 +117,10 @@ draw are Gymnasium's own, embedded in Gym.NET.Environments (DR-19).
 ## Array ownership
 
 NumSharp arrays live in unmanaged memory (D19). Whatever an env, space or wrapper returns belongs to the caller; spaces
-and envs dispose what they own. Results that carry arrays (`StepResult`, `ResetResult`, the vector results) implement
+and envs dispose what they own. A space has one owner (DR-40): the env it was given to, which disposes it with itself.
+Handing it to a second env that is not yet disposed throws at once, naming the fix: give each env its own space, a new
+one or `space.DeepCopy()`. A wrapper handed its own env's space passes it through without owning it, and a space an env
+replaces is let go, undisposed. Results that carry arrays (`StepResult`, `ResetResult`, the vector results) implement
 `INDArrayCarrier`, so NumSharp.Build's `[NDScoped]` weaving keeps them alive while it reclaims a method's temporaries.
 NumSharp's analyzer reports arrays that are created and dropped (`NDW012`).
 

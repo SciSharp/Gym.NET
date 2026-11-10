@@ -11,6 +11,15 @@ using NumSharp;
 
 namespace Gym.Vector {
     /// <summary>
+    ///     One layer of a vector-wrapper stack seen without its generic types, so code inside Gym.NET can walk down a stack
+    ///     whose layers are typed differently (a single-env stack has the public <see cref="IWrapper"/> for this).
+    /// </summary>
+    internal interface IVectorWrapperLayer {
+        /// <summary>The vector env this layer wraps, possibly another wrapper.</summary>
+        IVectorEnv InnerEnv { get; }
+    }
+
+    /// <summary>
     ///     Wraps a vector env to change its behaviour, forwarding everything it does not change: the spaces (until the wrapper
     ///     assigns its own), the metadata, the spec, the generator, <see cref="VectorEnv{TObs, TAct}.NumEnvs"/>, reset, step,
     ///     render and close. Typed by the wrapper's batched types and the wrapped env's.
@@ -28,7 +37,7 @@ namespace Gym.Vector {
     ///     </para>
     ///     <para>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/vector/vector_env.py#L361">gymnasium/vector/vector_env.py</see>.</para>
     /// </remarks>
-    public class VectorWrapper<TWObs, TWAct, TObs, TAct> : VectorEnv<TWObs, TWAct> {
+    public class VectorWrapper<TWObs, TWAct, TObs, TAct> : VectorEnv<TWObs, TWAct>, IVectorWrapperLayer {
         /// <summary>Wraps <paramref name="env"/>.</summary>
         /// <param name="env">The vector env to wrap, possibly another wrapper.</param>
         /// <exception cref="TypeError">Thrown when <paramref name="env"/> is <see langword="null"/>: <c>Expected env to be a `gymnasium.vector.VectorEnv` but got &lt;class 'NoneType'&gt;</c>.</exception>
@@ -110,13 +119,33 @@ namespace Gym.Vector {
         /// <summary>The innermost vector env.</summary>
         public override IVectorEnv Unwrapped => Env.Unwrapped;
 
-        /// <summary>This wrapper's own batched observation space, <see langword="null"/> to forward the env's; the wrapper owns it.</summary>
-        [PyName("_observation_space")]
-        protected Space<TWObs>? WrapperObservationSpace { get; set; }
+        /// <summary>The backing slot of <see cref="WrapperObservationSpace"/>.</summary>
+        private Space<TWObs>? _wrapperObservationSpace;
 
-        /// <summary>This wrapper's own batched action space, <see langword="null"/> to forward the env's; the wrapper owns it.</summary>
+        /// <summary>The backing slot of <see cref="WrapperActionSpace"/>.</summary>
+        private Space<TWAct>? _wrapperActionSpace;
+
+        /// <summary>The vector env this wrapper wraps, untyped, so <see cref="OwnedBeneath"/> can walk a stack of differently typed layers.</summary>
+        IVectorEnv IVectorWrapperLayer.InnerEnv => Env;
+
+        /// <summary>
+        ///     This wrapper's own batched observation space, <see langword="null"/> to forward the env's. The wrapper owns and
+        ///     disposes a space it is given (DR-40), except one a vector env beneath it already owns, which it only references.
+        /// </summary>
+        /// <exception cref="InvalidOperationException">Thrown by the setter for a space an env outside this stack, not yet disposed, owns.</exception>
+        [PyName("_observation_space")]
+        protected Space<TWObs>? WrapperObservationSpace {
+            get => _wrapperObservationSpace;
+            set => _wrapperObservationSpace = Space.Assign(this, value, _wrapperObservationSpace, _wrapperActionSpace, "observation_space", OwnedBeneath);
+        }
+
+        /// <summary>This wrapper's own batched action space, <see langword="null"/> to forward the env's; owned as <see cref="WrapperObservationSpace"/> is.</summary>
+        /// <exception cref="InvalidOperationException">Thrown by the setter for a space an env outside this stack, not yet disposed, owns.</exception>
         [PyName("_action_space")]
-        protected Space<TWAct>? WrapperActionSpace { get; set; }
+        protected Space<TWAct>? WrapperActionSpace {
+            get => _wrapperActionSpace;
+            set => _wrapperActionSpace = Space.Assign(this, value, _wrapperActionSpace, _wrapperObservationSpace, "action_space", OwnedBeneath);
+        }
 
         /// <summary>This wrapper's own single observation space, <see langword="null"/> to forward the env's.</summary>
         [PyName("_single_observation_space")]
@@ -175,9 +204,27 @@ namespace Gym.Vector {
             Close();
             if (!disposing)
                 return;
-            WrapperObservationSpace?.Dispose();
-            WrapperActionSpace?.Dispose();
+            // Only what this wrapper owns: a batched space passed through from a vector env beneath is that env's (DR-40).
+            if (WrapperObservationSpace is { } observationSpace && observationSpace.IsOwnedBy(this))
+                observationSpace.Dispose();
+            if (WrapperActionSpace is { } actionSpace && actionSpace.IsOwnedBy(this))
+                actionSpace.Dispose();
             Env.Dispose();
+        }
+
+        /// <summary>
+        ///     Whether a vector env beneath this wrapper (the one it wraps, or any layer below) owns <paramref name="space"/>,
+        ///     which makes the space a pass-through this wrapper references without owning (DR-40).
+        /// </summary>
+        /// <param name="space">The space assigned to this wrapper.</param>
+        /// <returns><see langword="true"/> when a lower layer owns it.</returns>
+        private bool OwnedBeneath(Space space) {
+            for (IVectorEnv? env = Env; env is not null; env = (env as IVectorWrapperLayer)?.InnerEnv) {
+                if (space.IsOwnedBy(env))
+                    return true;
+            }
+
+            return false;
         }
 
         /// <summary>Python's <c>repr</c>: <c>&lt;ClipReward, SyncVectorEnv(CartPole-v1, num_envs=3)&gt;</c>.</summary>

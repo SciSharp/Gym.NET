@@ -681,7 +681,11 @@ Specs: the port plan's §9 and §10; sources `vector` 3,113 lines and `wrappers`
     deviation). *Done 2026-11-10: the worker clears it after every reset; a unit test holds async to sync across the
     sequence in both paths, and the parity cells compare Gym.NET in both paths with Gymnasium's shared-memory path and
     pin Gymnasium's kept autoreset without shared memory.*
-  - DR-40: one owner per space, enforced when a second live env takes it.
+  - DR-40: one owner per space, enforced when a second live env takes it. *Done 2026-11-10: `Space` records its owner
+    atomically; `Env`, `Wrapper`, `VectorEnv` and `VectorWrapper` take ownership through their space slots and release a
+    replaced space; a wrapper handed a space an env beneath it owns passes it through (no double dispose); an
+    `ObjectSpace` view takes the space it wraps; `DeepCopy` and disposal clear ownership. No test or library path shared
+    a space: the unit and parity suites passed unchanged with the check on.*
   - DR-45: `get_keys_to_action` as a virtual method on `Env` with the presence hook, typed key combinations to actions.
   - DR-47: both viewers report the layout's keycode.
   - DR-43: `FuncEnv`'s functions as delegate properties, and a typed `Transform`.

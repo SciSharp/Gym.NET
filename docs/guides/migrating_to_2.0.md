@@ -92,6 +92,8 @@ What behaves differently, beyond the spelling:
   with Gymnasium's message.
 - **Arrays belong to the caller.** NumSharp arrays live in unmanaged memory; dispose what an env returns. NumSharp's
   analyzer, which comes with the packages, points at arrays that are dropped (`NDW012`).
+- **Spaces belong to their env.** An env disposes the spaces it was given, so one space cannot serve two envs: assigning
+  a space another undisposed env owns throws. Give each env its own, a new one or `space.DeepCopy()`.
 
 ## Rendering to an image
 

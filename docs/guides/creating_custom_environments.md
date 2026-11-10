@@ -15,7 +15,7 @@ The sample on this page compiles and passes `EnvChecker.CheckEnv` as shown.
 | `Reset(seed, options)` | Start with `SeedNpRandom(seed)`, which reseeds `NpRandom` when a seed is given and keeps the stream otherwise. Draw every random value from `NpRandom`. Return `ResetResult<TObs>(observation, info)`. |
 | `Step(action)` | Advance one step and return `StepResult<TObs>(observation, reward, terminated, truncated, info)`. Leave time limits to `TimeLimit` (`maxEpisodeSteps` at registration), so `truncated` is usually `false` here. |
 | `Render()` | Render in the mode fixed at construction: a frame (`RenderResult.Rgb`), text (`RenderResult.Ansi`), or `RenderResult.None`. In `human` mode, draw inside `Reset` and `Step` instead. |
-| `Close()` / `Dispose(bool)` | Release what the env holds (windows, files) in `Close`, which may run more than once. `Dispose()` calls `Close()`, then releases the env's spaces; a wrapper also disposes the env it wraps. |
+| `Close()` / `Dispose(bool)` | Release what the env holds (windows, files) in `Close`, which may run more than once. `Dispose()` calls `Close()`, then releases the env's spaces; a wrapper also disposes the env it wraps. Because the env owns its spaces, give every env its own: assigning a space another env still owns throws (`space.DeepCopy()` makes an unowned copy). |
 
 Return new arrays from `Reset` and `Step`: the caller owns them and may dispose them, and Gymnasium's checker refuses an
 env that hands out the same buffer twice.

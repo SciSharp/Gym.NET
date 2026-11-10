@@ -293,7 +293,7 @@ Effects of approved designs that only showed up in code. None changes a design; 
   is given (documented on `Env.ActionSpace`), where Gymnasium's tests share one space between envs, which processes
   copy. The ported tests build a space per env; sharing one is a caller error that shows up late: `AsyncVectorEnv`
   disposes the envs it builds only to read their spaces, which released a test's boxes while the test still held
-  them.
+  them. Since DR-40 it shows up early: the second env's setter refuses the space.
 - **DR-36, `play`, `PlayableGame` and `PlayPlot`** (found in P6.7, 2026-11-10): pygame's module-level display and
   event queue are mirrored, process-wide, by `Gym.Rendering.Display` (one window from the viewer factory, DR-20; its
   surface is replaced when the user resizes a resizable display) and `Gym.Rendering.EventQueue` (posted events, plus

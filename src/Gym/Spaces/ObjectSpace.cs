@@ -93,6 +93,37 @@ namespace Gym.Spaces {
         /// <inheritdoc />
         public override int GetHashCode() => Inner.GetHashCode();
 
+        /// <summary>
+        ///     Takes the view and the space it wraps for <paramref name="owner"/> (DR-40): the view disposes that space, so
+        ///     whoever owns the view owns it too, and an env viewing a space another env owns is refused as sharing it would be.
+        /// </summary>
+        /// <param name="owner">The env taking the view.</param>
+        /// <param name="attribute">The slot, in Python spelling, for the error.</param>
+        /// <exception cref="InvalidOperationException">Thrown when another env that has not been disposed owns the view or the wrapped space.</exception>
+        internal override void TakeOwnership(object owner, string attribute) {
+            // The view's own refusal first, then the wrapped space's, so a refused take leaves the wrapped space untouched.
+            object? viewOwner = Owner;
+            if (viewOwner is not null && !ReferenceEquals(viewOwner, owner))
+                base.TakeOwnership(owner, attribute);
+            Inner.TakeOwnership(owner, attribute);
+            base.TakeOwnership(owner, attribute);
+        }
+
+        /// <summary>Ends <paramref name="owner"/>'s ownership of the view and of the space it wraps.</summary>
+        /// <param name="owner">The env letting the view go.</param>
+        internal override void ReleaseOwnership(object owner) {
+            base.ReleaseOwnership(owner);
+            Inner.ReleaseOwnership(owner);
+        }
+
+        /// <summary>
+        ///     Whether <paramref name="owner"/> owns the view or the space it wraps: a new view of an env's space counts as that
+        ///     env's, so a wrapper handed one passes it through instead of disposing the env's space.
+        /// </summary>
+        /// <param name="owner">The env asked about.</param>
+        /// <returns><see langword="true"/> when <paramref name="owner"/> owns either.</returns>
+        internal override bool IsOwnedBy(object owner) => base.IsOwnedBy(owner) || Inner.IsOwnedBy(owner);
+
         /// <inheritdoc />
         protected override void Dispose(bool disposing) {
             if (disposing)

@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Numerics;
+using System.Threading;
 using Gym.Utils;
 using NumSharp;
 
@@ -30,6 +31,13 @@ namespace Gym.Spaces {
 
         /// <summary>Whether <see cref="Dispose()"/> already ran, so a second call is a no-op.</summary>
         private bool _disposed;
+
+        /// <summary>
+        ///     The env (or vector env) that owns this space and disposes it with itself (D19, DR-40), or <see langword="null"/>
+        ///     while none does. Written atomically, so two envs built at once on two threads (an async vector env's workers)
+        ///     cannot both take one space.
+        /// </summary>
+        private object? _owner;
 
         /// <summary>
         ///     Records the shape and dtype and seeds the generator when a seed is given; only <see cref="Space{T}"/> derives
@@ -299,6 +307,8 @@ namespace Gym.Spaces {
             }
 
             copy._disposed = false;
+            // MemberwiseClone copied the owner reference: a copy belongs to no env until one takes it (DR-40).
+            copy._owner = null;
             return copy;
         }
 
@@ -402,12 +412,78 @@ namespace Gym.Spaces {
         private protected abstract IList<object?> FromJsonableObject(object jsonable);
 
         /// <summary>Releases the arrays this space owns; idempotent. The space must not be used afterwards.</summary>
+        /// <remarks>Ownership ends with it (DR-40): a disposed space belongs to no env, though no env can use it either.</remarks>
         public void Dispose() {
             if (_disposed)
                 return;
             _disposed = true;
+            Interlocked.Exchange(ref _owner, null);
             Dispose(true);
             GC.SuppressFinalize(this);
+        }
+
+        /// <summary>The env that owns this space and disposes it with itself (DR-40), or <see langword="null"/> while none does.</summary>
+        internal object? Owner => Volatile.Read(ref _owner);
+
+        /// <summary>
+        ///     Records <paramref name="owner"/> as the env that owns this space and disposes it with itself (D19, DR-40). Taking
+        ///     it again for the same owner is a no-op, so an env may hold one space as both its action and observation space.
+        /// </summary>
+        /// <param name="owner">The env (or vector env) taking the space into one of its own slots.</param>
+        /// <param name="attribute">The slot, in Python spelling (<c>action_space</c>), for the error.</param>
+        /// <exception cref="InvalidOperationException">
+        ///     Thrown when another env that has not been disposed owns the space: that env would dispose it under the new one,
+        ///     the late failure (a released array) DR-40 turns into this early one, whose message names the fix.
+        /// </exception>
+        /// <remarks><see cref="ObjectSpace"/> overrides it to take the space it wraps too, since a view disposes it.</remarks>
+        internal virtual void TakeOwnership(object owner, string attribute) {
+            object? current = Interlocked.CompareExchange(ref _owner, owner, null);
+            if (current is null || ReferenceEquals(current, owner))
+                return;
+            throw new InvalidOperationException(
+                $"This {GetType().Name} cannot become the {attribute} of {PyAttributes.PyTypeName(owner.GetType())}: it already belongs to " +
+                $"{PyAttributes.PyTypeName(current.GetType())}, which has not been disposed and disposes its spaces with itself. " +
+                "Give each env its own space (a new one, or space.DeepCopy()), or dispose the other env first.");
+        }
+
+        /// <summary>
+        ///     Ends <paramref name="owner"/>'s ownership, as when an env puts another space in the slot; does nothing when
+        ///     another env, or none, owns it. The space is not disposed: whoever read it from the env may still use it, as in
+        ///     Python, and another env may take it now.
+        /// </summary>
+        /// <param name="owner">The env letting the space go.</param>
+        internal virtual void ReleaseOwnership(object owner) => Interlocked.CompareExchange(ref _owner, null, owner);
+
+        /// <summary>Whether <paramref name="owner"/> owns this space (for a view, also whether it owns the space the view wraps).</summary>
+        /// <param name="owner">The env asked about.</param>
+        /// <returns><see langword="true"/> when <paramref name="owner"/> disposes this space with itself.</returns>
+        internal virtual bool IsOwnedBy(object owner) => ReferenceEquals(Volatile.Read(ref _owner), owner);
+
+        /// <summary>
+        ///     Puts <paramref name="value"/> into one of <paramref name="owner"/>'s space slots (DR-40): takes ownership of it,
+        ///     unless <paramref name="ownedBeneath"/> finds that an env beneath the owner (a wrapper's stack) already owns it,
+        ///     which makes it a pass-through the owner references without disposing; and releases the space it replaces,
+        ///     unless the owner's other slot still holds that one.
+        /// </summary>
+        /// <typeparam name="TSpace">The slot's space type.</typeparam>
+        /// <param name="owner">The env whose slot it is.</param>
+        /// <param name="value">The new space, or <see langword="null"/> to empty the slot.</param>
+        /// <param name="replaced">The space the slot held, or <see langword="null"/>.</param>
+        /// <param name="sibling">The owner's other slot (the observation space for the action space, and back), which may hold the same space.</param>
+        /// <param name="attribute">The slot, in Python spelling, for the error.</param>
+        /// <param name="ownedBeneath">Whether an env beneath the owner owns a space; <see langword="null"/> for an env with nothing beneath it.</param>
+        /// <returns><paramref name="value"/>, for the slot to store.</returns>
+        /// <exception cref="InvalidOperationException">Thrown when an env outside the owner's stack owns <paramref name="value"/> (<see cref="TakeOwnership"/>).</exception>
+        internal static TSpace? Assign<TSpace>(object owner, TSpace? value, Space? replaced, Space? sibling, string attribute, Func<Space, bool>? ownedBeneath = null)
+            where TSpace : Space {
+            if (ReferenceEquals(value, replaced))
+                return value;
+            // Taken before the old one is let go, so a refused space leaves the slot and its ownership as they were.
+            if (value is not null && !(ownedBeneath?.Invoke(value) ?? false))
+                value.TakeOwnership(owner, attribute);
+            if (replaced is not null && !ReferenceEquals(replaced, sibling) && replaced.IsOwnedBy(owner))
+                replaced.ReleaseOwnership(owner);
+            return value;
         }
 
         /// <summary>Releases what a derived space owns (a <see cref="Box"/>'s bounds); called once, by <see cref="Dispose()"/>.</summary>

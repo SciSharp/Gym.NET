@@ -93,25 +93,29 @@ namespace Gym.Envs {
         /// <summary>
         ///     The space every action must belong to (<c>action_space</c>), typed by the action type (DR-07): a
         ///     <see cref="Discrete"/> or <see cref="Box"/> for <see cref="NDArray"/> actions. The env sets it in its constructor
-        ///     and owns it: <see cref="Dispose()"/> disposes it, so a space must not be shared between envs.
+        ///     and owns it: <see cref="Dispose()"/> disposes it, so a space must not be shared between envs, and the setter
+        ///     refuses one that another env not yet disposed owns (DR-40). Replacing it lets the old space go undisposed, as in
+        ///     Python, where whoever still holds it keeps using it.
         /// </summary>
         /// <exception cref="AttributeError">
         ///     Thrown by the getter while unset, as reading Python's annotated-only attribute does
         ///     (<c>'GenericTestEnv' object has no attribute 'action_space'</c>).
         /// </exception>
+        /// <exception cref="InvalidOperationException">Thrown by the setter for a space another env not yet disposed owns; the message names the fix (a new space, or <c>DeepCopy()</c>).</exception>
         public virtual Space<TAct> ActionSpace {
             get => _actionSpace ?? throw MissingAttribute("action_space");
-            set => _actionSpace = value;
+            set => _actionSpace = Space.Assign(this, value, _actionSpace, _observationSpace, "action_space");
         }
 
         /// <summary>
         ///     The space every observation belongs to (<c>observation_space</c>), typed by the observation type. The env sets it
-        ///     in its constructor and owns it, like <see cref="ActionSpace"/>.
+        ///     in its constructor and owns it, like <see cref="ActionSpace"/>, the same refusal included.
         /// </summary>
         /// <exception cref="AttributeError">Thrown by the getter while unset.</exception>
+        /// <exception cref="InvalidOperationException">Thrown by the setter for a space another env not yet disposed owns.</exception>
         public virtual Space<TObs> ObservationSpace {
             get => _observationSpace ?? throw MissingAttribute("observation_space");
-            set => _observationSpace = value;
+            set => _observationSpace = Space.Assign(this, value, _observationSpace, _actionSpace, "observation_space");
         }
 
         /// <summary>The action space, untyped, for code that handles any env (<see cref="IEnv"/>).</summary>
