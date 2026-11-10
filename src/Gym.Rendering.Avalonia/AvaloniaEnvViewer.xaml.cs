@@ -25,11 +25,15 @@ namespace Gym.Rendering.Avalonia {
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///     Keys are reported by their physical position on a US keyboard (<see cref="KeyEventArgs.PhysicalKey"/>), as SDL
-    ///     keycodes (<see cref="KeyCode"/>), so a game's keys stay where they are whatever the layout. A held key reports one
-    ///     press, not the system's auto-repeat, as pygame's default (no <c>key.set_repeat</c>). Keys without an SDL keycode
-    ///     in <see cref="KeyCode"/> are not reported. Resizes are reported in device-independent pixels, the unit the window
-    ///     was opened in.
+    ///     Keys are reported by the keyboard layout's key (<see cref="KeyEventArgs.Key"/>), as SDL keycodes
+    ///     (<see cref="KeyCode"/>), the way pygame reports them (DR-47): the key labeled A gives <c>K_a</c> on any layout, so
+    ///     a <c>keys_to_action</c> written with <c>ord("a")</c> fires on the key bearing A, as in Gymnasium. Avalonia's key is
+    ///     the platform's virtual key, which follows the layout for letters; where a layout types another character
+    ///     unshifted than its virtual key names (AZERTY's digit row types <c>&amp;</c>, <c>é</c>, ...), SDL reports that
+    ///     character and this viewer the virtual key (<c>K_1</c>), and the keypad's Enter is the main Enter (Avalonia's key
+    ///     does not tell them apart). A held key reports one press, not the system's auto-repeat, as pygame's default (no
+    ///     <c>key.set_repeat</c>). Keys without an SDL keycode in <see cref="KeyCode"/> are not reported. Resizes are
+    ///     reported in device-independent pixels, the unit the window was opened in.
     ///     </para>
     ///     <para>
     ///     Before <see cref="BeginInput"/> nothing changes: the close button closes the window, as it always has for the
@@ -47,8 +51,8 @@ namespace Gym.Rendering.Avalonia {
         /// <summary>The input reported since the last <see cref="TakeInput"/>, filled on the UI thread.</summary>
         private readonly ConcurrentQueue<ViewerInput> _input = new ConcurrentQueue<ViewerInput>();
 
-        /// <summary>The physical keys held now, so the system's auto-repeat reports no second press (UI thread only).</summary>
-        private readonly HashSet<PhysicalKey> _held = new HashSet<PhysicalKey>();
+        /// <summary>The keys held now, so the system's auto-repeat reports no second press (UI thread only).</summary>
+        private readonly HashSet<Key> _held = new HashSet<Key>();
 
         /// <summary>Whether input is reported (<see cref="BeginInput"/> ran); read on the UI thread, set on any.</summary>
         private volatile bool _inputEnabled;
@@ -166,10 +170,10 @@ namespace Gym.Rendering.Avalonia {
         /// <param name="e">The key event; marked handled when reported.</param>
         protected override void OnKeyDown(KeyEventArgs e) {
             base.OnKeyDown(e);
-            if (!_inputEnabled || !SdlKeys.TryGetValue(e.PhysicalKey, out int code))
+            if (!_inputEnabled || !SdlKeys.TryGetValue(e.Key, out int code))
                 return;
             // A key already held is the system repeating it: pygame reports no repeats unless asked to.
-            if (_held.Add(e.PhysicalKey))
+            if (_held.Add(e.Key))
                 _input.Enqueue(ViewerInput.KeyDown(code));
             e.Handled = true;
         }
@@ -178,9 +182,9 @@ namespace Gym.Rendering.Avalonia {
         /// <param name="e">The key event; marked handled when reported.</param>
         protected override void OnKeyUp(KeyEventArgs e) {
             base.OnKeyUp(e);
-            if (!_inputEnabled || !SdlKeys.TryGetValue(e.PhysicalKey, out int code))
+            if (!_inputEnabled || !SdlKeys.TryGetValue(e.Key, out int code))
                 return;
-            _held.Remove(e.PhysicalKey);
+            _held.Remove(e.Key);
             _input.Enqueue(ViewerInput.KeyUp(code));
             e.Handled = true;
         }
@@ -214,45 +218,45 @@ namespace Gym.Rendering.Avalonia {
         }
 
         /// <summary>
-        ///     The SDL keycode of each physical key on a US keyboard: characters for the keys that type one (unshifted),
-        ///     <see cref="KeyCode.ScancodeMask"/> codes for the rest.
+        ///     The SDL keycode of each of Avalonia's keys (DR-47): the character a key names for the keys that type one
+        ///     (unshifted, as on a US layout for the punctuation keys), <see cref="KeyCode.ScancodeMask"/> codes for the rest.
+        ///     Filled through the indexer, so Avalonia's aliases of one value (<c>Enter</c> and <c>Return</c>) cannot clash.
         /// </summary>
-        private static readonly Dictionary<PhysicalKey, int> SdlKeys = BuildKeyMap();
+        private static readonly Dictionary<Key, int> SdlKeys = BuildKeyMap();
 
         /// <summary>Builds <see cref="SdlKeys"/>.</summary>
         /// <returns>The map.</returns>
-        private static Dictionary<PhysicalKey, int> BuildKeyMap() {
-            var map = new Dictionary<PhysicalKey, int> {
-                [PhysicalKey.Backspace] = KeyCode.Backspace, [PhysicalKey.Tab] = KeyCode.Tab, [PhysicalKey.Enter] = KeyCode.Return,
-                [PhysicalKey.Escape] = KeyCode.Escape, [PhysicalKey.Space] = KeyCode.Space, [PhysicalKey.Quote] = KeyCode.Quote,
-                [PhysicalKey.Comma] = KeyCode.Comma, [PhysicalKey.Minus] = KeyCode.Minus, [PhysicalKey.Period] = KeyCode.Period,
-                [PhysicalKey.Slash] = KeyCode.Slash, [PhysicalKey.Semicolon] = KeyCode.Semicolon, [PhysicalKey.Equal] = KeyCode.EqualsSign,
-                [PhysicalKey.BracketLeft] = KeyCode.LeftBracket, [PhysicalKey.Backslash] = KeyCode.Backslash,
-                [PhysicalKey.BracketRight] = KeyCode.RightBracket, [PhysicalKey.Backquote] = KeyCode.Backquote, [PhysicalKey.Delete] = KeyCode.Delete,
-                [PhysicalKey.CapsLock] = KeyCode.CapsLock, [PhysicalKey.PrintScreen] = KeyCode.PrintScreen, [PhysicalKey.ScrollLock] = KeyCode.ScrollLock,
-                [PhysicalKey.Pause] = KeyCode.Pause, [PhysicalKey.Insert] = KeyCode.Insert, [PhysicalKey.Home] = KeyCode.Home,
-                [PhysicalKey.PageUp] = KeyCode.PageUp, [PhysicalKey.End] = KeyCode.End, [PhysicalKey.PageDown] = KeyCode.PageDown,
-                [PhysicalKey.ArrowRight] = KeyCode.Right, [PhysicalKey.ArrowLeft] = KeyCode.Left, [PhysicalKey.ArrowDown] = KeyCode.Down,
-                [PhysicalKey.ArrowUp] = KeyCode.Up, [PhysicalKey.NumLock] = KeyCode.NumLock, [PhysicalKey.NumPadDivide] = KeyCode.KeypadDivide,
-                [PhysicalKey.NumPadMultiply] = KeyCode.KeypadMultiply, [PhysicalKey.NumPadSubtract] = KeyCode.KeypadMinus,
-                [PhysicalKey.NumPadAdd] = KeyCode.KeypadPlus, [PhysicalKey.NumPadEnter] = KeyCode.KeypadEnter,
-                [PhysicalKey.NumPadDecimal] = KeyCode.KeypadPeriod, [PhysicalKey.NumPadEqual] = KeyCode.KeypadEquals,
-                [PhysicalKey.ContextMenu] = KeyCode.Menu, [PhysicalKey.ControlLeft] = KeyCode.LeftCtrl, [PhysicalKey.ShiftLeft] = KeyCode.LeftShift,
-                [PhysicalKey.AltLeft] = KeyCode.LeftAlt, [PhysicalKey.MetaLeft] = KeyCode.LeftGui, [PhysicalKey.ControlRight] = KeyCode.RightCtrl,
-                [PhysicalKey.ShiftRight] = KeyCode.RightShift, [PhysicalKey.AltRight] = KeyCode.RightAlt, [PhysicalKey.MetaRight] = KeyCode.RightGui,
+        private static Dictionary<Key, int> BuildKeyMap() {
+            var map = new Dictionary<Key, int> {
+                [Key.Back] = KeyCode.Backspace, [Key.Tab] = KeyCode.Tab, [Key.Enter] = KeyCode.Return,
+                [Key.Escape] = KeyCode.Escape, [Key.Space] = KeyCode.Space, [Key.OemQuotes] = KeyCode.Quote,
+                [Key.OemComma] = KeyCode.Comma, [Key.OemMinus] = KeyCode.Minus, [Key.OemPeriod] = KeyCode.Period,
+                [Key.OemQuestion] = KeyCode.Slash, [Key.OemSemicolon] = KeyCode.Semicolon, [Key.OemPlus] = KeyCode.EqualsSign,
+                [Key.OemOpenBrackets] = KeyCode.LeftBracket, [Key.OemPipe] = KeyCode.Backslash,
+                [Key.OemCloseBrackets] = KeyCode.RightBracket, [Key.OemTilde] = KeyCode.Backquote, [Key.Delete] = KeyCode.Delete,
+                [Key.CapsLock] = KeyCode.CapsLock, [Key.PrintScreen] = KeyCode.PrintScreen, [Key.Scroll] = KeyCode.ScrollLock,
+                [Key.Pause] = KeyCode.Pause, [Key.Insert] = KeyCode.Insert, [Key.Home] = KeyCode.Home,
+                [Key.PageUp] = KeyCode.PageUp, [Key.End] = KeyCode.End, [Key.PageDown] = KeyCode.PageDown,
+                [Key.Right] = KeyCode.Right, [Key.Left] = KeyCode.Left, [Key.Down] = KeyCode.Down,
+                [Key.Up] = KeyCode.Up, [Key.NumLock] = KeyCode.NumLock, [Key.Divide] = KeyCode.KeypadDivide,
+                [Key.Multiply] = KeyCode.KeypadMultiply, [Key.Subtract] = KeyCode.KeypadMinus,
+                [Key.Add] = KeyCode.KeypadPlus, [Key.Decimal] = KeyCode.KeypadPeriod,
+                [Key.Apps] = KeyCode.Menu, [Key.LeftCtrl] = KeyCode.LeftCtrl, [Key.LeftShift] = KeyCode.LeftShift,
+                [Key.LeftAlt] = KeyCode.LeftAlt, [Key.LWin] = KeyCode.LeftGui, [Key.RightCtrl] = KeyCode.RightCtrl,
+                [Key.RightShift] = KeyCode.RightShift, [Key.RightAlt] = KeyCode.RightAlt, [Key.RWin] = KeyCode.RightGui,
             };
             // The letters, digits, keypad digits and function keys by name, so nothing depends on the enumeration's values.
             for (int i = 0; i < 26; i++)
-                map[Enum.Parse<PhysicalKey>(((char)('A' + i)).ToString())] = KeyCode.A + i;
+                map[Enum.Parse<Key>(((char)('A' + i)).ToString())] = KeyCode.A + i;
             for (int i = 0; i < 10; i++) {
-                map[Enum.Parse<PhysicalKey>($"Digit{i}")] = KeyCode.Digit0 + i;
+                map[Enum.Parse<Key>($"D{i}")] = KeyCode.Digit0 + i;
                 // SDL numbers the keypad 1 to 9, then 0.
-                map[Enum.Parse<PhysicalKey>($"NumPad{i}")] = i == 0 ? KeyCode.Keypad0 : KeyCode.Keypad1 + (i - 1);
+                map[Enum.Parse<Key>($"NumPad{i}")] = i == 0 ? KeyCode.Keypad0 : KeyCode.Keypad1 + (i - 1);
             }
 
             // SDL's F1 to F12 run on from F1, F13 to F15 from F13.
             for (int i = 1; i <= 15; i++)
-                map[Enum.Parse<PhysicalKey>($"F{i}")] = i <= 12 ? KeyCode.F1 + (i - 1) : KeyCode.F13 + (i - 13);
+                map[Enum.Parse<Key>($"F{i}")] = i <= 12 ? KeyCode.F1 + (i - 1) : KeyCode.F13 + (i - 13);
             return map;
         }
     }

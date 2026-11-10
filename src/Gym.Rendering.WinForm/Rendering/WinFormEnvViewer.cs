@@ -20,10 +20,13 @@ namespace Gym.Rendering.WinForm {
     /// <remarks>
     ///     <para>
     ///     Once <see cref="BeginInput"/> runs it is an <see cref="IInteractiveEnvViewer"/>: it reports keys as SDL keycodes
-    ///     (<see cref="KeyCode"/>, by the key's position on a US keyboard), its close button (which then no longer closes it)
-    ///     and the user's resizes, so <c>Gym.Utils.Play</c> can play an env in it. A held key reports one press, not the
-    ///     system's auto-repeat, as pygame's default. WinForms reports Shift, Ctrl and Alt without their side, so they are
-    ///     reported as the left ones. Before <see cref="BeginInput"/> nothing changes.
+    ///     (<see cref="KeyCode"/>), its close button (which then no longer closes it) and the user's resizes, so
+    ///     <c>Gym.Utils.Play</c> can play an env in it. A key is read from Windows' virtual key (<see cref="Keys"/>), which
+    ///     follows the keyboard layout for letters, as pygame's keycodes do (DR-47): the key labeled A gives <c>K_a</c> on any
+    ///     layout. Where a layout types another character unshifted than its virtual key names (AZERTY's digit row types
+    ///     <c>&amp;</c>, <c>é</c>, ...), SDL reports that character and this viewer the virtual key (<c>K_1</c>). A held key
+    ///     reports one press, not the system's auto-repeat, as pygame's default. WinForms reports Shift, Ctrl and Alt without
+    ///     their side, so they are reported as the left ones. Before <see cref="BeginInput"/> nothing changes.
     ///     </para>
     /// </remarks>
     public partial class WinFormEnvViewer : Form, IInteractiveEnvViewer {
@@ -237,8 +240,9 @@ namespace Gym.Rendering.WinForm {
         }
 
         /// <summary>
-        ///     The SDL keycode of each key on a US keyboard: characters for the keys that type one (unshifted),
-        ///     <see cref="KeyCode.ScancodeMask"/> codes for the rest; Shift, Ctrl and Alt as their left keys.
+        ///     The SDL keycode of each of Windows' virtual keys (DR-47): the character a key names for the keys that type one
+        ///     (unshifted, as on a US layout for the punctuation keys), <see cref="KeyCode.ScancodeMask"/> codes for the rest;
+        ///     Shift, Ctrl and Alt as their left keys.
         /// </summary>
         private static readonly Dictionary<Keys, int> SdlKeys = BuildKeyMap();
 

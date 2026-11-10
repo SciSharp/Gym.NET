@@ -299,8 +299,9 @@ Effects of approved designs that only showed up in code. None changes a design; 
   surface is replaced when the user resizes a resizable display) and `Gym.Rendering.EventQueue` (posted events, plus
   the window's input moved in when `Get` pumps it), with `Event`, `EventType` and `KeyCode` (SDL keycodes read from
   pygame-ce 2.5.8). Gymnasium's tests therefore translate line for line (a callback posts events), and the footgun is
-  pygame's: one game per process. Viewers report input through the new `IInteractiveEnvViewer`. Keys are SDL keycodes by
-  physical position on a US layout, with no auto-repeat (pygame's default). While input is on, the close button
+  pygame's: one game per process. Viewers report input through the new `IInteractiveEnvViewer`. Keys were SDL keycodes by
+  physical position on a US layout in the Avalonia viewer (WinForms' virtual keys followed the layout already); since
+  DR-47 both report the layout's key, as pygame does, with no auto-repeat (pygame's default). While input is on, the close button
   posts `WINDOWCLOSE` then `QUIT` and keeps the window open, and any resize not made by the viewer's own code (a drag, maximizing, snapping, another program) posts `WINDOWRESIZED`, as SDL reports every size change. Before
   `BeginInput` a viewer behaves as it always has. The
   Avalonia and WinForms viewers implement it (WinForms reports Shift, Ctrl and Alt as the left keys). `play`'s callback

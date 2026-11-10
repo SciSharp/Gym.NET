@@ -695,7 +695,10 @@ Specs: the port plan's §9 and §10; sources `vector` 3,113 lines and `wrappers`
       bound delegates: present when overridden, hidden by the hook, and shadowed by run-time attributes, as in
       Python.
     - `play` and `PlayableGame` release a mapping they take from the env, on refusal too.*
-  - DR-47: both viewers report the layout's keycode.
+  - DR-47: both viewers report the layout's keycode. *Done 2026-11-10: the Avalonia viewer reads `KeyEventArgs.Key` (the
+    layout's virtual key) instead of `PhysicalKey`; WinForms' virtual keys already followed the layout and its docs are
+    corrected; keys whose layout character differs from their virtual key (AZERTY's digit row) stay a documented
+    difference from SDL. A reflection test pins both maps; no non-US layout was exercised on a desktop.*
   - DR-43: `FuncEnv`'s functions as delegate properties, and a typed `Transform`.
   - DR-41 and DR-44: `PygameContext` instances with a process-wide default, and `Play.RunAsync` on a dedicated thread or
     the thread pool.

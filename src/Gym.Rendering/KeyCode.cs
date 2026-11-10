@@ -13,8 +13,9 @@ namespace Gym.Rendering {
     ///     pygame 1's arrows, which no pygame 2 window produces.
     ///     </para>
     ///     <para>
-    ///     The values were read from live pygame-ce 2.5.8 (SDL 2.32.10); characters follow a US layout, as the viewers map
-    ///     physical keys.
+    ///     The values were read from live pygame-ce 2.5.8 (SDL 2.32.10). The viewers report the keyboard layout's key, as
+    ///     pygame does (DR-47): the key labeled A is <see cref="A"/> on any layout; the punctuation keys are named as on a US
+    ///     layout.
     ///     </para>
     ///     <para>Reference: <see href="https://github.com/pygame-community/pygame-ce/blob/2.5.8/src_c/constants.c">src_c/constants.c</see> (pygame-ce 2.5.8).</para>
     /// </remarks>
