@@ -2393,6 +2393,22 @@ namespace Gym.Tests.Parity {
                         using PyObject function = Module.GetAttr("convert_to_terminated_truncated_step_api");
                         return function.Invoke(step_returns);
                     }
+
+                    /// <summary><c>step_api_compatibility(step_returns, output_truncation_bool=..., is_vector_env=...)</c>, the dispatcher.</summary>
+                    /// <param name="step_returns">A 4- or 5-tuple; stays owned by the caller, and its info is edited in place.</param>
+                    /// <param name="output_truncation_bool">Whether the output is the terminated/truncated API.</param>
+                    /// <param name="is_vector_env">Whether the returns are a vector env's.</param>
+                    /// <returns>A new owned reference to the converted tuple (the argument itself when already in that form).</returns>
+                    /// <exception cref="PythonException">Thrown when the conversion raises.</exception>
+                    internal static PyObject step_api_compatibility_(PyObject step_returns, bool output_truncation_bool, bool is_vector_env) {
+                        using PyObject function = Module.GetAttr("step_api_compatibility");
+                        using var arguments = new PyDict();
+                        using PyObject output = Oracle.PyConvert.ToPython(output_truncation_bool);
+                        using PyObject vector = Oracle.PyConvert.ToPython(is_vector_env);
+                        arguments["output_truncation_bool"] = output;
+                        arguments["is_vector_env"] = vector;
+                        return function.Invoke(new[] { step_returns }, arguments);
+                    }
                 }
             }
 

@@ -634,6 +634,14 @@ Specs: the port plan's §9 and §10; sources `vector` 3,113 lines and `wrappers`
   (each async test in all three modes; the two custom-`worker` tests `[OpenBugs("P6.2-worker")]`), plus Gym.NET's own
   async-equals-sync test (18 mode combinations, bit for bit) and thread-affinity tests; inventory −5 names, the two
   process helpers (`CloudpickleWrapper`, `clear_mpi_env_vars`) now listed as not applicable.
+- *Done 2026-11-10, P6.7's first part (DR-36):* `FuncEnv` (`Gym.Experimental.Functional`, typed and untyped), the
+  `utils.performance` benchmarks (`Gym.Utils.Performance`: `BenchmarkStep`, `BenchmarkVectorStep`, `BenchmarkInit`,
+  `BenchmarkRender` over a replaceable clock), and `step_api_compatibility` with its vector forms
+  (`StepApiCompatibility.Dispatch` and the tuple overloads of the two conversions). 6 parity cells (the benchmarks under a
+  scripted clock with the sub-envs' states afterwards, the bare `FuncEnv`, the dispatcher over 16 single and vector
+  cases); `tests/utils/test_performance.py`, `tests/functional/test_functional.py`, `tests/envs/functional/test_core.py`
+  and the vector rows of `tests/utils/test_step_api_compatibility.py` mirrored; inventory −6 names. `play`, `PlayPlot`
+  and `MissingKeysToAction` follow.
 
 ### P8 Box2D
 

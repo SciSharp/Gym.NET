@@ -76,6 +76,8 @@ In short:
   with Gymnasium's `*_async`/`*_wait` protocol, `max_concurrency` and shared memory), the vector wrapper bases, every
   vector wrapper of `gymnasium.wrappers.vector` (named `...Vector`, printing Gymnasium's names), `CartPoleVectorEnv`.
 - **Checkers**: `EnvChecker.CheckEnv` (Gymnasium's `check_env`), `PassiveChecker`, `EnvMatch`.
+- **Utilities**: `StepApiCompatibility` (`step_api_compatibility`, single and vector), `Performance` (Gymnasium's
+  benchmarks), `Video.SaveVideo`, `Cv2.Resize`, and the functional protocol `FuncEnv` (without JAX).
 - **Environments** (all registered for `Gymnasium.Make`, each with `rgb_array` frames equal to Gymnasium's, `ansi` text
   for toy_text, and `human` mode):
 
@@ -133,7 +135,7 @@ Each has a test that asserts Gymnasium's answer and fails until the gap closes (
 
 Deferred, each with its design approved (the completion plan's P6 lists them):
 
-- `gymnasium.utils.play` and `PlayPlot`, the `FuncEnv` protocol, `gymnasium.utils.performance`.
+- `gymnasium.utils.play` and `PlayPlot`.
 
 Out of 2.0 by decision:
 

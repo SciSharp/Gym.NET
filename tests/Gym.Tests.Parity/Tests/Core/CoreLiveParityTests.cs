@@ -473,6 +473,49 @@ namespace Gym.Tests.Parity.Tests.Core {
         }
 
         /// <summary>
+        ///     <c>step_api_compatibility</c> over tuples, against <see cref="StepApiCompatibility.Dispatch"/>: both directions
+        ///     for a single env with Python's operand semantics (an int <c>done</c> or key comes back as itself where Python's
+        ///     <c>and</c>/<c>or</c> return it), tuples already in the asked form, the vector forms (a list of infos, a dict of
+        ///     arrays, an empty dict) both ways, and the refusals (a wrong length, infos of another type).
+        /// </summary>
+        [TestMethod]
+        public void StepApiCompatibility_Dispatch_MatchesGymnasium() {
+            var cases = new (string Label, Func<object?[]> Build, bool Output, bool Vector)[] {
+                ("(0, 1.5, 0, {'TimeLimit.truncated': 1}) to 5", () => new object?[] { 0L, 1.5, 0L, new Info { ["TimeLimit.truncated"] = 1L } }, true, false),
+                ("(0, 1.5, 2, {'TimeLimit.truncated': 1}) to 5", () => new object?[] { 0L, 1.5, 2L, new Info { ["TimeLimit.truncated"] = 1L } }, true, false),
+                ("(0, 1.5, True, {}) to 5", () => new object?[] { 0L, 1.5, true, new Info() }, true, false),
+                ("(0, 1.5, 0, 3, {}) to 4", () => new object?[] { 0L, 1.5, 0L, 3L, new Info() }, false, false),
+                ("(0, 1.5, True, False, {}) to 4", () => new object?[] { 0L, 1.5, true, false, new Info() }, false, false),
+                ("(0, 1.5, False, False, {'x': 1}) to 4", () => new object?[] { 0L, 1.5, false, false, new Info { ["x"] = 1L } }, false, false),
+                ("a 5-tuple to 5", () => new object?[] { 0L, 1.5, false, true, new Info() }, true, false),
+                ("a 4-tuple to 4", () => new object?[] { 0L, 1.5, true, new Info() }, false, false),
+                ("vector list to 5", () => new object?[] {
+                    0L, 0L, np.array(new[] { false, true, true }), new List<object?> { new Info(), new Info(), new Info { ["TimeLimit.truncated"] = true } },
+                }, true, true),
+                ("vector dict to 5", () => new object?[] { 0L, 0L, np.array(new[] { false, true, true }), new Info { ["TimeLimit.truncated"] = np.array(new[] { false, false, true }) } }, true, true),
+                ("vector empty dict to 5", () => new object?[] { 0L, 0L, np.array(new[] { false, true }), new Info() }, true, true),
+                ("vector dict to 4", () => new object?[] { 0L, 0L, np.array(new[] { false, true, false }), np.array(new[] { false, false, true }), new Info() }, false, true),
+                ("vector dict without endings to 4", () => new object?[] { 0L, 0L, np.array(new[] { false, false }), np.array(new[] { false, false }), new Info() }, false, true),
+                ("vector list to 4", () => new object?[] {
+                    0L, 0L, np.array(new[] { false, true, false }), np.array(new[] { false, false, true }), new List<object?> { new Info { ["Test-Info"] = true }, new Info(), new Info() },
+                }, false, true),
+                ("vector infos of another type", () => new object?[] { 0L, 0L, np.array(new[] { true }), "info" }, true, true),
+                ("a 3-tuple", () => new object?[] { 0L, 1.5, true }, true, false),
+            };
+
+            foreach ((string label, Func<object?[]> build, bool output, bool vector) in cases) {
+                ByteContract.AssertSame($"step_api_compatibility({label}, is_vector_env={vector})",
+                    Outcome.CapturePython(() => {
+                        object?[] built = build();
+                        using PyObject returns = PyConvert.ToPython(built);
+                        Outcome.Release(built);
+                        return Python.gymnasium.utils.step_api_compatibility.step_api_compatibility_(returns, output, vector);
+                    }),
+                    Outcome.Capture(() => StepApiCompatibility.Dispatch(build(), output, vector)));
+            }
+        }
+
+        /// <summary>
         ///     <c>repr(dict)</c> against <see cref="Info.ToString"/> (<see cref="PyBuiltins.Repr"/>): nested dicts, lists and
         ///     tuples, strings that need escaping, and floats in every notation Python prints.
         /// </summary>

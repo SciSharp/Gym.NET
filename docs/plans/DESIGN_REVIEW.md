@@ -236,6 +236,18 @@ Effects of approved designs that only showed up in code. None changes a design; 
   `context` and `daemon` (process start options) and the custom `worker` function (a pipe protocol), whose two tests are
   `[OpenBugs("P6.2-worker")]`. Gymnasium's live `AsyncVectorEnv` runs in the parity suite: its workers are spawned from
   the embedded interpreter once `multiprocessing.set_executable` names a real `python.exe`.
+- **DR-36, `FuncEnv`, the benchmarks and the step-API dispatcher** (found in P6.7, 2026-11-10): `FuncEnv<TState, TObs,
+  TAct, TReward, TTerminal, TRenderState, TParams>` (namespace `Gym.Experimental.Functional`, with an untyped `FuncEnv`)
+  keeps Gymnasium's functions as virtual methods raising `NotImplementedError`, sets its options by Python name
+  (`IDynamicAttributes` holds the undeclared ones) and reads `get_default_params` after them. `transform(func)` rebinds
+  Python's attributes, which C# methods cannot be: Gym.NET's stores the transformed functions as run-time attributes of
+  the same Python names (`step_info` for `transition_info`, Gymnasium's own naming), so `PyAttributes.GetAttr` sees them
+  while direct C# calls run the originals; no Gymnasium test exercises it. `Gym.Utils.Performance` reads its clock through
+  a replaceable `Performance.Time` (Python's `time.time`, which Gymnasium's tests monkeypatch) and disposes what its loops
+  drop, so collection does not leak into the measurement; a zero elapsed time raises Python's `float division by zero`.
+  `step_api_compatibility` over tuples is `StepApiCompatibility.Dispatch` (the class takes the name), marked
+  `[PyName("step_api_compatibility")]`, which now also targets methods; its single-env flags keep Python's `and`/`or`
+  operands (an int `done` comes back as itself), where the typed conversions return `bool`s.
 - **DR-34's generated docs** (found in P10.4, 2026-11-09): an options record copies each constructor `<param>` onto its
   property, and a `<paramref>` inside it is a broken reference on a property (CS1734 wherever documentation is generated,
   so in a consumer's build too). The generator now turns it into a `<see cref>` to the sibling property, or `<c>` text for

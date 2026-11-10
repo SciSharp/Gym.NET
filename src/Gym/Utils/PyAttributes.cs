@@ -14,13 +14,16 @@ namespace Gym.Utils {
     ///     part in Python attribute access only when it carries this attribute. On a constructor parameter it is the keyword
     ///     <c>make</c> binds to it (<see cref="PyKwargs.Construct"/>), for the rare kwarg snake_case cannot spell. On a class it
     ///     is the name Python prints for it (DR-24): the vector wrappers renamed for unique class names
-    ///     (<c>NormalizeObservationVector</c>) keep Gymnasium's (<c>NormalizeObservation</c>) in <c>repr</c> and messages.
+    ///     (<c>NormalizeObservationVector</c>) keep Gymnasium's (<c>NormalizeObservation</c>) in <c>repr</c> and messages. On
+    ///     a static method it is the Python function the method stands for where C# cannot use that name
+    ///     (<c>StepApiCompatibility.Dispatch</c> is <c>step_api_compatibility</c>, the class's own name).
     /// </summary>
     /// <remarks>
     ///     An overriding property inherits its base's name (<c>Inherited</c>), but a class's name is read from the class
     ///     itself only (<see cref="PyAttributes.PyTypeName"/>): a subclass prints its own name, as a Python subclass does.
     /// </remarks>
-    [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field | AttributeTargets.Parameter | AttributeTargets.Class, AllowMultiple = false, Inherited = true)]
+    [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field | AttributeTargets.Parameter | AttributeTargets.Class | AttributeTargets.Method, AllowMultiple = false,
+        Inherited = true)]
     public sealed class PyNameAttribute : Attribute {
         /// <summary>Maps the member to <paramref name="name"/>.</summary>
         /// <param name="name">The Python attribute name, spelled exactly as in the Gymnasium source.</param>

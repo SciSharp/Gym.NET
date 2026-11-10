@@ -46,7 +46,9 @@ refs/Gym.NET/
 │   │   ├── Internal/              # Dict (legacy info type), CircularQueue, Dynamic/Merging/Reflection helpers
 │   │   ├── Utils/                 # Seeding (PCG64), PyBuiltins, PyMath (F3), PyAttributes, PyEquality, PyCopy, PyKwargs (Python kwargs binding), PyJson, Deque,
 │   │   │                          # PassiveChecker, EnvChecker (check_env, data_equivalence), EnvMatch, StepApiCompatibility, RecordConstructorArgs, Warnings,
-│   │   │                          # Cv2 (OpenCV's 8-bit cv2.resize, INTER_AREA and INTER_LINEAR, byte for byte; DR-23), Video (save_video; PNG/ffmpeg writers)
+│   │   │                          # Cv2 (OpenCV's 8-bit cv2.resize, INTER_AREA and INTER_LINEAR, byte for byte; DR-23), Video (save_video; PNG/ffmpeg writers),
+│   │   │                          # Performance (benchmark_step/vector_step/init/render; DR-36)
+│   │   ├── Experimental/Functional/ # FuncEnv (Gymnasium's functional protocol, no JAX; DR-36)
 │   │   ├── Gymnasium.cs           # The `gymnasium` facade: Make, MakeVec, Spec, Register, Registry, PprintRegistry, HumanViewerFactory (DR-20)
 │   │   ├── Logger.cs              # Warnings as gymnasium.logger issues them (colourised, Python's default filters)
 │   │   └── Exceptions/            # Every gymnasium.error class (Error, ResetNeeded, ...), AssertionError, NotImplementedError, ImportError; legacy InvalidActionError etc.
