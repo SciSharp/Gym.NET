@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Reviewed on 2026-11-08 in ten rounds, on branch `journey1`: 36 designs, all decided; none pending. [Coverage by phase](#coverage-by-phase) says which phases can start |
+| **Status** | Reviewed on 2026-11-08 in ten rounds, on branch `journey1`: 36 designs, all decided. Four more rounds on 2026-11-10 settled the questions P6 and the per-env parity coverage raised: DR-37…DR-47. Pending: `DictInfoToList`'s result shape (deferred, with a direction) and six earlier readings the maintainer asked to be reminded of once implementing is finished ([Interpretations to confirm](#interpretations-to-confirm)). [Coverage by phase](#coverage-by-phase) says which phases can start |
 | **Rule** | A step of [`COMPLETION_PLAN.md`](COMPLETION_PLAN.md) starts only when every design it depends on is **Approved** here. A design that isn't listed is not approved: a new design question found while implementing goes through the same review before the step that needs it continues |
 | **How** | The maintainer reviewed the implementation design choices four at a time, before any phase from R0 to P9 started. Each answer is recorded with the options that were on the table and what it changes in the plans. Where a later round refined an earlier answer, both rows stay and the earlier one points to the later |
 | **Earlier decisions** | D1–D22 in [`GYMNASIUM_PORT_PLAN.md`](GYMNASIUM_PORT_PLAN.md) §20 and [`COMPLETION_PLAN.md`](COMPLETION_PLAN.md) §3 still stand unless a design here overrides them |
@@ -96,6 +96,48 @@
 
 DR-22's three-mode plan was approved, with the auto-switch for thread-bound envs; the row above holds it.
 
+### Round 11: the questions of P6 and the parity coverage (2026-11-10)
+
+| ID | Design | Approved | Options not taken | Applies to |
+|---|---|---|---|---|
+| DR-37 | `draw.aaline`/`draw.aalines` (D4, P7) | **Read pygame-ce 2.5.8's `src_c/draw.c` for these two functions only** and translate their algorithm, so MountainCar's frames become pixel-exact and the P7 cells (8 MountainCar frame cells, 2 draw corpus cells) become gates. D4's black-box rule stays for every other drawing function. The translated code derives from LGPL-2.1 source: it carries pygame-ce's notice in THIRD-PARTY-NOTICES, and where it lives (inside `Gym.Rendering` or an assembly of its own) goes to the maintainer before it lands | A documented deviation gated outside the measured gap; more black-box probing | P7, P4 (MountainCar) |
+| DR-38 | `AsyncVectorEnv`'s process options (DR-22) | **`worker` as a public delegate** over the per-sub-env channel, the counterpart of Gymnasium's pipe, with Gymnasium's eight arguments (index, env function, pipe, parent pipe, shared memory, error queue, autoreset mode, semaphore); the default worker becomes public as Gymnasium's worker loop. `daemon` maps to background threads; `context` is accepted and has nothing to choose (documented). Gymnasium's two custom-worker tests port; the arity check becomes a compile-time fact | Accepting `context`/`daemon` and refusing a custom worker; leaving all three out | P6.2 |
+| DR-39 | `PlayPlot`'s chart backend (DR-36) | **ScottPlot adapters in the viewer packages**: `Gym.NET.Rendering.Avalonia` and `Gym.NET.Rendering.WinForm` each ship a ScottPlot-backed `IPlotFigure` (titles, ticks, labels, live updates). The core keeps the plain built-in `PlotFigure` and gains no chart dependency | The built-in figure only; the built-in figure with an embedded bitmap font | P6.7 |
+| DR-40 | Shared spaces (D19) | **One owner per space, enforced**: a space records the env that owns it, and handing it to a second live env throws at once (`InvalidOperationException` naming the fix: give each env its own space). Ownership clears when the env disposes the space; a wrapper that passes its env's space through is not an owner | Envs copying the spaces they are given; keeping the rule documented only | P2 (spaces), every env and wrapper |
+
+### Round 12: `play`'s display, `transform`, `DictInfoToList`, the async autoreset (2026-11-10)
+
+| ID | Design | Approved | Options not taken | Applies to |
+|---|---|---|---|---|
+| DR-41 | `play`'s display and event queue (DR-36) | **Instances with a process-wide default**: a `PygameContext` holds a display and its event queue; `Play.Run`, `PlayableGame` and the display helpers take an optional context, and the static `Display`/`EventQueue` forward to the default context, so line-for-line ports keep pygame's spelling. The maintainer added "consider also `Play.RunAsync`": its shape is DR-44 | Keeping pygame's process-wide statics only | P6.7 |
+| DR-42 | `AsyncVectorEnv(shared_memory=False)` and a full reset after an episode end (DR-22) | **Fixed in Gym.NET, as a documented deviation**: a full reset clears the pending autoreset in both copy paths, so sync and async agree in every sequence. The parity cell pins Gym.NET's `[1, 1]` against Gymnasium's `[0, 0]`; the release notes list it | Keeping Gymnasium's quirk bit for bit | P6.2 |
+
+Two answers came back for a second look. `FuncEnv.transform` ("undecided, rethink the design and suggest again") was
+re-asked in round 13 (DR-43). On `DictInfoToList` the maintainer asked "can we inherit NumSharp's
+`ConcurrentOrderedDictionary`, and can we use `virtual` instead of `new`": the class is `sealed` in NumSharp 0.80.0 and
+enumerates its values (it is an `IReadOnlyList<TValue>`), and `VectorStepResult` is a struct holding an `Info`, so an
+override needs the list form to be an `Info`. The options were re-asked in round 13.
+
+### Round 13: `transform`, `DictInfoToList`, `Play.RunAsync`, `get_keys_to_action` (2026-11-10)
+
+| ID | Design | Approved | Options not taken | Applies to |
+|---|---|---|---|---|
+| DR-43 | `FuncEnv`'s functions and `transform` (DR-36) | **Python's function attributes as delegate-typed properties**: `Initial`, `Transition`, `Observation`, `Reward`, `Terminal`, `StateInfo`, `TransitionInfo` (and `StepInfo`, which Gymnasium's `transform` creates) are settable delegate properties under Gymnasium's names, so a call reads like a method call and `transform` is Python's seven assignments. Implementers override protected `…Core` methods (the properties start bound to them) or assign the properties. `Transform` takes a typed `IFunctionTransform` (`TDelegate Apply<TDelegate>(TDelegate function) where TDelegate : Delegate`, generic over every signature as `jax.jit` is) or an untyped `Func<Delegate, Delegate>`; Gymnasium's `step_info` quirk is kept | A functions record replaced by `transform`; run-time attributes (P6.7's first reading); dropping `transform` | P6.7 |
+| DR-44 | `Play.RunAsync` (DR-41) | **`Run`'s loop on a thread, and the thread pool where the env allows it**: `RunAsync` returns a `Task` that completes when the game ends; cancellation acts like Escape or the close button. The maintainer added "certain envs might be async-friendly and can run on the thread pool, especially envs that render nothing; see if we can support both": one loop body, written against an awaitable frame pacer and the env's `StepAsync`, runs on a dedicated thread (blocking pacing, as pygame's clock) for a thread-bound env and on the thread pool (awaited pacing, no thread held) otherwise, as DR-22's auto-switch decides | A second, separately written async loop | P6.7 |
+| — | `DictInfoToList`'s results | **Deferred.** The maintainer picked "unseal NumSharp's `ConcurrentOrderedDictionary` and derive `Info` from it" with the note "Defer, consider wrapping `ConcurrentOrderedDictionary` and exposing what we need": the direction is composition (an `Info` built over the collection, exposing what Gym.NET needs) rather than inheritance. Until it is designed, `DictInfoToList` keeps its hiding `Step`/`Reset` | `InfoList : Info` with overriding methods; keeping the hiding methods for good | P6.6 |
+
+### Round 14: `get_keys_to_action`, OpenCV's float32 paths, key layouts, readings (2026-11-10)
+
+| ID | Design | Approved | Options not taken | Applies to |
+|---|---|---|---|---|
+| DR-45 | `get_keys_to_action` (DR-36) | **A virtual method on `Env`, absent until overridden** (the maintainer's "consider inheritance"): `Env` declares `GetKeysToAction()` with `[PyName("get_keys_to_action")]`, whose base raises Python's `AttributeError`; an env with a mapping overrides it. `PyAttributes` counts a `[PyName]` virtual method as present when the runtime type overrides it, unless the env's overridable `HasPythonAttribute(name)` hook says no (MountainCar's continuous mode). Wrappers inherit the absent base, as Gymnasium 1.x's wrappers forward no attributes; `play` checks the env and then its unwrapped env, as Gymnasium does. The maintainer asked "are you sure `Dictionary<object, object>`?": the return type is typed by what Gymnasium returns, key-code combinations to the env's actions, and is listed for confirmation | The delegate-typed property P6.7 built; a method with a presence attribute | P6.7 |
+| DR-46 | OpenCV's float32 resize (DR-23) | **Translated too, as DR-23 says**: OpenCV 4.13.0's float32 `INTER_AREA` (integer and fractional scales) and `INTER_LINEAR`, bit for bit against live `cv2` on a float32 corpus, after measuring whether IPP and the SIMD dispatch change float32 results. `ResizeObservation` still refuses non-uint8 frames, as Gymnasium's does | Leaving float32 out, documented | P6.4 |
+| DR-47 | Keys from the viewers (`IInteractiveEnvViewer`) | **The layout's key, as pygame reports it**: both viewers report SDL's layout-dependent keycode (the key labeled A gives `K_a` on any layout). Avalonia switches from `PhysicalKey` to its layout key; WinForms' Windows virtual keys already follow the layout, and its docs, which claimed US positions, are corrected | The key's US position in both viewers | P6.7 |
+
+The fourth question of round 14 listed six readings recorded earlier (DR-02, DR-29, DR-32, P5's Blackjack and Taxi
+consequences, `HumanRendering` in the core, D13's one example). The maintainer answered "after we finished
+implementing, remind me of all these": they stay as built until then ([Interpretations to confirm](#interpretations-to-confirm)).
+
 ---
 
 ## Coverage by phase
@@ -106,17 +148,28 @@ Every design each phase of [`COMPLETION_PLAN.md`](COMPLETION_PLAN.md) depends on
 |---|---|---|
 | R0 Re-baseline | DR-01, DR-02, DR-05, DR-06; D2, D3, D18 | Yes |
 | P0r P0's rest | DR-03 (no static rules), DR-04 (goldens), D20 (CI informational) | Yes |
-| P2 Spaces | DR-07, DR-08, DR-09, DR-13 (the source generator), D19 (ownership) | Yes |
+| P2 Spaces | DR-07, DR-08, DR-09, DR-13 (the source generator), D19 (ownership); since 2026-11-10 DR-40 (one owner per space, enforced) | Yes |
 | P3 Registry and checkers | DR-10, DR-11, DR-12, DR-14, DR-17, DR-20, DR-34 | Yes |
-| P7 Rasterizer | D4; DR-19 (assets) for `image.load` | Yes |
+| P7 Rasterizer | D4; DR-19 (assets) for `image.load`; since 2026-11-10 DR-37 (`aaline`/`aalines` from pygame-ce's source; where the code lives goes to the maintainer first) | Yes |
 | P4 classic_control | DR-08, DR-19, DR-20, DR-32 (`MountainCarEnv(continuous)`) | Yes |
 | P5 toy_text | DR-08, DR-13, DR-19, DR-20 | Yes |
-| P6 Vector and wrappers | DR-21, DR-22, DR-23, DR-24, DR-25, DR-36 | Yes |
+| P6 Vector and wrappers | DR-21, DR-22, DR-23, DR-24, DR-25, DR-36; since 2026-11-10 DR-38, DR-39, DR-41…DR-47 (`DictInfoToList`'s result shape deferred) | Yes |
 | P8 Box2D | D5, DR-26, DR-27, DR-28, DR-29 (its measurement opens P8.1), DR-32 | Yes |
 | P9 MuJoCo | DR-30, DR-31, DR-33 | **Postponed** (DR-35) |
 | P10 Release | DR-35, DR-36; D9, D13 | Yes |
 
 ## Interpretations to confirm
+
+On 2026-11-10 (round 14) the maintainer asked to be reminded of these once implementing is finished, so each stays as
+built until then:
+
+1. The three readings below (DR-02, DR-29, DR-32).
+2. P5's consequences: `BlackjackEnv` is `Env<object?[], NDArray>` read by name through `BlackjackObservation`;
+   Taxi-v4's threshold is the float64 `8.0` where Gymnasium registers the int `8` (both under "Consequences found while
+   implementing").
+3. `HumanRendering` in the core assembly, with the frame `Clock` moved into `Gym` (same section, DR-25 and DR-20).
+4. D13's one example: the cross-entropy method with Gym.NET alone (same section).
+5. DR-45's return type: key-code combinations to the env's actions, in place of P6.7's `Dictionary<object, object?>`.
 
 Three answers were recorded in the reading below; a correction from the maintainer replaces the row before the step that depends on it starts:
 

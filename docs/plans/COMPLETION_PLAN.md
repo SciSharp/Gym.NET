@@ -675,6 +675,23 @@ Specs: the port plan's §9 and §10; sources `vector` 3,113 lines and `wrappers`
   frames) and a golden. Golden cases can now record `make`'s stack (`ViaMake`, an optional `via_make` header key, so
   the older goldens keep their bytes). Every new gated cell passed on its first run: the coverage found no new
   divergence.
+- **P6.9 The designs of 2026-11-10** (DESIGN_REVIEW rounds 11–14, asked once P6 and the coverage were done), each with
+  its tests, parity cells and docs:
+  - DR-42: a full reset clears the pending autoreset in both of `AsyncVectorEnv`'s copy paths (a documented
+    deviation).
+  - DR-40: one owner per space, enforced when a second live env takes it.
+  - DR-45: `get_keys_to_action` as a virtual method on `Env` with the presence hook, typed key combinations to actions.
+  - DR-47: both viewers report the layout's keycode.
+  - DR-43: `FuncEnv`'s functions as delegate properties, and a typed `Transform`.
+  - DR-41 and DR-44: `PygameContext` instances with a process-wide default, and `Play.RunAsync` on a dedicated thread or
+    the thread pool.
+  - DR-38: the public `worker` delegate, `daemon` and `context`.
+  - DR-46: OpenCV's float32 resize paths.
+  - DR-39: ScottPlot figures in the two viewer packages.
+  - DR-37 (P7): `aaline`/`aalines` translated from pygame-ce's `draw.c`. Where the LGPL-derived code lives goes to the
+    maintainer before it lands.
+  - Deferred: `DictInfoToList`'s result shape (composition over NumSharp's `ConcurrentOrderedDictionary`, to design).
+  - Last: remind the maintainer of the readings listed under DESIGN_REVIEW's "Interpretations to confirm".
 
 ### P8 Box2D
 
