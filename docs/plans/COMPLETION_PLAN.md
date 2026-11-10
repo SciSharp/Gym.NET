@@ -761,11 +761,15 @@ Specs: the port plan's §9 and §10; sources `vector` 3,113 lines and `wrappers`
       `StaticAvaloniaApp.Run`. The Windows Forms form runs on an STA thread of its own, as `WinFormEnvViewer` does. Both
       open at the first pause and draw nothing more once the user closes them.
     - The `IPlotAxes` adapter is one source file, `src/Shared/ScottPlotAxes.cs`, compiled into both packages. It
-      handles titles, marker-only scatters in matplotlib's base colors, removal, `set_xlim` with the y range refitted,
-      and every edit under the plot's `Sync` lock. The core gains no dependency.
-    - Tests: the adapter headless on plain plots (titles, colors, points, removal, limits, a `PlayPlot` run, a rendered
-      image), and each window figure under `PlayPlot` (`*AvaloniaEnv`, `*WinFormEnv`: they open windows, so they run
-      on a desktop).*
+      handles titles, marker-only scatters in matplotlib's base colors (malformed `#rrggbb` falls back to blue, where
+      ScottPlot would give transparent black), removal, `set_xlim` with the y range refitted, and every edit under the
+      plot's `Sync` lock. Its `StackRows` lays out both figures' rows: ScottPlot's `AddPlots(n)` sets the total, so
+      a figure asks for `rows` plots, not `rows - 1`. The core gains no dependency.
+    - Tests: the adapter headless on plain plots (titles, colors, points, removal, limits, the row layout for one to
+      four rows, a `PlayPlot` run, a rendered image), and each window figure under `PlayPlot` (`*AvaloniaEnv`,
+      `*WinFormEnv`: they open windows, so they run on a desktop). Checked on a disposable Windows 11 desktop: both
+      figures plot 300 steps live in two titled rows with the x range following the horizon, and closing either
+      window mid-run ends its display without an error. That check found the row bug before the commit.*
   - DR-37 (P7): `aaline`/`aalines` translated from pygame-ce's `draw.c`. *Done 2026-11-10, inside `Gym.Rendering` (the
     maintainer's choice):*
     - `src/Gym.Rendering/Draw.Aaline.cs` translates `aaline`, `aalines`, `draw_aaline` and `get_antialiased_color`

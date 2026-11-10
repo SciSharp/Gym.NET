@@ -21,8 +21,8 @@ It replaces 0.2's API, which followed gym before 0.26, with Gymnasium's.
 | Gym.NET | The env contract, wrappers, spaces, registry (`Gymnasium.Make`, `MakeVec`), vector envs, checkers, seeding, errors; `Gym.Legacy` |
 | Gym.NET.Rendering (new) | The rasterizer `rgb_array` frames are drawn with, equal to pygame-ce's pixels; licensed `Apache-2.0 AND LGPL-2.0-or-later` (below) |
 | Gym.NET.Environments | classic_control and toy_text, CartPole's vector env, their registration |
-| Gym.NET.Rendering.Avalonia | A window for `human` mode on Avalonia 12 (Windows, Linux, macOS) |
-| Gym.NET.Rendering.WinForm | The same on Windows Forms |
+| Gym.NET.Rendering.Avalonia | A window for `human` mode on Avalonia 12 (Windows, Linux, macOS), and `PlayPlot`'s live charts on ScottPlot (`AvaloniaPlotFigure`) |
+| Gym.NET.Rendering.WinForm | The same on Windows Forms (`WinFormPlotFigure`) |
 
 All target .NET 8 and .NET 10, and depend on NumSharp 0.80.0. All are Apache-2.0 except Gym.NET.Rendering, which is
 `Apache-2.0 AND LGPL-2.0-or-later`: its `draw.aaline`/`aalines` (MountainCar's hill) are translated from pygame-ce's

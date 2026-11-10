@@ -9,7 +9,7 @@
     <Authors>Eli Belash</Authors>
     <Company>SciSharp STACK</Company>
     <Product>Gym.NET.Rendering.Avalonia</Product>
-    <Description>A desktop window for Gym.NET's human render mode on Avalonia (Windows, Linux, macOS): set Gymnasium.HumanViewerFactory = AvaloniaEnvViewer.Factory and make an env with render_mode "human".</Description>
+    <Description>A desktop window for Gym.NET's human render mode on Avalonia (Windows, Linux, macOS): set Gymnasium.HumanViewerFactory = AvaloniaEnvViewer.Factory and make an env with render_mode "human". Also PlayPlot's live charts drawn by ScottPlot (AvaloniaPlotFigure.Subplots()).</Description>
     <Copyright>2019-2026 © SciSharp STACK Team</Copyright>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/SciSharp/Gym.NET</PackageProjectUrl>
@@ -53,6 +53,13 @@
     <PackageReference Include="Avalonia.Themes.Simple" Version="12.1.3" />
     <!-- Last Apache-2.0 ImageSharp line; 3.x+ is Split-licensed and fails Release builds without a Six Labors key. -->
     <PackageReference Include="SixLabors.ImageSharp" Version="2.1.13" />
+    <!-- PlayPlot's chart backend in this package (DR-39): ScottPlot's Avalonia control (MIT), built for Avalonia 12.
+         The core package stays free of chart dependencies. -->
+    <PackageReference Include="ScottPlot.Avalonia" Version="5.1.59" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- The ScottPlot axes adapter both viewer packages compile, so their figures draw alike (DR-39). -->
+    <Compile Include="..\Shared\ScottPlotAxes.cs" Link="Plotting\ScottPlotAxes.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Gym.Environments\Gym.Environments.csproj" />

@@ -8,7 +8,7 @@
     <Authors>Eli Belash</Authors>
     <Company>SciSharp STACK</Company>
     <Product>Gym.NET.Rendering.WinForm</Product>
-    <Description>A Windows Forms window for Gym.NET's human render mode (Windows only): set Gymnasium.HumanViewerFactory = WinFormEnvViewer.Factory and make an env with render_mode "human".</Description>
+    <Description>A Windows Forms window for Gym.NET's human render mode (Windows only): set Gymnasium.HumanViewerFactory = WinFormEnvViewer.Factory and make an env with render_mode "human". Also PlayPlot's live charts drawn by ScottPlot (WinFormPlotFigure.Subplots()).</Description>
     <Copyright>2019-2026 © SciSharp STACK Team</Copyright>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/SciSharp/Gym.NET</PackageProjectUrl>
@@ -32,6 +32,17 @@
   <ItemGroup>
     <ProjectReference Include="..\Gym.Environments\Gym.Environments.csproj" />
     <ProjectReference Include="..\Gym\Gym.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- PlayPlot's chart backend in this package (DR-39): ScottPlot's Windows Forms control (MIT). The core package stays
+         free of chart dependencies. -->
+    <PackageReference Include="ScottPlot.WinForms" Version="5.1.59" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The ScottPlot axes adapter both viewer packages compile, so their figures draw alike (DR-39). -->
+    <Compile Include="..\Shared\ScottPlotAxes.cs" Link="Plotting\ScottPlotAxes.cs" />
   </ItemGroup>
 
   <!-- The package's icon and readme, packed at its root (NuGet's PackageIcon / PackageReadmeFile). They replace the

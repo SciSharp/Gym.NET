@@ -37,7 +37,9 @@ namespace Gym.Utils {
     ///     <c>PlayPlot</c> makes them (<c>subplots</c>, <c>set_title</c>, <c>scatter</c>, <c>remove</c>, <c>set_xlim</c>,
     ///     <c>pause</c>), so the plotted data is Gymnasium's call for call. The default figure (<see cref="PlotFigure"/>) is
     ///     a plain window from the viewer factory: matplotlib's layout and blue markers, without text (the window's title
-    ///     names the plots). Pass <c>subplots</c> to draw elsewhere, such as a chart library.
+    ///     names the plots). Pass <c>subplots</c> to draw elsewhere: the viewer packages ship ScottPlot figures with titles,
+    ///     ticks, labels and live updates (DR-39), <c>AvaloniaPlotFigure.Subplots()</c> of Gym.NET.Rendering.Avalonia and
+    ///     <c>WinFormPlotFigure.Subplots()</c> of Gym.NET.Rendering.WinForm; this package takes no chart dependency.
     ///     </para>
     ///     <para>Not thread-safe: call <see cref="Callback"/> from one thread, as <c>play</c> does.</para>
     ///     <para>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/utils/play.py#L377">gymnasium/utils/play.py</see>.</para>
