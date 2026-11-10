@@ -87,11 +87,6 @@ gymnasium.envs.tabular.cliffwalking.EnvState                                    
 gymnasium.envs.tabular.cliffwalking.RenderStateType                                      n/a: JAX functional envs
 gymnasium.envs.tabular.cliffwalking.fell_off                                             n/a: JAX functional envs
 gymnasium.utils.ezpickle.EzPickle                                                        n/a: Python pickling
-gymnasium.utils.play.MissingKeysToAction                                                 P6 play (DR-36), deferred in this run
-gymnasium.utils.play.PlayPlot                                                            P6 play (DR-36), deferred in this run
-gymnasium.utils.play.PlayableGame                                                        P6 play (DR-36), deferred in this run
-gymnasium.utils.play.display_arr                                                         P6 play (DR-36), deferred in this run
-gymnasium.utils.play.play                                                                P6 play (DR-36), deferred in this run
 gymnasium.vector.utils.misc.CloudpickleWrapper                                           n/a: process workers (Gym.NET's are threads, DR-22)
 gymnasium.vector.utils.misc.clear_mpi_env_vars                                           n/a: process workers (Gym.NET's are threads, DR-22)
 gymnasium.vector.vector_env.ArrayType                                                    by design: a typing TypeVar; the batched types are VectorEnv<TObs, TAct>'s generic arguments (DR-21)

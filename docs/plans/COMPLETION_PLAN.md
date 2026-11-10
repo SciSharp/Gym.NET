@@ -642,6 +642,17 @@ Specs: the port plan's §9 and §10; sources `vector` 3,113 lines and `wrappers`
   cases); `tests/utils/test_performance.py`, `tests/functional/test_functional.py`, `tests/envs/functional/test_core.py`
   and the vector rows of `tests/utils/test_step_api_compatibility.py` mirrored; inventory −6 names. `play`, `PlayPlot`
   and `MissingKeysToAction` follow.
+- *Done 2026-11-10, P6.7's second part (DR-36):* `gymnasium.utils.play` in `Gym.Rendering`: `Play.Run` (`play`),
+  `Play.DisplayArr`, `PlayableGame`, `MissingKeysToAction`, `PlayPlot` over `IPlotFigure` with the default
+  `PlotFigure`; pygame's display and event queue (`Display`, `EventQueue`, `Event`, `EventType`, `KeyCode`) and
+  `SurfArray.MakeSurface` (with pygame's 8-bit palette for 2-D frames); keyboard input in the Avalonia and WinForms
+  viewers (`IInteractiveEnvViewer`); MountainCar's `get_keys_to_action`. 27 parity cells and a harness self-test: `display_arr` pixel for
+  pixel on 12 frame/size/screen combinations and 4 refusals; `PlayableGame` over 5 event scripts and 10 refusals or
+  lookups; `play` callback by callback over 10 scenarios (each key form, a wrapper's mapping, episodes restarting on
+  the seed, a held combination, `wait_on_player`, `rgb_array_list`, an explicit no-op without transpose, resizes), with
+  the display at each callback; 15 refusals of `play`; MountainCar's mapping; `PlayPlot` over 7 scenarios through a
+  matplotlib stand-in. `tests/utils/test_play.py` mirrored (17 tests); inventory −5 names. The viewers' keyboard input
+  was checked by hand on a disposable desktop (see the commit).*
 
 ### P8 Box2D
 

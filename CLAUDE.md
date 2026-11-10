@@ -55,7 +55,9 @@ refs/Gym.NET/
 │   │
 │   ├── Gym.SourceGenerators/      # Roslyn generator (DR-13, DR-34): <Class>Options records of [GymOptions] envs/wrappers; [GymTuple]/[GymDict] records
 │   ├── Gym.Rendering/             # pygame-compatible rasterizer: Surface (opaque or per-pixel alpha), GfxDraw (SDL_gfx 2.0.26 port), Draw (line, rect, aaline/aalines),
-│   │                              #   Transform (flip, scale, smoothscale), ImageIO (image.load/frombytes), SurfArray, Vector2
+│   │   │                          #   Transform (flip, scale, smoothscale), ImageIO (image.load/frombytes), SurfArray (incl. make_surface), Vector2;
+│   │   │                          #   pygame's display and event queue (Display, EventQueue, Event, EventType, KeyCode), process-wide like pygame's
+│   │   └── Utils/                 # namespace Gym.Utils: Play (play, display_arr), PlayableGame, MissingKeysToAction, PlayPlot (IPlotFigure, PlotFigure); DR-36
 │   ├── Gym.Environments/          # Concrete environment implementations
 │   │   ├── Envs/Classic/          # CartPoleEnv (+ CartPoleVectorEnv, CartPole's vector entry point), MountainCarEnv (MountainCar-v0 and
 │   │   │                          #   MountainCarContinuous-v0, DR-32), PendulumEnv, AcrobotEnv, ClassicControlUtils
@@ -67,8 +69,8 @@ refs/Gym.NET/
 │   │   ├── GymEnvironments.cs     # Register(): the built-in ids, from a module initializer (DR-12; GYMNET_DISABLE_ENV_REGISTRATION disarms it, DR-14)
 │   │   └── buildTransitive/       # Gym.NET.Environments.targets: the app-side registration initializer (DR-17)
 │   │
-│   ├── Gym.Rendering.Avalonia/    # Cross-platform GUI rendering (AvaloniaEnvViewer, StaticAvaloniaApp)
-│   └── Gym.Rendering.WinForm/     # Windows Forms GUI rendering (WinFormEnvViewer)
+│   ├── Gym.Rendering.Avalonia/    # Cross-platform GUI rendering (AvaloniaEnvViewer, StaticAvaloniaApp); keyboard input for play (IInteractiveEnvViewer)
+│   └── Gym.Rendering.WinForm/     # Windows Forms GUI rendering (WinFormEnvViewer); keyboard input for play (IInteractiveEnvViewer)
 │
 ├── tests/
 │   ├── Gym.Tests/                 # MSTest test suite for environments, spaces, and multi-instance concurrency

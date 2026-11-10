@@ -5,7 +5,6 @@
 >
 > - **P8, the Box2D environments** (LunarLander-v3, LunarLanderContinuous-v3, BipedalWalker-v3,
 >   BipedalWalkerHardcore-v3, CarRacing-v3), which the approved 2.0 scope includes (D21).
-> - **The deferred part of P6** (below, "Not in 2.0 yet"): decide whether 2.0 waits for it or ships without it.
 > - **The maintainer's decision on `draw.aaline`/`aalines`** (P7, D4), which decides whether MountainCar's frames become
 >   pixel-exact.
 > - The exit check: the inventory's list of missing names holds only MuJoCo's names and `AtariPreprocessing`.
@@ -78,6 +77,9 @@ In short:
 - **Checkers**: `EnvChecker.CheckEnv` (Gymnasium's `check_env`), `PassiveChecker`, `EnvMatch`.
 - **Utilities**: `StepApiCompatibility` (`step_api_compatibility`, single and vector), `Performance` (Gymnasium's
   benchmarks), `Video.SaveVideo`, `Cv2.Resize`, and the functional protocol `FuncEnv` (without JAX).
+- **Playing from the keyboard**: `Play.Run` (Gymnasium's `play`), `PlayableGame`, `Play.DisplayArr` and `PlayPlot`, in
+  a window from the viewer factory; the Avalonia and WinForms viewers report keys, their close button and resizes, and
+  headless runs are driven by events posted to `Gym.Rendering.EventQueue`, as Gymnasium's tests post them.
 - **Environments** (all registered for `Gymnasium.Make`, each with `rgb_array` frames equal to Gymnasium's, `ansi` text
   for toy_text, and `human` mode):
 
@@ -133,9 +135,7 @@ Each has a test that asserts Gymnasium's answer and fails until the gap closes (
 
 ## Not in 2.0 yet
 
-Deferred, each with its design approved (the completion plan's P6 lists them):
-
-- `gymnasium.utils.play` and `PlayPlot`.
+Nothing of P6 is deferred any more; the Box2D environments (P8) are still to come, as the note at the top says.
 
 Out of 2.0 by decision:
 

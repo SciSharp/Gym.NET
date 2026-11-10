@@ -12,11 +12,30 @@ namespace Gym.Tests.Parity.Oracle {
     /// </param>
     /// <param name="Message">The message: Python's <c>str(exception)</c>, .NET's <see cref="Exception.Message"/>.</param>
     public sealed record RaisedError(string Type, string Message) {
-        /// <summary>Describes a .NET exception.</summary>
+        /// <summary>
+        ///     Describes a .NET exception. For a NumSharp exception built on <see cref="ArgumentException"/> (its
+        ///     <c>AxisError</c>, a <c>ValueError</c> naming a parameter), the message is NumPy's text alone: .NET appends
+        ///     <c> (Parameter 'axis2')</c> and, for an <see cref="ArgumentOutOfRangeException"/>, an <c>Actual value was 1.</c>
+        ///     line, which NumSharp's own docs set apart from NumPy's message.
+        /// </summary>
         /// <param name="exception">The exception.</param>
         /// <returns>Its full type name and message.</returns>
         public static RaisedError FromDotNet(Exception exception) {
-            return new RaisedError(exception.GetType().FullName ?? exception.GetType().Name, exception.Message);
+            string message = exception.Message;
+            if (exception is ArgumentException { ParamName.Length: > 0 } argument && exception is NumSharp.INumSharpException) {
+                // Undo exactly what ArgumentOutOfRangeException.Message and ArgumentException.Message append, in that order.
+                if (argument is ArgumentOutOfRangeException { ActualValue: { } actual }) {
+                    string actualLine = Environment.NewLine + $"Actual value was {actual}.";
+                    if (message.EndsWith(actualLine, StringComparison.Ordinal))
+                        message = message.Substring(0, message.Length - actualLine.Length);
+                }
+
+                string parameter = $" (Parameter '{argument.ParamName}')";
+                if (message.EndsWith(parameter, StringComparison.Ordinal))
+                    message = message.Substring(0, message.Length - parameter.Length);
+            }
+
+            return new RaisedError(exception.GetType().FullName ?? exception.GetType().Name, message);
         }
 
         /// <inheritdoc />
@@ -193,6 +212,11 @@ namespace Gym.Tests.Parity.Oracle {
             ["ModuleNotFoundError"] = "Gym.Exceptions.ModuleNotFoundError",
             // json.loads' error is a ValueError subclass; EnvSpec.FromJson raises its base, as NumSharp has no JSONDecodeError.
             ["json.decoder.JSONDecodeError"] = "NumSharp.ValueError",
+            // Not built-ins, but errors of Gymnasium's play module and of the libraries under it, whose .NET counterparts
+            // live where Gym.NET's play does (the port plan's §3.4 has no rule for them).
+            ["gymnasium.utils.play.MissingKeysToAction"] = "Gym.Utils.MissingKeysToAction",
+            ["numpy.exceptions.AxisError"] = "NumSharp.AxisError",
+            ["pygame.error"] = "Gym.Rendering.SdlError",
         };
 
         /// <summary>The .NET type a Python exception type must correspond to.</summary>

@@ -236,6 +236,28 @@ Effects of approved designs that only showed up in code. None changes a design; 
   `context` and `daemon` (process start options) and the custom `worker` function (a pipe protocol), whose two tests are
   `[OpenBugs("P6.2-worker")]`. Gymnasium's live `AsyncVectorEnv` runs in the parity suite: its workers are spawned from
   the embedded interpreter once `multiprocessing.set_executable` names a real `python.exe`.
+- **DR-36, `play`, `PlayableGame` and `PlayPlot`** (found in P6.7, 2026-11-10): pygame's module-level display and
+  event queue are mirrored, process-wide, by `Gym.Rendering.Display` (one window from the viewer factory, DR-20; its
+  surface is replaced when the user resizes a resizable display) and `Gym.Rendering.EventQueue` (posted events, plus
+  the window's input moved in when `Get` pumps it), with `Event`, `EventType` and `KeyCode` (SDL keycodes read from
+  pygame-ce 2.5.8). Gymnasium's tests therefore translate line for line (a callback posts events), and the footgun is
+  pygame's: one game per process. Viewers report input through the new `IInteractiveEnvViewer`. Keys are SDL keycodes by
+  physical position on a US layout, with no auto-repeat (pygame's default). While input is on, the close button
+  posts `WINDOWCLOSE` then `QUIT` and keeps the window open, and any resize not made by the viewer's own code (a drag, maximizing, snapping, another program) posts `WINDOWRESIZED`, as SDL reports every size change. Before
+  `BeginInput` a viewer behaves as it always has. The
+  Avalonia and WinForms viewers implement it (WinForms reports Shift, Ctrl and Alt as the left keys). `play`'s callback
+  arguments are borrowed (D19): observations and infos are released after their last callback, so a callback copies
+  what it keeps; the first `obs_t` of each episode is the reset's `(obs, info)`, Gymnasium's quirk kept.
+  `get_keys_to_action` is a delegate-typed property marked `[PyName]` rather than a method, because a property can be
+  absent: MountainCar's raises `AttributeError` in continuous mode, where Gymnasium's continuous class has no such
+  method. MountainCar's mapping keeps Gymnasium's footguns (pygame 1's arrow codes 275 and 276, which no window
+  produces, and the empty combination `()` that makes `play` refuse the mapping). `PlayPlot` draws through
+  `IPlotFigure`, matplotlib's calls as `PlayPlot` makes them (compared call for call through a stand-in in the parity
+  suite); the default `PlotFigure` is a plain viewer window in matplotlib's layout without text, not matplotlib's
+  rendering. The port plan names "a .NET chart library", and that choice is left for the maintainer. `keys_to_action`
+  takes any dictionary and compares keys as Python does (`PyKeyComparer`). A display of size 0, which pygame opens
+  desktop-sized, is refused. The parity harness compares a NumSharp argument exception by NumPy's text, without the
+  ` (Parameter '...')` and `Actual value was` suffixes .NET appends (self-tested).
 - **DR-36, `FuncEnv`, the benchmarks and the step-API dispatcher** (found in P6.7, 2026-11-10): `FuncEnv<TState, TObs,
   TAct, TReward, TTerminal, TRenderState, TParams>` (namespace `Gym.Experimental.Functional`, with an untyped `FuncEnv`)
   keeps Gymnasium's functions as virtual methods raising `NotImplementedError`, sets its options by Python name

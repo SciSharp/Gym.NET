@@ -247,5 +247,26 @@ namespace Gym.Tests.Parity.Tests.Harness {
             Assert.AreEqual("call.message", ByteContract.Compare("call", python, Outcome.Capture(() => throw new ValueError("another message"))).Single().Path);
             Assert.AreEqual("raised", ByteContract.Compare("call", python, Outcome.Capture(() => 0L)).Single().Field);
         }
+
+        /// <summary>
+        ///     NumPy's <c>AxisError</c> (from a live <c>swapaxes</c>) matches NumSharp's, whose .NET message carries
+        ///     <c> (Parameter 'axis2')</c> and an <c>Actual value was 1.</c> line after NumPy's text: those suffixes are compared
+        ///     away, and only for NumSharp's argument exceptions. A different axis is still reported, and a plain .NET
+        ///     <see cref="System.ArgumentException"/> keeps its whole message.
+        /// </summary>
+        /// <exception cref="AxisError">Thrown only inside <see cref="Outcome.Capture"/>, which records the planted errors; none escapes the test.</exception>
+        [TestMethod]
+        public void ByteContract_ComparesNumSharpArgumentErrors_ByNumPysText() {
+            Outcome python = Outcome.CapturePython(() => Python.evalStmts("import numpy as np\nnp.zeros(3).swapaxes(0, 1)", "None"));
+            Assert.AreEqual("axis2: axis 1 is out of bounds for array of dimension 1", python.Raised!.Message);
+
+            var dotnet = new AxisError(1, 1, "axis2");
+            StringAssert.Contains(dotnet.Message, "(Parameter 'axis2')", "the .NET message this rule exists for");
+            Assert.AreEqual(0, ByteContract.Compare("call", python, Outcome.Capture(() => throw dotnet)).Count);
+            Assert.AreEqual("call.message", ByteContract.Compare("call", python, Outcome.Capture(() => throw new AxisError(2, 1, "axis2"))).Single().Path);
+
+            var plain = new System.ArgumentException("text", "name");
+            Assert.AreEqual(plain.Message, RaisedError.FromDotNet(plain).Message);
+        }
     }
 }

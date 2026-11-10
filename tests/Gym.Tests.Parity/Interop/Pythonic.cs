@@ -2269,6 +2269,28 @@ namespace Gym.Tests.Parity {
 
             /// <summary><c>gymnasium.utils</c>.</summary>
             internal static class utils {
+                /// <summary>
+                ///     <c>gymnasium.utils.play</c>; importing it imports pygame and tries matplotlib (switching it to <c>TkAgg</c>
+                ///     when it is installed, with only a warning when it is not).
+                /// </summary>
+                internal static class play {
+                    /// <summary>The module, imported on first use; never dispose it.</summary>
+                    private static PyObject Module => PythonRuntime.Import("gymnasium.utils.play");
+
+                    /// <summary><c>play.display_arr(screen, arr, video_size, transpose)</c>: draws the frame on the surface.</summary>
+                    /// <param name="screen">The surface; stays owned by the caller.</param>
+                    /// <param name="arr">The frame; stays owned by the caller.</param>
+                    /// <param name="video_size">The size the frame is scaled to, <c>(width, height)</c>.</param>
+                    /// <param name="transpose">Whether the frame's first two axes are swapped; <see langword="null"/> is Python's <c>None</c>.</param>
+                    /// <exception cref="PythonException">Thrown when the call raises (the dtype assertion, pygame's shape and size errors).</exception>
+                    internal static void display_arr(PyObject screen, PyObject arr, (long Width, long Height) video_size, bool? transpose) {
+                        using PyObject function = Module.GetAttr("display_arr");
+                        using PyObject size = Oracle.PyConvert.ToTuple(new[] { video_size.Width, video_size.Height });
+                        using PyObject flag = Oracle.PyConvert.ToPython(transpose);
+                        using PyObject _ = function.Invoke(screen, arr, size, flag);
+                    }
+                }
+
                 /// <summary><c>gymnasium.utils.save_video</c>; importing it needs moviepy (or the test stub of <c>RenderingWrappersLiveParityTests</c>).</summary>
                 internal static class save_video {
                     /// <summary>The module, imported on first use; never dispose it.</summary>
