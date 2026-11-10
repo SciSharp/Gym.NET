@@ -620,8 +620,20 @@ Specs: the port plan's §9 and §10; sources `vector` 3,113 lines and `wrappers`
   (`VectorWrappersLiveParityTests`: sync vector envs in lockstep across episode ends, both autoreset modes, the
   statistics afterwards, CartPole's frames through `AddRenderObservation`, `HumanRendering`'s grid, the videos over the
   moviepy stand-in) and `tests/wrappers/vector` mirrored (65 tests gated; CarRacing's cases `[OpenBugs("P8")]`, Ant's
-  `[OpenBugs("P9")]`, the async case `[OpenBugs("P6.2")]`; `test_array_conversion.py` is JAX/PyTorch); inventory −22
-  names.
+  `[OpenBugs("P9")]`, the async case `[OpenBugs("P6.2")]`, gated since P6.2; `test_array_conversion.py` is
+  JAX/PyTorch); inventory −22 names.
+- *Done 2026-11-10, P6.2 (DR-22):* `AsyncVectorEnv<TObs, TAct>` and the untyped `AsyncVectorEnv` on worker threads in
+  the three execution modes (`AsyncExecutionMode`), with Gymnasium's `reset_async`/`reset_wait`, `step_async`/
+  `step_wait`, `call_async`/`call_wait`, `close(timeout, terminate)`, `AsyncState`, `max_concurrency`, the sub-env error
+  protocol, and `shared_memory` through `VectorUtils.CreateSharedMemory`/`ReadFromSharedMemory`/`WriteToSharedMemory`;
+  `MakeVec(..., "async")` builds it. 107 parity cells: 24 against Gymnasium's own `AsyncVectorEnv` (its processes
+  spawned from the embedded interpreter): CartPole in every autoreset mode with and without shared memory and in every
+  execution mode, FrozenLake and Blackjack, the reset-after-an-episode-end quirk, masked resets, attributes and frames,
+  the protocol's errors, `max_concurrency` (refusals and lockstep), a failing sub-env; and 83 shared-memory cells over the
+  space catalog. Unit: `tests/vector/test_async_vector_env.py` and `tests/vector/utils/test_shared_memory.py` mirrored
+  (each async test in all three modes; the two custom-`worker` tests `[OpenBugs("P6.2-worker")]`), plus Gym.NET's own
+  async-equals-sync test (18 mode combinations, bit for bit) and thread-affinity tests; inventory −5 names, the two
+  process helpers (`CloudpickleWrapper`, `clear_mpi_env_vars`) now listed as not applicable.
 
 ### P8 Box2D
 

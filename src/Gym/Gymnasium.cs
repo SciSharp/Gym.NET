@@ -137,7 +137,7 @@ namespace Gym {
         /// </summary>
         /// <param name="id">The id.</param>
         /// <param name="numEnvs">The number of sub-envs.</param>
-        /// <param name="vectorizationMode">A <see cref="VectorizeMode"/> or its value (<c>"sync"</c>, <c>"vector_entry_point"</c>), or <see langword="null"/> for the spec's default.</param>
+        /// <param name="vectorizationMode">A <see cref="VectorizeMode"/> or its value (<c>"sync"</c>, <c>"async"</c>, <c>"vector_entry_point"</c>), or <see langword="null"/> for the spec's default.</param>
         /// <param name="vectorKwargs">The vector env's constructor arguments by Python name (<c>autoreset_mode</c>, <c>copy</c>, <c>observation_mode</c>).</param>
         /// <param name="wrappers">Wrappers applied to every sub-env, innermost first.</param>
         /// <param name="kwargs">The env's constructor arguments by Python name.</param>
@@ -145,7 +145,7 @@ namespace Gym {
         /// <exception cref="TypeError">Thrown when the env cannot be built from the kwargs.</exception>
         /// <exception cref="ValueError">Thrown for an unknown vectorization mode.</exception>
         /// <exception cref="Error">Thrown when the id is not registered, has no (vector) entry point, or the vector entry point is asked for with vector kwargs or wrappers.</exception>
-        /// <exception cref="NotImplementedError">Thrown for the async mode, which arrives with P6.2.</exception>
+        /// <exception cref="RuntimeError">Thrown when a sub-env's spaces do not fit the batch (sync and async modes).</exception>
         public static IVectorEnv MakeVec(string id, int numEnvs = 1, object? vectorizationMode = null, object? vectorKwargs = null, IEnumerable<Func<IEnv, IEnv>>? wrappers = null,
             object? kwargs = null) =>
             EnvRegistry.MakeVec(id, numEnvs, vectorizationMode, vectorKwargs, wrappers, kwargs);
@@ -161,7 +161,7 @@ namespace Gym {
         /// <exception cref="TypeError">Thrown when the env cannot be built.</exception>
         /// <exception cref="ValueError">Thrown for an unknown vectorization mode.</exception>
         /// <exception cref="Error">Thrown when the spec has no (vector) entry point.</exception>
-        /// <exception cref="NotImplementedError">Thrown for the async mode.</exception>
+        /// <exception cref="RuntimeError">Thrown when a sub-env's spaces do not fit the batch (sync and async modes).</exception>
         public static IVectorEnv MakeVec(EnvSpec spec, int numEnvs = 1, object? vectorizationMode = null, object? vectorKwargs = null, IEnumerable<Func<IEnv, IEnv>>? wrappers = null,
             object? kwargs = null) =>
             EnvRegistry.MakeVec(spec, numEnvs, vectorizationMode, vectorKwargs, wrappers, kwargs);
@@ -179,7 +179,7 @@ namespace Gym {
         /// <exception cref="TypeError">Thrown when the batched types are not the ones asked for, or the env cannot be built.</exception>
         /// <exception cref="ValueError">Thrown for an unknown vectorization mode.</exception>
         /// <exception cref="Error">Thrown when the id is not registered or has no (vector) entry point.</exception>
-        /// <exception cref="NotImplementedError">Thrown for the async mode.</exception>
+        /// <exception cref="RuntimeError">Thrown when a sub-env's spaces do not fit the batch (sync and async modes).</exception>
         public static VectorEnv<TObs, TAct> MakeVec<TObs, TAct>(string id, int numEnvs = 1, object? vectorizationMode = null, object? vectorKwargs = null,
             IEnumerable<Func<IEnv, IEnv>>? wrappers = null, object? kwargs = null) =>
             EnvRegistry.MakeVec<TObs, TAct>(id, numEnvs, vectorizationMode, vectorKwargs, wrappers, kwargs);
@@ -197,7 +197,7 @@ namespace Gym {
         /// <exception cref="TypeError">Thrown when the batched types differ or the env cannot be built.</exception>
         /// <exception cref="ValueError">Thrown for an unknown vectorization mode.</exception>
         /// <exception cref="Error">Thrown when the spec has no (vector) entry point.</exception>
-        /// <exception cref="NotImplementedError">Thrown for the async mode.</exception>
+        /// <exception cref="RuntimeError">Thrown when a sub-env's spaces do not fit the batch (sync and async modes).</exception>
         public static VectorEnv<TObs, TAct> MakeVec<TObs, TAct>(EnvSpec spec, int numEnvs = 1, object? vectorizationMode = null, object? vectorKwargs = null,
             IEnumerable<Func<IEnv, IEnv>>? wrappers = null, object? kwargs = null) =>
             EnvRegistry.MakeVec<TObs, TAct>(spec, numEnvs, vectorizationMode, vectorKwargs, wrappers, kwargs);

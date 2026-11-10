@@ -217,6 +217,25 @@ Effects of approved designs that only showed up in code. None changes a design; 
   leave `RecordEpisodeStatistics`' `t` (wall-clock time) out on both sides. The unit tests of `RecordVideo` over ten
   CartPoles take about 100 s per framework: each recorded step renders ten frames and `PngVideoWriter` writes their
   3000 × 800 mosaic (two rows of five) as a PNG.
+- **DR-22, `AsyncVectorEnv` on threads** (found in P6.2, 2026-11-10): each sub-env has a worker, the counterpart of
+  Gymnasium's process and pipe: the worker builds its sub-env from its function on its own thread and runs Gymnasium's
+  worker loop (`reset`, `reset-noop`, `step` by autoreset mode, `_call`, `_setattr`, `_check_spaces`, `close`), and the
+  caller's end keeps the results queued in send order, as a pipe does, so a timed-out call's result is the next one read,
+  as in Python. `ThreadPool` chains a sub-env's calls as pool tasks; `DedicatedThreads` and `ThreadPerEnv` run them on
+  long-lived background threads; a sub-env whose `render_mode` is `human` moves to a dedicated thread in pool mode, before
+  its first call. A worker's exception ends it (its sub-env closed) and comes back from the wait after Gymnasium's three
+  error lines, the trace line being .NET's stack trace; the worker is then detached and any later call through it fails as
+  Python's dropped pipe does (`AttributeError`). The constructor still builds Gymnasium's dummy env from the first function
+  and copies its spaces (disposing an env disposes its spaces); a function that throws makes the constructor throw.
+  `shared_memory` keeps Gymnasium's two copy paths through the new `create_shared_memory`/`read_from_shared_memory`/
+  `write_to_shared_memory` (an ordinary array buffer; threads write their slots under a lock), so Gymnasium's quirks stay:
+  without shared memory a reset after an episode end keeps the pending autoreset (measured: the next step's rewards
+  `[0, 0]` there and `[1, 1]` with shared memory, in both libraries), and `Text`/`OneOf` buffers are read once.
+  `close(terminate=True)` cannot kill threads: it stops waiting, each worker closes its sub-env once its current call
+  returns, and disposal waits for that. Not covered by DR-22 and left out, as questions for the maintainer: Gymnasium's
+  `context` and `daemon` (process start options) and the custom `worker` function (a pipe protocol), whose two tests are
+  `[OpenBugs("P6.2-worker")]`. Gymnasium's live `AsyncVectorEnv` runs in the parity suite: its workers are spawned from
+  the embedded interpreter once `multiprocessing.set_executable` names a real `python.exe`.
 - **DR-34's generated docs** (found in P10.4, 2026-11-09): an options record copies each constructor `<param>` onto its
   property, and a `<paramref>` inside it is a broken reference on a property (CS1734 wherever documentation is generated,
   so in a consumer's build too). The generator now turns it into a `<see cref>` to the sibling property, or `<c>` text for

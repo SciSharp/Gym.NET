@@ -55,15 +55,26 @@ In short:
 - **Seeding**: Gymnasium's `Generator(PCG64(SeedSequence(seed)))`, bit for bit, for envs and spaces.
 - **Spaces**: all ten (`Box`, `Discrete`, `MultiBinary`, `MultiDiscrete`, `Tuple`, `Dict`, `Text`, `Sequence`, `Graph`,
   `OneOf`), typed as `Space<T>`, with `SpaceUtils` (flatten, unflatten, flatdim, `is_space_dtype_shape_equiv`) and the
-  vector space utilities (`batch_space`, `batch_differing_spaces`, `iterate`, `concatenate`, `create_empty_array`).
+  vector space utilities (`batch_space`, `batch_differing_spaces`, `iterate`, `concatenate`, `create_empty_array`,
+  `create_shared_memory`, `read_from_shared_memory`, `write_to_shared_memory`).
 - **Registry**: `Gymnasium.Make` and `Gymnasium.MakeVec`, typed and untyped; `Register`, `Spec`, `PprintRegistry`,
   namespaces and versions with Gymnasium's errors and "Did you mean" suggestions; `EnvSpec` to and from JSON; constructor
   arguments by Python name from anonymous objects, dictionaries, or generated `<Class>Options` records
   (`[GymOptions]`); the built-in ids registered before `Main`.
-- **Wrappers**: `TimeLimit`, `OrderEnforcing`, `PassiveEnvChecker`, `Autoreset`, `RecordEpisodeStatistics`,
-  `RenderCollection`, `NormalizeObservation`, `NormalizeReward`, `TimeAwareObservation`, `FlattenObservation`.
+- **Wrappers**: every Gymnasium wrapper but `AtariPreprocessing` and the JAX/PyTorch conversions: `TimeLimit`,
+  `OrderEnforcing`, `PassiveEnvChecker`, `Autoreset`, `RecordEpisodeStatistics`, `RenderCollection`; the observation
+  transforms (`TransformObservation`, `FilterObservation`, `FlattenObservation`, `GrayscaleObservation`,
+  `ResizeObservation` over OpenCV's resize translated to C#, `ReshapeObservation`, `RescaleObservation`,
+  `DtypeObservation`, `AddRenderObservation`, `DiscretizeObservation`), the stateful ones (`TimeAwareObservation`,
+  `NormalizeObservation`, `DelayObservation`, `FrameStackObservation`, `MaxAndSkipObservation`), the action and reward
+  transforms (`TransformAction`, `ClipAction`, `RescaleAction`, `DiscretizeAction`, `StickyAction`, `RepeatAction`,
+  `TransformReward`, `ClipReward`, `NormalizeReward`), and the rendering wrappers (`RecordVideo` over a pluggable
+  `IVideoWriter`, PNG frames by default or mp4 through ffmpeg; `HumanRendering`; `AddWhiteNoise`; `ObstructView`), with
+  `save_video`.
 - **Vector envs**: `VectorEnv<TObs, TAct>` typed by the batched types, `SyncVectorEnv` in the three autoreset modes
-  (`NextStep`, `SameStep`, `Disabled`), the vector wrapper bases, `CartPoleVectorEnv`.
+  (`NextStep`, `SameStep`, `Disabled`), `AsyncVectorEnv` (parallel sub-envs on worker threads, in three execution modes,
+  with Gymnasium's `*_async`/`*_wait` protocol, `max_concurrency` and shared memory), the vector wrapper bases, every
+  vector wrapper of `gymnasium.wrappers.vector` (named `...Vector`, printing Gymnasium's names), `CartPoleVectorEnv`.
 - **Checkers**: `EnvChecker.CheckEnv` (Gymnasium's `check_env`), `PassiveChecker`, `EnvMatch`.
 - **Environments** (all registered for `Gymnasium.Make`, each with `rgb_array` frames equal to Gymnasium's, `ansi` text
   for toy_text, and `human` mode):
@@ -91,6 +102,13 @@ Each is documented on the member, and the parity suite pins it, so a change show
   of the sub-envs' (`GetAttr("np_random")` returns those); a `reset_mask` stays in the caller's options dictionary,
   where Python pops it.
 - **`TimeAwareObservation`'s observations** are `object`s, since their type depends on `flatten`.
+- **`AsyncVectorEnv`'s workers are threads**, not processes: Gymnasium's `context`, `daemon` and custom `worker`
+  arguments do not exist, and `close(terminate=True)` stops waiting instead of killing (each worker closes its sub-env as
+  soon as its current call returns). Kept from Gymnasium on purpose: without shared memory, a reset right after an
+  episode end leaves that sub-env's pending autoreset, as Gymnasium's worker does.
+- **`DictInfoToList`** returns its list of infos from its own `Step` and `Reset`; through `IVectorEnv` the infos stay a
+  dict.
+- **`RecordVideo` writes PNG frames** into a folder per video by default; `FfmpegVideoWriter` writes Gymnasium's mp4.
 - **Exceptions**: Python's built-in exceptions are NumSharp's types; `OverflowError` and `ZeroDivisionError` are .NET's
   `OverflowException` and `DivideByZeroException`.
 - **The reference platform is Windows x64.** Where Gymnasium's float64 arithmetic goes through the C runtime (CartPole's
@@ -108,8 +126,6 @@ Each has a test that asserts Gymnasium's answer and fails until the gap closes (
   message is NumSharp's `"AssertionError"` instead of Python's empty one (NumSharp gap N-1).
 - **`NotImplementedError` and `ImportError`** are `Gym.Exceptions` types until NumSharp defines them, and NumSharp's
   exceptions take no inner exception yet (N-3).
-- **`make` with `render_mode="human"` for an env without a human mode** raises `NotImplementedError`, where Gymnasium
-  adds its `HumanRendering` wrapper. Every built-in env has a human mode.
 - **The 0.2 `LunarLanderEnv`** (Aether physics) is still in Gym.NET.Environments, on the 2.0 API, but it is not
   Gymnasium's LunarLander and is not registered. Gymnasium's Box2D environments replace it in P8.
 
@@ -117,10 +133,6 @@ Each has a test that asserts Gymnasium's answer and fails until the gap closes (
 
 Deferred, each with its design approved (the completion plan's P6 lists them):
 
-- `AsyncVectorEnv` (`MakeVec(..., vectorizationMode: "async")` raises `NotImplementedError`).
-- The other 24 wrappers: the observation, action and reward transforms (`TransformObservation`, `ClipAction`,
-  `RescaleAction`, `FrameStackObservation`, `ResizeObservation`, ...) and the rendering wrappers (`HumanRendering`,
-  `RecordVideo`, `AddWhiteNoise`, `ObstructView`); and the vector wrappers.
 - `gymnasium.utils.play` and `PlayPlot`, the `FuncEnv` protocol, `gymnasium.utils.performance`.
 
 Out of 2.0 by decision:

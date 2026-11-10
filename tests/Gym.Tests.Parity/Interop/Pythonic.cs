@@ -2066,6 +2066,108 @@ namespace Gym.Tests.Parity {
                     }
                 }
 
+                /// <summary><c>AsyncVectorEnv</c>: its constructor and the members of its two-step protocol.</summary>
+                internal static class AsyncVectorEnv {
+                    /// <summary>The cached module; never dispose it.</summary>
+                    private static PyObject Module => PythonRuntime.Import("gymnasium.vector");
+
+                    /// <summary>
+                    ///     <c>AsyncVectorEnv(env_fns, **kwargs)</c>: the workers are spawned processes, so every function must pickle
+                    ///     (Gymnasium wraps them in <c>CloudpickleWrapper</c>).
+                    /// </summary>
+                    /// <param name="env_fns">A Python list of functions; stays owned by the caller.</param>
+                    /// <param name="kwargs">Keyword arguments in Python spelling, or <see langword="null"/>; values converted by <see cref="Oracle.PyConvert.ToPython"/>.</param>
+                    /// <returns>A new owned reference to the vector env.</returns>
+                    /// <exception cref="PythonException">Thrown when the constructor raises.</exception>
+                    internal static PyObject New(PyObject env_fns, IReadOnlyDictionary<string, object?>? kwargs = null) {
+                        using PyObject constructor = Module.GetAttr("AsyncVectorEnv");
+                        using var arguments = Oracle.PyConvert.ToKwargs(kwargs);
+                        return constructor.Invoke(new[] { env_fns }, arguments);
+                    }
+
+                    /// <summary><c>envs.reset_async(seed=seed)</c>.</summary>
+                    /// <param name="env">The vector env.</param>
+                    /// <param name="seed">The first sub-env's seed, or <see langword="null"/>.</param>
+                    /// <returns>A new owned reference to <c>None</c>.</returns>
+                    /// <exception cref="PythonException">Thrown when the call raises (a pending call, a closed env).</exception>
+                    internal static PyObject reset_async(PyObject env, long? seed = null) {
+                        using PyObject method = env.GetAttr("reset_async");
+                        using var arguments = new PyDict();
+                        using PyObject seedValue = Oracle.PyConvert.ToPython(seed);
+                        arguments["seed"] = seedValue;
+                        return method.Invoke(Array.Empty<PyObject>(), arguments);
+                    }
+
+                    /// <summary><c>envs.reset_wait(timeout=timeout)</c>.</summary>
+                    /// <param name="env">The vector env.</param>
+                    /// <param name="timeout">Seconds, or <see langword="null"/>.</param>
+                    /// <returns>A new owned reference to <c>(observations, infos)</c>.</returns>
+                    /// <exception cref="PythonException">Thrown when the call raises (no pending reset, a timeout, a sub-env's error).</exception>
+                    internal static PyObject reset_wait(PyObject env, double? timeout = null) => Wait(env, "reset_wait", timeout);
+
+                    /// <summary><c>envs.step_async(actions)</c>.</summary>
+                    /// <param name="env">The vector env.</param>
+                    /// <param name="actions">The batched actions; stays owned by the caller.</param>
+                    /// <returns>A new owned reference to <c>None</c>.</returns>
+                    /// <exception cref="PythonException">Thrown when the call raises (a pending call, a closed env, a length mismatch).</exception>
+                    internal static PyObject step_async(PyObject env, PyObject actions) {
+                        using PyObject method = env.GetAttr("step_async");
+                        return method.Invoke(actions);
+                    }
+
+                    /// <summary><c>envs.step_wait(timeout=timeout)</c>.</summary>
+                    /// <param name="env">The vector env.</param>
+                    /// <param name="timeout">Seconds, or <see langword="null"/>.</param>
+                    /// <returns>A new owned reference to the 5-tuple.</returns>
+                    /// <exception cref="PythonException">Thrown when the call raises (no pending step, a timeout, a sub-env's error).</exception>
+                    internal static PyObject step_wait(PyObject env, double? timeout = null) => Wait(env, "step_wait", timeout);
+
+                    /// <summary><c>envs.call_async(name)</c>.</summary>
+                    /// <param name="env">The vector env.</param>
+                    /// <param name="name">The member's Python name.</param>
+                    /// <returns>A new owned reference to <c>None</c>.</returns>
+                    /// <exception cref="PythonException">Thrown when the call raises (a pending call, a closed env).</exception>
+                    internal static PyObject call_async(PyObject env, string name) {
+                        using PyObject method = env.GetAttr("call_async");
+                        using var member = new PyString(name);
+                        return method.Invoke(member);
+                    }
+
+                    /// <summary><c>envs.call_wait(timeout=timeout)</c>.</summary>
+                    /// <param name="env">The vector env.</param>
+                    /// <param name="timeout">Seconds, or <see langword="null"/>.</param>
+                    /// <returns>A new owned reference to the tuple of results.</returns>
+                    /// <exception cref="PythonException">Thrown when the call raises (no pending call, a timeout, a sub-env's error).</exception>
+                    internal static PyObject call_wait(PyObject env, double? timeout = null) => Wait(env, "call_wait", timeout);
+
+                    /// <summary><c>envs.close(terminate=terminate)</c>.</summary>
+                    /// <param name="env">The vector env.</param>
+                    /// <param name="terminate">Whether the worker processes are terminated rather than closed in turn.</param>
+                    /// <returns>A new owned reference to <c>None</c>.</returns>
+                    /// <exception cref="PythonException">Thrown when the close raises (a pending call's sub-env error).</exception>
+                    internal static PyObject close(PyObject env, bool terminate = false) {
+                        using PyObject method = env.GetAttr("close");
+                        using var arguments = new PyDict();
+                        using PyObject flag = Oracle.PyConvert.ToPython(terminate);
+                        arguments["terminate"] = flag;
+                        return method.Invoke(Array.Empty<PyObject>(), arguments);
+                    }
+
+                    /// <summary>A <c>*_wait(timeout=timeout)</c> method.</summary>
+                    /// <param name="env">The vector env.</param>
+                    /// <param name="name">The method.</param>
+                    /// <param name="timeout">Seconds, or <see langword="null"/>.</param>
+                    /// <returns>A new owned reference to the method's result.</returns>
+                    /// <exception cref="PythonException">Thrown when the method raises.</exception>
+                    private static PyObject Wait(PyObject env, string name, double? timeout) {
+                        using PyObject method = env.GetAttr(name);
+                        using var arguments = new PyDict();
+                        using PyObject seconds = Oracle.PyConvert.ToPython(timeout);
+                        arguments["timeout"] = seconds;
+                        return method.Invoke(Array.Empty<PyObject>(), arguments);
+                    }
+                }
+
                 /// <summary><c>gymnasium.vector.utils</c>: batching spaces and their samples.</summary>
                 internal static class utils {
                     /// <summary>The cached module; never dispose it.</summary>
@@ -2121,6 +2223,46 @@ namespace Gym.Tests.Parity {
                         using PyObject function = Module.GetAttr("create_empty_array");
                         using var count = new PyInt(n);
                         return function.Invoke(space, count);
+                    }
+
+                    /// <summary><c>create_shared_memory(space, n=n)</c>: <c>multiprocessing</c> arrays of the batched layout.</summary>
+                    /// <param name="space">The single space; stays owned by the caller.</param>
+                    /// <param name="n">The number of sub-envs.</param>
+                    /// <returns>A new owned reference to the buffer (an array, or a tuple or dict of them).</returns>
+                    /// <exception cref="PythonException">Thrown for a space with no shared layout (<c>CustomSpaceError</c>, or <c>TypeError</c> for a dynamic shape).</exception>
+                    internal static PyObject create_shared_memory(PyObject space, long n) {
+                        using PyObject function = Module.GetAttr("create_shared_memory");
+                        using var arguments = new PyDict();
+                        using var count = new PyInt(n);
+                        arguments["n"] = count;
+                        return function.Invoke(new[] { space }, arguments);
+                    }
+
+                    /// <summary><c>write_to_shared_memory(space, index, value, shared_memory)</c>.</summary>
+                    /// <param name="space">The single space; stays owned by the caller.</param>
+                    /// <param name="index">The sub-env's slot.</param>
+                    /// <param name="value">The observation; stays owned by the caller.</param>
+                    /// <param name="shared_memory">The buffer; stays owned by the caller.</param>
+                    /// <returns>A new owned reference to <c>None</c>.</returns>
+                    /// <exception cref="PythonException">Thrown when the value does not fit the slot.</exception>
+                    internal static PyObject write_to_shared_memory(PyObject space, long index, PyObject value, PyObject shared_memory) {
+                        using PyObject function = Module.GetAttr("write_to_shared_memory");
+                        using var slot = new PyInt(index);
+                        return function.Invoke(space, slot, value, shared_memory);
+                    }
+
+                    /// <summary><c>read_from_shared_memory(space, shared_memory, n=n)</c>: views of the buffer, or decoded texts.</summary>
+                    /// <param name="space">The single space; stays owned by the caller.</param>
+                    /// <param name="shared_memory">The buffer; stays owned by the caller.</param>
+                    /// <param name="n">The number of sub-envs.</param>
+                    /// <returns>A new owned reference to the batch.</returns>
+                    /// <exception cref="PythonException">Thrown for a space with no shared layout, or an index past a tuple batch (<c>OneOf</c>).</exception>
+                    internal static PyObject read_from_shared_memory(PyObject space, PyObject shared_memory, long n) {
+                        using PyObject function = Module.GetAttr("read_from_shared_memory");
+                        using var arguments = new PyDict();
+                        using var count = new PyInt(n);
+                        arguments["n"] = count;
+                        return function.Invoke(new[] { space, shared_memory }, arguments);
                     }
                 }
             }
@@ -3131,6 +3273,33 @@ namespace Gym.Tests.Parity {
         }
 
         /// <summary><c>cv2</c>, OpenCV's Python module: the oracle of <c>Gym.Utils.Cv2</c> and of <c>ResizeObservation</c>.</summary>
+        /// <summary>
+        ///     <c>multiprocessing</c>: the start configuration Gymnasium's <c>AsyncVectorEnv</c> spawns its workers with. Embedded,
+        ///     <c>sys.executable</c> is the .NET test host, so the spawn start method needs the real interpreter named.
+        /// </summary>
+        internal static class multiprocessing {
+            /// <summary>The cached module; never dispose it.</summary>
+            private static PyObject Module => PythonRuntime.Import("multiprocessing");
+
+            /// <summary><c>multiprocessing.set_executable(executable)</c>: the interpreter spawned worker processes run.</summary>
+            /// <param name="executable">The interpreter's path.</param>
+            /// <exception cref="PythonException">Thrown when the call fails.</exception>
+            internal static void set_executable(string executable) {
+                using PyObject function = Module.GetAttr("set_executable");
+                using var path = new PyString(executable);
+                using PyObject _ = function.Invoke(path);
+            }
+
+            /// <summary><c>multiprocessing.get_start_method()</c>.</summary>
+            /// <returns>The start method's name (<c>spawn</c> on Windows).</returns>
+            /// <exception cref="PythonException">Thrown when the call fails.</exception>
+            internal static string get_start_method() {
+                using PyObject function = Module.GetAttr("get_start_method");
+                using PyObject method = function.Invoke();
+                return method.As<string>();
+            }
+        }
+
         internal static class cv2 {
             /// <summary>The cached module; never dispose it.</summary>
             private static PyObject Module => PythonRuntime.Import("cv2");

@@ -48,11 +48,9 @@ namespace Gym.Tests.Gymnasium.Wrappers.Vector {
         ///     into a dict: the batched observations of the reset and of a step are in the batched dict space.
         /// </summary>
         /// <remarks>
-        ///     The asynchronous vector env comes with P6.2; until then <c>make_vec</c> refuses the mode.
         ///     Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/tests/wrappers/vector/test_vectorize_transform.py#L31">tests/wrappers/vector/test_vectorize_transform.py (test_vectorize_dict_to_box_obs)</see>.
         /// </remarks>
         [TestMethod]
-        [OpenBugs("P6.2")]
         public void TestVectorizeDictToBoxObs() {
             static IEnv Wrapper(IEnv env) =>
                 new TransformObservation<Info, NDArray, NDArray>((Env<NDArray, NDArray>)env, x => new Info { ["key1"] = x["0:1"], ["key2"] = x["1:"] },

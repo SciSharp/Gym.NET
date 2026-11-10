@@ -464,7 +464,8 @@ namespace Gym.Vector {
 
         /// <summary>
         ///     One sub-env's <c>call</c>: an attribute through the wrappers (called when it is a delegate), else a public method
-        ///     whose Python name is <paramref name="name"/>, on the outermost object as Python's bound method would be.
+        ///     whose Python name is <paramref name="name"/>, on the outermost object as Python's bound method would be. The
+        ///     asynchronous vector env's workers run it too, on their own threads, so it touches nothing but the sub-env.
         /// </summary>
         /// <param name="env">The sub-env.</param>
         /// <param name="name">The Python name.</param>
@@ -472,7 +473,7 @@ namespace Gym.Vector {
         /// <returns>The value or the call's result.</returns>
         /// <exception cref="AttributeError">Thrown when there is no such attribute or method.</exception>
         /// <exception cref="TypeError">Thrown when no method of that name takes the arguments.</exception>
-        private static object? CallOne(IEnv env, string name, object?[] args) {
+        internal static object? CallOne(IEnv env, string name, object?[] args) {
             if (env.HasWrapperAttr(name)) {
                 object? function = env.GetWrapperAttr(name);
                 return function is Delegate callable ? callable.DynamicInvoke(args) : function;

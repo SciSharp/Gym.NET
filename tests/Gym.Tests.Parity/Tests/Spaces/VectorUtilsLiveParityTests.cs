@@ -102,6 +102,48 @@ namespace Gym.Tests.Parity.Tests.Spaces {
             ByteContract.AssertSame($"list(iterate(batch_space({name}, 3), sample))", pythonItems, dotnetItems);
         }
 
+        /// <summary>
+        ///     <c>create_shared_memory(space, n=3)</c>, three seeded samples written with <c>write_to_shared_memory</c> into slots
+        ///     0 to 2, then <c>read_from_shared_memory(space, memory, n=3)</c>: Gymnasium's batch (views of the buffer, decoded
+        ///     texts, <c>OneOf</c>'s index and sample pairs), or its refusal (a dynamic shape's <c>TypeError</c>).
+        /// </summary>
+        /// <param name="name">The space.</param>
+        /// <remarks>
+        ///     Gymnasium's buffer is a <c>multiprocessing</c> array and Gym.NET's an ordinary one, so the cell compares what
+        ///     reading gives after the writes: the layout, the casts and the decoding, which the async vector env relies on.
+        /// </remarks>
+        [TestMethod]
+        [DynamicData(nameof(Spaces))]
+        public void SharedMemory_MatchesGymnasium(string name) {
+            SpaceSpec spec = Spec(name);
+            using PyRef python = PyRef.Of(() => spec.BuildPython(17));
+            using Space dotnet = spec.BuildDotNet(17);
+            Outcome pythonRead = Outcome.CapturePython(() => {
+                using PyObject memory = Python.gymnasium.vector.utils.create_shared_memory(python.Object, 3);
+                for (int i = 0; i < 3; i++) {
+                    using PyObject sample = Python.gymnasium.spaces.space.Space.sample(python.Object);
+                    using PyObject _ = Python.gymnasium.vector.utils.write_to_shared_memory(python.Object, i, sample, memory);
+                }
+
+                return Python.gymnasium.vector.utils.read_from_shared_memory(python.Object, memory, 3);
+            });
+            object? memory = null;
+            Outcome dotnetRead = Outcome.Capture(() => {
+                memory = VectorUtils.CreateSharedMemory(dotnet, 3);
+                for (int i = 0; i < 3; i++) {
+                    object? sample = dotnet.Sample();
+                    VectorUtils.WriteToSharedMemory(dotnet, i, sample, memory);
+                    // The write copied the sample into the buffer.
+                    Outcome.Release(sample);
+                }
+
+                return VectorUtils.ReadFromSharedMemory(dotnet, memory, 3);
+            });
+            // The read's views were described and released by Capture; the buffer goes after them.
+            VectorUtils.ReleaseSharedMemory(memory);
+            ByteContract.AssertSame($"read_from_shared_memory({name}) after three writes", pythonRead, dotnetRead);
+        }
+
         /// <summary><c>iterate</c> refuses a bare <c>Discrete</c> and a custom space as Gymnasium does.</summary>
         [TestMethod]
         public void Iterate_Refusals_MatchGymnasium() {

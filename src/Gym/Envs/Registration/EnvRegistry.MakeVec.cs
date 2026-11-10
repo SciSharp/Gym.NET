@@ -18,15 +18,15 @@ namespace Gym.Envs.Registration {
         /// </summary>
         /// <param name="id">The id.</param>
         /// <param name="numEnvs">The number of sub-envs; a spec made by <c>MakeVec</c> records its own, which wins.</param>
-        /// <param name="vectorizationMode">A <see cref="VectorizeMode"/> or its value (<c>"sync"</c>, <c>"vector_entry_point"</c>); <see langword="null"/> picks the vector entry point when the spec has one, else sync.</param>
-        /// <param name="vectorKwargs">The vector env's constructor arguments by Python name (<c>autoreset_mode</c>, <c>copy</c>, <c>observation_mode</c>); sync only.</param>
-        /// <param name="wrappers">Wrappers applied to every sub-env after <c>Make</c>, innermost first; sync only.</param>
+        /// <param name="vectorizationMode">A <see cref="VectorizeMode"/> or its value (<c>"sync"</c>, <c>"async"</c>, <c>"vector_entry_point"</c>); <see langword="null"/> picks the vector entry point when the spec has one, else sync.</param>
+        /// <param name="vectorKwargs">The vector env's constructor arguments by Python name (<c>autoreset_mode</c>, <c>copy</c>, <c>observation_mode</c>; for async also <c>shared_memory</c>, <c>max_concurrency</c>, <c>execution_mode</c>, <c>thread_count</c>); sync and async only.</param>
+        /// <param name="wrappers">Wrappers applied to every sub-env after <c>Make</c>, innermost first; sync and async only.</param>
         /// <param name="kwargs">The env's constructor arguments by Python name, over the spec's.</param>
         /// <returns>The vector env, its spec recording how it was made; the caller owns it.</returns>
         /// <exception cref="TypeError">Thrown when <paramref name="id"/> is <see langword="null"/>, or the env cannot be built from the kwargs.</exception>
         /// <exception cref="ValueError">Thrown for an unknown vectorization mode, with Gymnasium's message.</exception>
         /// <exception cref="Error">Thrown when the id is not registered, has no (vector) entry point, or the vector entry point is asked for with vector kwargs or wrappers.</exception>
-        /// <exception cref="NotImplementedError">Thrown for <see cref="VectorizeMode.Async"/>: <c>AsyncVectorEnv</c> arrives with P6.2.</exception>
+        /// <exception cref="RuntimeError">Thrown when a sub-env's spaces do not fit the batch (sync and async modes).</exception>
         /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/envs/registration.py#L835">gymnasium/envs/registration.py</see>.</remarks>
         public static IVectorEnv MakeVec(string id, int numEnvs = 1, object? vectorizationMode = null, object? vectorKwargs = null, IEnumerable<Func<IEnv, IEnv>>? wrappers = null,
             object? kwargs = null) {
@@ -46,7 +46,7 @@ namespace Gym.Envs.Registration {
         /// <exception cref="TypeError">Thrown when <paramref name="spec"/> is <see langword="null"/>, or the env cannot be built.</exception>
         /// <exception cref="ValueError">Thrown for an unknown vectorization mode.</exception>
         /// <exception cref="Error">Thrown when the spec has no (vector) entry point, or the vector entry point is asked for with vector kwargs or wrappers.</exception>
-        /// <exception cref="NotImplementedError">Thrown for <see cref="VectorizeMode.Async"/>.</exception>
+        /// <exception cref="RuntimeError">Thrown when a sub-env's spaces do not fit the batch (sync and async modes).</exception>
         public static IVectorEnv MakeVec(EnvSpec spec, int numEnvs = 1, object? vectorizationMode = null, object? vectorKwargs = null, IEnumerable<Func<IEnv, IEnv>>? wrappers = null,
             object? kwargs = null) {
             if (spec is null)
@@ -71,7 +71,7 @@ namespace Gym.Envs.Registration {
         /// <exception cref="TypeError">Thrown when the vector env's batched types are not the ones asked for, or as the untyped form throws.</exception>
         /// <exception cref="ValueError">Thrown for an unknown vectorization mode.</exception>
         /// <exception cref="Error">Thrown when the id is not registered or has no (vector) entry point.</exception>
-        /// <exception cref="NotImplementedError">Thrown for <see cref="VectorizeMode.Async"/>.</exception>
+        /// <exception cref="RuntimeError">Thrown when a sub-env's spaces do not fit the batch (sync and async modes).</exception>
         public static VectorEnv<TObs, TAct> MakeVec<TObs, TAct>(string id, int numEnvs = 1, object? vectorizationMode = null, object? vectorKwargs = null,
             IEnumerable<Func<IEnv, IEnv>>? wrappers = null, object? kwargs = null) {
             if (id is null)
@@ -92,7 +92,7 @@ namespace Gym.Envs.Registration {
         /// <exception cref="TypeError">Thrown when <paramref name="spec"/> is <see langword="null"/> or the batched types differ.</exception>
         /// <exception cref="ValueError">Thrown for an unknown vectorization mode.</exception>
         /// <exception cref="Error">Thrown when the spec has no (vector) entry point.</exception>
-        /// <exception cref="NotImplementedError">Thrown for <see cref="VectorizeMode.Async"/>.</exception>
+        /// <exception cref="RuntimeError">Thrown when a sub-env's spaces do not fit the batch (sync and async modes).</exception>
         public static VectorEnv<TObs, TAct> MakeVec<TObs, TAct>(EnvSpec spec, int numEnvs = 1, object? vectorizationMode = null, object? vectorKwargs = null,
             IEnumerable<Func<IEnv, IEnv>>? wrappers = null, object? kwargs = null) {
             if (spec is null)
@@ -116,7 +116,7 @@ namespace Gym.Envs.Registration {
         /// <returns>The vector env.</returns>
         /// <exception cref="ValueError">Thrown for an unknown vectorization mode.</exception>
         /// <exception cref="Error">Thrown for the entry-point and argument conflicts Gymnasium refuses.</exception>
-        /// <exception cref="NotImplementedError">Thrown for <see cref="VectorizeMode.Async"/>.</exception>
+        /// <exception cref="RuntimeError">Thrown when a sub-env's spaces do not fit the batch (sync and async modes).</exception>
         /// <exception cref="TypeError">Thrown when the typed form's types do not fit, or the vector entry point builds no vector env.</exception>
         private static IVectorEnv MakeVecCore(EnvSpec registered, object id, int numEnvs, object? vectorizationMode, object? vectorKwargs, IEnumerable<Func<IEnv, IEnv>>? wrappers,
             object? kwargs, (Type Obs, Type Act)? typed) {
@@ -153,19 +153,19 @@ namespace Gym.Envs.Registration {
                 }
             }
 
+            // One Make stack per sub-env, each wrapped by the wrappers in order (the sync and async modes' create_single_env).
+            IEnv CreateSingleEnv() {
+                // make(env_spec, **env_spec_kwargs.copy()): a shallow copy per sub-env, the values shared as in Python.
+                IEnv singleEnv = Make(envSpec, new Info(envSpecKwargs));
+                foreach (Func<IEnv, IEnv> wrapper in wrapperList)
+                    singleEnv = wrapper(singleEnv);
+                return singleEnv;
+            }
+
             IVectorEnv env;
             if (ReferenceEquals(mode, VectorizeMode.Sync)) {
                 if (envSpec.EntryPoint is null)
                     throw new Error($"Cannot create vectorized environment for {envSpec.Id} because it doesn't have an entry point defined.");
-                // One Make stack per sub-env, each wrapped by the wrappers in order.
-                IEnv CreateSingleEnv() {
-                    // make(env_spec, **env_spec_kwargs.copy()): a shallow copy per sub-env, the values shared as in Python.
-                    IEnv singleEnv = Make(envSpec, new Info(envSpecKwargs));
-                    foreach (Func<IEnv, IEnv> wrapper in wrapperList)
-                        singleEnv = wrapper(singleEnv);
-                    return singleEnv;
-                }
-
                 Type syncType = typed is { } types ? typeof(SyncVectorEnv<,>).MakeGenericType(types.Obs, types.Act) : typeof(SyncVectorEnv);
                 var arguments = new Info { ["env_fns"] = Enumerable.Repeat<Func<IEnv>>(CreateSingleEnv, numEnvs).ToList() };
                 arguments.Update(vectorArguments);
@@ -173,7 +173,11 @@ namespace Gym.Envs.Registration {
             } else if (ReferenceEquals(mode, VectorizeMode.Async)) {
                 if (envSpec.EntryPoint is null)
                     throw new Error($"Cannot create vectorized environment for {envSpec.Id} because it doesn't have an entry point defined.");
-                throw new NotImplementedError("AsyncVectorEnv is not available yet (completion plan P6.2); use vectorization_mode=\"sync\", which returns the same results.");
+                // The workers call create_single_env on their own threads (DR-22), as Gymnasium's processes do.
+                Type asyncType = typed is { } types ? typeof(AsyncVectorEnv<,>).MakeGenericType(types.Obs, types.Act) : typeof(AsyncVectorEnv);
+                var arguments = new Info { ["env_fns"] = Enumerable.Repeat<Func<IEnv>>(CreateSingleEnv, numEnvs).ToList() };
+                arguments.Update(vectorArguments);
+                env = (IVectorEnv)PyKwargs.Construct(asyncType, arguments);
             } else {
                 if (vectorArguments.Count > 0)
                     throw new Error($"Custom vector environment can be passed arguments only through kwargs and `vector_kwargs` is not empty ({PyBuiltins.Str(vectorArguments)})");

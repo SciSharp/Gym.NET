@@ -227,7 +227,11 @@ using (truncations)
   one flag per sub-env. A vectorized env class such as `CartPoleVectorEnv` takes no `vectorKwargs` (Gymnasium's `Error`)
   and has its own mode, `NextStep` for CartPole.
 - Infos are merged as Gymnasium merges them: one array per key, and a boolean `_key` array saying which sub-envs set it.
-- The asynchronous mode (`AsyncVectorEnv`) is not in 2.0: `vectorizationMode: "async"` raises `NotImplementedError`.
+- `vectorizationMode: "async"` builds `AsyncVectorEnv`, which steps the sub-envs in parallel on worker threads and
+  returns what `SyncVectorEnv` returns, bit for bit. `vectorKwargs` choose where the calls run (`execution_mode`:
+  `AsyncExecutionMode.ThreadPool`, the default, `DedicatedThreads` with `thread_count`, or `ThreadPerEnv`), cap how many
+  sub-envs run at once (`max_concurrency`) and keep Gymnasium's `shared_memory` and `copy`. Each sub-env runs on another
+  thread, so an env function must build its own spaces and buffers rather than share one object among sub-envs.
 
 ## Arrays belong to the caller
 

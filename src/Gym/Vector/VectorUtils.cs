@@ -22,7 +22,7 @@ namespace Gym.Vector {
     ///     takes its base's path, and an unknown custom space takes Gymnasium's fallback (a tuple of copies for
     ///     <see cref="BatchSpace"/>, an error for <see cref="Iterate"/>). Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/vector/utils/space_utils.py">gymnasium/vector/utils/space_utils.py</see>.
     /// </remarks>
-    public static class VectorUtils {
+    public static partial class VectorUtils {
         /// <summary>
         ///     The space of <paramref name="n"/> stacked elements of <paramref name="space"/> (Gymnasium's <c>batch_space</c>):
         ///     a <see cref="Box"/> gains a leading axis, a <see cref="Discrete"/> becomes a <see cref="MultiDiscrete"/>, a

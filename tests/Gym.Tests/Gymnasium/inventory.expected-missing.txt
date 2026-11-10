@@ -98,13 +98,8 @@ gymnasium.utils.play.PlayableGame                                               
 gymnasium.utils.play.display_arr                                                         P6 play (DR-36), deferred in this run
 gymnasium.utils.play.play                                                                P6 play (DR-36), deferred in this run
 gymnasium.utils.step_api_compatibility.step_api_compatibility                            P6 utils, deferred in this run
-gymnasium.vector.async_vector_env.AsyncState                                             P6.2 vector, deferred in this run (DR-22 stays approved)
-gymnasium.vector.async_vector_env.AsyncVectorEnv                                         P6.2 vector, deferred in this run (DR-22 stays approved)
-gymnasium.vector.utils.misc.CloudpickleWrapper                                           P6 vector, deferred in this run
-gymnasium.vector.utils.misc.clear_mpi_env_vars                                           P6 vector, deferred in this run
-gymnasium.vector.utils.shared_memory.create_shared_memory                                P6 vector, deferred in this run
-gymnasium.vector.utils.shared_memory.read_from_shared_memory                             P6 vector, deferred in this run
-gymnasium.vector.utils.shared_memory.write_to_shared_memory                              P6 vector, deferred in this run
+gymnasium.vector.utils.misc.CloudpickleWrapper                                           n/a: process workers (Gym.NET's are threads, DR-22)
+gymnasium.vector.utils.misc.clear_mpi_env_vars                                           n/a: process workers (Gym.NET's are threads, DR-22)
 gymnasium.vector.vector_env.ArrayType                                                    by design: a typing TypeVar; the batched types are VectorEnv<TObs, TAct>'s generic arguments (DR-21)
 gymnasium.wrappers.ArrayConversion                                                       n/a: JAX/PyTorch
 gymnasium.wrappers.JaxToNumpy                                                            n/a: JAX/PyTorch

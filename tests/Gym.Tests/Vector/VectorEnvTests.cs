@@ -41,7 +41,7 @@ namespace Gym.Tests.Vector {
 
         /// <summary>
         ///     <c>MakeVec</c> picks the vector entry point by default and sync when asked; the typed form builds
-        ///     <c>SyncVectorEnv&lt;TObs, TAct&gt;</c> or refuses other types; the async mode is not available yet.
+        ///     <c>SyncVectorEnv&lt;TObs, TAct&gt;</c> or refuses other types; the async mode builds <c>AsyncVectorEnv</c> (P6.2).
         /// </summary>
         [TestMethod]
         public void MakeVec_BuildsTheModeAskedFor() {
@@ -56,7 +56,13 @@ namespace Gym.Tests.Vector {
             }
 
             Assert.ThrowsExactly<TypeError>(() => MakeVec<object?[], NDArray>("CartPole-v1", numEnvs: 2, vectorizationMode: "sync"));
-            Assert.ThrowsExactly<NotImplementedError>(() => MakeVec("CartPole-v1", numEnvs: 2, vectorizationMode: "async"));
+            using (IVectorEnv asynchronous = MakeVec("CartPole-v1", numEnvs: 2, vectorizationMode: "async")) {
+                Assert.IsInstanceOfType(asynchronous, typeof(AsyncVectorEnv));
+                Assert.AreEqual("AsyncVectorEnv(CartPole-v1, num_envs=2)", asynchronous.ToString());
+            }
+
+            using (VectorEnv<NDArray, NDArray> typedAsync = MakeVec<NDArray, NDArray>("CartPole-v1", numEnvs: 2, vectorizationMode: "async"))
+                Assert.IsInstanceOfType(typedAsync, typeof(AsyncVectorEnv<NDArray, NDArray>));
             Assert.AreEqual("Invalid vectorization mode: 'bogus', valid modes: ['async', 'sync', 'vector_entry_point']",
                 Assert.ThrowsExactly<ValueError>(() => MakeVec("CartPole-v1", vectorizationMode: "bogus")).Message);
         }
