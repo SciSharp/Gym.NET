@@ -66,8 +66,10 @@ namespace Gym.Utils {
         /// <param name="keysToAction">
         ///     A dictionary from keys to actions, or <see langword="null"/> for the env's own (<c>get_keys_to_action</c>,
         ///     through any wrapper). A key is a key code (<c>KeyCode.Space</c>, an int), a string whose characters are held
-        ///     together (<c>"wa"</c>), or a tuple of codes and one-character strings held together
+        ///     together (<c>"wa"</c>), a <see cref="KeyCombination"/>, or a tuple of codes and one-character strings held together
         ///     (<c>(KeyCode.Left, KeyCode.Right)</c>, <c>ValueTuple.Create("w")</c>); every action must be in the action space.
+        ///     A given dictionary stays the caller's; the env's own is a new one <c>play</c> owns and releases (its actions
+        ///     included) when it returns or throws (DR-45).
         /// </param>
         /// <param name="seed">The seed of every reset; <see langword="null"/> does not reseed.</param>
         /// <param name="noop">The action when no mapped combination is held; <see langword="null"/> is Gymnasium's default, the int 0.</param>
@@ -107,9 +109,12 @@ namespace Gym.Utils {
             object noopAction = noop ?? 0;
             Release(env.Reset(seed));
 
+            // A mapping taken from the env is a new one play owns (DR-45): its actions are released when play returns or throws,
+            // a refused mapping (MountainCar's empty combination) included.
+            object? envMapping = null;
             if (keysToAction is null) {
                 if (env.HasWrapperAttr("get_keys_to_action")) {
-                    keysToAction = PlayKeys.Call(env.GetWrapperAttr("get_keys_to_action"));
+                    keysToAction = envMapping = PlayKeys.Call(env.GetWrapperAttr("get_keys_to_action"));
                 } else {
                     if (env.Spec is null)
                         throw new ValueError("The environment must have an `env.spec` to auto-detect missing keys to action mappings.");
@@ -117,82 +122,86 @@ namespace Gym.Utils {
                 }
             }
 
-            if (keysToAction is null)
-                throw new ValueError("keys_to_action dictionary cannot be None");
-            List<KeyValuePair<object?, object?>> entries = PlayKeys.DictEntries(keysToAction)
-                                                           ?? throw new TypeError($"keys_to_action must be a dictionary, got {PyBuiltins.TypeRepr(keysToAction)}");
+            try {
+                if (keysToAction is null)
+                    throw new ValueError("keys_to_action dictionary cannot be None");
+                List<KeyValuePair<object?, object?>> entries = PlayKeys.DictEntries(keysToAction)
+                                                               ?? throw new TypeError($"keys_to_action must be a dictionary, got {PyBuiltins.TypeRepr(keysToAction)}");
 
-            // Validate every entry before converting any, key then action, in the mapping's order.
-            foreach ((object? key, object? action) in entries) {
-                if (PlayKeys.TupleItems(key) is { } combination) {
-                    if (combination.Count == 0)
-                        throw new ValueError("Key combinations in keys_to_action tuples cannot be empty");
-                    if (!combination.All(k => PlayKeys.IsStr(k) || PlayKeys.IsInt(k)))
-                        throw new TypeError($"All keys in key combination tuple must be integers or strings, got {PyBuiltins.Str(key)}");
-                } else if (!PlayKeys.IsStr(key) && !PlayKeys.IsInt(key)) {
-                    throw new TypeError($"Keys in keys_to_action must be integers or strings, got {PyBuiltins.TypeRepr(key)}");
+                // Validate every entry before converting any, key then action, in the mapping's order.
+                foreach ((object? key, object? action) in entries) {
+                    if (PlayKeys.TupleItems(key) is { } combination) {
+                        if (combination.Count == 0)
+                            throw new ValueError("Key combinations in keys_to_action tuples cannot be empty");
+                        if (!combination.All(k => PlayKeys.IsStr(k) || PlayKeys.IsInt(k)))
+                            throw new TypeError($"All keys in key combination tuple must be integers or strings, got {PyBuiltins.Str(key)}");
+                    } else if (!PlayKeys.IsStr(key) && !PlayKeys.IsInt(key)) {
+                        throw new TypeError($"Keys in keys_to_action must be integers or strings, got {PyBuiltins.TypeRepr(key)}");
+                    }
+
+                    if (!env.ActionSpace.Contains(action))
+                        throw new ValueError($"Action {PyBuiltins.Str(action)} is not a valid action in the environment action space: {PyBuiltins.Str(env.ActionSpace)}");
                 }
 
-                if (!env.ActionSpace.Contains(action))
-                    throw new ValueError($"Action {PyBuiltins.Str(action)} is not a valid action in the environment action space: {PyBuiltins.Str(env.ActionSpace)}");
-            }
-
-            // Every key becomes the sorted tuple of its codes (strings through ord), so a held set looks its action up directly.
-            var keyCodeToAction = new Dictionary<object, object?>(PyKeyComparer.Instance);
-            foreach ((object? keyCombination, object? action) in entries) {
-                IReadOnlyList<object?> keys = PlayKeys.IsInt(keyCombination) ? new[] { keyCombination } : PlayKeys.Iterate(keyCombination);
-                object?[] keyCode = PlayKeys.Sorted(keys.Select(k => k is string character ? PlayKeys.Ord(character) : k)).ToArray();
-                keyCodeToAction[keyCode] = action;
-            }
-
-            var game = new PlayableGame(env, keyCodeToAction, zoom, viewerFactory);
-
-            double framerate;
-            if (fps is { } given) {
-                framerate = given;
-            } else {
-                object? metadataFps = env.Metadata.TryGetValue(Metadata.RenderFpsKey, out object? value) ? value : 30;
-                if (!PlayKeys.IsInt(metadataFps))
-                    throw new TypeError($"Expected env.metadata['render_fps'] to be an integer, got {PyBuiltins.TypeRepr(metadataFps)}");
-                framerate = PyBuiltins.Float(metadataFps);
-            }
-
-            bool done = true;
-            // Gymnasium's obs: the reset's (obs, info) after a reset, the step's observation after a step.
-            object? obs = null;
-            var clock = new Clock();
-            while (game.Running) {
-                if (done) {
-                    done = false;
-                    // The episode's last observation was borrowed by its last callback only; nothing refers to it now.
-                    Release(obs);
-                    obs = env.Reset(seed);
-                } else if (!waitOnPlayer || game.PressedKeys.Count > 0) {
-                    object?[] held = PlayKeys.Sorted(game.PressedKeys).ToArray();
-                    object? action = keyCodeToAction.TryGetValue(held, out object? mapped) ? mapped : noopAction;
-                    object? previous = obs;
-                    StepResult<object?> step = env.Step(action);
-                    obs = step.Observation;
-                    done = step.Terminated || step.Truncated;
-                    callback?.Invoke(previous, obs, action, step.Reward, step.Terminated, step.Truncated, step.Info);
-                    // The previous observation has had both its callbacks; an env that hands out the same array again keeps it.
-                    ReleaseExcept(previous, obs);
-                    ReleaseExcept(step.Info, obs);
+                // Every key becomes the sorted tuple of its codes (strings through ord), so a held set looks its action up directly.
+                var keyCodeToAction = new Dictionary<object, object?>(PyKeyComparer.Instance);
+                foreach ((object? keyCombination, object? action) in entries) {
+                    IReadOnlyList<object?> keys = PlayKeys.IsInt(keyCombination) ? new[] { keyCombination } : PlayKeys.Iterate(keyCombination);
+                    object?[] keyCode = PlayKeys.Sorted(keys.Select(k => k is string character ? PlayKeys.Ord(character) : k)).ToArray();
+                    keyCodeToAction[keyCode] = action;
                 }
 
-                if (obs is not null) {
-                    using RenderResult rendered = env.Render();
-                    DisplayArr(game.Screen, FrameOf(rendered), game.VideoSize, transpose);
+                var game = new PlayableGame(env, keyCodeToAction, zoom, viewerFactory);
+
+                double framerate;
+                if (fps is { } given) {
+                    framerate = given;
+                } else {
+                    object? metadataFps = env.Metadata.TryGetValue(Metadata.RenderFpsKey, out object? value) ? value : 30;
+                    if (!PlayKeys.IsInt(metadataFps))
+                        throw new TypeError($"Expected env.metadata['render_fps'] to be an integer, got {PyBuiltins.TypeRepr(metadataFps)}");
+                    framerate = PyBuiltins.Float(metadataFps);
                 }
 
-                foreach (Event @event in EventQueue.Get())
-                    game.ProcessEvent(@event);
-                Display.Flip();
-                clock.Tick(framerate);
-            }
+                bool done = true;
+                // Gymnasium's obs: the reset's (obs, info) after a reset, the step's observation after a step.
+                object? obs = null;
+                var clock = new Clock();
+                while (game.Running) {
+                    if (done) {
+                        done = false;
+                        // The episode's last observation was borrowed by its last callback only; nothing refers to it now.
+                        Release(obs);
+                        obs = env.Reset(seed);
+                    } else if (!waitOnPlayer || game.PressedKeys.Count > 0) {
+                        object?[] held = PlayKeys.Sorted(game.PressedKeys).ToArray();
+                        object? action = keyCodeToAction.TryGetValue(held, out object? mapped) ? mapped : noopAction;
+                        object? previous = obs;
+                        StepResult<object?> step = env.Step(action);
+                        obs = step.Observation;
+                        done = step.Terminated || step.Truncated;
+                        callback?.Invoke(previous, obs, action, step.Reward, step.Terminated, step.Truncated, step.Info);
+                        // The previous observation has had both its callbacks; an env that hands out the same array again keeps it.
+                        ReleaseExcept(previous, obs);
+                        ReleaseExcept(step.Info, obs);
+                    }
 
-            Display.Quit();
-            Release(obs);
+                    if (obs is not null) {
+                        using RenderResult rendered = env.Render();
+                        DisplayArr(game.Screen, FrameOf(rendered), game.VideoSize, transpose);
+                    }
+
+                    foreach (Event @event in EventQueue.Get())
+                        game.ProcessEvent(@event);
+                    Display.Flip();
+                    clock.Tick(framerate);
+                }
+
+                Display.Quit();
+                Release(obs);
+            } finally {
+                PlayKeys.ReleaseActions(envMapping);
+            }
         }
 
         /// <summary>

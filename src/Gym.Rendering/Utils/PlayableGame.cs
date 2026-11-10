@@ -164,9 +164,12 @@ namespace Gym.Utils {
         /// <exception cref="AssertionError">Thrown, with an empty message, when the env has neither a mapping nor a spec.</exception>
         /// <exception cref="TypeError">Thrown when the mapping is no dictionary, or a key is not iterable.</exception>
         private ISet<object?> GetRelevantKeys(object? keysToAction) {
+            // A mapping taken from the env is a new one this method owns (DR-45): its actions are released once the keys are
+            // read, on a refusal too.
+            object? envMapping = null;
             if (keysToAction is null) {
                 if (Env.HasWrapperAttr("get_keys_to_action")) {
-                    keysToAction = PlayKeys.Call(Env.GetWrapperAttr("get_keys_to_action"));
+                    keysToAction = envMapping = PlayKeys.Call(Env.GetWrapperAttr("get_keys_to_action"));
                 } else {
                     // assert self.env.spec is not None: a bare assertion, so its message is empty.
                     if (Env.Spec is null)
@@ -175,13 +178,17 @@ namespace Gym.Utils {
                 }
             }
 
-            List<KeyValuePair<object?, object?>> entries = PlayKeys.DictEntries(keysToAction)
-                                                           ?? throw new TypeError($"keys_to_action must be a dictionary, got {PyBuiltins.TypeRepr(keysToAction)}");
-            // set(sum((list(k) for k in keys_to_action.keys()), [])): every element of every key.
-            var keys = new HashSet<object?>(PyKeyComparer.Instance);
-            foreach (KeyValuePair<object?, object?> entry in entries)
-                keys.UnionWith(PlayKeys.Iterate(entry.Key));
-            return keys;
+            try {
+                List<KeyValuePair<object?, object?>> entries = PlayKeys.DictEntries(keysToAction)
+                                                               ?? throw new TypeError($"keys_to_action must be a dictionary, got {PyBuiltins.TypeRepr(keysToAction)}");
+                // set(sum((list(k) for k in keys_to_action.keys()), [])): every element of every key.
+                var keys = new HashSet<object?>(PyKeyComparer.Instance);
+                foreach (KeyValuePair<object?, object?> entry in entries)
+                    keys.UnionWith(PlayKeys.Iterate(entry.Key));
+                return keys;
+            } finally {
+                PlayKeys.ReleaseActions(envMapping);
+            }
         }
 
         /// <summary><c>_get_video_size</c>: the size of the env's frame now, <c>(width, height)</c>, times the zoom, truncated.</summary>

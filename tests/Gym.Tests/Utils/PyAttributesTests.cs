@@ -1,6 +1,8 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
+using Gym.Environments.Envs.Classic;
+using Gym.Envs;
 using Gym.Utils;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using NumSharp;
@@ -35,6 +37,42 @@ namespace Gym.Tests.Utils {
             Assert.AreEqual("'Probe' object has no attribute 'missing'", Assert.ThrowsExactly<AttributeError>(() => PyAttributes.GetAttr(probe, "missing")).Message);
             Assert.IsFalse(PyAttributes.HasAttr(probe, "raises"), "A getter that raises AttributeError makes the attribute absent, as hasattr sees it.");
             Assert.ThrowsExactly<InvalidOperationException>(() => PyAttributes.HasAttr(probe, "throws"), "Any other exception propagates.");
+        }
+
+        /// <summary>
+        ///     DR-45: a <see cref="PyNameAttribute"/> virtual method (<c>get_keys_to_action</c> on <c>Env</c>) is absent until
+        ///     a class overrides it, reads as the bound method where one does, is hidden by the env's presence hook
+        ///     (MountainCar's continuous mode, whose Python class name the errors print), and a run-time attribute of the same
+        ///     name shadows it, as an instance's own attribute shadows a function of its class in Python.
+        /// </summary>
+        /// <exception cref="AssertFailedException">Thrown when a rule does not hold.</exception>
+        [TestMethod]
+        public void PyNameMethods_FollowPythonsMethodAttributes() {
+            using var cartPole = new CartPoleEnv();
+            Assert.IsFalse(PyAttributes.HasAttr(cartPole, "get_keys_to_action"), "CartPole only inherits the absent base");
+            Assert.AreEqual("'CartPoleEnv' object has no attribute 'get_keys_to_action'",
+                Assert.ThrowsExactly<AttributeError>(() => PyAttributes.GetAttr(cartPole, "get_keys_to_action")).Message);
+
+            using var discrete = new MountainCarEnv();
+            var bound = PyAttributes.GetAttr(discrete, "get_keys_to_action") as Func<IReadOnlyDictionary<KeyCombination, NDArray>>;
+            Assert.IsNotNull(bound, "the bound method, a delegate of the method's own signature");
+            IReadOnlyDictionary<KeyCombination, NDArray> mapping = bound!();
+            Assert.AreEqual(4, mapping.Count);
+            foreach (NDArray action in mapping.Values)
+                action.Dispose();
+
+            using var continuous = new MountainCarEnv(continuous: true);
+            Assert.IsFalse(PyAttributes.HasAttr(continuous, "get_keys_to_action"), "the presence hook hides it in continuous mode");
+            Assert.AreEqual("'Continuous_MountainCarEnv' object has no attribute 'get_keys_to_action'",
+                Assert.ThrowsExactly<AttributeError>(() => PyAttributes.GetAttr(continuous, "get_keys_to_action")).Message);
+            Assert.AreEqual("'Continuous_MountainCarEnv' object has no attribute 'x'", Assert.ThrowsExactly<AttributeError>(() => PyAttributes.GetAttr(continuous, "x")).Message);
+
+            // Python's `env.get_keys_to_action = f` sets an instance attribute that the next read returns.
+            Func<object> replacement = () => "mine";
+            PyAttributes.SetAttr(cartPole, "get_keys_to_action", replacement);
+            Assert.AreSame(replacement, PyAttributes.GetAttr(cartPole, "get_keys_to_action"));
+            PyAttributes.SetAttr(discrete, "get_keys_to_action", replacement);
+            Assert.AreSame(replacement, PyAttributes.GetAttr(discrete, "get_keys_to_action"), "the run-time attribute shadows the override too");
         }
 
         /// <summary>Assignments follow Python: read-only attributes refuse any value, numbers convert, other mismatches raise <c>TypeError</c>.</summary>

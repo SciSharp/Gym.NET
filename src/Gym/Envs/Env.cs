@@ -40,7 +40,7 @@ namespace Gym.Envs {
     ///     </para>
     ///     <para>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/core.py#L28">gymnasium/core.py</see>.</para>
     /// </remarks>
-    public abstract class Env<TObs, TAct> : IEnv, IDynamicAttributes {
+    public abstract class Env<TObs, TAct> : IEnv, IDynamicAttributes, IPythonAttributePresence {
         /// <summary>The metadata; a fresh <c>{"render_modes": []}</c> until the env assigns its own.</summary>
         private Metadata _metadata = new() { [Metadata.RenderModesKey] = new List<string>() };
 
@@ -259,6 +259,53 @@ namespace Gym.Envs {
         /// <returns>The rendering.</returns>
         /// <exception cref="NotImplementedError">Thrown unless the env overrides it.</exception>
         public virtual RenderResult Render() => throw new NotImplementedError();
+
+        /// <summary>
+        ///     The keyboard mapping <c>play</c> uses when the caller gives none (<c>get_keys_to_action()</c>): key combinations
+        ///     to the actions they trigger, MountainCar's <c>{(): 1, (276,): 0, (275,): 2, (275, 276): 1}</c>. Absent until an
+        ///     env overrides it (DR-45): this base raises Python's <see cref="AttributeError"/>, as calling a method the class
+        ///     lacks does, and <see cref="PyAttributes"/> reports the attribute only on an env that overrides it.
+        /// </summary>
+        /// <returns>A new mapping the caller owns, its actions included: an override builds fresh actions on every call.</returns>
+        /// <exception cref="AttributeError">
+        ///     Thrown by this base (<c>'CartPoleEnv' object has no attribute 'get_keys_to_action'</c>), and by an override in a
+        ///     state that has no mapping (MountainCar's continuous mode).
+        /// </exception>
+        /// <remarks>
+        ///     <para>
+        ///     Wrappers inherit this absent base: Gymnasium 1.x's wrappers forward no attributes, and <c>play</c> asks the layers
+        ///     beneath through <c>has_wrapper_attr</c>. An override whose presence depends on the instance also overrides
+        ///     <see cref="HasPythonAttribute"/>, so <c>hasattr</c> answers as Python's would for that state.
+        ///     </para>
+        ///     <para>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/utils/play.py#L39">gymnasium/utils/play.py</see>.</para>
+        /// </remarks>
+        [PyName("get_keys_to_action")]
+        public virtual IReadOnlyDictionary<KeyCombination, TAct> GetKeysToAction() =>
+            throw new AttributeError($"'{PythonClassName}' object has no attribute 'get_keys_to_action'");
+
+        /// <summary>
+        ///     The class name Python prints for this instance in messages: the class's own name (<see cref="PyAttributes.PyTypeName"/>)
+        ///     unless an env whose Python class depends on the instance says otherwise (the merged MountainCar's
+        ///     <c>Continuous_MountainCarEnv</c>, DR-32). <see cref="PyAttributes"/> names it in its <see cref="AttributeError"/>s.
+        /// </summary>
+        protected internal virtual string PythonClassName => PyAttributes.PyTypeName(GetType());
+
+        /// <summary>The class name, as <see cref="PyAttributes"/> reaches it on any env.</summary>
+        string IPythonAttributePresence.PythonClassName => PythonClassName;
+
+        /// <summary>
+        ///     Whether this instance has the Python attribute <paramref name="name"/>, for attributes whose presence varies by
+        ///     instance (DR-45): <see cref="PyAttributes"/> asks it before reporting a <see cref="PyNameAttribute"/> method that
+        ///     the env overrides. The default leaves the answer to that override check.
+        /// </summary>
+        /// <param name="name">The attribute, in Python spelling (<c>get_keys_to_action</c>).</param>
+        /// <returns><see langword="false"/> to hide the attribute on this instance; <see langword="true"/> here.</returns>
+        protected internal virtual bool HasPythonAttribute(string name) => true;
+
+        /// <summary>The presence hook, as <see cref="PyAttributes"/> reaches it on any env.</summary>
+        /// <param name="name">The attribute, in Python spelling.</param>
+        /// <returns>What <see cref="HasPythonAttribute"/> answers.</returns>
+        bool IPythonAttributePresence.HasPythonAttribute(string name) => HasPythonAttribute(name);
 
         /// <summary>
         ///     Releases what the env holds (<c>close()</c>): windows, native handles, connections. Calling it on a closed env

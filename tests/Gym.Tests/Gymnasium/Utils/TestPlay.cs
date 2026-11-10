@@ -347,19 +347,39 @@ namespace Gym.Tests.Gymnasium.Utils {
                 Assert.IsTrue(keys.Contains(key), $"missing {key}");
         }
 
-        /// <summary>Gymnasium's <c>KeysToActionWrapper</c>: a wrapper whose <c>get_keys_to_action</c> returns a given mapping.</summary>
+        /// <summary>
+        ///     Gymnasium's <c>KeysToActionWrapper</c>: a wrapper whose <c>get_keys_to_action</c> returns a given mapping. The
+        ///     method is typed (DR-45), key combinations to the env's actions, so a string key is held as its characters' codes
+        ///     and a tuple as its items' codes, which is what <c>play</c> makes of either; play's behaviour, the test's subject,
+        ///     is unchanged.
+        /// </summary>
         private sealed class KeysToActionWrapper : Wrapper<NDArray, NDArray> {
+            /// <summary>The mapping as key combinations and the actions' values, in the given order.</summary>
+            private readonly List<(KeyCombination Keys, long Action)> _mapping;
+
             /// <summary>Wraps <paramref name="env"/>.</summary>
             /// <param name="env">The env.</param>
-            /// <param name="keysToAction">The mapping to return.</param>
-            public KeysToActionWrapper(Env<NDArray, NDArray> env, object keysToAction) : base(env) => KeysToAction = keysToAction;
+            /// <param name="keysToAction">The mapping to return: tuple, string or int keys, int actions.</param>
+            /// <exception cref="ArgumentException">Thrown for a key of another kind.</exception>
+            public KeysToActionWrapper(Env<NDArray, NDArray> env, Dictionary<object, object?> keysToAction) : base(env) =>
+                _mapping = keysToAction.Select(entry => (Combination(entry.Key), Convert.ToInt64(entry.Value))).ToList();
 
-            /// <summary>The mapping (<c>keys_to_action</c>).</summary>
-            public object KeysToAction { get; }
+            /// <summary>The wrapper's <c>get_keys_to_action</c>: the mapping, with new action arrays on every call (the caller owns them).</summary>
+            /// <returns>The mapping.</returns>
+            public override IReadOnlyDictionary<KeyCombination, NDArray> GetKeysToAction() =>
+                _mapping.ToDictionary(entry => entry.Keys, entry => NDArray.Scalar(entry.Action));
 
-            /// <summary>The wrapper's <c>get_keys_to_action</c> method, a delegate-typed attribute as MountainCar's.</summary>
-            [PyName("get_keys_to_action")]
-            public Func<object> GetKeysToAction => () => KeysToAction;
+            /// <summary>A key as the codes <c>play</c> reads from it: a string's characters, an int, a tuple's items.</summary>
+            /// <param name="key">The key.</param>
+            /// <returns>The combination.</returns>
+            /// <exception cref="ArgumentException">Thrown for a key of another kind.</exception>
+            private static KeyCombination Combination(object key) => key switch {
+                string text => KeyCombination.FromText(text),
+                int code => new KeyCombination(code),
+                System.Runtime.CompilerServices.ITuple tuple => new KeyCombination(Enumerable.Range(0, tuple.Length)
+                    .Select(i => tuple[i] is string character ? char.ConvertToUtf32(character, 0) : Convert.ToInt32(tuple[i])).ToArray()),
+                _ => throw new ArgumentException($"A key is a string, an int or a tuple, not {key.GetType().Name}.", nameof(key)),
+            };
         }
 
         /// <summary>

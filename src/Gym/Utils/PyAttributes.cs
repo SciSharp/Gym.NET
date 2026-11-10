@@ -3,6 +3,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Reflection;
 using System.Text;
 using NumSharp;
@@ -44,6 +45,23 @@ namespace Gym.Utils {
     }
 
     /// <summary>
+    ///     An object whose Python attributes can be absent on one instance and present on another of the same class (DR-45),
+    ///     and whose Python class name can depend on the instance: the merged <c>MountainCarEnv</c> has
+    ///     <c>get_keys_to_action</c> in discrete mode only and prints <c>Continuous_MountainCarEnv</c> in continuous mode, as
+    ///     Gymnasium's two classes differ. <see cref="PyAttributes"/> asks it before reporting a <see cref="PyNameAttribute"/>
+    ///     method, and names it in its errors.
+    /// </summary>
+    internal interface IPythonAttributePresence {
+        /// <summary>Whether this instance has the Python attribute <paramref name="name"/>.</summary>
+        /// <param name="name">The attribute, in Python spelling.</param>
+        /// <returns><see langword="false"/> to hide it on this instance.</returns>
+        bool HasPythonAttribute(string name);
+
+        /// <summary>The class name Python prints for this instance (<c>'Continuous_MountainCarEnv' object has no attribute ...</c>).</summary>
+        string PythonClassName { get; }
+    }
+
+    /// <summary>
     ///     Python's <c>hasattr</c>, <c>getattr</c> and <c>setattr</c> for .NET objects that mirror Python classes: the declared
     ///     attributes are the public instance properties and fields (named by <see cref="PyNameAttribute"/>, or the
     ///     snake_case of the C# name: <c>NpRandomSeed</c> is <c>np_random_seed</c>) plus non-public members marked with
@@ -58,9 +76,17 @@ namespace Gym.Utils {
     ///     <c>hasattr</c>.
     ///     </para>
     ///     <para>
-    ///     Two deviations follow from static typing: methods are not attributes here (Python's <c>hasattr(env, "step")</c> is
-    ///     true), and a value must fit the member's type (Python stores anything): numbers convert between numeric types,
-    ///     anything else that does not fit raises <see cref="TypeError"/>.
+    ///     Two deviations follow from static typing: a method is an attribute only when it carries
+    ///     <see cref="PyNameAttribute"/> (Python's <c>hasattr(env, "step")</c> is true for every method), and a value must
+    ///     fit the member's type (Python stores anything): numbers convert between numeric types, anything else that does not
+    ///     fit raises <see cref="TypeError"/>.
+    ///     </para>
+    ///     <para>
+    ///     A <see cref="PyNameAttribute"/> method (DR-45, <c>get_keys_to_action</c>) reads as the bound method, a delegate to
+    ///     call. A virtual one is present only once the object's class overrides it, and only when an object with
+    ///     per-instance presence agrees (<see cref="IPythonAttributePresence"/>), so a base that merely declares it reads as
+    ///     Python's missing method. As in Python, where an instance's own attributes come before its class's functions, a
+    ///     run-time attribute of the same name shadows the method, and assigning the name creates that attribute.
     ///     </para>
     /// </remarks>
     public static class PyAttributes {
@@ -124,6 +150,8 @@ namespace Gym.Utils {
                 throw new ArgumentNullException(nameof(name));
 
             if (Members(target.GetType()).TryGetValue(name, out MemberInfo? member)) {
+                if (member is MethodInfo method)
+                    return BoundMethod(target, method, name);
                 try {
                     return member is PropertyInfo property ? property.GetValue(target) : ((FieldInfo)member).GetValue(target);
                 } catch (TargetInvocationException e) when (e.InnerException is not null) {
@@ -135,8 +163,49 @@ namespace Gym.Utils {
 
             if (target is IDynamicAttributes dynamic && dynamic.DynamicAttributes.TryGetValue(name, out object? value))
                 return value;
-            throw new AttributeError($"'{PyTypeName(target.GetType())}' object has no attribute '{name}'");
+            throw new AttributeError($"'{ClassNameOf(target)}' object has no attribute '{name}'");
         }
+
+        /// <summary>
+        ///     A <see cref="PyNameAttribute"/> method read as Python reads a method attribute (DR-45): the instance's own
+        ///     attribute of that name when it holds one, else the method bound to <paramref name="target"/>, when present.
+        /// </summary>
+        /// <param name="target">The object.</param>
+        /// <param name="method">The most derived declaration of the method for the object's class.</param>
+        /// <param name="name">The Python attribute name.</param>
+        /// <returns>The shadowing run-time attribute, or a delegate (<c>Func</c>/<c>Action</c>) that calls the method on the object.</returns>
+        /// <exception cref="AttributeError">Thrown when the method is absent on this object (<see cref="MethodPresent"/>).</exception>
+        private static object? BoundMethod(object target, MethodInfo method, string name) {
+            // Python looks an instance's own attributes up before its class's functions: `env.get_keys_to_action = f` wins.
+            if (target is IDynamicAttributes dynamic && dynamic.DynamicAttributes.TryGetValue(name, out object? shadow))
+                return shadow;
+            if (!MethodPresent(target, method, name))
+                throw new AttributeError($"'{ClassNameOf(target)}' object has no attribute '{name}'");
+            Type delegateType = System.Linq.Expressions.Expression.GetDelegateType(method.GetParameters().Select(p => p.ParameterType).Append(method.ReturnType).ToArray());
+            return method.CreateDelegate(delegateType, target);
+        }
+
+        /// <summary>
+        ///     Whether a <see cref="PyNameAttribute"/> method is present on <paramref name="target"/> (DR-45): a virtual method
+        ///     only once the object's class overrides it (the declaring base's body is Python's missing method), and only when an
+        ///     object with per-instance presence agrees.
+        /// </summary>
+        /// <param name="target">The object.</param>
+        /// <param name="method">The most derived declaration of the method for the object's class.</param>
+        /// <param name="name">The Python attribute name, for the per-instance hook.</param>
+        /// <returns><see langword="true"/> when reading the attribute should return the bound method.</returns>
+        private static bool MethodPresent(object target, MethodInfo method, string name) {
+            // The map holds the most derived declaration, so a virtual method declared where its base definition is was never overridden.
+            if (method.IsVirtual && method.GetBaseDefinition().DeclaringType == method.DeclaringType)
+                return false;
+            return target is not IPythonAttributePresence presence || presence.HasPythonAttribute(name);
+        }
+
+        /// <summary>The class name Python prints for <paramref name="target"/>: the instance's own when it varies by instance, else its type's.</summary>
+        /// <param name="target">The object.</param>
+        /// <returns>The name, as <c>'CartPoleEnv' object has no attribute 'x'</c> prints it.</returns>
+        private static string ClassNameOf(object target) =>
+            target is IPythonAttributePresence presence ? presence.PythonClassName : PyTypeName(target.GetType());
 
         /// <summary>
         ///     Python's <c>setattr(target, name, value)</c>: assigns a declared member, or creates or replaces a run-time
@@ -158,10 +227,20 @@ namespace Gym.Utils {
                 throw new ArgumentNullException(nameof(name));
 
             if (Members(target.GetType()).TryGetValue(name, out MemberInfo? member)) {
+                if (member is MethodInfo) {
+                    // Python's `env.get_keys_to_action = f` sets an instance attribute that shadows the class's function.
+                    if (target is IDynamicAttributes shadowed) {
+                        shadowed.DynamicAttributes[name] = value;
+                        return;
+                    }
+
+                    throw new AttributeError($"'{ClassNameOf(target)}' object attribute '{name}' is read-only");
+                }
+
                 // A read-only attribute refuses any value, before the value is looked at, as Python's property does. A
                 // readonly field counts as one: Python would model it as a property without a setter.
                 if (member is PropertyInfo { SetMethod: null } or FieldInfo { IsInitOnly: true })
-                    throw new AttributeError($"property '{name}' of '{PyTypeName(target.GetType())}' object has no setter");
+                    throw new AttributeError($"property '{name}' of '{ClassNameOf(target)}' object has no setter");
                 Type memberType = member is PropertyInfo p ? p.PropertyType : ((FieldInfo)member).FieldType;
                 object? converted = Fit(value, memberType, name);
                 try {
@@ -181,7 +260,7 @@ namespace Gym.Utils {
                 return;
             }
 
-            throw new AttributeError($"'{PyTypeName(target.GetType())}' object has no attribute '{name}'");
+            throw new AttributeError($"'{ClassNameOf(target)}' object has no attribute '{name}'");
         }
 
         /// <summary>
@@ -228,6 +307,16 @@ namespace Gym.Utils {
                     string? name = AttributeName(field, field.IsPublic);
                     if (name != null)
                         members.TryAdd(name, field);
+                }
+
+                foreach (MethodInfo method in level.GetMethods(flags)) {
+                    // Only methods marked [PyName] are attributes (DR-45); accessors and operators never are, and a generic
+                    // method has no single delegate to bind. An override inherits its base's name, and the most derived
+                    // declaration is found first, which is what the presence check reads.
+                    if (method.IsSpecialName || method.ContainsGenericParameters)
+                        continue;
+                    if (method.GetCustomAttribute<PyNameAttribute>(inherit: true) is { } methodName)
+                        members.TryAdd(methodName.Name, method);
                 }
             }
 

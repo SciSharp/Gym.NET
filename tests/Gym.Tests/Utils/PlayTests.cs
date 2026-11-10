@@ -306,13 +306,19 @@ namespace Gym.Tests.Utils {
 
         /// <summary>
         ///     MountainCar-v0 maps keys as Gymnasium's (pygame 1's arrow codes, with the empty combination that makes
-        ///     <c>play</c> refuse it); MountainCarContinuous-v0 has no mapping at all, so <c>play</c> reports it missing.
+        ///     <c>play</c> refuse it), as key combinations to 0-d int64 actions (DR-45); MountainCarContinuous-v0 has no
+        ///     mapping at all, so <c>play</c> reports it missing.
         /// </summary>
         [TestMethod]
         public void MountainCar_KeysToAction_IsDiscreteOnly() {
             using var discrete = new MountainCarEnv(renderMode: "rgb_array");
-            Dictionary<object, object?> mapping = discrete.GetKeysToAction();
-            Assert.AreEqual("{(): 1, (276,): 0, (275,): 2, (275, 276): 1}", PyBuiltins.Repr(mapping));
+            IReadOnlyDictionary<KeyCombination, NDArray> mapping = discrete.GetKeysToAction();
+            Assert.AreEqual("(), (276,), (275,), (275, 276)", string.Join(", ", mapping.Keys));
+            CollectionAssert.AreEqual(new long[] { 1, 0, 2, 1 }, mapping.Values.Select(action => action.GetAtIndex<long>(0)).ToArray());
+            Assert.IsTrue(mapping.Values.All(action => action.ndim == 0 && action.typecode == NPTypeCode.Int64), "every action is a 0-d int64 array");
+            // The caller owns the mapping's actions.
+            foreach (NDArray action in mapping.Values)
+                action.Dispose();
 
             using IEnv made = Make("MountainCar-v0", new { render_mode = "rgb_array" });
             Assert.IsTrue(made.HasWrapperAttr("get_keys_to_action"));

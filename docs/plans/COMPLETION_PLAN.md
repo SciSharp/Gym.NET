@@ -687,6 +687,14 @@ Specs: the port plan's §9 and §10; sources `vector` 3,113 lines and `wrappers`
     `ObjectSpace` view takes the space it wraps; `DeepCopy` and disposal clear ownership. No test or library path shared
     a space: the unit and parity suites passed unchanged with the check on.*
   - DR-45: `get_keys_to_action` as a virtual method on `Env` with the presence hook, typed key combinations to actions.
+    *Done 2026-11-10:*
+    - `Env.GetKeysToAction()` returns `IReadOnlyDictionary<KeyCombination, TAct>`; its base raises Python's
+      `AttributeError`, and an override builds new actions on each call. Alongside it come
+      `HasPythonAttribute(name)` and `PythonClassName`, which MountainCar's continuous mode overrides.
+    - `KeyCombination` holds key codes, Python's tuple of ints. `PyAttributes` now reads `[PyName]` methods as
+      bound delegates: present when overridden, hidden by the hook, and shadowed by run-time attributes, as in
+      Python.
+    - `play` and `PlayableGame` release a mapping they take from the env, on refusal too.*
   - DR-47: both viewers report the layout's keycode.
   - DR-43: `FuncEnv`'s functions as delegate properties, and a typed `Transform`.
   - DR-41 and DR-44: `PygameContext` instances with a process-wide default, and `Play.RunAsync` on a dedicated thread or

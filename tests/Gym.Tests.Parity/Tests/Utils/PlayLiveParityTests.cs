@@ -443,8 +443,9 @@ namespace Gym.Tests.Parity.Tests.Utils {
                 using IEnv discrete = Gymnasium.Make("MountainCar-v0");
                 using IEnv continuous = Gymnasium.Make("MountainCarContinuous-v0");
                 // The mapping as its (key, action) items in order: the harness matches dict keys by their rendering, where a
-                // Python int has no width and a .NET int does, so items compare value by value instead (the order too).
-                var mapping = (Dictionary<object, object?>)PlayKeysCall(discrete.GetWrapperAttr("get_keys_to_action"))!;
+                // Python int has no width and a .NET int does, so items compare value by value instead (the order too). The
+                // keys are key combinations (tuples) and the actions 0-d int64 arrays (DR-45), released with the result.
+                var mapping = (IReadOnlyDictionary<KeyCombination, NDArray>)PlayKeysCall(discrete.GetWrapperAttr("get_keys_to_action"))!;
                 return new object?[] { discrete.HasWrapperAttr("get_keys_to_action"), mapping.Select(item => (object?)(item.Key, item.Value)).ToList(), continuous.HasWrapperAttr("get_keys_to_action") };
             });
             ByteContract.AssertSame("MountainCar's get_keys_to_action", python, dotnet);
@@ -678,19 +679,33 @@ namespace Gym.Tests.Parity.Tests.Utils {
             return Outcome.Returned(ValueFacts.FromSequence(records, "tuple"));
         }
 
-        /// <summary>Gymnasium's test wrapper: <c>get_keys_to_action</c> returns a given mapping (a delegate-typed attribute, as MountainCar's).</summary>
+        /// <summary>
+        ///     Gymnasium's test wrapper: <c>get_keys_to_action</c> returns a given mapping. The method is typed (DR-45), key
+        ///     combinations to the env's actions, so the wrapper holds a tuple key as its codes and an int action as a 0-d int64
+        ///     array, which the harness compares with Gymnasium's Python int by value.
+        /// </summary>
         private sealed class KeysToActionWrapper : Wrapper<NDArray, NDArray> {
+            /// <summary>The mapping as key combinations and the actions' values, in the given order.</summary>
+            private readonly List<(KeyCombination Keys, long Action)> _mapping;
+
             /// <summary>Wraps <paramref name="env"/>.</summary>
             /// <param name="env">The env.</param>
-            /// <param name="keysToAction">The mapping.</param>
-            public KeysToActionWrapper(Env<NDArray, NDArray> env, object keysToAction) : base(env) => KeysToAction = keysToAction;
+            /// <param name="keysToAction">The mapping: tuple keys of int codes, int actions.</param>
+            /// <exception cref="InvalidCastException">Thrown for a key that is no tuple of ints, or an action that is no int.</exception>
+            public KeysToActionWrapper(Env<NDArray, NDArray> env, Dictionary<object, object?> keysToAction) : base(env) =>
+                _mapping = keysToAction.Select(entry => (Combination((System.Runtime.CompilerServices.ITuple)entry.Key), Convert.ToInt64(entry.Value))).ToList();
 
-            /// <summary>The mapping (<c>keys_to_action</c>).</summary>
-            public object KeysToAction { get; }
+            /// <summary>The wrapper's <c>get_keys_to_action</c>: the mapping, with new action arrays on every call (play owns and releases them).</summary>
+            /// <returns>The mapping.</returns>
+            public override IReadOnlyDictionary<KeyCombination, NDArray> GetKeysToAction() =>
+                _mapping.ToDictionary(entry => entry.Keys, entry => NDArray.Scalar(entry.Action));
 
-            /// <summary>The <c>get_keys_to_action</c> method.</summary>
-            [PyName("get_keys_to_action")]
-            public Func<object> GetKeysToAction => () => KeysToAction;
+            /// <summary>A tuple key's codes.</summary>
+            /// <param name="key">The tuple.</param>
+            /// <returns>The combination.</returns>
+            /// <exception cref="InvalidCastException">Thrown for an item that is no int.</exception>
+            private static KeyCombination Combination(System.Runtime.CompilerServices.ITuple key) =>
+                new(Enumerable.Range(0, key.Length).Select(i => (int)key[i]!).ToArray());
         }
 
         /// <summary>The matplotlib stand-in's .NET twin: a figure logging <see cref="PlayPlot"/>'s calls as the Python stand-in logs them.</summary>

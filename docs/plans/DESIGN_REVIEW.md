@@ -306,9 +306,9 @@ Effects of approved designs that only showed up in code. None changes a design; 
   Avalonia and WinForms viewers implement it (WinForms reports Shift, Ctrl and Alt as the left keys). `play`'s callback
   arguments are borrowed (D19): observations and infos are released after their last callback, so a callback copies
   what it keeps; the first `obs_t` of each episode is the reset's `(obs, info)`, Gymnasium's quirk kept.
-  `get_keys_to_action` is a delegate-typed property marked `[PyName]` rather than a method, because a property can be
+  `get_keys_to_action` was a delegate-typed property marked `[PyName]` rather than a method, because a property can be
   absent: MountainCar's raises `AttributeError` in continuous mode, where Gymnasium's continuous class has no such
-  method. MountainCar's mapping keeps Gymnasium's footguns (pygame 1's arrow codes 275 and 276, which no window
+  method. DR-45 replaced it with a virtual method on `Env`, absent until overridden, with a presence hook. MountainCar's mapping keeps Gymnasium's footguns (pygame 1's arrow codes 275 and 276, which no window
   produces, and the empty combination `()` that makes `play` refuse the mapping). `PlayPlot` draws through
   `IPlotFigure`, matplotlib's calls as `PlayPlot` makes them (compared call for call through a stand-in in the parity
   suite); the default `PlotFigure` is a plain viewer window in matplotlib's layout without text, not matplotlib's

@@ -405,8 +405,14 @@ namespace Gym.Environments.Envs.Classic {
         /// <summary>
         ///     The discrete mode's keyboard mapping for <see cref="Gym.Utils.Play"/> (Gymnasium's
         ///     <c>get_keys_to_action()</c>): <c>{(): 1, (276,): 0, (275,): 2, (275, 276): 1}</c>, nothing pressed or both
-        ///     arrows coasting, one arrow pushing that way. Call it like the method it stands for: <c>env.GetKeysToAction()</c>.
+        ///     arrows coasting, one arrow pushing that way. Each call builds a new mapping whose actions (0-d int64 arrays, DR-08)
+        ///     the caller owns.
         /// </summary>
+        /// <returns>The mapping, in Gymnasium's order.</returns>
+        /// <exception cref="AttributeError">
+        ///     Thrown in continuous mode, where Gymnasium's class has no such method:
+        ///     <c>'Continuous_MountainCarEnv' object has no attribute 'get_keys_to_action'</c>.
+        /// </exception>
         /// <remarks>
         ///     <para>
         ///     Two footguns are Gymnasium's own and kept: 275 and 276 are pygame 1's arrow codes, which no pygame 2 window (nor
@@ -415,25 +421,32 @@ namespace Gym.Environments.Envs.Classic {
         ///     MountainCar only with a mapping of the caller's. <c>PlayableGame</c> takes it (its relevant keys are 275 and 276).
         ///     </para>
         ///     <para>
-        ///     A delegate-typed property rather than a method, so that it is a Python attribute through
-        ///     <see cref="PyAttributes"/> (<c>has_wrapper_attr("get_keys_to_action")</c> finds it through any wrapper stack)
-        ///     and can be absent: Gymnasium's continuous class has no such method, so in continuous mode reading it raises
-        ///     <see cref="AttributeError"/> and <c>has_wrapper_attr</c> answers false. Each call builds a new dictionary
-        ///     whose keys are value tuples (<c>ValueTuple</c>, <c>ValueTuple&lt;int&gt;</c>, <c>(int, int)</c>), Python's tuples
-        ///     of ints.
+        ///     The override of <c>Env</c>'s absent base (DR-45); <see cref="HasPythonAttribute"/> keeps <c>hasattr</c> false in
+        ///     continuous mode, as on Gymnasium's continuous class.
         ///     </para>
         ///     <para>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/envs/classic_control/mountain_car.py#L278">gymnasium/envs/classic_control/mountain_car.py</see>.</para>
         /// </remarks>
-        /// <exception cref="AttributeError">Thrown by the getter in continuous mode: <c>'Continuous_MountainCarEnv' object has no attribute 'get_keys_to_action'</c>.</exception>
-        [PyName("get_keys_to_action")]
-        public Func<Dictionary<object, object?>> GetKeysToAction => Continuous
-            ? throw new AttributeError($"'{ClassName}' object has no attribute 'get_keys_to_action'")
-            : () => new Dictionary<object, object?> {
-                [new ValueTuple()] = 1,
-                [ValueTuple.Create(276)] = 0,
-                [ValueTuple.Create(275)] = 2,
-                [(275, 276)] = 1,
+        public override IReadOnlyDictionary<KeyCombination, NDArray> GetKeysToAction() {
+            if (Continuous)
+                throw new AttributeError($"'{ClassName}' object has no attribute 'get_keys_to_action'");
+            return new Dictionary<KeyCombination, NDArray> {
+                [KeyCombination.None] = NDArray.Scalar(1L),
+                [new KeyCombination(276)] = NDArray.Scalar(0L),
+                [new KeyCombination(275)] = NDArray.Scalar(2L),
+                [new KeyCombination(275, 276)] = NDArray.Scalar(1L),
             };
+        }
+
+        /// <summary>
+        ///     Hides <c>get_keys_to_action</c> in continuous mode (DR-45): Gymnasium's <c>Continuous_MountainCarEnv</c> has no
+        ///     such method, so <c>hasattr</c> and <c>has_wrapper_attr</c> answer false there.
+        /// </summary>
+        /// <param name="name">The attribute, in Python spelling.</param>
+        /// <returns><see langword="false"/> for <c>get_keys_to_action</c> in continuous mode; <see langword="true"/> otherwise.</returns>
+        protected override bool HasPythonAttribute(string name) => name != "get_keys_to_action" || !Continuous;
+
+        /// <summary>The Python class this instance stands for: <c>Continuous_MountainCarEnv</c> in continuous mode (DR-32), else <c>MountainCarEnv</c>.</summary>
+        protected override string PythonClassName => ClassName;
 
         /// <summary>
         ///     The env's description, as Gymnasium prints the class of this mode: <c>&lt;MountainCarEnv&lt;MountainCar-v0&gt;&gt;</c>,

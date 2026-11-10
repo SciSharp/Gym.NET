@@ -133,6 +133,19 @@ namespace Gym.Utils {
         }
 
         /// <summary>
+        ///     Releases the actions of a mapping taken from an env's <c>get_keys_to_action</c> (DR-45): the env builds a new
+        ///     mapping on every call and the caller owns it, actions included (0-d arrays for a discrete env, D19). Values that
+        ///     hold nothing (Python ints from a run-time attribute) are left alone.
+        /// </summary>
+        /// <param name="mapping">The mapping, or <see langword="null"/> (none was taken); anything that is no dictionary is ignored.</param>
+        public static void ReleaseActions(object? mapping) {
+            if (DictEntries(mapping) is not { } entries)
+                return;
+            foreach (KeyValuePair<object?, object?> entry in entries)
+                (entry.Value as IDisposable)?.Dispose();
+        }
+
+        /// <summary>
         ///     Calls an attribute's value with no arguments, as Python's <c>getattr(...)()</c> does:
         ///     <c>get_wrapper_attr("get_keys_to_action")()</c>.
         /// </summary>
