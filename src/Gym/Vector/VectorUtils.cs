@@ -100,6 +100,9 @@ namespace Gym.Vector {
         public static Space BatchDifferingSpaces(IReadOnlyList<Space> spaces) {
             if (spaces is null || spaces.Count == 0)
                 throw new ValueError("Expects a non-empty list of spaces");
+            // An untyped env's spaces are ObjectSpace views, Gym.NET's own wrapper: the spaces inside are the ones Gymnasium's
+            // function gets (as in BatchSpace), so SyncVectorEnv's "different" mode batches untyped envs too.
+            spaces = spaces.Select(space => ObjectSpace.Unview(space) ?? space).ToArray();
             Type first = spaces[0].GetType();
             if (!spaces.All(s => first.IsInstanceOfType(s)))
                 throw new TypeError($"Expects all spaces to be of the same type, actual types: [{string.Join(", ", spaces.Select(s => PyBuiltins.TypeRepr(s)))}]");
@@ -232,7 +235,16 @@ namespace Gym.Vector {
         /// <param name="items">The elements, one per env.</param>
         /// <param name="out">The destination (from <see cref="CreateEmptyArray"/>): an array, a tuple or dict of them, or <see langword="null"/> for other spaces.</param>
         /// <returns><paramref name="out"/> filled, a new tuple or dict holding the filled parts, or a tuple of the items.</returns>
-        /// <exception cref="TypeError">Thrown when <paramref name="space"/> is <see langword="null"/>.</exception>
+        /// <exception cref="TypeError">
+        ///     Thrown when <paramref name="space"/> is <see langword="null"/>, or an array space's item is neither an array nor
+        ///     a Python number (<c>Expected an array to concatenate, got &lt;class 'str'&gt;</c>).
+        /// </exception>
+        /// <exception cref="OverflowException">Thrown, as Python's <c>OverflowError</c>, for an int beyond 64 bits, which NumPy would stack as an object.</exception>
+        /// <remarks>
+        ///     An array space's items may be Python numbers, as <c>np.stack</c> takes them: an int stacks as int64 (uint64 above
+        ///     <see cref="long.MaxValue"/>), a float as float64, a bool as bool, a .NET <see langword="float"/> as float32 (the
+        ///     NumPy scalar it stands for); the batch then takes <paramref name="out"/>'s dtype.
+        /// </remarks>
         public static object? Concatenate(Space space, IEnumerable<object?> items, object? @out) {
             // An untyped env's spaces are ObjectSpace views, Gym.NET's own wrapper: the space inside is the one Gymnasium's function gets.
             space = ObjectSpace.Unview(space)!;
@@ -243,16 +255,24 @@ namespace Gym.Vector {
                 case Discrete:
                 case MultiDiscrete:
                 case MultiBinary: {
-                    // The items are the caller's arrays, only cast here, so the stack borrows them.
+                    // np.stack takes whatever np.asanyarray takes: the caller's arrays, borrowed for the stack, and Python
+                    // numbers (an env's Discrete observation as an int), which become 0-d arrays of NumPy's default dtypes
+                    // here and are released once stacked.
+                    var created = new List<NDArray>();
+                    try {
 #pragma warning disable NDW012
-                    NDArray[] arrays = items.Select(item => item as NDArray ?? throw new TypeError($"Expected an array to concatenate, got {PyBuiltins.TypeRepr(item)}")).ToArray();
+                        NDArray[] arrays = items.Select(item => item as NDArray ?? Track(created, ScalarArray(item))).ToArray();
 #pragma warning restore NDW012
-                    using NDArray stacked = np.stack(arrays);
-                    if (@out is not NDArray destination)
-                        return stacked.copy();
-                    // np.stack(..., out=out): the batch is written into the caller's buffer, which the caller keeps.
-                    np.copyto(destination, stacked);
-                    return destination;
+                        using NDArray stacked = np.stack(arrays);
+                        if (@out is not NDArray destination)
+                            return stacked.copy();
+                        // np.stack(..., out=out): the batch is written into the caller's buffer, which the caller keeps.
+                        np.copyto(destination, stacked);
+                        return destination;
+                    } finally {
+                        foreach (NDArray array in created)
+                            array.Dispose();
+                    }
                 }
                 case Tuple tuple: {
                     object?[] list = items.ToArray();
@@ -315,6 +335,49 @@ namespace Gym.Vector {
                 default:
                     return null;
             }
+        }
+
+        /// <summary>
+        ///     <c>np.asanyarray(item)</c> for a Python number <see cref="Concatenate"/> stacks: a new 0-d array of NumPy's dtype
+        ///     for it (int64, or uint64 past <see cref="long.MaxValue"/>; float64; bool; float32 and float16 for the .NET floats
+        ///     standing for NumPy's scalars).
+        /// </summary>
+        /// <param name="item">The item.</param>
+        /// <returns>A new 0-d array the caller disposes.</returns>
+        /// <exception cref="TypeError">Thrown for anything else: <c>Expected an array to concatenate, got &lt;class 'str'&gt;</c>.</exception>
+        /// <exception cref="OverflowException">Thrown for an int beyond 64 bits.</exception>
+        private static NDArray ScalarArray(object? item) {
+            switch (item) {
+                case bool flag:
+                    return NDArray.Scalar(flag);
+                case sbyte or byte or short or ushort or int or uint or long:
+                    return NDArray.Scalar(Convert.ToInt64(item, CultureInfo.InvariantCulture));
+                case ulong unsigned:
+                    return unsigned <= long.MaxValue ? NDArray.Scalar((long)unsigned) : NDArray.Scalar(unsigned);
+                case BigInteger integer when integer >= long.MinValue && integer <= long.MaxValue:
+                    return NDArray.Scalar((long)integer);
+                case BigInteger integer when integer >= 0 && integer <= ulong.MaxValue:
+                    return NDArray.Scalar((ulong)integer);
+                case BigInteger:
+                    throw new OverflowException("Python int too large to convert to C long");
+                case double d:
+                    return NDArray.Scalar(d);
+                case float f:
+                    return NDArray.Scalar(f);
+                case Half h:
+                    return NDArray.Scalar(h);
+                default:
+                    throw new TypeError($"Expected an array to concatenate, got {PyBuiltins.TypeRepr(item)}");
+            }
+        }
+
+        /// <summary>Records an array <see cref="Concatenate"/> created, so it is released after the stack.</summary>
+        /// <param name="created">The arrays created so far.</param>
+        /// <param name="array">The new array.</param>
+        /// <returns><paramref name="array"/>.</returns>
+        private static NDArray Track(List<NDArray> created, NDArray array) {
+            created.Add(array);
+            return array;
         }
 
         /// <summary>

@@ -653,6 +653,17 @@ Specs: the port plan's §9 and §10; sources `vector` 3,113 lines and `wrappers`
   the display at each callback; 15 refusals of `play`; MountainCar's mapping; `PlayPlot` over 7 scenarios through a
   matplotlib stand-in. `tests/utils/test_play.py` mirrored (17 tests); inventory −5 names. The viewers' keyboard input
   was checked by hand on a disposable desktop (see the commit).*
+- *Done 2026-11-10, P6.8:* the rest of `tests/vector` mirrored: `test_sync_vector_env.py` (11),
+  `test_vector_env.py` (8, over sync and async with and without shared memory), `test_autoreset_mode.py` (6),
+  `test_observation_mode.py` (5), `test_vector_env_info.py` (2), `test_vector_wrapper.py` (3) and
+  `utils/test_space_utils.py` (10, over the testing space catalog), so every Gymnasium test function of `tests/vector`
+  and `tests/wrappers` has its port except the documented ones (array conversions and Atari: out of scope; module
+  imports: the inventory; a float `num_repeats`: unreachable through C#'s `long`). The ports found two bugs, fixed:
+  `VectorUtils.Concatenate` refused Python numbers (an untyped env's `Discrete` observation as an `int`), which NumPy's
+  `np.stack` takes; `VectorUtils.BatchDifferingSpaces` did not unwrap an untyped env's `ObjectSpace` views, so
+  `SyncVectorEnv(..., observation_mode="different")` failed over untyped envs. The test helper `assert_rng_equal` now
+  compares NumSharp's `PCG64.State` field by field (the object has no value equality). The P6 exit holds: both suites
+  green, async equal to sync in every execution mode; open: the BipedalWalker seed test (P8).
 
 ### P8 Box2D
 

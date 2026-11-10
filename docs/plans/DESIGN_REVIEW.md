@@ -236,6 +236,11 @@ Effects of approved designs that only showed up in code. None changes a design; 
   `context` and `daemon` (process start options) and the custom `worker` function (a pipe protocol), whose two tests are
   `[OpenBugs("P6.2-worker")]`. Gymnasium's live `AsyncVectorEnv` runs in the parity suite: its workers are spawned from
   the embedded interpreter once `multiprocessing.set_executable` names a real `python.exe`.
+- **D19 and Gymnasium's shared spaces** (found in P6.8, 2026-11-10): a Gym.NET env owns and disposes the spaces it
+  is given (documented on `Env.ActionSpace`), where Gymnasium's tests share one space between envs, which processes
+  copy. The ported tests build a space per env; sharing one is a caller error that shows up late: `AsyncVectorEnv`
+  disposes the envs it builds only to read their spaces, which released a test's boxes while the test still held
+  them.
 - **DR-36, `play`, `PlayableGame` and `PlayPlot`** (found in P6.7, 2026-11-10): pygame's module-level display and
   event queue are mirrored, process-wide, by `Gym.Rendering.Display` (one window from the viewer factory, DR-20; its
   surface is replaced when the user resizes a resizable display) and `Gym.Rendering.EventQueue` (posted events, plus

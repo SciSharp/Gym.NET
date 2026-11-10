@@ -54,12 +54,24 @@ namespace Gym.Tests.Gymnasium.Vector {
             return env;
         };
 
-        /// <summary><c>assert_rng_equal(rng_1, rng_2)</c>: the two generators are in the same state.</summary>
+        /// <summary>
+        ///     <c>assert_rng_equal(rng_1, rng_2)</c>: the two generators are in the same state, field by field of NumPy's
+        ///     <c>bit_generator.state</c> dict (<c>state</c>, <c>inc</c>, <c>has_uint32</c>, <c>uinteger</c>).
+        /// </summary>
         /// <param name="rng1">The first generator.</param>
         /// <param name="rng2">The second.</param>
         /// <exception cref="AssertFailedException">Thrown when the states differ.</exception>
-        internal static void AssertRngEqual(Generator rng1, Generator rng2) =>
-            Assert.IsTrue(PyEquality.AreEqual(rng1.bit_generator.state, rng2.bit_generator.state), "the generators' states differ");
+        /// <exception cref="InvalidCastException">Thrown for a generator over another bit generator than PCG64, which no Gymnasium space uses.</exception>
+        /// <remarks>
+        ///     NumSharp's <see cref="PCG64.State"/> is a class without value equality, so comparing the state objects (as
+        ///     Python compares the dicts) would compare references: the fields are compared instead.
+        /// </remarks>
+        internal static void AssertRngEqual(Generator rng1, Generator rng2) {
+            var state1 = (PCG64.State)rng1.bit_generator.state;
+            var state2 = (PCG64.State)rng2.bit_generator.state;
+            Assert.IsTrue(state1.state == state2.state && state1.inc == state2.inc && state1.has_uint32 == state2.has_uint32 && state1.uinteger == state2.uinteger,
+                $"the generators' states differ: ({state1.state}, {state1.inc}, {state1.has_uint32}, {state1.uinteger}) vs ({state2.state}, {state2.inc}, {state2.has_uint32}, {state2.uinteger})");
+        }
 
         /// <summary>Disposes the observation of a reset the caller does not read.</summary>
         /// <typeparam name="TObs">The observation type.</typeparam>
