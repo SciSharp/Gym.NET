@@ -25,6 +25,9 @@
     <ProjectReference Include="..\..\src\Gym.Rendering.Avalonia\Gym.Rendering.Avalonia.csproj" />
     <ProjectReference Include="..\..\src\Gym.Rendering.WinForm\Gym.Rendering.WinForm.csproj" />
     <ProjectReference Include="..\..\src\Gym\Gym.csproj" />
+    <!-- The Box2D engine, for its own tests (Box2D/): Gym.Environments references it privately, as the package carries it,
+         so its types reach the tests only through a reference of their own. -->
+    <ProjectReference Include="..\..\src\Gym.Box2D\Gym.Box2D.csproj" />
     <!-- An assembly the tests never touch, so it stays unloaded until make("Gym.Tests.Plugin:RegisterDuringMake-v0") loads it
          and its module initializer registers the id (TestMake.TestImportModuleDuringMake). -->
     <ProjectReference Include="..\Gym.Tests.Plugin\Gym.Tests.Plugin.csproj" />

@@ -21,6 +21,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Gym.Tests.Parity", "tests\G
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Gym.Rendering", "src\Gym.Rendering\Gym.Rendering.csproj", "{C1682014-33C5-567B-9500-5E521E45D0FA}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Gym.Box2D", "src\Gym.Box2D\Gym.Box2D.csproj", "{DAAB4712-EFAF-4C67-B1D1-73C013C74CCB}"
+EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Gym.SourceGenerators", "src\Gym.SourceGenerators\Gym.SourceGenerators.csproj", "{CE4C045A-2C87-4E19-B7B3-69723240BE85}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Gym.Tests.Plugin", "tests\Gym.Tests.Plugin\Gym.Tests.Plugin.csproj", "{41FCF174-EA63-461E-834F-7BF14AB9CC10}"
@@ -75,6 +77,10 @@ Global
 		{1F7CC344-6B55-4DB0-8C4F-E4FB9EB7C2BD}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{1F7CC344-6B55-4DB0-8C4F-E4FB9EB7C2BD}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{1F7CC344-6B55-4DB0-8C4F-E4FB9EB7C2BD}.Release|Any CPU.Build.0 = Release|Any CPU
+		{DAAB4712-EFAF-4C67-B1D1-73C013C74CCB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DAAB4712-EFAF-4C67-B1D1-73C013C74CCB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DAAB4712-EFAF-4C67-B1D1-73C013C74CCB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DAAB4712-EFAF-4C67-B1D1-73C013C74CCB}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

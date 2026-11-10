@@ -1,0 +1,43 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The Box2D 2.3 physics engine Gymnasium's box2d envs run on (decision D5, DR-26, DR-29; port plan section 5.6), in
+       managed C#: the C++ core that pybox2d 2.3.10 (the 'box2d==2.3.10' wheel of the parity stack) compiles, translated
+       statement for statement in float32 so its results match the wheel's bit for bit, plus the pybox2d-shaped surface
+       Gymnasium's Python calls. Box2D and pybox2d are zlib-licensed (THIRD-PARTY-NOTICES.md); each translated file keeps
+       Erin Catto's or Ken Lauer's notice and says what was altered.
+
+       Not a package of its own: the NuGet id 'Box2D.NET' belongs to an unrelated Box2D v3 port, so this assembly ships
+       inside Gym.NET.Environments (DR-16), whose project packs it next to its own assembly. -->
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>Gym.Box2D</RootNamespace>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <Deterministic>true</Deterministic>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- Packed by Gym.Environments.csproj into Gym.NET.Environments, never on its own. -->
+    <IsPackable>false</IsPackable>
+    <Version>2.0.0</Version>
+    <Authors>Eli Belash</Authors>
+    <Company>SciSharp STACK</Company>
+    <Product>Gym.NET.Environments</Product>
+    <Description>Box2D 2.3 in managed C#, float32 and bit for bit as pybox2d 2.3.10 computes it, with pybox2d's surface: the physics of Gym.NET's LunarLander, BipedalWalker and CarRacing.</Description>
+    <Copyright>2019-2026 © SciSharp STACK Team; Box2D © 2006-2012 Erin Catto; pybox2d © 2010 Ken Lauer</Copyright>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- The engine's own tests reach its internals: the C++-faithful core stays internal, the pybox2d-shaped surface public. -->
+    <InternalsVisibleTo Include="Gym.Tests" />
+    <InternalsVisibleTo Include="Gym.Tests.Parity" />
+  </ItemGroup>
+
+  <!-- NumSharp: Python's built-in exceptions (AssertionError for b2Assert, TypeError and ValueError for pybox2d's argument
+       checks) come from NumSharp, as everywhere in Gym.NET (D17). The regular NuGet reference by default; the import swaps
+       it for refs/NumSharp's source build under -p:NumSharpSource=Submodule and stays last, as in the other projects. -->
+  <ItemGroup>
+    <PackageReference Include="NumSharp" Version="0.80.0" />
+  </ItemGroup>
+  <Import Project="..\..\eng\NumSharp.props" />
+
+</Project>

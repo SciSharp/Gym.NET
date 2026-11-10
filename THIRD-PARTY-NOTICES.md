@@ -91,6 +91,60 @@ Andreas Schiffler -- aschiffler at ferzkopp dot net
 
 ---
 
+## Box2D 2.3.0 and pybox2d 2.3.10 (zlib)
+
+`src/Gym.Box2D` (the `Gym.Box2D` assembly, shipped inside Gym.NET.Environments) is a C# translation of the
+[Box2D](https://box2d.org) 2.3.0 C++ sources that [pybox2d](https://github.com/pybox2d/pybox2d) 2.3.10 bundles
+(`Box2D/Common`, `Collision`, `Dynamics`: the parts Gymnasium's box2d environments reach), and of pybox2d's SWIG
+extensions (`Box2D/*.i`) for the Python-shaped surface those environments call. Every file is an altered version, marked
+as such under the notice it keeps: translated to C#, reduced to the shapes and joints Gymnasium uses (circle, edge,
+polygon; revolute), with Box2D's allocators, timers, GJK and TOI call statistics and debug drawing removed and its
+assertions raising Python's `AssertionError`, as pybox2d compiles them. Each file keeps its own copyright line; the notice below is the one
+they share, and pybox2d's package notice follows it.
+
+```
+Copyright (c) 2006-2012 Erin Catto http://www.box2d.org
+
+This software is provided 'as-is', without any express or implied
+warranty.  In no event will the authors be held liable for any damages
+arising from the use of this software.
+Permission is granted to anyone to use this software for any purpose,
+including commercial applications, and to alter it and redistribute it
+freely, subject to the following restrictions:
+1. The origin of this software must not be misrepresented; you must not
+claim that you wrote the original software. If you use this software
+in a product, an acknowledgment in the product documentation would be
+appreciated but is not required.
+2. Altered source versions must be plainly marked as such, and must not be
+misrepresented as being the original software.
+3. This notice may not be removed or altered from any source distribution.
+```
+
+```
+This software is covered under the zlib license.
+
+C++ version Copyright (c) 2006-2011 Erin Catto http://www.box2d.org
+Python version Copyright (c) 2008-2011 Ken Lauer / sirkne at gmail dot com
+
+Implemented using the pybox2d SWIG interface for Box2D (pybox2d.googlecode.com)
+
+This software is provided 'as-is', without any express or implied
+warranty.  In no event will the authors be held liable for any damages
+arising from the use of this software.
+Permission is granted to anyone to use this software for any purpose,
+including commercial applications, and to alter it and redistribute it
+freely, subject to the following restrictions:
+1. The origin of this software must not be misrepresented; you must not
+claim that you wrote the original software. If you use this software
+in a product, an acknowledgment in the product documentation would be
+appreciated but is not required.
+2. Altered source versions must be plainly marked as such, and must not be
+misrepresented as being the original software.
+3. This notice may not be removed or altered from any source distribution.
+```
+
+---
+
 ## CPython 3.12 (PSF License Version 2)
 
 Three files in `src/Gym/Utils` follow CPython v3.12.12's source so that Gym.NET's error messages and printed values

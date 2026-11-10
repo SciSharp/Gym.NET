@@ -51,7 +51,27 @@
     <ProjectReference Include="..\Gym.Rendering\Gym.Rendering.csproj" />
     <!-- The source generator, for the envs' [GymOptions] records (DR-34): compiler-only, not a runtime dependency. -->
     <ProjectReference Include="..\Gym.SourceGenerators\Gym.SourceGenerators.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" PrivateAssets="all" />
+    <!-- The managed Box2D engine of the box2d envs (D5, DR-26). It ships inside this package (DR-16; the NuGet id
+         Box2D.NET is taken): PrivateAssets keeps it out of the package's dependencies, and IncludeBox2DInPackage below
+         packs its assembly, docs and symbols next to this one. -->
+    <ProjectReference Include="..\Gym.Box2D\Gym.Box2D.csproj" PrivateAssets="All" />
   </ItemGroup>
+
+  <!-- Packs Gym.Box2D's build output (dll, xml, pdb) into lib/<tfm>/ beside Gym.Environments.dll, so consumers compile
+       against it, see its docs and load it without a package of its own. Pack's reference resolution yields the dll
+       alone (no related files), so its xml and pdb are taken from the dll's own folder, the engine project's bin.
+       Gym.Rendering and Gym are packages of their own and stay dependencies. -->
+  <PropertyGroup>
+    <TargetsForTfmSpecificBuildOutput>$(TargetsForTfmSpecificBuildOutput);IncludeBox2DInPackage</TargetsForTfmSpecificBuildOutput>
+  </PropertyGroup>
+  <Target Name="IncludeBox2DInPackage" DependsOnTargets="ResolveReferences">
+    <ItemGroup>
+      <_Box2DAssembly Include="@(ReferenceCopyLocalPaths)" Condition="'%(ReferenceCopyLocalPaths.Filename)%(ReferenceCopyLocalPaths.Extension)' == 'Gym.Box2D.dll'" />
+      <BuildOutputInPackage Include="@(_Box2DAssembly)" />
+      <BuildOutputInPackage Include="@(_Box2DAssembly->'%(RootDir)%(Directory)%(Filename).xml')" />
+      <BuildOutputInPackage Include="@(_Box2DAssembly->'%(RootDir)%(Directory)%(Filename).pdb')" />
+    </ItemGroup>
+  </Target>
 
   <!-- The envs' images (DR-19): copied once from the pinned Gymnasium (Assets/README.md lists sources and hashes) and
        embedded, so the package carries them. Each is named assets/<path> with forward slashes on every OS (RecursiveDir

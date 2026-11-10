@@ -189,6 +189,13 @@ built until then:
    float32 `INTER_AREA` does not depend on IPP. IPP's bilinear is not published, so `Cv2.Resize` gives OpenCV's own
    kernel, exact against `cv2` with IPP off, and the gap against default `cv2` is an open cell. To decide: keep that
    reference, or try harder to reproduce IPP's arithmetic black-box.
+10. DR-26's one facade deviation (added in P8.1): a vector coordinate beyond float32 (or infinite) in a keyword
+    constructor (`CreateDynamicBody(position=(0, 1e39))`, a polygon vertex). pybox2d converts it inside the constructor
+    and prefixes the error (`Failed on kwargs for b2BodyDef.position: Converting from sequence to b2Vec2, ...`; a
+    polygon vertex even fails as SWIG's `OverflowError`). C# converts the tuple where the caller builds the `b2Vec2`,
+    before the constructor runs, so Gym.NET raises the conversion's own `TypeError`, unprefixed. Both sides are pinned
+    exactly (`VectorOverflowInKeywords_DeviatesAsDocumented`). Matching it would take an argument type that defers the
+    conversion (tuples and `b2Vec2`s alike) through every facade signature; no Gymnasium env passes such a value.
 
 Three answers were recorded in the reading below; a correction from the maintainer replaces the row before the step that depends on it starts:
 
@@ -363,3 +370,21 @@ Effects of approved designs that only showed up in code. None changes a design; 
   Taxi-v4's threshold, which Gymnasium registers as the `int` 8 (its annotation says `float`), prints `8.0` in
   `pprint` and `to_json`; the value is equal. Pinned by `RegistrationLiveParityTests.Spec_TaxiRewardThreshold_IsFloat64`,
   as rewards are float64 everywhere in Gym.NET.
+- **DR-29, measured** (P8.1, 2026-11-10): the contact solver's velocity and position loops and the dynamic tree's query
+  were written both ways and run on the same scenes, with bit-identical results. On NumSharp `NDArray`s the solver ran
+  6.2× slower than on float32 structs and the tree query 1.6× slower, and both took more code (element access and
+  scalar extraction around every vector operation). No subsystem passed the gate, so the engine is float32 structs from
+  end to end, as Box2D's C++ is; NumSharp supplies Python's exceptions (`AssertionError`, `TypeError`, `ValueError`).
+- **DR-26, the pybox2d facade** (P8.1, 2026-11-10): "pybox2d-shaped" is held to pybox2d's behavior, measured against
+  the live wheel, where it is surprising:
+  - `b2World(doSleep=False)` does not stop bodies sleeping. pybox2d's constructor runs `self.allowSleeping = doSleep`,
+    and its world has no such property (only `GetAllowSleeping`/`SetAllowSleeping`), so the value lands in a plain
+    attribute. Gym.NET records it as `DoSleep` and leaves the engine alone; `SetAllowSleeping` is public and is the
+    switch. No Gymnasium env passes `doSleep`.
+  - Keyword constructors wrap a refused argument's error as pybox2d's `_init_kwargs` does, keeping its type:
+    `Failed on kwargs for b2BodyDef.angle: in method 'b2BodyDef_angle_set', argument 2 of type 'float32'`; the body's
+    fixture shortcuts use pybox2d's other format, `Failed on kwargs, class="b2CircleShape" key="radius": ...`. C# binds
+    named arguments to parameters, so when two arguments fail, the one reported first follows the parameter order, not
+    the call's.
+  - Box2D's `b2Assert` raises `AssertionError` with C++'s stringified condition (`#A`), as pybox2d compiles it; where C#
+    spells the condition differently, the call passes C++'s text (44 conditions).

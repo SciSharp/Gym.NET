@@ -25,6 +25,7 @@ option records.
 | Gym.NET.Rendering.Avalonia | `src/Gym.Rendering.Avalonia` | `AvaloniaEnvViewer`, a window for `human` mode; `AvaloniaPlotFigure`, `PlayPlot`'s ScottPlot figure (DR-39) | Gym.NET.Environments, Avalonia 12, ScottPlot.Avalonia 5.1 |
 | Gym.NET.Rendering.WinForm | `src/Gym.Rendering.WinForm` | `WinFormEnvViewer`, the same on Windows Forms; `WinFormPlotFigure` | Gym.NET.Environments, Windows Forms, ScottPlot.WinForms 5.1 |
 | (inside Gym.NET) | `src/Gym.SourceGenerators` | The generator behind `[GymOptions]`, `[GymTuple]` and `[GymDict]` (DR-13, DR-34) | Roslyn 4.8 |
+| (inside Gym.NET.Environments) | `src/Gym.Box2D` | Box2D 2.3.0 in managed C#, float32 and bit for bit as pybox2d 2.3.10 computes it, with pybox2d's surface (`b2World`, `CreateDynamicBody`, `b2FixtureDef`, `b2PolygonShape`, `b2RevoluteJointDef`, contact listeners, ray casts) for the box2d envs (D5, DR-26, DR-29) | NumSharp 0.80.0 (Python's exceptions) |
 
 Gymnasium's modules map to namespaces by area, with Gymnasium's class names kept (D1, D16):
 

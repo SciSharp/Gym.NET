@@ -795,7 +795,38 @@ Specs: the port plan's §5.6 and §11.3; sources 2,979 lines.
   distance, TOI, manifolds, contact solver, island, joints, ray casts, the contact-listener callback order) and the
   pybox2d-shaped facade the envs call. Engine goldens come from live pybox2d scenes (free fall, stacking, joints,
   contacts, ray casts), compared per step in float32 bits; the first ones also settle whether .NET's `MathF`
-  trigonometry matches the CRT calls Box2D makes (§8).
+  trigonometry matches the CRT calls Box2D makes (§8). *Done 2026-11-10:*
+  - DR-29's measurement, both forms of the hot loops on the same scenes and bit-identical: the contact solver on
+    `NDArray`s ran 6.2× slower than on float32 structs, the dynamic tree's query 1.6× slower, with more code in both. No
+    subsystem passed the gate, so the whole engine is float32 structs (C++'s `b2Vec2`, `b2Rot`, manifolds, inline fixed
+    arrays); NumSharp supplies Python's exceptions. Recorded under DESIGN_REVIEW's consequences.
+  - `src/Gym.Box2D` (28 files, 12,706 lines with their docs): the core translated statement for statement from the
+    Box2D 2.3.0 that pybox2d 2.3.10 bundles (settings and math, broad phase and dynamic tree with Box2D's pair order, GJK distance, time of impact,
+    the circle/polygon/edge manifolds, contact solver with the block solver, island and TOI sub-stepping, sleeping,
+    the revolute joint, ray casts, the listener's callback order), each file under Erin Catto's zlib notice with a
+    dated "altered" line. Template `b2Min`/`b2Max`/`b2Abs`, C++'s operation order and float32 throughout; the GJK/TOI
+    statistics counters, allocators, timers and debug drawing are left out (the counters would be state shared across
+    vector-env threads). Box2D's assertions raise `AssertionError` with C++'s stringified condition, as pybox2d
+    compiles them: 44 conditions C# spells differently (`bd.position`, `GetShapeType()`) pass C++'s text explicitly.
+  - The pybox2d facade (`Facade/`, under Ken Lauer's notice): SWIG's float32 conversions and their `OverflowError`
+    texts, the sequence typemap's `TypeError`, keyword constructors with `_init_kwargs`' `Failed on kwargs for
+    Class.key: ` prefix and the fixture shortcuts' `class="…" key="…"` one, `CreateBody` creating fixtures then shapes,
+    the revolute definition's bodies-first order and reference angle, `doSleep` recorded but inert (pybox2d stores it
+    in a plain attribute, so bodies sleep either way; `SetAllowSleeping` is the switch).
+  - `MathF.Sin`/`Cos`/`Atan2`/`Sqrt` give MSVC's CRT bits on win-x64, on net8.0 and net10.0: every scene below is
+    bit-identical over its whole run (§8's risk closed).
+  - Engine cells (`Tests/Box2D/Box2DEngineLiveParityTests`, 13 gates, net8.0 and net10.0): scenes described once as
+    JSON and built by both engines, every body's position, angle, velocities and awake flag after every step in
+    float32 bits, the contact listener's begin/end events in order: LunarLander's hull on an edge, a 15-box pyramid
+    that must fall asleep, a motorized and limited revolute chain, BipedalWalker-like legs under per-step motor
+    schedules, bouncing circles, bullets through time of impact, sensors with filters, groups and a kinematic body,
+    1/60 s with sleeping off, `doSleep=False` still sleeping, 12 seeded random scenes; 80 ray casts with every callback
+    answer (clip, all, stop, filter); 33 error texts; and the one deviation pinned: a vector coordinate beyond float32
+    in a keyword constructor fails at the C# call site, unprefixed (DESIGN_REVIEW's list).
+  - Unit tests (`tests/Gym.Tests/Box2D`): eight worlds stepped at once on eight threads give one thread's bits; the
+    sleeping switches; the keyword errors' prefixes and chained originals.
+  - `Gym.Environments` references the engine privately and packs `Gym.Box2D.dll` (with its xml and pdb) into
+    `lib/<tfm>/` of Gym.NET.Environments, with no package dependency of its own.*
 - **P8.2** LunarLander-v3 and LunarLanderContinuous-v3 as `LunarLanderEnv` (DR-32, `[PyName("LunarLander")]`), with
   `heuristic` and a private nested `ContactDetector` (DR-28); the 8 LunarLander `[OpenBugs]` cells turn green.
 - **P8.3** BipedalWalker-v3 and BipedalWalkerHardcore-v3 as `BipedalWalkerEnv` (lidar ray casts), with its own private
@@ -941,8 +972,8 @@ one:
 | ImageSharp 2.1.13 stays flagged (D18) | Consumers' restores report three high and two moderate advisories; under `TreatWarningsAsErrors` their builds fail | Release notes and README name the five advisories and why Gym.NET's use doesn't reach them; a new advisory gets the same review (R0.2) |
 | One branch until 2.0 (D20) | A long-lived branch with many commits merges once; contributors keep targeting `master` | The branch sits on `master`'s tip (13 ahead, 0 behind), so while `master` doesn't move the final merge is a fast-forward; CI runs on the branch from P0r |
 | pygame `draw` from our own code (D4) | A primitive that won't converge stalls P7 | The random-shape harness reports the first differing pixel and its neighbourhood; the maintainer decides before any other route |
-| Box2D float32 trigonometry (D5) | Box2D calls `sinf`/`cosf`/`atan2f` from MSVC's CRT; .NET's `MathF` must agree on win-x64 | The first engine goldens include rotation-heavy scenes; a mismatch surfaces at P8.1, before any env |
-| Box2D on NumSharp (DR-29) | `NDArray`s in the solver's hot loops could cost performance or code size | P8.1 measures both forms per subsystem before choosing; float32 structs where NDArrays lose |
+| Box2D float32 trigonometry (D5) | Box2D calls `sinf`/`cosf`/`atan2f` from MSVC's CRT; .NET's `MathF` must agree on win-x64 | The first engine goldens include rotation-heavy scenes; a mismatch surfaces at P8.1, before any env. **Closed 2026-11-10:** every engine scene is bit-identical with pybox2d on win-x64, net8.0 and net10.0 |
+| Box2D on NumSharp (DR-29) | `NDArray`s in the solver's hot loops could cost performance or code size | P8.1 measures both forms per subsystem before choosing; float32 structs where NDArrays lose. **Closed 2026-11-10:** NDArrays lost in both measured loops (6.2× and 1.6× slower), so the engine is float32 structs |
 | CarRacing's recorded glyphs (DR-27) | The font is GNU FreeFont (GPL with a font exception); its glyph data ships in Gym.NET | License check before P8.4; if the data can't ship, the text design goes back to review before P8.4 continues |
 | The source generator (DR-13, DR-34) | One generator project feeds composite records and options records; a defect there reaches every env | Its output is covered by the same parity cells as hand-written code (`repr`, `==`, kwargs binding) |
 | MuJoCo postponed (DR-35) | 2.0 ships without Gymnasium's mujoco family | Release notes say so; DR-30, DR-31 and DR-33 keep the approved design for when it resumes (a managed port is XXL, and its bitwise parity with native MuJoCo is uncertain until measured) |

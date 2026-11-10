@@ -63,6 +63,12 @@ refs/Gym.NET/
 │   │   │                          #   Default the static Display/EventQueue forward to, process-wide like pygame's; Event, EventType, KeyCode
 │   │   └── Utils/                 # namespace Gym.Utils: Play (play, display_arr, RunAsync: DR-44), PlayableGame, MissingKeysToAction, PlayPlot
 │   │                              #   (IPlotFigure, PlotFigure); DR-36
+│   ├── Gym.Box2D/                 # Box2D 2.3.0 in managed C# (D5, DR-26, DR-29), float32 and bit for bit as pybox2d 2.3.10 computes it:
+│   │                              #   Common/, Collision/, Dynamics/ (the C++-faithful core, statement for statement; internal where pybox2d
+│   │                              #   hides it) and Facade/ (pybox2d's surface: b2World(gravity, doSleep), CreateDynamicBody, b2FixtureDef,
+│   │                              #   b2PolygonShape(vertices/box), b2RevoluteJointDef, contact listener, ray casts, SWIG's conversions and
+│   │                              #   messages). Each file keeps Erin Catto's or Ken Lauer's zlib notice. Packed inside
+│   │                              #   Gym.NET.Environments (DR-16), not a package of its own
 │   ├── Gym.Environments/          # Concrete environment implementations
 │   │   ├── Envs/Classic/          # CartPoleEnv (+ CartPoleVectorEnv, CartPole's vector entry point), MountainCarEnv (MountainCar-v0 and
 │   │   │                          #   MountainCarContinuous-v0, DR-32), PendulumEnv, AcrobotEnv, ClassicControlUtils
