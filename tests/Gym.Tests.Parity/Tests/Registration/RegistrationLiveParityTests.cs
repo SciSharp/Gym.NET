@@ -146,6 +146,7 @@ namespace Gym.Tests.Parity.Tests.Registration {
         [DataRow("LunarLanderContinuous-v3", 200)]
         [DataRow("BipedalWalker-v3", 300)]
         [DataRow("BipedalWalkerHardcore-v3", 300)]
+        [DataRow("CarRacing-v3", 900)]
         public void Make_Box2D_StackAndSpecs_MatchGymnasium(string id, int threshold) {
             using PyRef python = PyRef.Of(() => Python.gymnasium.make(id));
             using IEnv dotnet = Gymnasium.Make(id);

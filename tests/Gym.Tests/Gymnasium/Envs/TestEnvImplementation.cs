@@ -21,9 +21,6 @@ namespace Gym.Tests.Gymnasium.Envs {
     ///     classic envs' customizable resets, CartPole's vector equivalence, and the discrete action check.
     /// </summary>
     /// <remarks>
-    ///     <para>
-    ///     The CarRacing tests are the <c>[OpenBugs("P8")]</c> methods until CarRacing-v3 arrives (P8.4).
-    ///     </para>
     ///     <para>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/tests/envs/test_env_implementation.py">tests/envs/test_env_implementation.py</see>.</para>
     /// </remarks>
     [TestClass]
@@ -71,11 +68,9 @@ namespace Gym.Tests.Gymnasium.Envs {
 
         /// <summary>
         ///     CarRacing's domain randomization: new colours at every reset, the same ones with <c>options={"randomize": False}</c>.
-        ///     Open until CarRacing-v3 is registered (P8.4).
         /// </summary>
         /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/tests/envs/test_env_implementation.py#L50">test_carracing_domain_randomize</see>.</remarks>
         [TestMethod]
-        [OpenBugs("P8")]
         public void TestCarracingDomainRandomize() {
             using IEnv made = Make("CarRacing-v3", new { domain_randomize = true });
             IEnv env = made.Unwrapped;
@@ -379,10 +374,9 @@ namespace Gym.Tests.Gymnasium.Envs {
         [TestMethod]
         public void TestDiscreteActionValidation_LunarLander() => AssertDiscreteActionValidation("LunarLander-v3");
 
-        /// <summary>The same for CarRacing-v3, whose refusal is <c>InvalidAction</c>; open until CarRacing-v3 is registered (P8.4).</summary>
+        /// <summary>The same for CarRacing-v3, whose refusal is <c>InvalidAction</c>.</summary>
         /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/tests/envs/test_env_implementation.py#L324">test_discrete_action_validation</see>.</remarks>
         [TestMethod]
-        [OpenBugs("P8")]
         public void TestDiscreteActionValidation_CarRacing() => AssertDiscreteActionValidation("CarRacing-v3");
 
         /// <summary>

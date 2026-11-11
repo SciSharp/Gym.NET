@@ -906,6 +906,46 @@ Specs: the port plan's §5.6 and §11.3; sources 2,979 lines.
     does. The inventory lists three fewer missing names.
 - **P8.4** CarRacing-v3 as `CarRacingEnv` with `car_dynamics`; its score text drawn from glyph data recorded once from
   live pygame and SDL_ttf's shaded layout (DR-27), after the font-data license check; coordinate with PR #13.
+  *Done 2026-11-11, except shipping the score's glyph data, which waits on the maintainer:*
+  - `src/Gym.Environments/Envs/Box2D/CarDynamics.cs`: Gymnasium's `car_dynamics` (`Car`, `Particle`, and `CarWheel` for
+    the attributes Python hangs on wheel bodies). The wheel physics is float64 over the bodies' float32 state. One
+    pybox2d quirk is kept: a skid's start point is `body.position`, a live view in pybox2d, so a new mark's two first
+    points are the wheel's position when the mark is made.
+  - `CarRacingEnv.cs`: Gymnasium's `CarRacing` (`[PyName("CarRacing")]`). One world for the env's life. The tracks come
+    from 12 checkpoints with Python's negative-index wraps and in-place kerb propagation, retried until one closes. The
+    tiles (`RoadTile`) share their colour arrays with `road_poly`, so a touched tile loses its shade as in Gymnasium.
+    `FrictionDetector` is public: Gymnasium's is module-level and no other env has one (DR-28 keeps only the duplicated
+    `ContactDetector` private). Domain randomization draws in the constructor and at resets. Both action modes;
+    `InvalidAction` with Gymnasium's message. Every step renders the 96×96 observation: road and grass through SDL_gfx,
+    culled as Gymnasium culls, the car through `draw.polygon`, the indicators, the score, `smoothscale`. `rgb_array`
+    and `human` frames add the skid marks. `RegisterInput` is the demo's keyboard handler over `EventQueue`.
+  - The rasterizer's `draw.lines` gained width 2, derived black-box (D4): each segment is its width-1 line plus a copy one
+    pixel right when steep or down otherwise. Exact on 3,000 segments, 600 open and 600 closed polylines and 600 width-2
+    polygon outlines.
+  - The score (DR-27): `ScoreFont` translates the single-line path of SDL_ttf 2.24.0 (zlib; notice in
+    THIRD-PARTY-NOTICES): HarfBuzz positions in 26.6 floored per glyph, the font's kern table scaled as HarfBuzz scales
+    it, the wrapped variant's row height, shaded glyphs OR-ed together. `tools/parity/record_score_font.py` records the
+    data (11 glyphs, 49 kerned pairs). The layout matches pygame on 12,666 strings (every 1–3 character string, every
+    score from -1500 to 2600, 3,000 random strings, 65-glyph runs).
+  - **The licence check (DR-27) found** that pygame-ce 2.5.8's `freesansbold.ttf` is GNU FreeFont's FreeSans Bold of 2002,
+    whose embedded licence reads "The use of this font is granted subject to GNU General Public License", with no font
+    exception (later FreeFont releases added one). So, as DR-27 requires, the data is not committed: the env draws no
+    score without it (`ScoreFont.Current` is null), and the parity suite installs data recorded live. Whether the
+    rasterized glyphs may ship is the maintainer's question (asked with the deferred ones). Until it is answered,
+    CarRacing has no golden, since a replay without Python would need the data.
+  - Parity: `CarRacingLiveParityTests` (27 gated): the score font against pygame; resets (5); the world a reset builds
+    (track, polygons and colours, tiles' hulled vertices, the car; 5 seeds with and without randomization); sampled
+    episodes of both modes; two laps of a track-following driver (1,709 and 1,767 steps to the lap's end); `rgb_array`
+    frames with skid marks; randomized resets with `{"randomize": False/True}`; 10 action forms and 3 refused discrete
+    actions; leaving the playfield (-100); render before reset (`None`); spaces; metadata; `make`'s stack. The step
+    before a reset is open (N-1). Also: registration (threshold `900` printing `900.0`), `check_env` and
+    `check_environments_match` through the bridge (`BridgeReward.FloatOrOffFieldInt`), and the coverage cells.
+  - Unit tests: `CarRacingTests` (the demo's keyboard handler, the score's format, an env without glyph data). The
+    `[OpenBugs("P8")]` tests that waited for CarRacing run: domain randomization, discrete validation, `make`'s kwargs
+    error, `NormalizeObservation`, `ResizeObservation` and the image vector wrappers. The inventory lists five fewer
+    missing names; only the two private `ContactDetector`s remain among box2d's, by design.
+  - PR #13 (an open 2023 CarRacing on Aether, with a LEM lander that is not Gymnasium's) is superseded by this env;
+    what to tell its author is the maintainer's call, so nothing was posted.
 - **P8.5** Delete the Aether LunarLander (D10) and the `Aether.Physics2D`, `ImageSharp.Drawing` and `Fonts`
   references in `Gym.Environments`; B-17…B-30 close.
   *Done 2026-11-11 (ahead of P8.4, which it does not depend on):*

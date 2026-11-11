@@ -388,8 +388,11 @@ namespace Gym.Tests.Parity.Tests.Bridge {
         [DataRow("LunarLanderContinuous-v3")]
         [DataRow("BipedalWalker-v3")]
         [DataRow("BipedalWalkerHardcore-v3")]
+        [DataRow("CarRacing-v3")]
         public void CheckEnv_PassesGymNetsBox2DEnvs_AsGymnasiumsOwn(string id) {
             SkipOffReferencePlatform("Box2D's sinf/cosf");
+            // CarRacing's frames carry its score, whose glyph data the suite records live (DR-27's data does not ship yet).
+            Envs.CarRacingLiveParityTests.EnsureScoreFont();
             IEnvironmentViewerFactoryDelegate? previous = Gymnasium.HumanViewerFactory;
             // check_env makes the env in human mode too; Gym.NET's renders into a headless viewer, as pygame does under SDL's dummy driver.
             Gymnasium.HumanViewerFactory = NullEnvViewer.Factory;
@@ -429,8 +432,10 @@ namespace Gym.Tests.Parity.Tests.Bridge {
         [DataRow("LunarLanderContinuous-v3")]
         [DataRow("BipedalWalker-v3")]
         [DataRow("BipedalWalkerHardcore-v3")]
+        [DataRow("CarRacing-v3")]
         public void CheckEnvironmentsMatch_GymNetsBox2DEnvs_AsGymnasiumsOwn(string id) {
             SkipOffReferencePlatform("Box2D's sinf/cosf");
+            Envs.CarRacingLiveParityTests.EnsureScoreFont();
             using var bridge = new ReverseBridge();
             foreach (long seed in new long[] { 0, 123 }) {
                 using PyRef reference = PyRef.Of(() => Python.gymnasium.make(id, render_mode: "rgb_array"));
@@ -466,12 +471,14 @@ namespace Gym.Tests.Parity.Tests.Bridge {
         /// <summary>
         ///     The Python type of a box2d env's reward in Gymnasium under the tools' float32 sampled actions: LunarLander's
         ///     <c>np.float64</c> with the int ±100 on termination, BipedalWalker's <c>np.float32</c> (its energy cost takes the
-        ///     action's precision) with the int -100 on a fall.
+        ///     action's precision) with the int -100 on a fall, CarRacing's <c>float</c> with the int -100 off the playfield.
         /// </summary>
         /// <param name="id">The id.</param>
         /// <returns>The bridge's reward type for it.</returns>
         private static BridgeReward Box2DReward(string id) =>
-            id.StartsWith("BipedalWalker", StringComparison.Ordinal) ? BridgeReward.NumpyFloat32OrFallInt : BridgeReward.NumpyFloat64OrTerminalInt;
+            id.StartsWith("BipedalWalker", StringComparison.Ordinal) ? BridgeReward.NumpyFloat32OrFallInt
+            : id.StartsWith("CarRacing", StringComparison.Ordinal) ? BridgeReward.FloatOrOffFieldInt
+            : BridgeReward.NumpyFloat64OrTerminalInt;
 
         /// <summary>
         ///     What a Gym.NET env raises reaches Gymnasium as the Python type it stands for: <c>make</c> with a keyword the

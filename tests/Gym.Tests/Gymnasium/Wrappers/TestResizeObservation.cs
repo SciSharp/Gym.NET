@@ -10,8 +10,6 @@ using NumSharp;
 namespace Gym.Tests.Gymnasium.Wrappers {
     /// <summary>Gymnasium's <c>ResizeObservation</c> tests (<c>test_resize_observation.py</c>), run against <see cref="ResizeObservation{TObs, TAct}"/>.</summary>
     /// <remarks>
-    ///     The cases on <c>CarRacing-v3</c> wait for P8 (Box2D) and are <c>[OpenBugs("P8")]</c>; the parity suite gates the
-    ///     refusals they check over CartPole's frames instead.
     ///     Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/tests/wrappers/test_resize_observation.py">tests/wrappers/test_resize_observation.py</see>.
     /// </remarks>
     [TestClass]
@@ -70,11 +68,9 @@ namespace Gym.Tests.Gymnasium.Wrappers {
         /// <summary>CarRacing's frames resized to four sizes stay in <c>Box(0, 255, shape + (3,), uint8)</c>.</summary>
         /// <param name="size">The new height and width.</param>
         /// <remarks>
-        ///     CarRacing comes with P8.
         ///     Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/tests/wrappers/test_resize_observation.py#L78">tests/wrappers/test_resize_observation.py (test_resize_shapes)</see>.
         /// </remarks>
         [TestMethod]
-        [OpenBugs("P8")]
         [DataRow(10L)]
         [DataRow(20L)]
         [DataRow(60L)]
@@ -92,11 +88,9 @@ namespace Gym.Tests.Gymnasium.Wrappers {
 
         /// <summary>Shapes of the wrong length or sign, a 1-D box and a <c>Tuple</c> space are refused.</summary>
         /// <remarks>
-        ///     CarRacing comes with P8.
         ///     Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/tests/wrappers/test_resize_observation.py#L90">tests/wrappers/test_resize_observation.py (test_invalid_input)</see>.
         /// </remarks>
         [TestMethod]
-        [OpenBugs("P8")]
         public void TestInvalidInput() {
             using var env = (Env<NDArray, NDArray>)Make("CarRacing-v3");
 

@@ -155,6 +155,10 @@ namespace Gym.Tests.Parity.Bridge {
                             BridgeReward.NumpyFloat32OrFallInt => result.Terminated && result.Reward == -100
                                 ? new PyInt(-100)
                                 : Python.numpy.float32((float)result.Reward),
+                            // CarRacing's score differences are Python floats; leaving the playfield assigns the int -100.
+                            BridgeReward.FloatOrOffFieldInt => result.Terminated && result.Reward == -100
+                                ? new PyInt(-100)
+                                : new PyFloat(result.Reward),
                             _ => new PyFloat(result.Reward),
                         };
                         using PyObject terminated = result.Terminated.ToPython();
@@ -554,6 +558,12 @@ namespace Gym.Tests.Parity.Bridge {
         ///     <c>int</c> literal; the far end's finish keeps its float32.
         /// </summary>
         NumpyFloat32OrFallInt,
+
+        /// <summary>
+        ///     A Python <c>float</c>: CarRacing's change of score, except the int -100 its step assigns when the car leaves the
+        ///     playfield.
+        /// </summary>
+        FloatOrOffFieldInt,
     }
 
     /// <summary>

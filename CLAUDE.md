@@ -56,7 +56,7 @@ refs/Gym.NET/
 │   │
 │   ├── Gym.SourceGenerators/      # Roslyn generator (DR-13, DR-34): <Class>Options records of [GymOptions] envs/wrappers; [GymTuple]/[GymDict] records
 │   ├── Gym.Rendering/             # pygame-compatible rasterizer: Surface (opaque or per-pixel alpha), GfxDraw (SDL_gfx 2.0.26 port), Draw (line, rect;
-│   │   │                          #   polygon, circle, lines in Draw.Polygon.cs, black-box from pygame like line and rect, D4;
+│   │   │                          #   polygon, circle, lines (widths 1 and 2) in Draw.Polygon.cs, black-box from pygame like line and rect, D4;
 │   │   │                          #   aaline/aalines in Draw.Aaline.cs, translated from pygame-ce's draw.c under its LGPL-2.0-or-later, DR-37: the
 │   │   │                          #   package is Apache-2.0 AND LGPL-2.0-or-later), Transform (flip, scale, smoothscale), ImageIO (image.load/frombytes),
 │   │   │                          #   SurfArray (incl. make_surface), Vector2;
@@ -80,7 +80,10 @@ refs/Gym.NET/
 │   │   ├── Envs/Box2D/            # LunarLanderEnv (LunarLander-v3 and LunarLanderContinuous-v3, [PyName("LunarLander")], DR-32; Heuristic,
 │   │   │                          #   DemoHeuristicLander, a private ContactDetector, DR-28; LunarLanderContinuousEnv, the refusing stub) on Gym.Box2D;
 │   │   │                          #   BipedalWalkerEnv (BipedalWalker-v3 and BipedalWalkerHardcore-v3, [PyName("BipedalWalker")]; one world per env,
-│   │   │                          #   lidar ray casts, NEP 50 rewards; private ContactDetector), BipedalWalkerHeuristics, BipedalWalkerHardcoreEnv (stub)
+│   │   │                          #   lidar ray casts, NEP 50 rewards; private ContactDetector), BipedalWalkerHeuristics, BipedalWalkerHardcoreEnv (stub);
+│   │   │                          #   CarRacingEnv (CarRacing-v3, [PyName("CarRacing")]; RoadTile, public FrictionDetector, RegisterInput), CarDynamics.cs
+│   │   │                          #   (Car, CarWheel, Particle), ScoreFont (internal: the score's text as SDL_ttf 2.24 lays it out, zlib translation, from
+│   │   │                          #   recorded glyphs that do not ship yet, DR-27; the parity suite installs them live, tools/parity/record_score_font.py)
 │   │   ├── GymEnvironments.cs     # Register(): the built-in ids, from a module initializer (DR-12; GYMNET_DISABLE_ENV_REGISTRATION disarms it, DR-14)
 │   │   └── buildTransitive/       # Gym.NET.Environments.targets: the app-side registration initializer (DR-17)
 │   │

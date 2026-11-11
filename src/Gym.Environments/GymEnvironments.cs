@@ -29,7 +29,7 @@ namespace Gym.Environments {
     ///     <para>
     ///     Ids register in Gymnasium's order as their phases port them: classic_control's (CartPole-v0/v1, MountainCar-v0,
     ///     MountainCarContinuous-v0, Pendulum-v1, Acrobot-v1), box2d's (LunarLander-v3, LunarLanderContinuous-v3,
-    ///     BipedalWalker-v3, BipedalWalkerHardcore-v3; CarRacing-v3 comes with P8.4) and toy_text's (Blackjack-v1,
+    ///     BipedalWalker-v3, BipedalWalkerHardcore-v3, CarRacing-v3) and toy_text's (Blackjack-v1,
     ///     FrozenLake-v1, FrozenLake8x8-v1, CliffWalking-v1, CliffWalkingSlippery-v1, Taxi-v4). CartPole's two register
     ///     <c>CartPoleVectorEnv</c> as their vectorized entry point.
     ///     </para>
@@ -88,6 +88,8 @@ namespace Gym.Environments {
             // The same class with hardcore=True, as Gymnasium registers it.
             EnvRegistry.Register("BipedalWalkerHardcore-v3", typeof(BipedalWalkerEnv), kwargs: new BipedalWalkerEnvOptions { Hardcore = true },
                 maxEpisodeSteps: 2000, rewardThreshold: 300);
+
+            EnvRegistry.Register("CarRacing-v3", typeof(CarRacingEnv), maxEpisodeSteps: 1000, rewardThreshold: 900);
 
             // Toy Text
             // ----------------------------------------

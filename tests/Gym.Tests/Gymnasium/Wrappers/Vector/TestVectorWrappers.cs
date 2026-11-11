@@ -19,8 +19,7 @@ namespace Gym.Tests.Gymnasium.Wrappers.Vector {
     /// </summary>
     /// <remarks>
     ///     Gymnasium parametrizes the test with an autoreset mode its body never passes on, so each case runs twice over the
-    ///     same vector envs; the port keeps that. The <c>CarRacing-v3</c> cases wait for the Box2D envs (P8) and are
-    ///     <c>[OpenBugs("P8")]</c>; the parity suite runs the same vector wrappers over CartPole's frames.
+    ///     same vector envs; the port keeps that. The image cases run over <c>CarRacing-v3</c>, as Gymnasium's do.
     ///     Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/tests/wrappers/vector/test_vector_wrappers.py">tests/wrappers/vector/test_vector_wrappers.py</see>.
     /// </remarks>
     [TestClass]
@@ -37,11 +36,10 @@ namespace Gym.Tests.Gymnasium.Wrappers.Vector {
         [DataRow("ClipReward")]
         public void TestVectorWrapperEquivalence(string wrapperName) => RunEquivalence(wrapperName);
 
-        /// <summary>The image cases of <see cref="TestVectorWrapperEquivalence"/>, over <c>CarRacing-v3</c> (P8).</summary>
+        /// <summary>The image cases of <see cref="TestVectorWrapperEquivalence"/>, over <c>CarRacing-v3</c>.</summary>
         /// <param name="wrapperName">The wrapper's Gymnasium name.</param>
         /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/tests/wrappers/vector/test_vector_wrappers.py#L41">tests/wrappers/vector/test_vector_wrappers.py (test_vector_wrapper_equivalence)</see>.</remarks>
         [TestMethod]
-        [OpenBugs("P8")]
         [DataRow("GrayscaleObservation")]
         [DataRow("ResizeObservation")]
         [DataRow("ReshapeObservation")]

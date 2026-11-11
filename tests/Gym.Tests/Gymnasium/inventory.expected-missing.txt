@@ -7,11 +7,6 @@
 # Phases are docs/plans/COMPLETION_PLAN.md's; the DR ids are docs/plans/DESIGN_REVIEW.md's.
 
 gymnasium.envs.box2d.bipedal_walker.ContactDetector                                      by design: a private nested class of BipedalWalkerEnv (DR-28)
-gymnasium.envs.box2d.car_dynamics.Car                                                    P8 box2d
-gymnasium.envs.box2d.car_dynamics.Particle                                               P8 box2d
-gymnasium.envs.box2d.car_racing.CarRacing                                                P8 box2d
-gymnasium.envs.box2d.car_racing.FrictionDetector                                         P8 box2d
-gymnasium.envs.box2d.car_racing.register_input                                           P8 box2d
 gymnasium.envs.box2d.lunar_lander.ContactDetector                                        by design: a private nested class of LunarLanderEnv (DR-28)
 gymnasium.envs.classic_control.continuous_mountain_car.Continuous_MountainCarEnv         by design: merged into MountainCarEnv(continuous) (DR-32)
 gymnasium.envs.functional_jax_env.FunctionalJaxEnv                                       n/a: JAX functional envs

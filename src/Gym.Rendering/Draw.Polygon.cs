@@ -11,7 +11,7 @@ namespace Gym.Rendering {
         /// <param name="surface">The surface, without per-pixel alpha.</param>
         /// <param name="color">The colour; its alpha is ignored.</param>
         /// <param name="points">The vertices, as floats (each converted as pygame converts it, <see cref="PyInt"/>).</param>
-        /// <param name="width">0 fills; a positive width outlines (only 1 is modelled); a negative width draws nothing.</param>
+        /// <param name="width">0 fills; a positive width outlines (1 and 2 are modelled, see <see cref="Lines"/>); a negative width draws nothing.</param>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="surface"/> or <paramref name="points"/> is <see langword="null"/>.</exception>
         /// <exception cref="NotSupportedException">Thrown for a surface with per-pixel alpha, or an outline wider than 1 (not modelled).</exception>
         /// <exception cref="ValueError">
@@ -125,17 +125,17 @@ namespace Gym.Rendering {
         }
 
         /// <summary>
-        ///     <c>pygame.draw.lines(surface, color, closed, points, width)</c> at width 1: <c>draw.line</c> between each pair of
-        ///     consecutive points, and from the last point back to the first when <paramref name="closed"/> and there are more
-        ///     than two points.
+        ///     <c>pygame.draw.lines(surface, color, closed, points, width)</c> at width 1 or 2: <c>draw.line</c> between each pair
+        ///     of consecutive points, and from the last point back to the first when <paramref name="closed"/> and there are
+        ///     more than two points; at width 2 each segment also gets a copy one pixel over (CarRacing's skid marks).
         /// </summary>
         /// <param name="surface">The surface, without per-pixel alpha.</param>
         /// <param name="color">The colour; its alpha is ignored.</param>
         /// <param name="closed">Whether the last point joins the first (ignored for two points, as in pygame).</param>
         /// <param name="points">The points, as floats (converted as pygame converts them, <see cref="PyInt"/>).</param>
-        /// <param name="width">1 draws; below 1 draws nothing; above 1 is not modelled yet.</param>
+        /// <param name="width">1 or 2 draws; below 1 draws nothing; above 2 is not modelled yet.</param>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="surface"/> or <paramref name="points"/> is <see langword="null"/>.</exception>
-        /// <exception cref="NotSupportedException">Thrown for a surface with per-pixel alpha, or a width above 1.</exception>
+        /// <exception cref="NotSupportedException">Thrown for a surface with per-pixel alpha, or a width above 2.</exception>
         /// <exception cref="ValueError">Thrown for fewer than 2 points, with pygame's message, whatever the width.</exception>
         /// <remarks>
         ///     Gym.NET's own implementation of pygame-ce 2.5.8's observable behaviour (D4): pygame's polyline at width 1 is the
@@ -143,6 +143,9 @@ namespace Gym.Rendering {
         ///     a closed polyline of two points draws its one segment only (a line and its reverse can differ by a pixel, so
         ///     drawing the return segment would show). Each segment is the line <see cref="Line(Surface, Color, long, long, long, long)"/>
         ///     draws, stepped only across the surface, so a far-off endpoint (a NaN becomes <c>int.MinValue</c>) costs nothing.
+        ///     At width 2 a segment is its width-1 line plus the same line moved one pixel right when it is steep
+        ///     (<c>|dx| &lt;= |dy|</c> of the truncated ends) or one pixel down otherwise: exact on 3,000 random segments, 600
+        ///     open polylines of float points, 600 closed ones, 600 closed two-point ones and 600 width-2 polygon outlines.
         /// </remarks>
         public static void Lines(Surface surface, Color color, bool closed, IReadOnlyList<(double X, double Y)> points, int width = 1) {
             RequireOpaque(surface);
@@ -152,14 +155,37 @@ namespace Gym.Rendering {
                 throw new ValueError("points argument must contain 2 or more points");
             if (width < 1)
                 return;
-            if (width > 1)
-                throw new NotSupportedException($"draw.lines with width {width} is not modelled: only width 1 is.");
+            if (width > 2)
+                throw new NotSupportedException($"draw.lines with width {width} is not modelled: only widths 1 and 2 are.");
             uint mapped = color.Mapped;
             int count = points.Count;
             for (int i = 1; i < count; i++)
-                ClippedLine(surface, mapped, PyInt(points[i - 1].X), PyInt(points[i - 1].Y), PyInt(points[i].X), PyInt(points[i].Y));
+                Segment(surface, mapped, PyInt(points[i - 1].X), PyInt(points[i - 1].Y), PyInt(points[i].X), PyInt(points[i].Y), width);
             if (closed && count > 2)
-                ClippedLine(surface, mapped, PyInt(points[count - 1].X), PyInt(points[count - 1].Y), PyInt(points[0].X), PyInt(points[0].Y));
+                Segment(surface, mapped, PyInt(points[count - 1].X), PyInt(points[count - 1].Y), PyInt(points[0].X), PyInt(points[0].Y), width);
+        }
+
+        /// <summary>
+        ///     One polyline segment at width 1 or 2: the line, and at width 2 the line again one pixel right (steep) or down
+        ///     (shallow), as measured on pygame (see <see cref="Lines"/>).
+        /// </summary>
+        /// <param name="surface">The surface.</param>
+        /// <param name="mapped">The pixel word.</param>
+        /// <param name="x0">The start column.</param>
+        /// <param name="y0">The start row.</param>
+        /// <param name="x1">The end column.</param>
+        /// <param name="y1">The end row.</param>
+        /// <param name="width">1 or 2.</param>
+        private static void Segment(Surface surface, uint mapped, int x0, int y0, int x1, int y1, int width) {
+            ClippedLine(surface, mapped, x0, y0, x1, y1);
+            if (width != 2)
+                return;
+            // The differences in long arithmetic: int.MinValue ends (NaN) would overflow C's int subtraction here.
+            bool steep = Math.Abs((long)x0 - x1) <= Math.Abs((long)y0 - y1);
+            if (steep)
+                ClippedLine(surface, mapped, unchecked(x0 + 1), y0, unchecked(x1 + 1), y1);
+            else
+                ClippedLine(surface, mapped, x0, unchecked(y0 + 1), x1, unchecked(y1 + 1));
         }
 
         /// <summary>

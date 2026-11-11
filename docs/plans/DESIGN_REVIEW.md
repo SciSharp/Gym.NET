@@ -405,6 +405,19 @@ Effects of approved designs that only showed up in code. None changes a design; 
     float32 actions). The float64 carries the float32 value exactly.
   - `BipedalWalkerHeuristics.StepHeuristic` returns a new array per call. Python returns the instance's own `a` array,
     which its next call overwrites in place; Gym.NET keeps a copy in `A`. The values are the same.
+- **DR-32 and DR-28 on CarRacing** (P8.4, 2026-11-11):
+  - `CarRacingEnv` (`[PyName("CarRacing")]`). `FrictionDetector` is public: it is not a twin, which is DR-28's rule for
+    keeping a name. `Car` and `Particle` keep `car_dynamics`' names.
+  - The attributes Python hangs on bodies live in `RoadTile` (a tile's `color`, `road_visited`, `road_friction`,
+    `idx`) and `CarWheel` (a wheel's `gas`, `brake`, `steer`, `phase`, `omega`, skid state, `joint`, `tiles`). Each is
+    the body's user data, as Python's `t.userData = t` makes the listener find it.
+  - `register_input`, which Gymnasium defines only when the module runs as a script, is
+    `CarRacingEnv.RegisterInput(a, ref quit, ref restart)`: Python's module globals become the caller's variables.
+  - Rewards are float64 values; Gymnasium's are Python floats, and the int -100 when the car leaves the playfield.
+- **DR-27's licence check** (P8.4, 2026-11-11): pygame-ce 2.5.8's default font (`freesansbold.ttf`) is GNU FreeFont's
+  FreeSans Bold of 2002, licensed "subject to GNU General Public License" with no font exception. So, as DR-27 provides,
+  the recorded data does not ship until the maintainer decides. The layout (`ScoreFont`, an SDL_ttf 2.24 translation)
+  and the recorder are in; without data the env leaves the score out, and the parity suite installs data recorded live.
 - **D4's rasterizer and non-finite coordinates** (P8.2, 2026-11-11): pygame's C code converts a NaN, infinite or
   out-of-range coordinate to `INT_MIN` and draws the visible part. P7's `Draw.Line(double…)` raised `ValueError` there
   instead; it now converts as pygame does, like the new `Polygon`, `Circle` and `Lines`. `Aaline`/`Aalines` (DR-37's

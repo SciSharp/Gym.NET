@@ -86,11 +86,9 @@ namespace Gym.Tests.Gymnasium.Wrappers {
 
         /// <summary>Four <c>NormalizeObservation(GrayscaleObservation(make("CarRacing-v3")))</c> in a sync vector env reset.</summary>
         /// <remarks>
-        ///     CarRacing comes with P8 (Box2D); until then the id is not registered.
         ///     Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/tests/wrappers/test_normalize_observation.py#L71">tests/wrappers/test_normalize_observation.py (test_normalize_obs_with_vector)</see>.
         /// </remarks>
         [TestMethod]
-        [OpenBugs("P8")]
         public void TestNormalizeObsWithVector() {
             static IEnv Thunk() {
                 var env = (Env<NDArray, NDArray>)Make("CarRacing-v3");

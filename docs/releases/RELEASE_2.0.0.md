@@ -20,7 +20,7 @@ It replaces 0.2's API, which followed gym before 0.26, with Gymnasium's.
 |---|---|
 | Gym.NET | The env contract, wrappers, spaces, registry (`Gymnasium.Make`, `MakeVec`), vector envs, checkers, seeding, errors; `Gym.Legacy` |
 | Gym.NET.Rendering (new) | The rasterizer `rgb_array` frames are drawn with, equal to pygame-ce's pixels; licensed `Apache-2.0 AND LGPL-2.0-or-later` (below) |
-| Gym.NET.Environments | classic_control, toy_text and box2d (LunarLander and BipedalWalker so far), CartPole's vector env, their registration; inside it, `Gym.Box2D`: Box2D 2.3.0 in managed C#, bit for bit as pybox2d 2.3.10, with pybox2d's surface (zlib notices in THIRD-PARTY-NOTICES.md) |
+| Gym.NET.Environments | classic_control, toy_text and box2d (LunarLander, BipedalWalker, CarRacing), CartPole's vector env, their registration; inside it, `Gym.Box2D`: Box2D 2.3.0 in managed C#, bit for bit as pybox2d 2.3.10, with pybox2d's surface (zlib notices in THIRD-PARTY-NOTICES.md) |
 | Gym.NET.Rendering.Avalonia | A window for `human` mode on Avalonia 12 (Windows, Linux, macOS), and `PlayPlot`'s live charts on ScottPlot (`AvaloniaPlotFigure`) |
 | Gym.NET.Rendering.WinForm | The same on Windows Forms (`WinFormPlotFigure`) |
 
@@ -94,7 +94,7 @@ In short:
   | Family | Ids |
   |---|---|
   | classic_control | CartPole-v0, CartPole-v1 (and its vector env), MountainCar-v0, MountainCarContinuous-v0, Pendulum-v1, Acrobot-v1 |
-  | box2d | LunarLander-v3, LunarLanderContinuous-v3, BipedalWalker-v3, BipedalWalkerHardcore-v3 (on `Gym.Box2D`, Box2D 2.3.0 in managed C#; CarRacing to come) |
+  | box2d | LunarLander-v3, LunarLanderContinuous-v3, BipedalWalker-v3, BipedalWalkerHardcore-v3, CarRacing-v3 (on `Gym.Box2D`, Box2D 2.3.0 in managed C#) |
   | toy_text | FrozenLake-v1, FrozenLake8x8-v1, CliffWalking-v1, CliffWalkingSlippery-v1, Taxi-v4, Blackjack-v1 |
 
 - **Rendering**: `Gym.Rendering`, a rasterizer with pygame's semantics (SDL_gfx's `gfxdraw` primitives, `draw.line`,
@@ -147,6 +147,11 @@ Each has a test that asserts Gymnasium's answer and fails until the gap closes (
   message is NumSharp's `"AssertionError"` instead of Python's empty one (NumSharp gap N-1).
 - **`NotImplementedError` and `ImportError`** are `Gym.Exceptions` types until NumSharp defines them, and NumSharp's
   exceptions take no inner exception yet (N-3).
+- **CarRacing-v3's score text** is drawn from glyph data of pygame's default font (GNU FreeFont's FreeSans Bold),
+  recorded from live pygame and laid out as SDL_ttf 2.24 lays it out, exact on every score string. The data does not
+  ship until the maintainer decides it may (the font's embedded licence is the GPL; DR-27's licence check), so the
+  packaged env leaves the score out: its observations and frames match Gymnasium's everywhere but the score's few
+  pixels. The parity suite installs the recorded data and proves the rest.
 
 ## Not in 2.0 yet
 

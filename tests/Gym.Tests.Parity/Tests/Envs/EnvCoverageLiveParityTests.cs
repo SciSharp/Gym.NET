@@ -44,7 +44,7 @@ namespace Gym.Tests.Parity.Tests.Envs {
         /// <summary>Every id Gym.NET registers, in Gymnasium's registration order.</summary>
         private static readonly string[] Ids = {
             "CartPole-v0", "CartPole-v1", "MountainCar-v0", "MountainCarContinuous-v0", "Pendulum-v1", "Acrobot-v1",
-            "LunarLander-v3", "LunarLanderContinuous-v3", "BipedalWalker-v3", "BipedalWalkerHardcore-v3",
+            "LunarLander-v3", "LunarLanderContinuous-v3", "BipedalWalker-v3", "BipedalWalkerHardcore-v3", "CarRacing-v3",
             "FrozenLake-v1", "FrozenLake8x8-v1", "CliffWalking-v1", "CliffWalkingSlippery-v1", "Taxi-v4", "Blackjack-v1",
         };
 
@@ -327,14 +327,18 @@ namespace Gym.Tests.Parity.Tests.Envs {
         private void SkipClassicOffReferencePlatform(string id) {
             if (IsToyText(id))
                 return;
+            // CarRacing's frames carry its score, whose glyph data the suite records live (DR-27's data does not ship yet).
+            if (id.StartsWith("CarRacing", StringComparison.Ordinal))
+                CarRacingLiveParityTests.EnsureScoreFont();
             SkipOffReferencePlatform(IsBox2D(id) ? "Box2D's sinf/cosf" : "the classic envs' cos/sin");
         }
 
         /// <summary>Whether an id is one of box2d's, which run on Gym.NET's Box2D and its C runtime's sinf/cosf.</summary>
         /// <param name="id">The env.</param>
-        /// <returns><see langword="true"/> for LunarLander and BipedalWalker.</returns>
+        /// <returns><see langword="true"/> for LunarLander, BipedalWalker and CarRacing.</returns>
         private static bool IsBox2D(string id) =>
-            id.StartsWith("LunarLander", StringComparison.Ordinal) || id.StartsWith("BipedalWalker", StringComparison.Ordinal);
+            id.StartsWith("LunarLander", StringComparison.Ordinal) || id.StartsWith("BipedalWalker", StringComparison.Ordinal)
+            || id.StartsWith("CarRacing", StringComparison.Ordinal);
 
         /// <summary>Whether an id is one of toy_text's: no transcendental math, and 4 frames per second in human mode.</summary>
         /// <param name="id">The env.</param>
