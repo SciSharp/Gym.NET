@@ -229,3 +229,70 @@ physics files.
 The flags (§4) are in MuJoCo's `cmake/MujocoOptions.cmake` and `cmake/CheckAvxSupport.cmake`. The imports were read from
 the wheel's `mujoco.dll` with `strings`. Module sizes are line counts of `src/engine` (`.c` and `.h`), `src/user` and
 `src/xml` (`.cc`), and `src/render/classic`.
+
+## 9. The five most-used envs without core code (evaluated 2026-11-11)
+
+The maintainer asked what it would take to port the four or five most-used envs directly, writing no core or shared code.
+
+### 9.1 Which five
+
+Models on the Hugging Face Hub whose id names the env in Gym's id form (`hf_usage.py`):
+
+| Env | Models | | Env | Models |
+|---|---:|---|---|---:|
+| HalfCheetah | 106 | | Swimmer | 57 |
+| Humanoid | 105 | | InvertedPendulum | 27 |
+| Hopper | 98 | | Pusher | 26 |
+| Ant | 81 | | HumanoidStandup | 20 |
+| Walker2d | 69 | | InvertedDoublePendulum | 16 |
+| | | | Reacher | 9 |
+
+The top five are the classic locomotion benchmark set: 10 ids (each env's v4 and v5) on 6 models, since Walker2d-v5 has
+its own `walker2d_v5.xml`.
+
+### 9.2 What an env is, and what it needs from MuJoCo
+
+The env files are thin (`env_logic.py`): 97 to 225 lines of code each, 1,518 for all ten, plus 129 for `MujocoEnv`; the
+rest is documentation. No env calls a MuJoCo function. Each reads `qpos` and `qvel` (Ant and Humanoid also `cfrc_ext`;
+Humanoid also `cinert`, `cvel` and `qfrc_actuator`) and computes its reward and termination from them. `MujocoEnv` steps
+the simulation (`mj_step` × `frame_skip`, then `mj_rnePostConstraint`). So everything an env computes beyond reward
+arithmetic is MuJoCo's.
+
+| Env | Integrator / solver | Joints | Colliders its filters allow | Tendons |
+|---|---|---|---|---|
+| HalfCheetah | Euler / Newton | slide, hinge | plane-capsule | — |
+| Hopper | RK4 / Newton | slide, hinge | plane-capsule, capsule-capsule | — |
+| Walker2d | RK4 / Newton | slide, hinge | plane-capsule | — |
+| Ant | RK4 / Newton | free, hinge | plane-capsule, plane-sphere | — |
+| Humanoid | RK4 / PGS | free, hinge | plane-capsule, plane-sphere, capsule-capsule, sphere-capsule, sphere-sphere | 2 fixed |
+
+**What only some of them need is small** (`callgraph.py`'s definitions): PGS is 296 lines, tendons 459, free-joint
+integration 21. Swimmer's fluid model (464) and Pusher's convex path (2,774) are not needed. The rest of §3's 26,028
+lines is common to all five: kinematics, inertia, the LDL factorization, RNE, the broad phase (whose order fixes the
+contacts' order, and with it the constraint rows' order), contacts, limits, islands, the shared Newton/CG core, line
+search, Cholesky updates, RK4 and Euler. For byte parity none of it can be replaced by simpler equations, since a
+closed-form planar model rounds differently from MuJoCo's general algorithms.
+
+### 9.3 Three routes
+
+| Route | What is written | Bitwise with Gymnasium | Native binaries | Frames | v5's `xml_file` | Estimate |
+|---|---|---|---|---|---|---|
+| **A. Each env self-contained, managed** (the literal reading) | Each env carries its own copy of MuJoCo's pipeline for its model: the common core of about 22,000 lines (static upper bound; perhaps 11,000–15,000 after specializing to the model) plus its compiled model embedded as data | Yes, if each copy is exact | None | None, unless each carries a renderer | Refused (no compiler) | Four to five times route C's engine: three to five weeks, and five copies to keep exact through every MuJoCo release |
+| **B. Native MuJoCo through MuJoCo's own C# bindings** (the only route that writes no engine code) | The env logic (1,647 lines of Python code for the ten ids and the base) and native packaging. `unity/Runtime/Bindings/MjBindings.cs` is reused as it stands: 7,782 generated lines, Apache-2.0, 348 `DllImport("mujoco")` functions, no Unity dependency, covering `mj_loadXML`, `mj_step`, `mj_forward`, `mj_resetData`, `mj_rnePostConstraint` and `mj_name2id` | By construction on win-x64: DeepMind's release `mujoco.dll` is the wheel's build (`pe_compare.py`: identical once the release's 10,392-byte Authenticode signature is stripped, same link timestamp) | Yes: `mujoco.dll` (5.5 MB) per platform, from DeepMind's release (22–33 MB archives) | MuJoCo's own `mjr_*`, given an OpenGL context to create | Works (the native compiler) | Two to three days with every parity layer, frames one to two more. The other 11 ids then cost about a day, since each is 100–200 lines over the same base |
+| **C. One minimal shared managed engine for these five** | §3's subset without the convex path and the fluid model: about 22,800 lines (static upper bound), shared. Compiled models embedded as data (no compiler), renderer deferred | Yes | None | Deferred | Refused | One to one and a half weeks |
+
+### 9.4 The verdict
+
+- **Route A is the most expensive way to get these five.** For MuJoCo envs the core *is* the env: a self-contained port
+  repeats the same 22,000-line core in each, so dropping "shared" multiplies the work instead of removing it.
+- **Route B is the only one that writes no core code.** It is the fastest, exact by construction, and keeps `xml_file`
+  and every model working. It reverses DR-30 (no native binaries, which DR-16's condition required for joining
+  Gym.NET.Environments). That would need a new design decision, for example native MuJoCo as a separate package and an
+  interim that the managed engine later replaces behind the same env classes. With route B, porting all 21 ids costs
+  about one day more than porting five.
+- **If DR-30 stands, route C is the cheapest managed one.** It is about half of P9's physics work and none of its compiler
+  or renderer, at the price of refusing `xml_file` and having no frames until the renderer comes.
+
+Measured with `hf_usage.py`, `env_logic.py` and `pe_compare.py` (in `tools/parity/mujoco/`; the release archive is
+`mujoco-3.15.0-windows-x86_64.zip` from DeepMind's GitHub release), and with `callgraph.py`'s `definitions` for the
+function sizes.
