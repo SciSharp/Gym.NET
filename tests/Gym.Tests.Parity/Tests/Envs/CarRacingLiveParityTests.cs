@@ -257,7 +257,8 @@ namespace Gym.Tests.Parity.Tests.Envs {
         [DataRow(false, 0L)]
         [DataRow(false, 7L)]
         public void GymNet_Reset_MatchesGymnasium(bool continuous, long seed) {
-            SkipOffReferencePlatform(Platform);            using GymPair pair = Pair(continuous);
+            SkipOffReferencePlatform(Platform);
+            using GymPair pair = Pair(continuous);
             pair.Reset(seed);
         }
 
@@ -275,7 +276,8 @@ namespace Gym.Tests.Parity.Tests.Envs {
         [DataRow(0L, true)]
         [DataRow(5L, true)]
         public void GymNet_Track_MatchesGymnasium(long seed, bool domainRandomize) {
-            SkipOffReferencePlatform(Platform);            ValueFacts python = Outcome.CapturePython(() => {
+            SkipOffReferencePlatform(Platform);
+            ValueFacts python = Outcome.CapturePython(() => {
                 using PyObject flag = domainRandomize.ToPython();
                 using var seedValue = new PyInt(seed);
                 return Python.evalStmts(TrackStatements, "result", ("domain_randomize", flag), ("seed", seedValue));
@@ -314,7 +316,8 @@ namespace Gym.Tests.Parity.Tests.Envs {
         [DataRow(false, 0L)]
         [DataRow(false, 4L)]
         public void GymNet_SampledEpisodes_MatchGymnasium(bool continuous, long seed) {
-            SkipOffReferencePlatform(Platform);            using GymPair pair = Pair(continuous);
+            SkipOffReferencePlatform(Platform);
+            using GymPair pair = Pair(continuous);
             PairRun run = pair.Run(seed, ActionSources.Sampled(seed), maxSteps: 250);
             TestContext.WriteLine(run.ToString());
         }
@@ -328,7 +331,8 @@ namespace Gym.Tests.Parity.Tests.Envs {
         [DataRow(0L)]
         [DataRow(2L)]
         public void GymNet_FollowerEpisodes_MatchGymnasium(long seed) {
-            SkipOffReferencePlatform(Platform);            using GymPair pair = Pair(true);
+            SkipOffReferencePlatform(Platform);
+            using GymPair pair = Pair(true);
             PairRun run = pair.Run(seed, new FollowerSource(), maxSteps: 3000);
             TestContext.WriteLine(run.ToString());
         }
@@ -342,7 +346,8 @@ namespace Gym.Tests.Parity.Tests.Envs {
         [DataRow(true)]
         [DataRow(false)]
         public void GymNet_Frames_MatchGymnasium(bool follower) {
-            SkipOffReferencePlatform(Platform);            using GymPair pair = Pair(true, "rgb_array");
+            SkipOffReferencePlatform(Platform);
+            using GymPair pair = Pair(true, "rgb_array");
             PairRun run = pair.Run(5, follower ? new FollowerSource() : ActionSources.Sampled(5), maxSteps: 400, frameEvery: 5);
             TestContext.WriteLine(run.ToString());
         }
@@ -354,7 +359,8 @@ namespace Gym.Tests.Parity.Tests.Envs {
         /// </summary>
         [TestMethod]
         public void GymNet_DomainRandomize_MatchesGymnasium() {
-            SkipOffReferencePlatform(Platform);            ValueFacts python = Outcome.CapturePython(() => Python.evalStmts(DomainRandomizeStatements, "result")).Expect("Gymnasium's randomized resets");
+            SkipOffReferencePlatform(Platform);
+            ValueFacts python = Outcome.CapturePython(() => Python.evalStmts(DomainRandomizeStatements, "result")).Expect("Gymnasium's randomized resets");
             ValueFacts dotnet = Outcome.Capture(() => {
                 using var env = new CarRacingEnv(domainRandomize: true);
                 var results = new List<object?>();
@@ -376,7 +382,8 @@ namespace Gym.Tests.Parity.Tests.Envs {
         /// </summary>
         [TestMethod]
         public void GymNet_ActionForms_MatchGymnasium() {
-            SkipOffReferencePlatform(Platform);            var continuous = new (string What, Func<NDArray> Make)[] {
+            SkipOffReferencePlatform(Platform);
+            var continuous = new (string What, Func<NDArray> Make)[] {
                 ("float32 [0.5, 0.8, 0.0]", () => np.array(new[] { 0.5f, 0.8f, 0.0f })),
                 ("float64 [-3.0, 2.0, 0.95]", () => np.array(new[] { -3.0, 2.0, 0.95 })),
                 ("int64 [1, 1, 0]", () => np.array(new[] { 1L, 1L, 0L })),
@@ -413,7 +420,8 @@ namespace Gym.Tests.Parity.Tests.Envs {
         /// </summary>
         [TestMethod]
         public void GymNet_LeavingThePlayfield_MatchesGymnasium() {
-            SkipOffReferencePlatform(Platform);            using GymPair pair = Pair(true);
+            SkipOffReferencePlatform(Platform);
+            using GymPair pair = Pair(true);
             PairRun run = pair.Run(17, new ConstantSource(new[] { 0.0, 0.3, 0.0 }), maxSteps: 600);
             Assert.IsTrue(run.Ended, $"The car must leave the playfield: {run}");
             TestContext.WriteLine(run.ToString());
@@ -475,7 +483,8 @@ namespace Gym.Tests.Parity.Tests.Envs {
         /// <summary><c>make</c>'s stack (<c>TimeLimit</c> at 1,000 steps) against <c>Gymnasium.Make</c>: the driver until the limit or the lap.</summary>
         [TestMethod]
         public void GymNet_MakeStack_MatchesGymnasium() {
-            SkipOffReferencePlatform(Platform);            using var pair = new GymPair(PyGymEnv.Make(Id, viaMake: true), new GymNetEnv(Gymnasium.Make(Id)));
+            SkipOffReferencePlatform(Platform);
+            using var pair = new GymPair(PyGymEnv.Make(Id, viaMake: true), new GymNetEnv(Gymnasium.Make(Id)));
             PairRun run = pair.Run(31, new FollowerSource(), maxSteps: 1100);
             Assert.IsTrue(run.Ended, $"The episode must end: {run}");
         }

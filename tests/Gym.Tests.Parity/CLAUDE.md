@@ -63,6 +63,11 @@ file: a runsettings `TestCaseFilter` is combined with the command line's `--filt
 The first thing every run prints (test `Stack_MatchesTheManifest`) is the stack it ran on, including the Gymnasium commit,
 where `gymnasium` and `numpy` were imported from, and whether `refs/Gymnasium` has local modifications.
 
+The parity audit ([docs/plans/GYMNASIUM_PARITY_AUDIT.md](../../docs/plans/GYMNASIUM_PARITY_AUDIT.md)) is built from this suite's
+results and the unit suite's: run both without the OpenBugs filter with a TRX logger, then
+`python tools/parity/audit/parity_matrix.py unit.trx parity.trx` tabulates every result by env and criterion (the audit's
+§9 has the commands). A new cell lands in the right column when its class, method or data row names its env.
+
 ---
 
 ## 2. The moving parts
