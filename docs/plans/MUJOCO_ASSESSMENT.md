@@ -5,7 +5,7 @@
 | **Date** | 2026-11-11 |
 | **Status** | Assessment for P9, which DR-35 postponed out of 2.0. The approved designs stand: DR-30 (a 100% managed port inside Gym.NET.Environments), DR-31 (MuJoCo's own renderer, ported, drawing through a managed OpenGL binding), DR-33 (scope: what Gymnasium's envs reach, proven bitwise) |
 | **Measured against** | Gymnasium `8ba8c3a6` (v1.4.0, committed 2026-10-05); MuJoCo 3.15.0 (released the same day): its source, and its `win_amd64` wheel for Python 3.12 in an isolated venv |
-| **Reproduce** | §8; the probes are in `tools/parity/mujoco/`, the proof of concept for HalfCheetah (§10), Hopper and Humanoid (§11), with its physics-only check of the other envs (§12), in `tools/parity/mujoco/halfcheetah_poc/`, the line coverage (§10.6, §12) in `tools/parity/mujoco/coverage/` |
+| **Reproduce** | §8; the probes are in `tools/parity/mujoco/`, the proof of concept for HalfCheetah (§10), Hopper and Humanoid (§11) and all 21 ids (§13) in `tools/parity/mujoco/halfcheetah_poc/`, with its verification scripts (§13) in `halfcheetah_poc/verify/`, the engine's line coverage (§10.6, §12) in `tools/parity/mujoco/coverage/` |
 
 ---
 
@@ -54,6 +54,14 @@
   70 for fluid forces. Pusher needs about 1,050: MuJoCo's GJK/EPA convex collider and
   island-local solving. Together that is about 1,140 lines of core and 490 of env rules, about 3.5 to 6.5 hours, of which
   Pusher is 2 to 4.
+- **All 21 now run on that core (§13):**
+  - **Size:** 3,776 lines of code, 1,512 of them new (33% above §12's estimate, almost all in the convex collider).
+  - **Parity:** every id that runs on MuJoCo 3 steps bit for bit with MuJoCo 3.15.0 and Gymnasium at every layer, over
+    45 trace folders, 2,460 episodes and 555,514 physics steps.
+  - **Coverage:** a search of about 90 million more physics steps found two branches the traces had missed; both were
+    then recorded and are exact. What no trace executes is listed with the reason.
+  - **Time:** 40 minutes of one session, against §12's 3.5 to 6.5 hours.
+  - **Still a proof of concept:** P9 stays postponed.
 
 ## 2. What Gymnasium needs
 
@@ -298,8 +306,31 @@ only, and reports a model the core refuses by the feature `Load` names:
 dotnet run --project tools/parity/mujoco/halfcheetah_poc -c Release -- <dir>/ant <dir>/ant_nt ...
 ```
 
-The probe copy of §12.3 makes the two edits described there in a copy of the project; the repo's core refuses those
-models until they land.
+The probe copy of §12.3 made the two edits described there in a copy of the project; since §13 both are in the core,
+and every id has env rules, so these runs now check the env layer too.
+
+§13 records its trace set from `verify/traces.txt`, about 1.6 GB, and checks it whole. The coverage needs
+`dotnet-coverage`, a Debug build and a few minutes:
+
+```bash
+poc=tools/parity/mujoco/halfcheetah_poc
+<venv>/bin/python $poc/verify/record_traces.py --out <set> --python <venv>/bin/python   # 45 folders, 8 at a time
+dotnet run --project $poc -c Release -- <set>/*        # 45/45 traces bit-exact, then the speed of each id's first folder
+dotnet tool install dotnet-coverage --tool-path <tools>
+dotnet build $poc -c Debug
+<tools>/dotnet-coverage collect -f cobertura -o <cov.xml> -- $poc/bin/Debug/net10.0/HalfCheetahPoc.exe <set>/*
+python $poc/verify/cs_coverage.py <cov.xml> $poc        # lines executed per file, and every unexecuted run
+# the branch search: first prove the probes change no bit (the probed copy built as the checker), then search
+python $poc/verify/branch_search.py <cov.xml> $poc <probed> checker
+dotnet run --project <probed> -c Release -- <set>/*    # must stay 45/45
+python $poc/verify/branch_search.py <cov.xml> $poc <search>
+dotnet build <search> -c Release
+<search>/bin/Release/net10.0/HalfCheetahPoc.exe <set>/pus5_a 0 80000     # likewise each id: a folder, the seed range
+python $poc/verify/negative_controls.py $poc <scratch> <set>             # every control gives its expected verdict
+<venv>/bin/python $poc/verify/mj_speed.py <set>/hc5 <set>/hop5_nt <set>/wal5_nt <set>/ant5_nt <set>/hum5_nt \
+  <set>/hst5 <set>/ip5 <set>/idp5 <set>/rea5 <set>/swi5 <set>/pus5_a
+dotnet run --project $poc -c Release -- <the same folders, in the same order>   # the core's side; alternate the two
+```
 
 The visualizer's figure uses the roots `mjv_updateScene`, `mjv_moveCamera`, `mjv_initGeom`, `mjv_defaultScene`,
 `mjv_makeScene`, `mjv_defaultOption`, `mjv_defaultCamera`, `mjv_defaultPerturb` and `mjv_freeScene`, and excludes the
@@ -883,3 +914,239 @@ Without Pusher, the 17 other ids take about 1.5–3 hours.
    controls showed for the first three. Pusher's reset also draws the object's position in a rejection loop of
    `uniform` calls.
 5. **Productizing** (env classes, registration, parity cells, goldens, frames) remains §10.5's separate cost.
+
+## 13. All eleven envs on the same core (2026-11-11)
+
+The maintainer asked for the rest, implemented to completion, with parity covered to completion. The proof of concept's
+core (`tools/parity/mujoco/halfcheetah_poc/`) now steps every id that runs on MuJoCo 3: the 22 ids but `Pusher-v4`,
+which Gymnasium itself refuses on MuJoCo 3 (§1), so there is nothing to step. The checker holds the env rules of all 21.
+The work stays a proof of concept outside `Gym.NET.sln`: P9 is still postponed (DR-35), and §7's decisions still
+precede a product.
+
+### 13.1 What was added
+
+The core grew by 1,512 lines of code, to 3,776 (5,666 with docs). §12.4 estimated about 1,140, so the estimate was 33%
+low, almost all of it in the convex collider. Counted per member against §12's commit:
+
+| Area | Code lines added | §12.4 estimate | Contents |
+|---|---:|---:|---|
+| GJK and EPA (`Ccd` in `Kernels.cs`) | 1,012 | ~812, with the glue | The distance query (GJK with the signed-volume subalgorithm and the intersection fallback), the initial polytopes from 2, 3 or 4 vertices, EPA with its horizon, the witness points, the support functions of a point, segment, sphere, capsule and cylinder |
+| The convex collider's glue | 76 | (in the line above) | `mjc_Convex`'s one query with a margin, the capsule shrunk to its segment and inflated back, MultiCCD's four perturbed queries and their distinctness test |
+| Plane-cylinder | 72 | ~60 | `mjc_PlaneCylinder`: the near rim point, the far one, and for a disk flat on the plane the two side points |
+| Islands | 148 | ~150 | The union-find over trees, the maps of dofs and rows, each island's problem gathered (the sparse mass matrix and its factor, renumbered), solved by Newton with its own scale, and scattered back; the dofs in no island reset to their unconstrained acceleration |
+| Fluid forces | 86 | ~70 | The inertia-box model, the body's local velocity, the wind's transform, `mj_applyFT` |
+| Sites, simple dofs, the collider dispatch, two 3x3 helpers | 24 | ~20 | InvertedDoublePendulum's reward reads a site; Reacher's and Pusher's slides take `dof_M0` |
+| Fields, constructor, loader and validation | 94 | | The new arrays; `Load` admits cylinders, several trees, fluid and sites, and refuses, by name, what the core does not do (§13.8) |
+| **Total** | **1,512** | **~1,140** | |
+
+The checker's env rules moved into `EnvRules.cs`: 450 lines of code for all 21 ids, including §11's three, which
+`Program.cs` held until now (it fell from 503 to 319 lines). §12.4 estimated about 490 lines for the 18 new ids alone.
+The 21 took fewer because a v4 and its v5 share one class, and a base class holds the resets, NumPy's sums and the info
+plumbing. `oracle.py` records format 3: site frames, body positions and the `TimeLimit`, which the rules read.
+
+`verify/` holds what §13.2–§13.6 ran: the trace list and its recorder, the coverage summary, the branch search, the
+negative controls and MuJoCo's timing.
+
+### 13.2 Results
+
+The trace set (`verify/traces.txt`, 45 folders, about 1.6 GB) plays every id as Gymnasium does. It adds long episodes
+without termination for the four envs that can fall, the planar HalfCheetah upside down, and the eight targeted
+episodes of §13.4:
+
+| Id | Folders | Episodes | Env steps | Physics steps | Steps with constraint rows | Solver iterations |
+|---|---:|---:|---:|---:|---:|---:|
+| HalfCheetah-v5 | 2 | 7 | 7,000 | 35,000 | 20,803 | 28,110 |
+| HalfCheetah-v4 | 2 | 4 | 4,000 | 20,000 | 11,799 | 16,036 |
+| Hopper-v5 | 4 | 105 | 7,267 | 29,068 | 25,012 | 30,007 |
+| Hopper-v4 | 2 | 102 | 4,267 | 17,068 | 14,294 | 16,675 |
+| Walker2d-v5 | 2 | 103 | 5,147 | 20,588 | 18,425 | 29,413 |
+| Walker2d-v4 | 2 | 102 | 4,164 | 16,656 | 14,917 | 24,047 |
+| Ant-v5 | 2 | 32 | 9,158 | 45,790 | 45,001 | 89,248 |
+| Ant-v4 | 2 | 31 | 8,158 | 40,790 | 40,077 | 79,423 |
+| Humanoid-v5 | 2 | 103 | 5,347 | 26,735 | 22,998 | 379,659 (PGS) |
+| Humanoid-v4 | 2 | 102 | 4,347 | 21,735 | 18,102 | 283,549 (PGS) |
+| HumanoidStandup-v5 | 1 | 3 | 3,000 | 15,000 | 14,756 | 269,725 (PGS) |
+| HumanoidStandup-v4 | 1 | 2 | 2,000 | 10,000 | 9,857 | 181,753 (PGS) |
+| InvertedPendulum-v5 | 1 | 300 | 1,911 | 3,822 | 0 | 0 |
+| InvertedPendulum-v4 | 1 | 300 | 1,911 | 3,822 | 0 | 0 |
+| InvertedDoublePendulum-v5 | 1 | 300 | 1,944 | 9,720 | 0 | 0 |
+| InvertedDoublePendulum-v4 | 1 | 300 | 1,944 | 9,720 | 0 | 0 |
+| Reacher-v5 | 1 | 100 | 5,000 | 10,000 | 581 | 585 |
+| Reacher-v4 | 1 | 100 | 5,000 | 10,000 | 581 | 585 |
+| Swimmer-v5 | 1 | 5 | 5,000 | 20,000 | 1,591 | 1,556 |
+| Swimmer-v4 | 1 | 3 | 3,000 | 12,000 | 956 | 940 |
+| Pusher-v5 | 13 | 356 | 35,600 | 178,000 | 178,000 | 51,044 |
+| **Total** | **45** | **2,460** | **125,165** | **555,514** | **437,750** | **1,482,355** |
+
+The pendulums never reach a joint limit in these episodes, which end first.
+
+| Check | Result |
+|---|---|
+| Reset noise and the 125,165 sampled actions, drawn through NumSharp's `Generator` (Pusher's rejection loop included) | bit-exact |
+| Closed loop: per physics step 30 arrays, 47 in debug episodes; per env step `cfrc_ext`, tendons, site frames and body positions | 18,265,118 of 18,265,118 comparisons bit-exact |
+| Resync, each physics step from MuJoCo's recorded state | bit-exact |
+| Env layer of all 21 ids: observation, reward, terminated, truncated, every info entry | bit-exact |
+| The playable HalfCheetah, built against the extended core: its autopilot's returns on seeds 0–9 | identical to the last bit |
+
+### 13.3 What the new envs needed
+
+- **Islands, as MuJoCo solves them.** Pusher has three kinematic trees: the arm, the object and the goal. MuJoCo
+  solves each constrained island alone, with its own dofs, rows and inertia scale, so the core gathers each island's
+  problem, solves it and scatters the result. Scaling Newton by the model's inertia instead breaks Pusher at physics
+  step 436 (§13.5). MuJoCo also resets the dofs no island holds to their unconstrained acceleration after choosing the
+  warm start. None of the searched episodes could show that reset (§13.5); the core does it anyway.
+- **The convex collider.** Pusher's capsules meet its object's cylinder through `mjc_Convex`. Each pair makes one GJK
+  query with the margin, on the capsule shrunk to its segment, inflated back at the end. A deep penetration goes on to
+  EPA, from the polytope GJK's last simplex gives. MultiCCD then repeats the query four times with the geoms rotated by
+  ±0.001 rad about the contact's tangents, and keeps each new contact far enough from the others. EPA runs in 1.6% of
+  Pusher's episodes. EPA from a triangle (`polytope3`) runs in 0.18%, and its arithmetic shows in the contact in fewer
+  still, so its seeds were found by search and recorded on their own (§13.4).
+- **Plane-cylinder.** The object only slides, so its cylinder always stands upright on the table. That is MuJoCo's
+  flat-disk case: three contacts on the bottom rim. The branches for a tilted or lifted cylinder are unreachable in
+  Gymnasium's envs (§13.4).
+- **Fluid forces** (Swimmer): MuJoCo's left-to-right products, and `mj_applyFT`'s order (the force's term, then the
+  torque's). The order shows at physics step 1 (§13.5).
+- **The env layers.** InvertedDoublePendulum's distance penalty squares with NumPy's float64 `**`, which is C's `pow`
+  and differs from a product in 0.05% of values. Reacher-v4 prices the state before the step. Pusher's arm starts at its
+  reference pose with no noise, and its object is drawn by rejection until it lies farther than 0.17 from the goal. Ant's health
+  range is inclusive. A v4's healthy reward is `float(healthy or terminate)`. HumanoidStandup-v4 caps the impact cost
+  with `min` where v5 clips it. The body positions an env reads after `mj_step` are those of RK4's last stage, or under
+  Euler those from before the integration.
+
+### 13.4 What the traces execute
+
+Line coverage of the managed core over the 45 folders (`dotnet-coverage`, Debug build, executable lines):
+- `CheetahCore.cs`: 1,781 of 1,868 lines;
+- `Kernels.cs`: 1,149 of 1,339;
+- `CheetahModel.cs`: 242 of 243;
+- `EnvRules.cs`: 369 of 377. The eight are the arm for an id without rules, and NumPy's sums at lengths no env uses:
+  a float32 sum beyond 8 entries, a float64 sum below 8.
+
+Random actions reach rare branches rarely, so coverage alone cannot tell an unreachable branch from an unlucky set of
+traces. A branch search settles it as far as search can. `verify/branch_search.py` puts a probe at the start of every
+run of unexecuted lines in a copy of the core, 86 of the 92 runs. It cannot place the other six (statements under an
+unbraced header, switch arms):
+- two get probes on their conditions instead;
+- one is covered by `polytope2`'s own probe;
+- three cannot run here: a minimum over several contacts, a second shrunk geom, and an empty simplex.
+
+It also probes conditions no single line shows, such as the island warm start's reset changing a value. Its `Main` then plays
+seeded episodes as oracle.py plays them, through the core alone, without MuJoCo. Any seed that reaches a probe is then
+recorded with oracle.py and checked. The probes must change nothing, so the probed copy is first built as the checker
+and run over the trace set: 45 of 45 bit-exact. That check exists because the first version broke it: a probe placed
+before a statement that a multi-line condition guarded made the statement unconditional, so `polytope3` always failed
+in the probed copy. Its own output showed this, and Pusher was searched again after the fix.
+
+| Env | Episodes searched | Physics steps | Unexecuted branches reached |
+|---|---:|---:|---|
+| HalfCheetah-v5, and upside down | 3,000 + 300 | 16.5 million | none |
+| Hopper-v5, as played and lying down | 30,000 + 1,200 | 7.5 million | two capsules with parallel axes, in seeds 109, 280, 552, 668 and 697 lying down |
+| Walker2d-v5 and -v4, as played and lying down | 60,800 | 8.3 million | none |
+| Ant-v5, as played and lying down | 2,300 | 3.2 million | none |
+| Humanoid-v5, as played and lying down | 20,300 | 3.9 million | none |
+| HumanoidStandup-v5 | 150 | 0.75 million | none |
+| InvertedPendulum-v5, InvertedDoublePendulum-v5 | 80,000 | 1.8 million | none |
+| Reacher-v5 | 40,000 | 4.0 million | none |
+| Swimmer-v5 | 1,000 | 4.0 million | none |
+| Pusher-v5 | 80,000 | 40 million | none. EPA ran in 1,292 episodes and `polytope3` in 143; every one of its 663 calls went on into EPA |
+| **Total** | | **about 90 million** | |
+
+Two of the parallel-axes seeds (109 and 280) and six `polytope3` seeds (654, 1559, 2455, 20432, 40228 and 60390) were
+recorded on their own: the targeted lines of `traces.txt`, bit-exact in §13.2. Coverage confirms that the parallel-axes
+branch ran in them.
+
+The lines still never executed fall in two groups. Each follows MuJoCo's source but is unproven:
+- **No model here can reach them:**
+  - geom priorities, direct (negative) or mixed-sign solref, and an impedance of power 1;
+  - a body of zero subtree mass, the undamped Euler step, and a body welded to the world in the fluid;
+  - a tilted or lifted cylinder;
+  - the union-find's other merge orders. Pusher's arm (tree 0) only ever joins its object (tree 1), whose table
+    contact has already activated it, and the goal never collides;
+  - the convex collider's paths for spheres, for two shrunk geoms, for zero-margin multi-contact and for zero
+    contacts;
+  - the loader's own refusals.
+- **No search reached them:**
+  - the auto-reset of a bad state or bad controls;
+  - coincident sphere centres, two parallel capsules touching at both ends, and a contact in the gap zone;
+  - PGS's cost-rise revert (dead by construction, §11.4);
+  - Newton's fallbacks: a zero step, an exhausted or stuck line search, a lost rank in the factor update;
+  - the collider's degenerate exits: EPA from a segment (`polytope2`), a degenerate simplex or face, and EPA's
+    failure exits;
+  - the kernels' degenerate cases: tiny pivots, zero-length vectors and quaternions, a zero rotation angle.
+
+### 13.5 Negative controls
+
+`verify/negative_controls.py` applies each change to a copy of the project and runs the checker on the traces named.
+Each control expects one of two verdicts. "Detected" means the checker reports a difference. "Same bits" applies to a
+change that cannot move a recorded bit on these models; its reason was measured, not assumed.
+
+| Change | Traces | Verdict |
+|---|---|---|
+| Newton's scale from the whole model's inertia, not the island's | Pusher (7), Reacher (2) | Detected: Pusher, physics step 436, `qacc[7]`. Reacher stays exact: its one limit row solves in one iteration |
+| Without the upright cylinder's two side contacts | Pusher | Detected at step 0: 1 contact, MuJoCo 3 |
+| Without MultiCCD's perturbed contacts | Pusher | Detected: step 418, `qpos[0]` |
+| S2D's cofactor `m14` summed in another order | Pusher | Detected: step 290, 6 ulp in `qpos[7]` |
+| `polytope3`'s normal from the triangle's other edge | Pusher, with the targeted seeds | Detected: seed 1559, step 479, 20 ulp. The broad set's three `polytope3` episodes stay exact |
+| `mj_applyFT` adding the torque's term before the force's | Swimmer | Detected at step 1: 2 ulp in `qfrc_passive[2]` |
+| InvertedDoublePendulum's squares as products, not NumPy's `**` | InvertedDoublePendulum | Detected: env layer, step 2, 1 ulp |
+| Reacher-v4 priced after the step, like v5 | Reacher-v4 | Detected: env layer, step 0 |
+| Ant's float32 control cost summed left to right | Ant | Detected: env layer, step 0 |
+| Pusher's object kept at its first draw | Pusher | Detected at the reset |
+| Pusher's reward summed in another order | Pusher | Detected: env layer, step 2, 1 ulp |
+| The dofs in no island keep their warm start | Pusher, Reacher | Same bits. The search saw 7.3 million Pusher steps and 0.64 million Reacher steps keep the warm start while a tree was in no island. In every one, the free dofs' warm start already equalled `qacc_smooth`: the goal and the target never move. When Pusher's arm is free with another warm start, the smooth start wins and resets it anyway |
+| S2D taking an exact tie | Pusher | Same bits. Ties are common, 59,516 of 425,129 edge comparisons in 20,000 episodes, but every one falls at the two edges' shared vertex, where both give the same weights |
+| `polytope3`'s two support points taken in the other order | Pusher, with the targeted seeds | Same bits. The order only numbers the two vertices; the points and EPA's faces are the same |
+| Swimmer's face drag regrouped, `abs(v)*v` first | Swimmer | Same bits. The drag's last bit changes in 32% of evaluations, but it is small against the viscous force it is subtracted from, which never changes |
+| The zero wind not transformed | Swimmer | Same bits. The transform only signs zeros. 3% of the local velocity components are exactly zero, because Swimmer is planar, yet the subtraction changed no bit in 28.8 million |
+| Simple dofs' diagonal computed, not `dof_M0` | Pusher, Reacher | Same bits: armature plus mass along an axis-aligned slide, compared in 561,200 evaluations |
+
+### 13.6 Speed
+
+The minimum of five interleaved rounds. Each round is the best of five runs of one episode, the same episode for both:
+1,000 env steps for HalfCheetah and Swimmer, and for Hopper, Walker2d, Ant and Humanoid without termination. The others
+use their first recorded episode.
+
+| Episode | Managed core | MuJoCo 3.15.0, `mj_step(nstep=frame_skip)` from Python | Ratio |
+|---|---:|---:|---:|
+| HalfCheetah-v5, seed 0 | 5.47 µs | 6.84 µs | 0.80 |
+| Hopper-v5, seed 0, no termination | 16.36 µs | 21.20 µs | 0.77 |
+| Walker2d-v5, seed 0, no termination | 26.42 µs | 29.63 µs | 0.89 |
+| Ant-v5, seed 0, no termination | 47.56 µs | 47.03 µs | 1.01 |
+| Humanoid-v5, seed 0, no termination (lying down) | 85.43 µs | 88.43 µs | 0.97 |
+| HumanoidStandup-v5, seed 0 | 86.40 µs | 87.24 µs | 0.99 |
+| InvertedPendulum-v5, seed 0 (5 env steps) | 3.33 µs | 8.87 µs | 0.38 |
+| InvertedDoublePendulum-v5, seed 0 (6 env steps) | 4.61 µs | 9.65 µs | 0.48 |
+| Reacher-v5, seed 0 (50 env steps) | 5.74 µs | 10.75 µs | 0.53 |
+| Swimmer-v5, seed 0 | 8.81 µs | 12.07 µs | 0.73 |
+| Pusher-v5, seed 0 (100 env steps) | 5.91 µs | 7.26 µs | 0.81 |
+
+On the smallest models, Python's one call per env step (about a microsecond, over two to five physics steps) is a large
+share of MuJoCo's time. §11.6 measured Humanoid at 112 µs while another session shared the machine; these rounds
+measured 85 µs.
+
+### 13.7 Time
+
+The session clock, from the request (16:54 UTC) to:
+- the env rules of all 21 ids written, and the 18 ids that need neither fluid forces nor a new collider bit-exact at
+  every layer: 15 minutes;
+- Swimmer, with fluid forces: 19 minutes;
+- the island-local solve: 27 minutes;
+- Pusher, with GJK, EPA, MultiCCD and plane-cylinder: 40 minutes;
+- the 37 folders of the broad set bit-exact: 46 minutes;
+- coverage, the branch search, the targeted traces, the controls, the speed and the full documentation: 1 hour 52
+  minutes.
+
+§12.5 estimated 3.5 to 6.5 hours for the 18 ids. The implementation took 40 minutes, so the estimate was five to ten
+times too high. Its line count was 33% too low.
+
+### 13.8 Still open
+
+- **Productizing.** No env classes, registration, parity cells, goldens or frames. P9 stays postponed (DR-35), and
+  §7's decisions come first: the MuJoCo pin, specialized core or general port, the renderer.
+- **§10.3 still holds.** There is no compiler: the models come from MuJoCo's own compiled dump. Exactness holds on
+  win-x64 only, and needs re-verification at each MuJoCo pin.
+- **The unexecuted branches** of §13.4.
+- **What `Load` refuses:** colliding geoms other than planes, spheres, capsules and cylinders; a capsule-cylinder pair
+  without a margin (MuJoCo's multi-contact polygon clipping); ball joints; equality constraints; active tendons;
+  elliptic cones; the ellipsoid fluid model; PGS over several trees; and stateful actuators. Gymnasium's eleven models
+  need none of them. Their own `xml_file` variants might.

@@ -11,25 +11,20 @@ using NumSharp;
 namespace MujocoPoc;
 
 /// <summary>
-///     Checks the core against MuJoCo 3.15.0 and Gymnasium bit for bit, for HalfCheetah-v5, Hopper-v5 and Humanoid-v5: the
-///     reset noise and the sampled actions (NumSharp's NumPy generator), every mjData array oracle.py recorded after each
-///     physics step and each env step, and the env's observation, reward, flags and info after each env step.
+///     Checks the core against MuJoCo 3.15.0 and Gymnasium bit for bit, for the 21 MuJoCo ids that run on MuJoCo 3 (the
+///     rules in <see cref="EnvRules"/>): the reset noise and the sampled actions (NumSharp's NumPy generator), every
+///     mjData array oracle.py recorded after each physics step and each env step, and the env's observation, reward,
+///     flags and info after each env step.
 /// </summary>
 /// <remarks>
 ///     Two passes over each recorded episode. Closed loop: the core runs on its own from its own reset, as an env would, so
 ///     any difference compounds. Resync: before each physics step the core is put back on MuJoCo's recorded state, so a
 ///     difference shows in the step that makes it. Exit code 0 when every episode is exact in both passes and the env layer.
-///     Any other env oracle.py recorded is checked physics only: the closed loop starts from Gymnasium's recorded reset
-///     and replays its actions, and its env layer is not checked (its report says so). A model outside the core's scope
-///     stops the run at <see cref="CheetahModel.Load"/>, which names the feature.
+///     An id without rules (a MuJoCo env outside Gymnasium's eleven) is checked physics only: the closed loop starts from
+///     Gymnasium's recorded reset and replays its actions, and its env layer is not checked (its report says so). A model
+///     outside the core's scope is reported by the feature <see cref="CheetahModel.Load"/> names, and counts as failed.
 /// </remarks>
 internal static class Program {
-    /// <summary>
-    ///     The three envs' <c>max_episode_steps</c>: Gymnasium's TimeLimit truncates at this step, so a shorter episode
-    ///     never sees <c>truncated</c> set.
-    /// </summary>
-    internal const int MaxEpisodeSteps = 1000;
-
     /// <summary>The names of the per-step records, in oracle.py's order after the state block.</summary>
     private static readonly string[] StateNames =
         ["qpos", "qvel", "qacc", "qacc_warmstart", "qacc_smooth", "qfrc_constraint", "qfrc_passive", "qfrc_bias", "qfrc_actuator", "actuator_force"];
@@ -40,7 +35,7 @@ internal static class Program {
     private static readonly string[] DebugNames =
         ["xpos", "xquat", "xmat", "xipos", "ximat", "geom_xpos", "geom_xmat", "subtree_com", "cinert", "cdof", "crb", "M", "qLD", "qLDiagInv", "cvel", "cdof_dot"];
 
-    private static readonly string[] PostNames = ["cfrc_ext", "ten_length", "ten_velocity"];
+    private static readonly string[] PostNames = ["cfrc_ext", "ten_length", "ten_velocity", "site_xpos", "site_xmat", "xpos"];
 
     /// <summary>
     ///     Checks every recorded trace given and prints one report per trace, then the totals, then the core's speed on
@@ -97,31 +92,6 @@ internal static class Program {
     /// <param name="Comparisons">Array comparisons made in the closed loop.</param>
     private sealed record TraceResult(bool Exact, string Summary, long EnvSteps, long PhysicsSteps, long Comparisons);
 
-    /// <summary>oracle.py's run.json: which env, which episodes, and the env's info keys in their recorded order.</summary>
-    /// <param name="Env">The Gymnasium id.</param>
-    /// <param name="Seeds">Each episode's reset and action-space seed.</param>
-    /// <param name="Steps">Each episode's env steps.</param>
-    /// <param name="Flip">Whether the episodes start upside down.</param>
-    /// <param name="Terminate">Whether the env terminates when unhealthy.</param>
-    /// <param name="InfoKeys">The info entries and their sizes, in env.bin's order.</param>
-    private sealed record RunInfo(string Env, int[] Seeds, int[] Steps, bool Flip, bool Terminate, (string Key, int Size)[] InfoKeys) {
-        /// <summary>Reads run.json.</summary>
-        /// <param name="path">The file.</param>
-        /// <returns>The run.</returns>
-        /// <exception cref="IOException">The file cannot be read.</exception>
-        /// <exception cref="JsonException">The file is not the expected JSON.</exception>
-        public static RunInfo Load(string path) {
-            using JsonDocument doc = JsonDocument.Parse(File.ReadAllBytes(path));
-            JsonElement r = doc.RootElement;
-            return new RunInfo(
-                r.GetProperty("env").GetString() ?? "",
-                r.GetProperty("seeds").EnumerateArray().Select(e => e.GetInt32()).ToArray(),
-                r.GetProperty("steps").EnumerateArray().Select(e => e.GetInt32()).ToArray(),
-                r.GetProperty("flip").GetBoolean(),
-                r.GetProperty("terminate").GetBoolean(),
-                r.GetProperty("info_keys").EnumerateArray().Select(e => (e[0].GetString() ?? "", e[1].GetInt32())).ToArray());
-        }
-    }
 
     /// <summary>
     ///     Checks one recording: per episode the reset and actions drawn with NumSharp, the closed loop with the env layer,
@@ -134,7 +104,7 @@ internal static class Program {
     /// <param name="verbose">Whether to print each pass's tally.</param>
     /// <returns>The trace's results.</returns>
     /// <exception cref="IOException">A trace file cannot be read.</exception>
-    /// <exception cref="InvalidDataException">The trace is not oracle.py's format 2.</exception>
+    /// <exception cref="InvalidDataException">The trace is not oracle.py's format 3.</exception>
     /// <remarks>
     ///     A physics-only pass proves the core's arithmetic for the model, not the env: the reset noise, the action
     ///     sampling and the env's observation, reward and info stay unverified until the env has rules here.
@@ -142,9 +112,9 @@ internal static class Program {
     private static TraceResult CheckTrace(string dir, CheetahModel model, RunInfo run, bool verbose) {
         List<double[]> trace = Records.ReadAll(Path.Combine(dir, "trace.bin"));
         List<double[]> envRecords = Records.ReadAll(Path.Combine(dir, "env.bin"));
-        if (trace[0].Length != 2 || trace[0][0] != 2)
-            throw new InvalidDataException($"{dir}: not an oracle.py format-2 trace");
-        EnvRules? rules = EnvRules.TryFor(run.Env, model, run.Terminate);
+        if (trace[0].Length != 2 || trace[0][0] != 3)
+            throw new InvalidDataException($"{dir}: not an oracle.py format-3 trace");
+        EnvRules? rules = EnvRules.TryFor(model, run);
         var closed = new Checker("closed loop");
         var resync = new Checker("resync");
         var env = new Checker("env layer");
@@ -183,7 +153,7 @@ internal static class Program {
                 if (SameBits(action, trace[recClosed]))
                     actionsOk++;
                 recClosed++;
-                rules?.Before(core);
+                rules?.Before(core, action);
                 Array.Copy(action, core.ctrl, model.nu);
                 for (int k = 0; k < model.frame_skip; k++) {
                     core.Step();
@@ -311,7 +281,7 @@ internal static class Program {
     /// <param name="rec">The cursor, advanced past the records.</param>
     /// <param name="t">The env step index.</param>
     private static void ComparePost(Checker c, CheetahCore core, List<double[]> trace, ref int rec, int t) {
-        double[][] post = [core.cfrc_ext, core.ten_length, core.ten_velocity];
+        double[][] post = [core.cfrc_ext, core.ten_length, core.ten_velocity, core.site_xpos, core.site_xmat, core.xpos];
         for (int i = 0; i < PostNames.Length; i++)
             c.Check(PostNames[i], post[i], trace[rec++], t);
     }
@@ -335,7 +305,7 @@ internal static class Program {
     /// </param>
     /// <exception cref="IOException">The trace of an env without rules cannot be read.</exception>
     private static void Benchmark(CheetahModel model, RunInfo run, string dir) {
-        EnvRules? rules = EnvRules.TryFor(run.Env, model, run.Terminate);
+        EnvRules? rules = EnvRules.TryFor(model, run);
         (double[] Qpos, double[] Qvel, double[] Warm, double Time, double[][] Actions)? recorded =
             rules == null ? FirstEpisode(Records.ReadAll(Path.Combine(dir, "trace.bin")), model) : null;
         double[][] actions = recorded?.Actions ?? SampleActions(rules!, run.Seeds[0], run.Steps[0]);
@@ -371,7 +341,8 @@ internal static class Program {
     /// <returns>The reset's qpos, qvel, qacc_warmstart and time, and the episode's actions.</returns>
     /// <remarks>
     ///     The records of an env step are its action, then per physics step 30 records (47 in a debug episode), then the
-    ///     three recorded after <c>mj_rnePostConstraint</c>; a change to oracle.py's layout must change the stride here.
+    ///     six recorded after <c>mj_rnePostConstraint</c> (<see cref="PostNames"/>); a change to oracle.py's layout must
+    ///     change the stride here.
     /// </remarks>
     private static (double[] Qpos, double[] Qvel, double[] Warm, double Time, double[][] Actions) FirstEpisode(
         List<double[]> trace, CheetahModel model) {
@@ -387,324 +358,32 @@ internal static class Program {
     }
 }
 
-/// <summary>
-///     An env's rules over the core, as Gymnasium's v5 class has them: the reset noise, the action bounds, the
-///     observation, and per step the reward, the termination and the info entries. Each reproduces NumPy's arithmetic
-///     where it decides bits (NEP 50 float32 costs, NumPy's pairwise sums, einsum's sequential sum).
-/// </summary>
-internal abstract class EnvRules {
-    /// <summary>The model the rules read.</summary>
-    protected readonly CheetahModel M;
-
-    /// <summary>The control step, <c>timestep * frame_skip</c>.</summary>
-    protected readonly double Dt;
-
-    /// <summary>Whether an unhealthy state terminates the episode.</summary>
-    protected readonly bool Terminate;
-
-    /// <summary>The action space's lower bounds (the control ranges rounded to float32).</summary>
-    public readonly double[] ActionLow;
-
-    /// <summary>The action space's upper bounds.</summary>
-    public readonly double[] ActionHigh;
-
-    /// <summary>Sets up the rules for a model.</summary>
-    /// <param name="model">The model.</param>
-    /// <param name="terminate">Whether an unhealthy state terminates the episode.</param>
-    protected EnvRules(CheetahModel model, bool terminate) {
-        M = model;
-        Terminate = terminate;
-        Dt = model.timestep * model.frame_skip;
-        ActionLow = Enumerable.Range(0, model.nu).Select(i => (double)(float)model.actuator_ctrlrange[2 * i]).ToArray();
-        ActionHigh = Enumerable.Range(0, model.nu).Select(i => (double)(float)model.actuator_ctrlrange[2 * i + 1]).ToArray();
-    }
-
-    /// <summary>
-    ///     The rules of an env id, or <see langword="null"/> for an env the checker has no rules for, which it then checks
-    ///     physics only (from the recorded reset and actions, without the env layer).
-    /// </summary>
-    /// <param name="env">The Gymnasium id: HalfCheetah-v5, Hopper-v5 and Humanoid-v5 have rules.</param>
-    /// <param name="model">The model.</param>
-    /// <param name="terminate">Whether an unhealthy state terminates the episode.</param>
-    /// <returns>The rules, or <see langword="null"/>.</returns>
-    public static EnvRules? TryFor(string env, CheetahModel model, bool terminate) => env switch {
-        "HalfCheetah-v5" => new HalfCheetahRules(model),
-        "Hopper-v5" => new HopperRules(model, terminate),
-        "Humanoid-v5" => new HumanoidRules(model, terminate),
-        _ => null,
-    };
-
-    /// <summary>
-    ///     Gymnasium's reset after <c>mj_resetData</c>: the env's noise from <c>Generator(PCG64(SeedSequence(seed)))</c>
-    ///     added to the reference configuration (and zero velocity), the optional flip, then <c>mj_forward</c>
-    ///     (<c>set_state</c>).
-    /// </summary>
-    /// <param name="core">A new core, whose state is set.</param>
-    /// <param name="seed">The reset seed.</param>
-    /// <param name="flip">Whether to turn the model upside down (<c>qpos[2] += pi</c>).</param>
-    public void Reset(CheetahCore core, int seed, bool flip) {
-        var rng = new Generator(new PCG64(new SeedSequence(new BigInteger(seed))));
-        (double[] dq, double[] dv) = Noise(rng);
-        for (int i = 0; i < M.nq; i++)
-            core.qpos[i] = M.qpos0[i] + dq[i];
-        for (int i = 0; i < M.nv; i++)
-            core.qvel[i] = 0.0 + dv[i];
-        if (flip)
-            core.qpos[2] += Math.PI;
-        core.Forward();
-    }
-
-    /// <summary>The env's reset noise, in its draw order.</summary>
-    /// <param name="rng">The seeded generator.</param>
-    /// <returns>The position and velocity noise.</returns>
-    protected abstract (double[] Qpos, double[] Qvel) Noise(Generator rng);
-
-    /// <summary>The observation.</summary>
-    /// <param name="core">The core.</param>
-    /// <returns>The observation.</returns>
-    public abstract double[] Obs(CheetahCore core);
-
-    /// <summary>Records what the step's reward needs from before the physics steps.</summary>
-    /// <param name="core">The core before the step.</param>
-    public abstract void Before(CheetahCore core);
-
-    /// <summary>The step's results after the physics steps and <c>mj_rnePostConstraint</c>.</summary>
-    /// <param name="core">The core after the step.</param>
-    /// <param name="action">The action (float32 values).</param>
-    /// <param name="t">The step index within the episode.</param>
-    /// <param name="infoKeys">The info entries in env.bin's order.</param>
-    /// <returns>The observation, and [reward, terminated, truncated, the info values].</returns>
-    /// <exception cref="KeyNotFoundException">An info key the rules do not produce.</exception>
-    public (double[] Obs, double[] Row) After(CheetahCore core, double[] action, int t, (string Key, int Size)[] infoKeys) {
-        (double reward, bool terminated, Dictionary<string, double[]> info) = Results(core, action);
-        var row = new List<double> { reward, terminated ? 1 : 0, t + 1 >= Program.MaxEpisodeSteps ? 1 : 0 };
-        foreach ((string key, _) in infoKeys)
-            row.AddRange(info[key]);
-        return (Obs(core), row.ToArray());
-    }
-
-    /// <summary>The reward, the termination and the info entries.</summary>
-    /// <param name="core">The core after the step.</param>
-    /// <param name="action">The action.</param>
-    /// <returns>The results.</returns>
-    protected abstract (double Reward, bool Terminated, Dictionary<string, double[]> Info) Results(CheetahCore core, double[] action);
-
-    /// <summary>
-    ///     <c>np.sum(np.square(a))</c> of a float32 array: float32 squares, then NumPy's add reduction (the identity 0 plus
-    ///     the pairwise sum, a plain loop below 8 entries).
-    /// </summary>
-    /// <param name="a">The float32 values (widened).</param>
-    /// <returns>The float32 sum.</returns>
-    protected static float SumSquaresF32(double[] a) {
-        var sq = new float[a.Length];
-        for (int i = 0; i < a.Length; i++) {
-            float f = (float)a[i];
-            sq[i] = f * f;
-        }
-        return 0f + PairwiseF32(sq);
-    }
-
-    /// <summary>NumPy's float32 pairwise sum for up to 128 entries (8 accumulators beyond 7 entries).</summary>
-    /// <param name="v">The values.</param>
-    /// <returns>The sum.</returns>
-    private static float PairwiseF32(float[] v) {
-        int n = v.Length;
-        if (n < 8) {
-            float r = 0;
-            foreach (float x in v)
-                r += x;
-            return r;
-        }
-        var acc = new float[8];
-        Array.Copy(v, acc, 8);
-        int i = 8;
-        for (; i < n - n % 8; i += 8)
-            for (int j = 0; j < 8; j++)
-                acc[j] += v[i + j];
-        float res = ((acc[0] + acc[1]) + (acc[2] + acc[3])) + ((acc[4] + acc[5]) + (acc[6] + acc[7]));
-        for (; i < n; i++)
-            res += v[i];
-        return res;
-    }
-
-    /// <summary>NumPy's float64 sum of up to 128 entries: the identity 0 plus the pairwise sum.</summary>
-    /// <param name="v">The values.</param>
-    /// <returns>The sum.</returns>
-    protected static double SumF64(double[] v) {
-        int n = v.Length;
-        double res;
-        if (n < 8) {
-            res = 0;
-            foreach (double x in v)
-                res += x;
-            return 0.0 + res;
-        }
-        var acc = new double[8];
-        Array.Copy(v, acc, 8);
-        int i = 8;
-        for (; i < n - n % 8; i += 8)
-            for (int j = 0; j < 8; j++)
-                acc[j] += v[i + j];
-        res = ((acc[0] + acc[1]) + (acc[2] + acc[3])) + ((acc[4] + acc[5]) + (acc[6] + acc[7]));
-        for (; i < n; i++)
-            res += v[i];
-        return 0.0 + res;
-    }
-}
-
-/// <summary>HalfCheetah-v5: forward velocity reward minus a float32 control cost; it never terminates.</summary>
-internal sealed class HalfCheetahRules : EnvRules {
-    private double xBefore;
-
-    /// <summary>Sets up the rules.</summary>
-    /// <param name="model">The model.</param>
-    public HalfCheetahRules(CheetahModel model) : base(model, false) { }
-
-    /// <inheritdoc/>
-    protected override (double[] Qpos, double[] Qvel) Noise(Generator rng) {
-        using NDArray u = rng.uniform(-0.1, 0.1, new Shape(M.nq));
-        using NDArray z = rng.standard_normal(new Shape(M.nv));
-        return (u.ToArray<double>(), z.ToArray<double>().Select(v => 0.1 * v).ToArray());
-    }
-
-    /// <inheritdoc/>
-    public override double[] Obs(CheetahCore core) => core.qpos.Skip(1).Concat(core.qvel).ToArray();
-
-    /// <inheritdoc/>
-    public override void Before(CheetahCore core) => xBefore = core.qpos[0];
-
-    /// <inheritdoc/>
-    protected override (double, bool, Dictionary<string, double[]>) Results(CheetahCore core, double[] action) {
-        double xAfter = core.qpos[0];
-        double xVelocity = (xAfter - xBefore) / Dt;
-        double forward = 1.0 * xVelocity;
-        float ctrlCost = 0.1f * SumSquaresF32(action);
-        return (forward - ctrlCost, false, new Dictionary<string, double[]> {
-            ["x_position"] = [xAfter], ["x_velocity"] = [xVelocity], ["reward_forward"] = [forward], ["reward_ctrl"] = [-ctrlCost],
-        });
-    }
-}
-
-/// <summary>
-///     Hopper-v5: forward velocity plus a healthy reward minus a float32 control cost; unhealthy (fallen, tilted, or a state
-///     beyond ±100) terminates; velocities are clipped to ±10 in the observation.
-/// </summary>
-internal sealed class HopperRules : EnvRules {
-    private double xBefore;
-
-    /// <summary>Sets up the rules.</summary>
-    /// <param name="model">The model.</param>
-    /// <param name="terminate">Whether an unhealthy state terminates.</param>
-    public HopperRules(CheetahModel model, bool terminate) : base(model, terminate) { }
-
-    /// <inheritdoc/>
-    protected override (double[] Qpos, double[] Qvel) Noise(Generator rng) {
-        using NDArray q = rng.uniform(-5e-3, 5e-3, new Shape(M.nq));
-        using NDArray v = rng.uniform(-5e-3, 5e-3, new Shape(M.nv));
-        return (q.ToArray<double>(), v.ToArray<double>());
-    }
-
-    /// <inheritdoc/>
-    public override double[] Obs(CheetahCore core) =>
-        core.qpos.Skip(1).Concat(core.qvel.Select(v => v < -10 ? -10.0 : v > 10 ? 10.0 : v)).ToArray();
-
-    /// <inheritdoc/>
-    public override void Before(CheetahCore core) => xBefore = core.qpos[0];
-
-    /// <summary>Whether the hopper is healthy: state within ±100 (beyond the x and z positions), z above 0.7, angle within ±0.2.</summary>
-    /// <param name="core">The core.</param>
-    /// <returns>The health.</returns>
-    private bool Healthy(CheetahCore core) {
-        bool state = core.qpos.Skip(2).Concat(core.qvel).All(s => -100.0 < s && s < 100.0);
-        double z = core.qpos[1], angle = core.qpos[2];
-        return state && 0.7 < z && z < double.PositiveInfinity && -0.2 < angle && angle < 0.2;
-    }
-
-    /// <inheritdoc/>
-    protected override (double, bool, Dictionary<string, double[]>) Results(CheetahCore core, double[] action) {
-        double xAfter = core.qpos[0];
-        double xVelocity = (xAfter - xBefore) / Dt;
-        double forward = 1.0 * xVelocity;
-        bool healthy = Healthy(core);
-        double healthyReward = healthy ? 1.0 : 0.0;
-        double rewards = forward + healthyReward;
-        float ctrlCost = 1e-3f * SumSquaresF32(action);
-        return (rewards - ctrlCost, !healthy && Terminate, new Dictionary<string, double[]> {
-            ["x_position"] = [xAfter], ["z_distance_from_origin"] = [core.qpos[1] - M.qpos0[1]], ["x_velocity"] = [xVelocity],
-            ["reward_forward"] = [forward], ["reward_ctrl"] = [-ctrlCost], ["reward_survive"] = [healthyReward],
-        });
-    }
-}
-
-/// <summary>
-///     Humanoid-v5: the mass centre's forward velocity (weight 1.25) plus a healthy reward, minus float64 control and
-///     contact costs; a torso height outside (1, 2) terminates; the observation adds the body inertias, velocities,
-///     actuator forces and external forces to the state.
-/// </summary>
-internal sealed class HumanoidRules : EnvRules {
-    private double[] xyBefore = [0, 0];
-
-    /// <summary>Sets up the rules.</summary>
-    /// <param name="model">The model.</param>
-    /// <param name="terminate">Whether an unhealthy state terminates.</param>
-    public HumanoidRules(CheetahModel model, bool terminate) : base(model, terminate) { }
-
-    /// <inheritdoc/>
-    protected override (double[] Qpos, double[] Qvel) Noise(Generator rng) {
-        using NDArray q = rng.uniform(-1e-2, 1e-2, new Shape(M.nq));
-        using NDArray v = rng.uniform(-1e-2, 1e-2, new Shape(M.nv));
-        return (q.ToArray<double>(), v.ToArray<double>());
-    }
-
-    /// <inheritdoc/>
-    public override double[] Obs(CheetahCore core) =>
-        core.qpos.Skip(2).Concat(core.qvel).Concat(core.cinert.Skip(10)).Concat(core.cvel.Skip(6))
-            .Concat(core.qfrc_actuator.Skip(6)).Concat(core.cfrc_ext.Skip(6)).ToArray();
-
-    /// <summary>
-    ///     <c>mass_center</c>: <c>einsum("b,bj->j", body_mass, xipos)</c> (each column summed in body order from 0) over
-    ///     <c>body_mass.sum()</c> (NumPy's pairwise sum), the x and y components.
-    /// </summary>
-    /// <param name="core">The core, whose last forward pass set xipos.</param>
-    /// <returns>The mass centre's x and y.</returns>
-    private double[] MassCenter(CheetahCore core) {
-        double denom = SumF64(M.body_mass);
-        var res = new double[2];
-        for (int j = 0; j < 2; j++) {
-            double num = 0;
-            for (int b = 0; b < M.nbody; b++)
-                num += M.body_mass[b] * core.xipos[3 * b + j];
-            res[j] = num / denom;
-        }
-        return res;
-    }
-
-    /// <inheritdoc/>
-    public override void Before(CheetahCore core) => xyBefore = MassCenter(core);
-
-    /// <inheritdoc/>
-    protected override (double, bool, Dictionary<string, double[]>) Results(CheetahCore core, double[] action) {
-        double[] xyAfter = MassCenter(core);
-        double xVelocity = (xyAfter[0] - xyBefore[0]) / Dt, yVelocity = (xyAfter[1] - xyBefore[1]) / Dt;
-        double forward = 1.25 * xVelocity;
-        double z = core.qpos[2];
-        bool healthy = 1.0 < z && z < 2.0;
-        double healthyReward = healthy ? 5.0 : 0.0;
-        double rewards = forward + healthyReward;
-        // float64 costs: data.ctrl holds the action widened to float64; cfrc_ext's 84 squares
-        double ctrlCost = 0.1 * SumF64(core.ctrl.Select(c => c * c).ToArray());
-        double contactCost = 5e-7 * SumF64(core.cfrc_ext.Select(c => c * c).ToArray());
-        contactCost = Math.Min(Math.Max(contactCost, double.NegativeInfinity), 10.0);
-        double costs = ctrlCost + contactCost;
-        double x = core.qpos[0], y = core.qpos[1];
-        return (rewards - costs, !healthy && Terminate, new Dictionary<string, double[]> {
-            ["x_position"] = [x], ["y_position"] = [y],
-            ["tendon_length"] = (double[])core.ten_length.Clone(), ["tendon_velocity"] = (double[])core.ten_velocity.Clone(),
-            ["distance_from_origin"] = [Math.Sqrt(x * x + y * y)],
-            ["x_velocity"] = [xVelocity], ["y_velocity"] = [yVelocity],
-            ["reward_survive"] = [healthyReward], ["reward_forward"] = [forward], ["reward_ctrl"] = [-ctrlCost],
-            ["reward_contact"] = [-contactCost],
-        });
+/// <summary>oracle.py's run.json: which env, which episodes, and the env's info keys in their recorded order.</summary>
+/// <param name="Env">The Gymnasium id.</param>
+/// <param name="Seeds">Each episode's reset and action-space seed.</param>
+/// <param name="Steps">Each episode's env steps.</param>
+/// <param name="Flip">Whether the episodes start upside down.</param>
+/// <param name="Terminate">Whether the env terminates when unhealthy.</param>
+/// <param name="InfoKeys">The info entries and their sizes, in env.bin's order.</param>
+/// <param name="MaxEpisodeSteps">The env's TimeLimit (<c>max_episode_steps</c>), the step that truncates.</param>
+internal sealed record RunInfo(string Env, int[] Seeds, int[] Steps, bool Flip, bool Terminate, (string Key, int Size)[] InfoKeys,
+                                 int MaxEpisodeSteps) {
+    /// <summary>Reads run.json.</summary>
+    /// <param name="path">The file.</param>
+    /// <returns>The run.</returns>
+    /// <exception cref="IOException">The file cannot be read.</exception>
+    /// <exception cref="JsonException">The file is not the expected JSON.</exception>
+    public static RunInfo Load(string path) {
+        using JsonDocument doc = JsonDocument.Parse(File.ReadAllBytes(path));
+        JsonElement r = doc.RootElement;
+        return new RunInfo(
+            r.GetProperty("env").GetString() ?? "",
+            r.GetProperty("seeds").EnumerateArray().Select(e => e.GetInt32()).ToArray(),
+            r.GetProperty("steps").EnumerateArray().Select(e => e.GetInt32()).ToArray(),
+            r.GetProperty("flip").GetBoolean(),
+            r.GetProperty("terminate").GetBoolean(),
+            r.GetProperty("info_keys").EnumerateArray().Select(e => (e[0].GetString() ?? "", e[1].GetInt32())).ToArray(),
+            r.GetProperty("max_episode_steps").GetInt32());
     }
 }
 

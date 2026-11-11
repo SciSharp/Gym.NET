@@ -1,32 +1,36 @@
-"""Oracle for the from-scratch core (HalfCheetah-v5, Hopper-v5, Humanoid-v5, and any other MuJoCo env physics only):
-records MuJoCo 3.15.0's exact state after every mj_step of seeded episodes, and Gymnasium's env results, as binary
-files the C# checker compares against bit for bit.
+"""Oracle for the from-scratch core (Gymnasium's 21 MuJoCo ids that run on MuJoCo 3, and any other MuJoCo env physics
+only): records MuJoCo 3.15.0's exact state after every mj_step of seeded episodes, and Gymnasium's env results, as
+binary files the C# checker compares against bit for bit.
 
 Writes into the output folder:
     model.json  every compiled model array the cores read, as exact doubles (Python's repr round-trips), plus the
-                options, the statistics, the sizes and frame_skip.
+                options, the statistics, the sizes, frame_skip and the body names.
     run.json    {"env", "seeds", "steps" (env steps per episode), "flip", "terminate", "frame_skip", "debug_episodes",
-                "info_keys" ([key, size] in the order env.bin stores them)}.
-    trace.bin   records of an int32 count and that many little-endian float64. First [2, n_episodes] (the format and
+                "info_keys" ([key, size] in the order env.bin stores them), "max_episode_steps" (the TimeLimit)}.
+    trace.bin   records of an int32 count and that many little-endian float64. First [3, n_episodes] (the format and
                 the episode count). Per episode: [n_steps, has_debug]; qpos, qvel, qacc_warmstart and [time] at the
                 start; then per env step the action, and per mj_step (frame_skip of them) the state block (STATE below),
                 [time, ncon, nefc, solver_niter, nisland], the contacts (dist, geom pairs, pos, frame), efc_J, the efc
                 arrays (EFC below), and when has_debug the dual matrix efc_AR (dual solvers, else empty) and the
-                position/velocity-stage arrays (DEBUG below); after the env step's mj_rnePostConstraint, POST below.
+                position/velocity-stage arrays (DEBUG below); after the env step's mj_rnePostConstraint, POST below
+                (the external forces, tendons, sites and body positions the envs read). Format 3 added sites and body
+                positions to POST; the checker reads format 3 only.
     env.bin     per episode the observation after reset, then per env step the observation and [reward, terminated,
                 truncated, the info values in info_keys order], from a second env stepped through Gymnasium.
 
 Args (command line):
     --out DIR         output folder (required; HalfCheetah writes about 40 MB per 1,000 env steps, Humanoid more: keep it
                       outside the repo).
-    --env ID          any Gymnasium MuJoCo id (default HalfCheetah-v5). The checker has env rules for HalfCheetah-v5,
-                      Hopper-v5 and Humanoid-v5, and checks any other id physics only.
+    --env ID          any Gymnasium MuJoCo id (default HalfCheetah-v5). The checker has env rules (EnvRules.cs) for the 21
+                      ids that run on MuJoCo 3 (every v4 and v5 but Pusher-v4, which refuses MuJoCo 3), and checks any
+                      other id physics only.
     --seed N          the first episode's reset and action-space seed (default 42); episode k uses seed + k.
     --episodes N      how many episodes (default 1).
-    --steps N         the most env steps per episode (default 1000; Gymnasium also truncates at 1,000).
-    --flip            turn the model upside down after the reset (qpos[2] += pi, hinge-rooted models only), so its body
-                      lands on the ground; both envs get the same start.
-    --no-terminate    pass terminate_when_unhealthy=False (Hopper, Humanoid), so episodes run past a fall.
+    --steps N         the most env steps per episode (default 1000; Gymnasium's TimeLimit truncates at 1,000, Reacher's
+                      at 50 and Pusher's at 100).
+    --flip            turn the model upside down after the reset (qpos[2] += pi: the planar walkers, whose qpos[2] is the
+                      root's pitch hinge), so its body lands on the ground; both envs get the same start.
+    --no-terminate    pass terminate_when_unhealthy=False (Hopper, Walker2d, Ant, Humanoid), so episodes run past a fall.
     --debug-episodes N  record efc_AR and the DEBUG arrays for the first N episodes only (default: all), to bound the size.
 
 Raises:
@@ -89,9 +93,13 @@ for name in ["body_parentid", "body_rootid", "body_weldid", "body_jntnum", "body
              "tendon_adr", "tendon_num", "tendon_limited", "tendon_actfrclimited", "tendon_range",
              "tendon_stiffness", "tendon_stiffnesspoly", "tendon_damping", "tendon_dampingpoly", "tendon_armature",
              "tendon_frictionloss", "tendon_lengthspring", "tendon_margin", "tendon_actuatorid",
-             "wrap_type", "wrap_objid", "wrap_prm", "ten_J_rownnz", "ten_J_rowadr", "ten_J_colind"]:
+             "wrap_type", "wrap_objid", "wrap_prm", "ten_J_rownnz", "ten_J_rowadr", "ten_J_colind",
+             # sites (InvertedDoublePendulum's tip) and the geoms' fluid parameters (Swimmer's inertia-box model)
+             "site_bodyid", "site_pos", "site_quat", "site_sameframe", "geom_fluid"]:
     if hasattr(m, name):
         fields[name] = np.asarray(getattr(m, name)).ravel().tolist()
+# body names, for the envs that read bodies by name (Reacher's fingertip, Pusher's object, Ant's torso)
+fields["body_names"] = [m.body(i).name for i in range(m.nbody)]
 o = m.opt
 fields["opt"] = {k: (np.asarray(getattr(o, k)).ravel().tolist()) for k in
                  ["timestep", "gravity", "tolerance", "ls_tolerance", "noslip_tolerance", "impratio", "o_margin",
@@ -137,7 +145,7 @@ EFC = ["efc_type", "efc_id", "efc_pos", "efc_margin", "efc_frictionloss", "efc_d
        "efc_vel", "efc_aref", "efc_b", "efc_force", "efc_state"]
 DEBUG = ["xpos", "xquat", "xmat", "xipos", "ximat", "geom_xpos", "geom_xmat", "subtree_com", "cinert", "cdof", "crb",
          "M", "qLD", "qLDiagInv", "cvel", "cdof_dot"]
-POST = ["cfrc_ext", "ten_length", "ten_velocity"]
+POST = ["cfrc_ext", "ten_length", "ten_velocity", "site_xpos", "site_xmat", "xpos"]
 DUAL = m.opt.solver == mujoco.mjtSolver.mjSOL_PGS or m.opt.noslip_iterations > 0
 
 seeds, lengths, info_keys = [], [], None
@@ -153,7 +161,7 @@ with open(os.path.join(OUT, "trace.bin"), "wb") as trace, open(os.path.join(OUT,
         f.write(struct.pack("<i", a.size))
         f.write(a.tobytes())
 
-    put(trace, [2, args.episodes])
+    put(trace, [3, args.episodes])
     env2 = gym.make(args.env, **KWARGS)
     for e in range(args.episodes):
         seed = args.seed + e
@@ -217,7 +225,8 @@ with open(os.path.join(OUT, "trace.bin"), "wb") as trace, open(os.path.join(OUT,
 
 with open(os.path.join(OUT, "run.json"), "w") as f:
     json.dump({"env": args.env, "seeds": seeds, "steps": lengths, "flip": args.flip, "terminate": not args.no_terminate,
-               "frame_skip": int(u.frame_skip), "debug_episodes": DEBUG_EPISODES, "info_keys": info_keys}, f)
+               "frame_skip": int(u.frame_skip), "debug_episodes": DEBUG_EPISODES, "info_keys": info_keys,
+               "max_episode_steps": env.spec.max_episode_steps}, f)
 print(f"mujoco {mujoco.__version__}: {args.env} seeds {seeds[0]}..{seeds[-1]}{' flipped' if args.flip else ''}"
       f"{' no-terminate' if args.no_terminate else ''}: {len(lengths)} episodes, {sum(lengths)} env steps "
       f"(lengths min {min(lengths)} max {max(lengths)}), {sum(lengths) * u.frame_skip} mj_steps -> {OUT}")

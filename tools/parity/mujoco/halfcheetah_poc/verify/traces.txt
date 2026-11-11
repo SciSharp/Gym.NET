@@ -1,0 +1,52 @@
+# The trace set of MUJOCO_ASSESSMENT.md §13: one oracle.py run per line, recorded by record_traces.py.
+# Columns: folder name, Gymnasium id, first seed, episodes, debug episodes (efc_AR and the stage arrays), then oracle.py flags.
+# The first 37 lines are the broad set: every id, as Gymnasium plays it, plus long episodes without termination and the
+# planar walkers upside down. The last eight are targeted: seeds the branch search (branch_search.py) found reaching a
+# branch the broad set does not, recorded on their own.
+hc5 HalfCheetah-v5 0 5 1
+hc4 HalfCheetah-v4 0 3 1
+hc5_flip HalfCheetah-v5 0 2 0 --flip
+hc4_flip HalfCheetah-v4 0 1 0 --flip
+hop5 Hopper-v5 0 100 10
+hop4 Hopper-v4 0 100 10
+hop5_nt Hopper-v5 0 3 1 --no-terminate
+hop4_nt Hopper-v4 0 2 0 --no-terminate
+wal5 Walker2d-v5 0 100 10
+wal4 Walker2d-v4 0 100 10
+wal5_nt Walker2d-v5 0 3 1 --no-terminate
+wal4_nt Walker2d-v4 0 2 0 --no-terminate
+ant5 Ant-v5 0 30 2
+ant4 Ant-v4 0 30 2
+ant5_nt Ant-v5 0 2 0 --no-terminate
+ant4_nt Ant-v4 0 1 0 --no-terminate
+hum5 Humanoid-v5 0 100 5
+hum4 Humanoid-v4 0 100 5
+hum5_nt Humanoid-v5 0 3 0 --no-terminate
+hum4_nt Humanoid-v4 0 2 0 --no-terminate
+hst5 HumanoidStandup-v5 0 3 0
+hst4 HumanoidStandup-v4 0 2 0
+ip5 InvertedPendulum-v5 0 300 30
+ip4 InvertedPendulum-v4 0 300 30
+idp5 InvertedDoublePendulum-v5 0 300 30
+idp4 InvertedDoublePendulum-v4 0 300 30
+rea5 Reacher-v5 0 100 10
+rea4 Reacher-v4 0 100 10
+swi5 Swimmer-v5 0 5 1
+swi4 Swimmer-v4 0 3 1
+pus5_a Pusher-v5 0 50 5
+pus5_b Pusher-v5 100 50 0
+pus5_c Pusher-v5 150 50 0
+pus5_d Pusher-v5 200 50 0
+pus5_e Pusher-v5 250 50 0
+pus5_f Pusher-v5 300 50 0
+pus5_g Pusher-v5 350 50 0
+# targeted: two capsules with parallel axes (Hopper lying down)
+hop5_nt_s109 Hopper-v5 109 1 1 --no-terminate
+hop5_nt_s280 Hopper-v5 280 1 1 --no-terminate
+# targeted: EPA from GJK's triangle (polytope3), whose arithmetic reaches the contact in seeds 654 and 1559
+pus5_s654 Pusher-v5 654 1 1
+pus5_s1559 Pusher-v5 1559 1 1
+pus5_s2455 Pusher-v5 2455 1 1
+pus5_s20432 Pusher-v5 20432 1 1
+pus5_s40228 Pusher-v5 40228 1 1
+pus5_s60390 Pusher-v5 60390 1 1

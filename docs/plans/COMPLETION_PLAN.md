@@ -1002,6 +1002,11 @@ Specs: the port plan's §5.7 and §11.4; sources 6,153 lines. Nothing here start
   Reacher need about 20 lines, Swimmer about 70 (fluid forces), and Pusher about 1,050 (MuJoCo's GJK/EPA collider and
   island-local solving). Add about 490 lines of env rules for all 18; the estimate is 3.5 to 6.5 hours, of which Pusher
   takes 2 to 4.
+- **All 21 on that core** ([§13](MUJOCO_ASSESSMENT.md#13-all-eleven-envs-on-the-same-core-2026-11-11)), implemented
+  and checked. The core, now 3,776 lines of code (1,512 added, 33% over the estimate), steps every id that runs on
+  MuJoCo 3 bit for bit at every layer, over 45 trace folders and 555,514 physics steps. A branch search of about 90
+  million physics steps found two more branches, both then recorded and exact. It took 40 minutes. It is still a proof
+  of concept outside `Gym.NET.sln`: no env classes, registration, parity cells or frames.
 
 The approved designs for that time are:
 

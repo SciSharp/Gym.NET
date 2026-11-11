@@ -1,8 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- The proof of concept for HalfCheetah-v5, Hopper-v5 and Humanoid-v5: one from-scratch managed core specialized to
-       their models, checked bit for bit against MuJoCo 3.15.0 traces recorded by oracle.py (the folder keeps
-       HalfCheetah's name, its first env). Not part of Gym.NET.sln; nothing ships from here. -->
+  <!-- The proof of concept for Gymnasium's MuJoCo envs (the 21 ids that run on MuJoCo 3): one from-scratch managed core
+       specialized to their models, checked bit for bit against MuJoCo 3.15.0 traces recorded by oracle.py (the folder
+       keeps HalfCheetah's name, its first env). Not part of Gym.NET.sln; nothing ships from here. verify/ holds the
+       scripts that measure how far the traces reach (coverage, the branch search, the negative controls, the speed). -->
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net10.0</TargetFramework>

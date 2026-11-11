@@ -7,18 +7,20 @@ using System.Text.Json;
 namespace MujocoPoc;
 
 /// <summary>
-///     A compiled MuJoCo model reduced to what the most-used locomotion envs need (HalfCheetah, Hopper, Humanoid): a
-///     kinematic tree of hinge and slide joints under an optional free root, a ground plane with spheres and capsules,
-///     motors on joints, Euler or RK4, pyramidal and frictionless contacts, the dense Newton or PGS solver, and inert fixed
-///     tendons. Read from the JSON dump of a model MuJoCo compiled (oracle.py's model.json), so the numbers are MuJoCo's
-///     own; no MJCF compiler.
+///     A compiled MuJoCo model reduced to what Gymnasium's eleven MuJoCo envs need (HalfCheetah, Hopper, Walker2d, Ant,
+///     Humanoid, HumanoidStandup, InvertedPendulum, InvertedDoublePendulum, Reacher, Swimmer, Pusher): kinematic trees of
+///     hinge and slide joints, each under an optional free root; a ground plane with spheres, capsules and cylinders;
+///     motors on joints; Euler or RK4; pyramidal and frictionless contacts; the dense Newton or PGS solver; inert fixed
+///     tendons; sites; and the inertia-box fluid model. Read from the JSON dump of a model MuJoCo compiled (oracle.py's
+///     model.json), so the numbers are MuJoCo's own; no MJCF compiler.
 /// </summary>
 /// <remarks>
 ///     <see cref="Load"/> refuses any model that uses a feature the core does not reproduce (ball joints, springs on free
-///     joints, active tendons, equality constraints, frictionloss, other geom types, elliptic cones, stateful actuators,
-///     other integrators or solvers), so a model that loads is one the core steps exactly. Arrays keep MuJoCo's names and
-///     layouts (row-major, <c>3*i</c>, <c>4*i</c>, <c>9*i</c> strides). The class keeps its first name: HalfCheetah's
-///     play project compiles it as it is.
+///     joints, active tendons, equality constraints, frictionloss, colliding geoms of other types, a capsule-cylinder
+///     pair without a margin, elliptic cones, the ellipsoid fluid model, stateful actuators, PGS over several kinematic
+///     trees, other integrators or solvers), so a model that loads is one the core steps exactly. Arrays keep MuJoCo's
+///     names and layouts (row-major, <c>3*i</c>, <c>4*i</c>, <c>9*i</c> strides). The class keeps its first name:
+///     HalfCheetah's play project compiles it as it is.
 /// </remarks>
 public sealed class CheetahModel {
     // sizes
@@ -36,6 +38,10 @@ public sealed class CheetahModel {
     public int ngeom;
     /// <summary>Number of stored entries of the sparse inertia matrix.</summary>
     public int nC;
+    /// <summary>Number of sites (frames the env code reads, such as InvertedDoublePendulum's tip).</summary>
+    public int nsite;
+    /// <summary>Number of kinematic trees (subtrees hanging from the world); constraint islands are unions of them.</summary>
+    public int ntree;
 
     // bodies
     /// <summary>Parent body of each body.</summary>
@@ -120,6 +126,19 @@ public sealed class CheetahModel {
     public double[] dof_armature = [];
     /// <summary>Inverse dof weights at the reference pose.</summary>
     public double[] dof_invweight0 = [];
+    /// <summary>
+    ///     MuJoCo's simple dofs: nonzero for a dof of a body whose mass-matrix rows are diagonal and constant (sliders at a
+    ///     root, such as Reacher's target), whose diagonal is then <see cref="dof_M0"/> rather than computed.
+    /// </summary>
+    public int[] dof_simplenum = [];
+    /// <summary>Each dof's diagonal of the mass matrix at the reference pose (used for simple dofs).</summary>
+    public double[] dof_M0 = [];
+    /// <summary>The kinematic tree of each dof.</summary>
+    public int[] dof_treeid = [];
+    /// <summary>The kinematic tree of each body (-1 for the world and bodies welded to it).</summary>
+    public int[] body_treeid = [];
+    /// <summary>Dofs per kinematic tree.</summary>
+    public int[] tree_dofnum = [];
 
     // geoms
     /// <summary>Geom types (0 plane, 3 capsule).</summary>
@@ -169,6 +188,22 @@ public sealed class CheetahModel {
     /// <summary>Gain parameters (10 per actuator; a motor uses the first).</summary>
     public double[] actuator_gainprm = [];
 
+    // sites (frames fixed in bodies; empty when the model has none)
+    /// <summary>Body of each site.</summary>
+    public int[] site_bodyid = [];
+    /// <summary>Site positions in the body frames.</summary>
+    public double[] site_pos = [];
+    /// <summary>Site orientations in the body frames.</summary>
+    public double[] site_quat = [];
+    /// <summary>How each site's frame relates to its body's frames.</summary>
+    public int[] site_sameframe = [];
+
+    /// <summary>
+    ///     Body names, for env rules that read a body by name (Reacher's fingertip, Pusher's object); empty when the dump
+    ///     predates them.
+    /// </summary>
+    public string[] body_names = [];
+
     // reference configuration
     /// <summary>The reference configuration the joint values are measured from.</summary>
     public double[] qpos0 = [];
@@ -206,6 +241,16 @@ public sealed class CheetahModel {
     public int solver;
     /// <summary>The model's mean inertia, which scales PGS's improvement test (<c>stat.meaninertia</c>).</summary>
     public double meaninertia;
+    /// <summary>The fluid's density (Swimmer's 4000; 0 disables the drag and lift terms).</summary>
+    public double density;
+    /// <summary>The fluid's viscosity (Swimmer's 0.1; 0 disables the viscous terms).</summary>
+    public double viscosity;
+    /// <summary>The fluid's velocity in the world frame (3 values; 0 in every Gymnasium model, still transformed).</summary>
+    public double[] wind = new double[3];
+    /// <summary>The convex collider's iteration budget for GJK and EPA (<c>opt.ccd_iterations</c>).</summary>
+    public int ccd_iterations;
+    /// <summary>The convex collider's tolerance (<c>opt.ccd_tolerance</c>).</summary>
+    public double ccd_tolerance;
 
     // fixed tendons (Humanoid's two; inert in the dynamics, reported in the env's info)
     /// <summary>The number of tendons.</summary>
@@ -263,7 +308,8 @@ public sealed class CheetahModel {
             jnt_solref = D("jnt_solref"), jnt_solimp = D("jnt_solimp"),
             dof_bodyid = I("dof_bodyid"), dof_jntid = I("dof_jntid"), dof_parentid = I("dof_parentid"),
             dof_damping = D("dof_damping"), dof_dampingpoly = D("dof_dampingpoly"), dof_armature = D("dof_armature"),
-            dof_invweight0 = D("dof_invweight0"),
+            dof_invweight0 = D("dof_invweight0"), dof_simplenum = I("dof_simplenum"), dof_M0 = D("dof_M0"),
+            dof_treeid = I("dof_treeid"), body_treeid = I("body_treeid"), tree_dofnum = I("tree_dofnum"),
             geom_type = I("geom_type"), geom_contype = I("geom_contype"), geom_conaffinity = I("geom_conaffinity"),
             geom_condim = I("geom_condim"), geom_bodyid = I("geom_bodyid"), geom_sameframe = I("geom_sameframe"),
             geom_priority = I("geom_priority"), geom_size = D("geom_size"), geom_rbound = D("geom_rbound"),
@@ -281,7 +327,11 @@ public sealed class CheetahModel {
             frame_skip = r.GetProperty("frame_skip").GetInt32(),
             integrator = (int)Opt("integrator"), solver = (int)Opt("solver"),
             meaninertia = r.GetProperty("stat").GetProperty("meaninertia").GetDouble(),
+            density = Opt("density"), viscosity = Opt("viscosity"),
+            wind = opt.GetProperty("wind").EnumerateArray().Select(e => e.GetDouble()).ToArray(),
+            ccd_iterations = (int)Opt("ccd_iterations"), ccd_tolerance = Opt("ccd_tolerance"),
         };
+        m.ntree = m.tree_dofnum.Length;
         // the tendon arrays are read only when the model has tendons, so a dump without them (HalfCheetah's) still loads
         m.ntendon = sizes.TryGetProperty("ntendon", out JsonElement nten) ? nten.GetInt32() : 0;
         if (m.ntendon > 0) {
@@ -294,6 +344,16 @@ public sealed class CheetahModel {
             m.ten_J_rowadr = I("ten_J_rowadr");
             m.ten_J_colind = I("ten_J_colind");
         }
+        // sites and names, both absent from dumps older than the remaining envs' (the play project's HalfCheetah has none)
+        m.nsite = sizes.TryGetProperty("nsite", out JsonElement nsite) ? nsite.GetInt32() : 0;
+        if (m.nsite > 0) {
+            m.site_bodyid = I("site_bodyid");
+            m.site_pos = D("site_pos");
+            m.site_quat = D("site_quat");
+            m.site_sameframe = I("site_sameframe");
+        }
+        if (r.TryGetProperty("body_names", out JsonElement names))
+            m.body_names = names.EnumerateArray().Select(e => e.GetString() ?? "").ToArray();
         m.Validate(r, sizes, opt);
         return m;
     }
@@ -321,10 +381,15 @@ public sealed class CheetahModel {
         Require(integrator == 0 || integrator == 1, "the Euler or RK4 integrator");
         Require(Opt("cone") == 0, "pyramidal friction cone only");
         Require(solver == 2 || solver == 0, "the Newton or PGS solver");
+        // PGS runs per island in MuJoCo; with one tree its single island holds every row and dof, which the core's
+        // monolithic sweeps reproduce (Newton has the island-local solve)
+        Require(solver != 0 || ntree == 1, "PGS on a single kinematic tree");
         Require(Opt("jacobian") == 2 || Opt("jacobian") == 0, "dense Jacobian only");
         Require(Opt("disableflags") == 0 && Opt("enableflags") == 0, "default flags only");
         Require(Opt("noslip_iterations") == 0, "no noslip");
-        Require(Opt("density") == 0 && Opt("viscosity") == 0, "no fluid forces");
+        // fluid forces: the inertia-box model only (a geom's first fluid parameter selects the ellipsoid model instead)
+        if (density != 0 || viscosity != 0)
+            Require(D("geom_fluid").Where((_, k) => k % 12 == 0).All(v => v == 0), "fluid forces of the inertia-box model only");
         // joints: slides and hinges, and free joints as the only joint of a body, without a spring (the core's springs are
         // the scalar ones of slides and hinges)
         for (int j = 0; j < njnt; j++) {
@@ -343,19 +408,41 @@ public sealed class CheetahModel {
                 dofs += jnt_type[j] == 0 ? 6 : 1;
             Require(dofs == body_dofnum[b], $"body {b}: its dofs are its joints'");
         }
-        Require(I("dof_simplenum").All(v => v == 0), "no simple dofs");
         Require(D("dof_frictionloss").All(v => v == 0), "no dof frictionloss");
         Require(I("jnt_actuatorid").All(v => v == -1), "no actuator-inherited damping or armature");
         Require(D("geom_adhesion").All(v => v == 0), "no adhesion");
         Require(I("body_mocapid").All(v => v == -1), "no mocap bodies");
-        // geoms: one plane on the world body; spheres and capsules on bodies, whose every pair has a primitive collider
+        // geoms: those that can collide are planes on the world body, or spheres, capsules and cylinders on bodies, whose
+        // every pair has a collider here. A geom no geom of another body can touch (no compatible bitmask) never reaches a
+        // collider, so it may be of any type and on any body, the world included (InvertedPendulum's rail, Reacher's
+        // arena); the core still computes its frame.
         for (int g = 0; g < ngeom; g++) {
+            int gg = g;
+            bool collides = Enumerable.Range(0, ngeom).Any(h => geom_bodyid[h] != geom_bodyid[gg]
+                && ((geom_contype[gg] & geom_conaffinity[h]) != 0 || (geom_contype[h] & geom_conaffinity[gg]) != 0));
+            if (!collides)
+                continue;
             bool plane = geom_type[g] == 0 && geom_bodyid[g] == 0;
-            Require(plane || ((geom_type[g] == 2 || geom_type[g] == 3) && geom_bodyid[g] > 0),
-                    $"geom {g}: a plane on the world body, or a sphere or capsule on a body");
+            Require(plane || ((geom_type[g] == 2 || geom_type[g] == 3 || geom_type[g] == 5) && geom_bodyid[g] > 0),
+                    $"geom {g}: a plane on the world body, or a sphere, capsule or cylinder on a body");
             Require(geom_condim[g] == 1 || geom_condim[g] == 3, $"geom {g}: condim 1 or 3");
         }
-        Require(body_geomnum[0] == 1 && geom_type[body_geomadr[0]] == 0, "exactly one geom, a plane, on the world body");
+        // every pair of geoms that may touch needs a collider the core reproduces: plane against sphere, capsule or
+        // cylinder; sphere-sphere, sphere-capsule, capsule-capsule; capsule-cylinder through the convex collider (a
+        // superset of the real candidates, which the body filters thin further)
+        for (int g = 0; g < ngeom; g++)
+            for (int h = g + 1; h < ngeom; h++) {
+                if (geom_bodyid[g] == geom_bodyid[h]
+                    || ((geom_contype[g] & geom_conaffinity[h]) == 0 && (geom_contype[h] & geom_conaffinity[g]) == 0))
+                    continue;
+                int lo = Math.Min(geom_type[g], geom_type[h]), hi = Math.Max(geom_type[g], geom_type[h]);
+                bool ok = (lo == 0 && (hi == 2 || hi == 3 || hi == 5)) || (lo == 2 && (hi == 2 || hi == 3)) || (lo == 3 && (hi == 3 || hi == 5));
+                Require(ok, $"geoms {g} and {h}: a collider for geom types {lo} and {hi}");
+                // without a margin the convex collider makes several contacts by clipping polygons, which the core
+                // leaves out; with one it makes a single contact plus MuJoCo's perturbed ones (CheetahCore.Convex)
+                if (lo == 3 && hi == 5)
+                    Require(geom_margin[g] + geom_margin[h] > 0, $"geoms {g} and {h}: a capsule-cylinder pair needs a margin (one contact per pair)");
+            }
         // tendons: fixed, and inert in the dynamics (no limit, spring, damper, armature, friction loss or actuator), so the
         // core only reports their lengths and velocities
         if (ntendon > 0) {
