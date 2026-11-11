@@ -115,7 +115,10 @@ EnvChecker.CheckEnv(env.Unwrapped);   // Gymnasium's check_env: spaces, seeding,
 - `Gymnasium.Register` takes Gymnasium's `register` arguments: `entryPoint` (the class, an `EnvCreator` delegate, or a
   `"Namespace:Class"` string), `maxEpisodeSteps` (adds `TimeLimit`), `rewardThreshold`, `kwargs` (default constructor
   arguments), `orderEnforce`, `disableEnvChecker`, `additionalWrappers` and `vectorEntryPoint` (a vectorized class for
-  `MakeVec`). Ids follow Gymnasium's grammar, `[namespace/]name[-vN]`.
+  `MakeVec`). Ids follow Gymnasium's grammar, `[namespace/]name[-vN]`. To put several envs in one namespace, register
+  them inside `using (EnvRegistry.Namespace("MyEnvs")) { ... }` (`Gym.Envs.Registration`): `"Grid-v0"` becomes
+  `"MyEnvs/Grid-v0"`. The scope applies to the thread and async flow that opens it (DR-57), so plugins registering on
+  other threads keep their own.
 - `Gymnasium.Make` wraps the env as Gymnasium's `make` does: `PassiveEnvChecker` (it checks the first reset, step and
   render, and warns with Gymnasium's texts), `OrderEnforcing` (a step before the first reset raises `ResetNeeded`) and
   `TimeLimit`.

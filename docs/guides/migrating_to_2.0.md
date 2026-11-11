@@ -40,6 +40,10 @@ will be removed in 3.0.
 | `GoalEnv` | removed (Gymnasium-Robotics' concern) |
 | `Gym.Threading` (`DistributedScheduler`, `DistributedThread`, `DistributedQueuedTaskScheduler`, `ThreadAffinityDistrubution`, `CancellationSourceExtensions`), which 0.2's `StepAsync` ran on | removed: built on `Thread.Abort`, which throws on .NET 5 and later. `StepAsync` runs the step on the calling thread; `Gymnasium.MakeVec(id, n, "async")` steps envs on worker threads |
 | `IVecEnv`, `VecEnv`, `DummyVecEnv`, `VecEnvWrapper` | `Gym.Vector`: `Gymnasium.MakeVec("CartPole-v1", n)`, `SyncVectorEnv`, `VectorEnv<TObs, TAct>`; the old types moved to `Gym.Legacy`, obsolete |
+| `catch (InvalidActionError)` | removed (DR-56): the envs that check their action assert it, as Gymnasium's do, and raise `AssertionError` (LunarLander, CartPole, ...); CarRacing raises `Gym.Exceptions.InvalidAction`, which is also what a custom env should throw |
+| `AlreadySteppingError`, `NotSteppingError` | removed (nothing threw them); `AsyncVectorEnv` raises Gymnasium's `AlreadyPendingCallError` and `NoAsyncCallError` |
+| `Gym.Collections.CircularQueue<T>`, `CircularQueueThreadSafe<T>` | removed: a `Queue<T>` cycled with `queue.Enqueue(queue.Dequeue())`, or `ConcurrentQueue<T>` |
+| `Gym.Reflection.GenericCallFactory` | removed: `method.MakeGenericMethod(type).Invoke(target, args)` |
 | `space.Seed(int)` | `space.Seed(seed)`, which also takes Gymnasium's lists and dicts of seeds for composite spaces |
 | `new Discrete(n)` samples | 0-d int64 arrays, `start` to `start + n - 1` |
 | `new Box(low, high, shape, typeof(float))` | `new Box(low, high, shape, dtype: np.float32)` |
@@ -131,6 +135,38 @@ while (!step.Done)                            // Done = terminated || truncated
   `ILegacyEnv`.
 
 Everything in `Gym.Legacy` is `[Obsolete]`, with the replacement named in the warning, and is removed in 3.0.
+
+### The legacy `Dict` and its helpers
+
+`Gym.Legacy` still hands out 0.2's `Gym.Collections.Dict` (`Step.Information`, `ILegacyEnv.Metadata`,
+`VecEnv.Metadata`), so `Dict` and the fifteen types behind it stay in 2.0, `[Obsolete]` (DR-56), and go in 3.0 with
+`Gym.Legacy`. Each warning names the replacement:
+
+| 0.2 type | 2.0 replacement |
+|---|---|
+| `Gym.Collections.Dict` | `Gym.Envs.Info` for infos, `Gym.Envs.Metadata` for metadata |
+| `Gym.Dynamic.Expando` | `System.Dynamic.ExpandoObject` |
+| `Gym.Merging.Merger`, `IMergable`, `IMergable<T>`, `MergePrefer` | `Info.Update`, Python's `dict.update`: the new value wins, one level deep |
+| `Gym.Collections.ExpandableList`, `ExpandableList<T>`, `IExpandableList` | `List<T>` |
+| `Gym.Reflection.DefaultConstructor`, `DefaultConstructor<T>`, `DefaultConstructorNotFoundException` | `Activator.CreateInstance<T>()`, or a `new()` constraint |
+| `Gym.Reflection.ReflectionHelper` | `Type.GetConstructor(Type.EmptyTypes)`, `Type.IsAssignableTo`, `System.Runtime.CompilerServices.ITuple` |
+| `DictInlineInitializationException`, `DictMergingException` | none needed |
+
+Moving code from `Dict` to `Info`, member by member:
+
+| `Dict` | `Info` |
+|---|---|
+| `new Dict("key", value, ...)`, `Dict.Empty` | `new Info { ["key"] = value, ... }`, `new Info()` |
+| `d["key"]`, `ContainsKey`, `TryGetValue`, `Remove`, `foreach` | the same |
+| `d.Get<T>("key")` (`default(T)` when missing) | `(T)info["key"]!`, or `info.Get("key") is T value` (Python's `get`: `null` when missing) |
+| `d.Get<T>("key", fallback)` | `info.Get("key", fallback)`, which returns `object?` |
+| `d.Update(other)`, `Append(other)`, `Override(other)` | `info.Update(other)` |
+| `d.Merge(other, MergePrefer.New)` | `info.Update(other)`, one level deep; nothing replaces the deep merge |
+| `d.Clone()` (shallow) | `info.Copy()` (shallow) or `info.DeepCopy()` |
+| `d.RemoveWhere(predicate)` | `foreach (string key in info.Keys.Where(...).ToList()) info.Remove(key);` |
+| `d.AsDynamic()` | a `System.Dynamic.ExpandoObject` filled from the info |
+
+`Info` keeps Python's insertion order through removals, which `Dict` (a `Dictionary`) does not promise.
 
 ## LunarLander
 

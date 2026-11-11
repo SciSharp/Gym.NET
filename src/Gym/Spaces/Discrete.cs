@@ -195,7 +195,7 @@ namespace Gym.Spaces {
                 nameof(action));
         }
 
-        /// <summary>The non-throwing form of <see cref="ToInt64"/>, for membership tests and action conversion.</summary>
+        /// <summary>The non-throwing form of <see cref="ToInt64(object)"/>, for membership tests and action conversion.</summary>
         /// <param name="action">The candidate.</param>
         /// <param name="value">The integer when <see langword="true"/> is returned; otherwise 0.</param>
         /// <returns><see langword="true"/> when the candidate denotes an integer.</returns>

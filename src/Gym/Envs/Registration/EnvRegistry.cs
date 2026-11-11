@@ -10,6 +10,7 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 using Gym.Exceptions;
 using Gym.Utils;
 using Gym.Wrappers;
@@ -20,8 +21,11 @@ namespace Gym.Envs.Registration {
         /// <summary>Entry-point strings already resolved to their class, so <c>make</c> scans the loaded assemblies once per name.</summary>
         private static readonly ConcurrentDictionary<string, Type> ResolvedEntryPoints = new(StringComparer.Ordinal);
 
-        /// <summary>Guards <see cref="CurrentNamespace"/>'s save and restore in <see cref="Namespace"/>.</summary>
-        private static readonly object NamespaceGate = new();
+        /// <summary>
+        ///     <see cref="CurrentNamespace"/>'s storage: one value per thread and async flow (DR-57), so a scope one thread
+        ///     opens never renames what another thread registers. Needs no lock: no other flow ever sees this flow's value.
+        /// </summary>
+        private static readonly AsyncLocal<string?> CurrentNamespaceSlot = new();
 
         /// <summary>
         ///     The global registry (Python's <c>gymnasium.registry</c>): every id <c>make</c> knows, in registration order. Env
@@ -34,8 +38,19 @@ namespace Gym.Envs.Registration {
         ///     <c>current_namespace</c>); <see langword="null"/> keeps each id's namespace. Set it through
         ///     <see cref="Namespace"/>, which restores it.
         /// </summary>
-        /// <remarks>Process-wide, as in Python: registering from two threads with different namespaces at once mixes them up.</remarks>
-        public static string? CurrentNamespace { get; set; }
+        /// <remarks>
+        ///     Unlike Python's module global, the value belongs to the current thread and async flow (an
+        ///     <see cref="AsyncLocal{T}"/>, DR-57): two threads registering inside scopes of their own at the same moment each
+        ///     get their own namespace, where one global would hand both the namespace opened last. A thread, task or async
+        ///     continuation started inside a scope inherits its value as it was at the start. On one thread it behaves as
+        ///     Gymnasium's global does. Footgun: a value set inside an <see langword="async"/> method does not flow back to
+        ///     its caller once the method returns (how <see cref="AsyncLocal{T}"/> works), so open the scope in the code that
+        ///     registers rather than in a helper it awaits.
+        /// </remarks>
+        public static string? CurrentNamespace {
+            get => CurrentNamespaceSlot.Value;
+            set => CurrentNamespaceSlot.Value = value;
+        }
 
         /// <summary>
         ///     The highest registered version of <paramref name="name"/> in <paramref name="ns"/> (Python's
@@ -112,18 +127,19 @@ namespace Gym.Envs.Registration {
         /// <summary>
         ///     Sets <see cref="CurrentNamespace"/> until the returned scope is disposed (Python's <c>namespace</c> context
         ///     manager): <c>using (EnvRegistry.Namespace("MyPlugin")) Register("Env-v0", ...);</c> registers
-        ///     <c>MyPlugin/Env-v0</c>.
+        ///     <c>MyPlugin/Env-v0</c>. Inside the scope every id lands in <paramref name="ns"/>, even one that names a
+        ///     namespace of its own, as in Gymnasium.
         /// </summary>
         /// <param name="ns">The namespace.</param>
-        /// <returns>The scope; disposing it restores the previous namespace.</returns>
-        /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/envs/registration.py#L554">gymnasium/envs/registration.py</see>.</remarks>
+        /// <returns>The scope; disposing it restores the namespace that was current before, once.</returns>
+        /// <remarks>
+        ///     The scope applies to the thread and async flow that opened it, and to the threads and tasks started inside it
+        ///     (DR-57); other threads keep their own namespace. Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/envs/registration.py#L554">gymnasium/envs/registration.py</see>.
+        /// </remarks>
         public static IDisposable Namespace(string ns) {
-            string? old;
-            lock (NamespaceGate) {
-                old = CurrentNamespace;
-                CurrentNamespace = ns;
-            }
-
+            // No lock: the slot is this flow's own, so nothing can change it between the read and the write.
+            string? old = CurrentNamespace;
+            CurrentNamespace = ns;
             return new NamespaceScope(old);
         }
 
@@ -1006,13 +1022,15 @@ namespace Gym.Envs.Registration {
             /// <param name="old">The namespace current before the scope.</param>
             public NamespaceScope(string? old) => _old = old;
 
-            /// <summary>Restores the namespace, once.</summary>
+            /// <summary>
+            ///     Restores the namespace, once. Disposed on the flow that opened it (the <see langword="using"/> pattern),
+            ///     it restores that flow's value; disposed on another thread, it would set that thread's instead.
+            /// </summary>
             public void Dispose() {
                 if (_disposed)
                     return;
                 _disposed = true;
-                lock (NamespaceGate)
-                    CurrentNamespace = _old;
+                CurrentNamespace = _old;
             }
         }
     }

@@ -9,9 +9,10 @@ namespace Gym.Exceptions {
     /// <remarks>
     ///     The error classes follow Gymnasium's hierarchy (<see cref="UnregisteredEnv"/> and its three subclasses,
     ///     <see cref="ResetNeeded"/>, <see cref="InvalidAction"/>, ...); the ones Gymnasium does not derive from <c>Error</c>
-    ///     (<see cref="AlreadyPendingCallError"/>, <see cref="DeprecatedWrapper"/>, ...) do not here either. Gym.NET's older
-    ///     exceptions (<see cref="InvalidActionError"/>, <see cref="AlreadySteppingError"/>, <see cref="NotSteppingError"/>)
-    ///     remain for the legacy API. Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/error.py#L4">gymnasium/error.py</see>.
+    ///     (<see cref="AlreadyPendingCallError"/>, <see cref="DeprecatedWrapper"/>, ...) do not here either. 0.2's own
+    ///     exceptions are gone (DR-56): <c>InvalidActionError</c> became <see cref="InvalidAction"/> (or the envs'
+    ///     <see cref="NumSharp.AssertionError"/>), <c>AlreadySteppingError</c> <see cref="AlreadyPendingCallError"/>, and
+    ///     <c>NotSteppingError</c> <see cref="NoAsyncCallError"/>. Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/error.py#L4">gymnasium/error.py</see>.
     /// </remarks>
     public class Error : Exception {
         /// <summary>

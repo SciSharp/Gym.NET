@@ -42,6 +42,11 @@ In short:
 - Seeds select Gymnasium's random streams, so seeded runs give Gymnasium's numbers, not 0.2's.
 - NumSharp 0.80.0 replaces NumSharp.Lite 0.1.12; `Discrete` samples are 0-d int64 arrays.
 - The baselines-style vector types (`IVecEnv`, `VecEnv`, `DummyVecEnv`, `VecEnvWrapper`) moved to `Gym.Legacy`.
+- 0.2's unused public types are gone (DR-56): `CircularQueue<T>`, `CircularQueueThreadSafe<T>`, `GenericCallFactory`,
+  and the exceptions `InvalidActionError` (the envs raise `AssertionError` or `InvalidAction`), `AlreadySteppingError`
+  and `NotSteppingError` (`AsyncVectorEnv` raises `AlreadyPendingCallError` and `NoAsyncCallError`). The legacy `Dict`,
+  which `Gym.Legacy` still returns, and its helpers in `Gym.Collections`, `Gym.Dynamic`, `Gym.Merging` and
+  `Gym.Reflection` are `[Obsolete]`, each warning naming its replacement, and go in 3.0 with `Gym.Legacy`.
 - The 0.2 `LunarLanderEnv` (Aether physics, `Gym.Environments.Envs.Aether`) and its `LunarLanderDiscreteActions` are
   gone, with the Aether.Physics2D, ImageSharp.Drawing and SixLabors.Fonts dependencies; Gymnasium's LunarLander-v3 on
   Gym.NET's Box2D replaces it (`Gym.Environments.Envs.Box2D.LunarLanderEnv`).
@@ -128,6 +133,9 @@ Each is documented on the member, and the parity suite pins it, so a change show
   resets the sub-env a second time, with a reward of 0; Gym.NET's sync and async envs agree in every sequence instead.
 - **`DictInfoToList`** returns its list of infos from its own `Step` and `Reset`; through `IVectorEnv` the infos stay a
   dict.
+- **The registry's namespace scope** (`EnvRegistry.Namespace`, Gymnasium's `namespace` context manager) applies to the
+  thread and async flow that opens it (DR-57), where Gymnasium's `current_namespace` is one module global: two threads
+  registering in scopes of their own at once each get their own namespace. On one thread nothing differs.
 - **`RecordVideo` writes PNG frames** into a folder per video by default; `FfmpegVideoWriter` writes Gymnasium's mp4.
 - **`Draw.Aalines` with two points**: pygame-ce reads one float past its buffer there, so for a steep segment ending off
   a whole pixel its drawing varies from run to run, by one blend of the end column. Gym.NET takes that float as 0, what a

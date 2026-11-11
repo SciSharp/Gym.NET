@@ -170,7 +170,8 @@ namespace Gym.Exceptions {
 
     /// <summary>
     ///     An action outside the action space. The envs mostly assert instead (<see cref="NumSharp.AssertionError"/>), as Gymnasium's
-    ///     do; the legacy <see cref="InvalidActionError"/> is Gym.NET's older counterpart, kept for the legacy API.
+    ///     do; CarRacing raises this one, as should a custom env refusing an action. It replaces 0.2's
+    ///     <c>InvalidActionError</c>, removed in 2.0 (DR-56).
     /// </summary>
     /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/error.py#L50">gymnasium/error.py</see>.</remarks>
     public class InvalidAction : Error {
@@ -256,7 +257,8 @@ namespace Gym.Exceptions {
 
     /// <summary>
     ///     An asynchronous <c>reset</c> or <c>step</c> was started while the previous one of the same kind is still pending.
-    ///     Not an <see cref="Error"/>, as in Gymnasium; the legacy <see cref="AlreadySteppingError"/> is its older counterpart.
+    ///     Not an <see cref="Error"/>, as in Gymnasium. It replaces 0.2's <c>AlreadySteppingError</c>, which nothing threw and
+    ///     2.0 removed (DR-56).
     /// </summary>
     /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/error.py#L72">gymnasium/error.py</see>.</remarks>
     public class AlreadyPendingCallError : Exception {
@@ -272,8 +274,8 @@ namespace Gym.Exceptions {
     }
 
     /// <summary>
-    ///     <c>reset_wait</c> or <c>step_wait</c> was called with no matching asynchronous call running. The legacy
-    ///     <see cref="NotSteppingError"/> is its older counterpart.
+    ///     <c>reset_wait</c> or <c>step_wait</c> was called with no matching asynchronous call running. It replaces 0.2's
+    ///     <c>NotSteppingError</c>, which nothing threw and 2.0 removed (DR-56).
     /// </summary>
     /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/error.py#L83">gymnasium/error.py</see>.</remarks>
     public class NoAsyncCallError : Exception {
