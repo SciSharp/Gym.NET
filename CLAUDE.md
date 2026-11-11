@@ -52,7 +52,7 @@ refs/Gym.NET/
 │   │   ├── Experimental/Functional/ # FuncEnv (Gymnasium's functional protocol, no JAX; DR-36)
 │   │   ├── Gymnasium.cs           # The `gymnasium` facade: Make, MakeVec, Spec, Register, Registry, PprintRegistry, HumanViewerFactory (DR-20)
 │   │   ├── Logger.cs              # Warnings as gymnasium.logger issues them (colourised, Python's default filters)
-│   │   └── Exceptions/            # Every gymnasium.error class (Error, ResetNeeded, ...), AssertionError, NotImplementedError, ImportError (0.2's own three removed, DR-56)
+│   │   └── Exceptions/            # Every gymnasium.error class (Error, ResetNeeded, ...), AssertionError, NotImplementedError, ImportError; 0.2's three as [Obsolete] bases of InvalidAction, AlreadyPendingCallError, NoAsyncCallError (DR-58)
 │   │
 │   ├── Gym.SourceGenerators/      # Roslyn generator (DR-13, DR-34): <Class>Options records of [GymOptions] envs/wrappers; [GymTuple]/[GymDict] records
 │   ├── Gym.Rendering/             # pygame-compatible rasterizer: Surface (opaque or per-pixel alpha), GfxDraw (SDL_gfx 2.0.26 port), Draw (line, rect;
@@ -118,7 +118,7 @@ refs/Gym.NET/
 
 - **Environment Contract (`Env<TObs, TAct>` / `IEnv`), Gymnasium's shape since the core-API work (P1):**
   - `ResetResult<TObs> Reset(BigInteger? seed = null, options = null)`: `(obs, info)`; a seed reseeds `NpRandom` with Gymnasium's `Generator(PCG64(SeedSequence(seed)))`, `null` keeps the stream. Implementations start with `SeedNpRandom(seed)` (Gymnasium's `super().reset(seed=seed)`).
-  - `StepResult<TObs> Step(TAct action)`: `(obs, reward (float64), terminated, truncated, info)`; `IEnv.Step(object)` converts untyped actions (`ConvertAction`). The result structs (and the vector ones) are `IDisposable`: `using var step = env.Step(a);` releases the arrays they hold (DR-51).
+  - `StepResult<TObs> Step(TAct action)`: `(obs, reward (float64), terminated, truncated, info)`; `IEnv.Step(object)` converts untyped actions (`ConvertAction`). The result structs (and the vector ones) are `IDisposable`: `using var step = env.Step(a);` releases the arrays they hold (DR-51). 0.2's spellings compile until 3.0 through `[Obsolete]` shims (DR-58): a four-element `Deconstruct` (done = terminated or truncated), `ResetResult` → observation, `CloseEnvironment()`, `Box(low, high, dType)`, `CartPoleEnv(viewerFactory)`, LunarLander's 0.2 names; never call them from Gym.NET's own code (the build shows any such use as CS0618).
   - `ValueTask<StepResult<TObs>> StepAsync(TAct action, CancellationToken ct = default)` (and `IEnv.StepAsync(object)`): runs `Step` on the calling thread and completes synchronously, never through `Task.Run`; a failure or a cancellation before the step surfaces through the task. Override it only for an env with real asynchronous work; wrappers do not forward it, so a wrapper's `Step` override always applies.
   - `RenderResult Render()`: per the `render_mode` fixed at construction (`RenderResult.Rgb` for `rgb_array`; `human` renders inside reset/step and returns `None`); `RenderModes` names the modes as constants (DR-52).
   - `NpRandom` (lazy, entropy-seeded on first use) / `NpRandomSeed` (-1 once a generator is assigned), `Metadata`, `Spec`, `Unwrapped`, `Close()` / `Dispose()`.

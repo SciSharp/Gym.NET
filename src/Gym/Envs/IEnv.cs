@@ -105,6 +105,13 @@ namespace Gym.Envs {
         void Close();
 
         /// <summary>
+        ///     0.2's name for <see cref="Close"/>, kept so 0.2 code holding an <see cref="IEnv"/> compiles until 3.0 (DR-58).
+        ///     The default calls <see cref="Close"/>; <see cref="Env{TObs, TAct}"/>'s public method of the same name replaces it.
+        /// </summary>
+        [Obsolete("Close() is Gymnasium's name (or Dispose(), through using); CloseEnvironment is 0.2's. Removed in 3.0 with Gym.Legacy.")]
+        void CloseEnvironment() => Close();
+
+        /// <summary>
         ///     Python's <c>has_wrapper_attr(name)</c>: whether this env, or for a wrapper any env beneath it, has the Python
         ///     attribute <paramref name="name"/> (<c>"gravity"</c>, <c>"_disable_render_order_enforcing"</c>).
         /// </summary>

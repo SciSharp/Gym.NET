@@ -160,6 +160,40 @@ namespace Gym.Envs {
         public object? Get(string key, object? @default = null) => TryGetValue(key, out object? value) ? value : @default;
 
         /// <summary>
+        ///     The value under <paramref name="key"/> read as <typeparamref name="T"/>, or <c>default(T)</c> when the key is
+        ///     missing: the legacy <c>Gym.Collections.Dict.Get&lt;T&gt;</c>, kept so code moving from <c>Gym.Legacy</c>'s info to
+        ///     <see cref="Info"/> compiles unchanged (DR-58). Python's dict has no such method.
+        /// </summary>
+        /// <typeparam name="T">
+        ///     The type to read as. A boxed value casts only to its own type: a <see cref="long"/> stored, as NumPy integers
+        ///     are, is not an <see cref="int"/>.
+        /// </typeparam>
+        /// <param name="key">The key.</param>
+        /// <returns>
+        ///     The value as <typeparamref name="T"/>, or <c>default(T)</c> when the key is missing. Footgun: a missing key and a
+        ///     stored default read the same; <see cref="TryGetValue"/> tells them apart.
+        /// </returns>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="key"/> is <see langword="null"/>.</exception>
+        /// <exception cref="InvalidCastException">Thrown when the stored value is not a <typeparamref name="T"/>.</exception>
+        /// <exception cref="NullReferenceException">Thrown when the stored value is <see langword="null"/> and <typeparamref name="T"/> is a non-nullable value type.</exception>
+        /// <remarks>
+        ///     There is deliberately no <c>Get&lt;T&gt;(key, T fallback)</c>: next to <see cref="Get(string, object?)"/>,
+        ///     overload resolution would prefer it for existing calls such as <c>Get("k", 5)</c> (an identity conversion beats
+        ///     boxing), which would then cast a stored <see cref="long"/> to <see cref="int"/> and throw (measured, DR-58).
+        /// </remarks>
+        public T? Get<T>(string key) => TryGetValue(key, out object? value) ? (T?)value : default;
+
+        /// <summary>
+        ///     A shallow copy, the same as <see cref="Copy"/>: the legacy <c>Gym.Collections.Dict.Clone</c>, kept so code moving
+        ///     to <see cref="Info"/> compiles unchanged (DR-58).
+        /// </summary>
+        /// <returns>
+        ///     A new info of the same type with the same entries in the same order. The values are shared, not copied;
+        ///     <see cref="DeepCopy"/> copies them.
+        /// </returns>
+        public Info Clone() => Copy();
+
+        /// <summary>
         ///     Python's <c>del info[key]</c> without the error: removes the key and closes the gap, so the other keys keep
         ///     their relative order.
         /// </summary>

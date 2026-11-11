@@ -40,8 +40,8 @@ will be removed in 3.0.
 | `GoalEnv` | removed (Gymnasium-Robotics' concern) |
 | `Gym.Threading` (`DistributedScheduler`, `DistributedThread`, `DistributedQueuedTaskScheduler`, `ThreadAffinityDistrubution`, `CancellationSourceExtensions`), which 0.2's `StepAsync` ran on | removed: built on `Thread.Abort`, which throws on .NET 5 and later. `StepAsync` runs the step on the calling thread; `Gymnasium.MakeVec(id, n, "async")` steps envs on worker threads |
 | `IVecEnv`, `VecEnv`, `DummyVecEnv`, `VecEnvWrapper` | `Gym.Vector`: `Gymnasium.MakeVec("CartPole-v1", n)`, `SyncVectorEnv`, `VectorEnv<TObs, TAct>`; the old types moved to `Gym.Legacy`, obsolete |
-| `catch (InvalidActionError)` | removed (DR-56): the envs that check their action assert it, as Gymnasium's do, and raise `AssertionError` (LunarLander, CartPole, ...); CarRacing raises `Gym.Exceptions.InvalidAction`, which is also what a custom env should throw |
-| `AlreadySteppingError`, `NotSteppingError` | removed (nothing threw them); `AsyncVectorEnv` raises Gymnasium's `AlreadyPendingCallError` and `NoAsyncCallError` |
+| `catch (InvalidActionError)` | compiles, with a warning: `InvalidActionError` is now the obsolete base of Gymnasium's `InvalidAction` (DR-58), which CarRacing raises and a custom env should throw. The envs that check their action assert it, as Gymnasium's do, and raise `AssertionError` (LunarLander, CartPole, ...), which this `catch` does not see |
+| `AlreadySteppingError`, `NotSteppingError` | compile, with a warning: the obsolete bases of the `AlreadyPendingCallError` and `NoAsyncCallError` that `AsyncVectorEnv` raises (DR-58), so a 0.2 `catch` now catches them (0.2 itself threw neither) |
 | `Gym.Collections.CircularQueue<T>`, `CircularQueueThreadSafe<T>` | removed: a `Queue<T>` cycled with `queue.Enqueue(queue.Dequeue())`, or `ConcurrentQueue<T>` |
 | `Gym.Reflection.GenericCallFactory` | removed: `method.MakeGenericMethod(type).Invoke(target, args)` |
 | `space.Seed(int)` | `space.Seed(seed)`, which also takes Gymnasium's lists and dicts of seeds for composite spaces |
@@ -167,6 +167,30 @@ Moving code from `Dict` to `Info`, member by member:
 | `d.AsDynamic()` | a `System.Dynamic.ExpandoObject` filled from the info |
 
 `Info` keeps Python's insertion order through removals, which `Dict` (a `Dictionary`) does not promise.
+
+`Info` also takes `Dict`'s two reads (DR-58): `info.Get<T>("key")` (`default(T)` when missing) and `info.Clone()`
+(the same as `Copy()`). There is no `Get<T>("key", fallback)`: it would capture `Get("key", fallback)` calls, which
+must keep returning Python's `object`.
+
+### 0.2 lines that still compile
+
+Compiling 0.2's own tests against 2.0 found the lines below broken; each now compiles with an `[Obsolete]` warning that
+names the 2.0 spelling (DR-58), and goes in 3.0 with `Gym.Legacy`:
+
+| 0.2 line | What it does in 2.0 | 2.0 spelling |
+|---|---|---|
+| `var (obs, reward, done, info) = env.Step(a);` | `done` is `terminated \|\| truncated`, as gym 0.21 reported it | `var (obs, reward, terminated, truncated, info) = env.Step(a);` |
+| `NDArray obs = env.Reset();` | the observation; the info is dropped, and arrays in it are never disposed (Taxi's action mask) | `env.Reset().Observation`, or `var (obs, info) = env.Reset();` |
+| `env.CloseEnvironment();` | `Close()` | `env.Close()`, or `using` |
+| `new Box(-5f, 5f, np.float32)`, `new Box(low, high, dType: np.float32)` | the box `dtype:` builds; `new Box(low, high, null)` is then ambiguous | `new Box(-5, 5, dtype: np.float32)` |
+| `new CartPoleEnv(WinFormEnvViewer.Factory)` | human mode in that window, drawing every step itself (drop 0.2's per-step `Render()`, which would draw twice) | `new CartPoleEnv(renderMode: "human", viewerFactory: WinFormEnvViewer.Factory)` |
+| `new CartPoleEnv(NullEnvViewer.Factory)` | headless, no render mode (`Render()` warns once and returns nothing) | `new CartPoleEnv()` |
+| `(int)LunarLanderDiscreteActions.FireMainEngine` | 2, Gymnasium's main engine (0 nothing, 1 left, 3 right); the enum is in `Gym.Environments.Envs.Box2D`, and in 0.2's `Gym.Environments.Envs.Aether`, revived for it alone (importing both is ambiguous) | `2` |
+| `env.ContinuousMode`, `LunarLanderEnv.SCALE`, `MAIN_ENGINE_POWER`, `SIDE_ENGINE_POWER`, `INITIAL_RANDOM` | the same values, 0.2's float constants | `env.Continuous`, `LunarLanderEnv.Scale`, ... (doubles) |
+
+Still broken: `env.Seed(s)` (`Reset(seed: s)`; a `Seed` method would make `check_env` warn on every env, as Gymnasium's
+does), `env.RewardRange` (Gymnasium 1.0 removed it), `env.Render("rgb_array")` returning an `Image` (see Rendering to an
+image), NumSharp's now-explicit `(float)array`, and 0.2's Aether `LunarLanderEnv`.
 
 ## LunarLander
 

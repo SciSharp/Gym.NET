@@ -168,13 +168,18 @@ namespace Gym.Exceptions {
         public ResetNeeded(string message, Exception innerException) : base(message, innerException) { }
     }
 
+#pragma warning disable CS0618 // The obsolete base is on purpose: it keeps 0.2's catch blocks compiling until 3.0 (DR-58).
     /// <summary>
     ///     An action outside the action space. The envs mostly assert instead (<see cref="NumSharp.AssertionError"/>), as Gymnasium's
-    ///     do; CarRacing raises this one, as should a custom env refusing an action. It replaces 0.2's
-    ///     <c>InvalidActionError</c>, removed in 2.0 (DR-56).
+    ///     do; CarRacing raises this one, as should a custom env refusing an action.
     /// </summary>
-    /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/error.py#L50">gymnasium/error.py</see>.</remarks>
-    public class InvalidAction : Error {
+    /// <remarks>
+    ///     Its base is 0.2's obsolete <see cref="InvalidActionError"/> (itself an <see cref="Error"/>), kept until 3.0 so 0.2's
+    ///     <c>catch (InvalidActionError)</c> still compiles and catches it (DR-58): one level Gymnasium's hierarchy does not
+    ///     have. Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/error.py#L50">gymnasium/error.py</see>.
+    /// </remarks>
+    public class InvalidAction : InvalidActionError {
+#pragma warning restore CS0618
         /// <summary>An error without a message; its <see cref="Exception.Message"/> is empty, as Python's <c>str(error)</c> is.</summary>
         public InvalidAction() : base("") { }
 
@@ -255,13 +260,18 @@ namespace Gym.Exceptions {
         public DeprecatedWrapper(string message, Exception innerException) : base(message, innerException) { }
     }
 
+#pragma warning disable CS0618 // The obsolete base is on purpose: it keeps 0.2's catch blocks compiling until 3.0 (DR-58).
     /// <summary>
     ///     An asynchronous <c>reset</c> or <c>step</c> was started while the previous one of the same kind is still pending.
-    ///     Not an <see cref="Error"/>, as in Gymnasium. It replaces 0.2's <c>AlreadySteppingError</c>, which nothing threw and
-    ///     2.0 removed (DR-56).
+    ///     Not an <see cref="Error"/>, as in Gymnasium.
     /// </summary>
-    /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/error.py#L72">gymnasium/error.py</see>.</remarks>
-    public class AlreadyPendingCallError : Exception {
+    /// <remarks>
+    ///     Its base is 0.2's obsolete <see cref="AlreadySteppingError"/> (an <see cref="Exception"/>, not an
+    ///     <see cref="Error"/>), kept until 3.0 so 0.2's <c>catch (AlreadySteppingError)</c> still compiles and catches it
+    ///     (DR-58). Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/error.py#L72">gymnasium/error.py</see>.
+    /// </remarks>
+    public class AlreadyPendingCallError : AlreadySteppingError {
+#pragma warning restore CS0618
         /// <summary>The error with Gymnasium's message and the name of the call that is pending.</summary>
         /// <param name="message">The message; Gym's own raise sites pass Gymnasium's text verbatim.</param>
         /// <param name="name">The pending call's name (<c>step</c>, <c>reset</c>, <c>call</c>), Python's <c>name</c> attribute.</param>
@@ -273,12 +283,16 @@ namespace Gym.Exceptions {
         public string Name { get; }
     }
 
+#pragma warning disable CS0618 // The obsolete base is on purpose: it keeps 0.2's catch blocks compiling until 3.0 (DR-58).
     /// <summary>
-    ///     <c>reset_wait</c> or <c>step_wait</c> was called with no matching asynchronous call running. It replaces 0.2's
-    ///     <c>NotSteppingError</c>, which nothing threw and 2.0 removed (DR-56).
+    ///     <c>reset_wait</c> or <c>step_wait</c> was called with no matching asynchronous call running.
     /// </summary>
-    /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/error.py#L83">gymnasium/error.py</see>.</remarks>
-    public class NoAsyncCallError : Exception {
+    /// <remarks>
+    ///     Its base is 0.2's obsolete <see cref="NotSteppingError"/> (an <see cref="Exception"/>, not an <see cref="Error"/>),
+    ///     kept until 3.0 so 0.2's <c>catch (NotSteppingError)</c> still compiles and catches it (DR-58). Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/error.py#L83">gymnasium/error.py</see>.
+    /// </remarks>
+    public class NoAsyncCallError : NotSteppingError {
+#pragma warning restore CS0618
         /// <summary>The error with Gymnasium's message and the name of the call that was expected.</summary>
         /// <param name="message">The message; Gym's own raise sites pass Gymnasium's text verbatim.</param>
         /// <param name="name">The expected call's name, Python's <c>name</c> attribute.</param>

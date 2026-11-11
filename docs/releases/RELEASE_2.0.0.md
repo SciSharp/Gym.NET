@@ -42,11 +42,16 @@ In short:
 - Seeds select Gymnasium's random streams, so seeded runs give Gymnasium's numbers, not 0.2's.
 - NumSharp 0.80.0 replaces NumSharp.Lite 0.1.12; `Discrete` samples are 0-d int64 arrays.
 - The baselines-style vector types (`IVecEnv`, `VecEnv`, `DummyVecEnv`, `VecEnvWrapper`) moved to `Gym.Legacy`.
-- 0.2's unused public types are gone (DR-56): `CircularQueue<T>`, `CircularQueueThreadSafe<T>`, `GenericCallFactory`,
-  and the exceptions `InvalidActionError` (the envs raise `AssertionError` or `InvalidAction`), `AlreadySteppingError`
-  and `NotSteppingError` (`AsyncVectorEnv` raises `AlreadyPendingCallError` and `NoAsyncCallError`). The legacy `Dict`,
-  which `Gym.Legacy` still returns, and its helpers in `Gym.Collections`, `Gym.Dynamic`, `Gym.Merging` and
-  `Gym.Reflection` are `[Obsolete]`, each warning naming its replacement, and go in 3.0 with `Gym.Legacy`.
+- 0.2's unused public types are gone (DR-56): `CircularQueue<T>`, `CircularQueueThreadSafe<T>` and
+  `GenericCallFactory`. The legacy `Dict`, which `Gym.Legacy` still returns, and its helpers in `Gym.Collections`,
+  `Gym.Dynamic`, `Gym.Merging` and `Gym.Reflection` are `[Obsolete]`, each warning naming its replacement, and go in
+  3.0 with `Gym.Legacy`.
+- Common 0.2 lines still compile, each with an `[Obsolete]` warning naming the 2.0 spelling (DR-58), until 3.0:
+  `var (obs, reward, done, info) = env.Step(a)` (done is terminated or truncated), `NDArray obs = env.Reset()`,
+  `env.CloseEnvironment()`, `new Box(low, high, np.float32)`, `new CartPoleEnv(viewerFactory)`, LunarLander's 0.2
+  names, and `catch` blocks of 0.2's three exceptions, now the bases of Gymnasium's `InvalidAction`,
+  `AlreadyPendingCallError` and `NoAsyncCallError`. `Info` also reads like the legacy `Dict` (`Get<T>(key)`,
+  `Clone()`). The migration guide lists each.
 - The 0.2 `LunarLanderEnv` (Aether physics, `Gym.Environments.Envs.Aether`) and its `LunarLanderDiscreteActions` are
   gone, with the Aether.Physics2D, ImageSharp.Drawing and SixLabors.Fonts dependencies; Gymnasium's LunarLander-v3 on
   Gym.NET's Box2D replaces it (`Gym.Environments.Envs.Box2D.LunarLanderEnv`).
@@ -141,7 +146,9 @@ Each is documented on the member, and the parity suite pins it, so a change show
   a whole pixel its drawing varies from run to run, by one blend of the end column. Gym.NET takes that float as 0, what a
   fresh interpreter usually holds there. No Gymnasium env draws a two-point polyline.
 - **Exceptions**: Python's built-in exceptions are NumSharp's types; `OverflowError` and `ZeroDivisionError` are .NET's
-  `OverflowException` and `DivideByZeroException`.
+  `OverflowException` and `DivideByZeroException`. `InvalidAction`, `AlreadyPendingCallError` and `NoAsyncCallError` each
+  have one of 0.2's obsolete exceptions as their base (DR-58), a level Gymnasium's hierarchy does not have; their
+  messages, and the Python types they stand for, are Gymnasium's.
 - **The reference platform is Windows x64.** Where Gymnasium's float64 arithmetic goes through the C runtime (CartPole's
   `cos`/`sin`), results are verified on Windows; on Linux and macOS the C library may differ in the last bit.
 

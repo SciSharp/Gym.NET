@@ -113,6 +113,29 @@ namespace Gym.Environments.Envs.Classic {
         }
 
         /// <summary>
+        ///     0.2's <c>new CartPoleEnv(viewerFactory)</c>, kept so 0.2 code compiles until 3.0 (DR-58). 0.2 drew only when
+        ///     <c>Render()</c> was called, and its headless runs passed <see cref="NullEnvViewer.Factory"/>: that factory, or
+        ///     <see langword="null"/>, builds the env without a render mode (headless and unpaced), and any other factory builds
+        ///     a <c>human</c>-mode env drawing into the window it creates.
+        /// </summary>
+        /// <param name="viewerFactory">The viewer factory, as 0.2 took it.</param>
+        /// <remarks>
+        ///     Footguns: a human-mode env draws every <see cref="Step"/> itself, paced at 50 frames a second, so 0.2's
+        ///     <c>Render()</c> after each step draws every frame twice (drop the call); a headless env's <c>Render()</c> warns
+        ///     once, as Gymnasium's does without a render mode, and returns nothing. <c>new CartPoleEnv(null)</c> is ambiguous
+        ///     next to the <see cref="IEnvViewer"/> constructor; cast the <see langword="null"/>.
+        /// </remarks>
+        [Obsolete("0.2's constructor: write new CartPoleEnv(renderMode: \"human\", viewerFactory: factory), or new CartPoleEnv() headless. Removed in 3.0 with Gym.Legacy.")]
+        public CartPoleEnv(IEnvironmentViewerFactoryDelegate? viewerFactory)
+            : this(false, IsHeadless(viewerFactory) ? null : "human", IsHeadless(viewerFactory) ? null : viewerFactory) { }
+
+        /// <summary>Whether a 0.2 viewer factory meant a headless run: no factory, or <see cref="NullEnvViewer.Factory"/>.</summary>
+        /// <param name="viewerFactory">The factory 0.2 code passed.</param>
+        /// <returns><see langword="true"/> for <see langword="null"/> or a delegate equal to <see cref="NullEnvViewer.Factory"/> (same method and target).</returns>
+        private static bool IsHeadless(IEnvironmentViewerFactoryDelegate? viewerFactory) =>
+            viewerFactory is null || viewerFactory == NullEnvViewer.Factory;
+
+        /// <summary>
         ///     Gymnasium's class attribute <c>metadata</c>, which <c>make</c> reads before building the env:
         ///     <c>{"render_modes": ["human", "rgb_array"], "render_fps": 50}</c>, keys in that order. Every env starts with a
         ///     copy of it as its instance <see cref="Env{TObs, TAct}.Metadata"/>.
