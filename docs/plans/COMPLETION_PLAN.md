@@ -979,8 +979,16 @@ reset waits on NumSharp's N-1).*
 
 ### P9 MuJoCo (postponed out of 2.0, DR-35)
 
-Specs: the port plan's §5.7 and §11.4; sources 6,153 lines. Nothing here starts before MuJoCo resumes; the approved
-designs for that time are:
+Specs: the port plan's §5.7 and §11.4; sources 6,153 lines. Nothing here starts before MuJoCo resumes.
+
+[`MUJOCO_ASSESSMENT.md`](MUJOCO_ASSESSMENT.md) (2026-11-11) measures what completing it takes, against Gymnasium
+`8ba8c3a6` and MuJoCo 3.15.0:
+- **Scope:** 21 of the 22 ids run on MuJoCo 3 (`Pusher-v4` refuses). They reach at most 26,028 lines of the engine's C,
+  a compiler subset of 23 MJCF elements, and about 10,500 lines of visualizer and classic renderer.
+- **Bitwise parity:** reachable on win-x64, since the builds fuse no multiply-adds and call the C runtime's scalar libm.
+- **Plan:** steps P9.0–P9.6, with six decisions to review, the MuJoCo pin first.
+
+The approved designs for that time are:
 
 - **A managed port, 100%** (DR-30), inside `Gym.NET.Environments` with no native binaries, using NumSharp where it fits
   (`np.evaluate`, accelerated `np.*`).
