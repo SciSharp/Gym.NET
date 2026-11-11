@@ -1,0 +1,329 @@
+/* Gym.NET DocFX template customization (https://dotnet.github.io/docfx/docs/template.html).
+ *
+ * The modern template runs on Bootstrap 5.3 variables; this file sets Gym.NET's neon accents, then styles the landing
+ * page (index.md): the showreel video, the intro, the 8-bit "select your environment" gallery that main.js fills from
+ * images/envs/envs.json, and the documentation cards. The gallery and the video stay dark in both themes: they are
+ * screens, not page surfaces.
+ */
+
+:root {
+  --gn-pink: #ff4fd8;
+  --gn-cyan: #39f3ff;
+  --gn-yellow: #ffe14d;
+  --gn-night: #0b0221;
+  --gn-tv: #0d0d2b;
+  --bs-link-color: #c2189b;
+  --bs-link-hover-color: #8f0f72;
+  --bs-link-color-rgb: 194, 24, 155;
+}
+
+[data-bs-theme="dark"] {
+  --bs-link-color: #ff7fe3;
+  --bs-link-hover-color: #ffb3ef;
+  --bs-link-color-rgb: 255, 127, 227;
+}
+
+#logo {
+  height: 32px;
+  width: auto;
+  image-rendering: pixelated;
+}
+
+/* ---------------------------------------------------------------------------------------------- landing page --- */
+
+.gn-home {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1.25rem 1rem 3rem;
+}
+
+.gn-hero {
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--gn-night);
+  box-shadow: 0 0 0 2px #3a0d5c, 0 0 38px rgba(255, 79, 216, 0.35), 0 0 80px rgba(57, 243, 255, 0.12);
+}
+
+.gn-video {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: var(--gn-night);
+}
+
+.gn-intro {
+  text-align: center;
+  margin: 2.25rem auto 2.5rem;
+  max-width: 900px;
+}
+
+.gn-kicker {
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--bs-link-color);
+  margin-bottom: 0.25rem;
+}
+
+.gn-title {
+  font-size: 2.6rem;
+  font-weight: 800;
+  margin: 0 0 0.75rem;
+}
+
+.gn-lede {
+  font-size: 1.1rem;
+  line-height: 1.6;
+  color: var(--bs-secondary-color);
+}
+
+.gn-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  justify-content: center;
+  margin: 1.4rem 0 1.6rem;
+}
+
+.gn-button {
+  display: inline-block;
+  padding: 0.55rem 1.1rem;
+  border-radius: 6px;
+  border: 1px solid var(--bs-border-color);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.gn-button-primary {
+  background: linear-gradient(90deg, var(--gn-pink), #8a3dff);
+  border-color: transparent;
+  color: #fff !important;
+  box-shadow: 0 0 18px rgba(255, 79, 216, 0.35);
+}
+
+.gn-code {
+  text-align: left;
+  display: grid;
+  gap: 0.6rem;
+}
+
+.gn-code pre {
+  margin: 0;
+}
+
+/* ------------------------------------------------------------------- the 8-bit "select your environment" screen --- */
+
+.gn-arcade {
+  margin: 0 0 2.5rem;
+  scroll-margin-top: 80px;
+}
+
+.gn-tv {
+  background: var(--gn-tv);
+  border: 6px solid #1e1e4a;
+  border-radius: 8px;
+  padding: 22px 22px 18px;
+  color: #fcfcfc;
+  box-shadow: inset 0 0 0 2px #000, 0 10px 30px rgba(0, 0, 0, 0.35);
+}
+
+/* Pixel text is drawn on canvases at whole-pixel scales; the browser must never smooth it. */
+.gn-pixel {
+  display: block;
+  image-rendering: pixelated;
+  max-width: 100%;
+}
+
+.gn-arcade-title,
+.gn-press-start {
+  margin: 0 auto;
+}
+
+.gn-arcade-title {
+  margin-bottom: 18px;
+}
+
+.gn-press-start {
+  margin-top: 18px;
+  animation: gn-blink 1s steps(1) infinite;
+}
+
+@keyframes gn-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+.gn-arcade-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 440px);
+  gap: 22px;
+  align-items: start;
+}
+
+@media (max-width: 991px) {
+  .gn-arcade-body {
+    grid-template-columns: 1fr;
+  }
+}
+
+.gn-carts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(156px, 1fr));
+  gap: 14px 12px;
+}
+
+/* A grey cartridge: bevelled with flat shadows, a notch on top, the env's loop as its label art. */
+.gn-cart {
+  position: relative;
+  background: #7c7c7c;
+  border: 3px solid #000;
+  box-shadow: inset -4px -4px 0 #4c4c4c, inset 4px 4px 0 #bcbcbc;
+  padding: 10px 10px 8px;
+  cursor: pointer;
+  text-align: center;
+  font: inherit;
+  color: inherit;
+}
+
+.gn-cart::before {
+  content: "";
+  position: absolute;
+  top: -3px;
+  left: 34%;
+  right: 34%;
+  height: 6px;
+  background: #000;
+}
+
+.gn-cart:focus-visible {
+  outline: 3px solid var(--gn-cyan);
+  outline-offset: 3px;
+}
+
+.gn-cart[aria-selected="true"] {
+  background: #a4a4a4;
+  border-color: #f8b800;
+  animation: gn-selected 0.5s steps(1) infinite;
+}
+
+@keyframes gn-selected {
+  50% {
+    border-color: #000;
+  }
+}
+
+/* The selection arrow, pointing at the chosen cartridge. */
+.gn-cart[aria-selected="true"]::after {
+  content: "";
+  position: absolute;
+  left: -16px;
+  top: 40%;
+  border-top: 8px solid transparent;
+  border-bottom: 8px solid transparent;
+  border-left: 12px solid #fcfcfc;
+}
+
+.gn-cart-art {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 84px;
+  background: #000;
+  border: 2px solid #000;
+  overflow: hidden;
+}
+
+/* The loops are a fifth of the env's frame size: fill the art box's height so each env pixel becomes a chunky block. */
+.gn-cart-art img {
+  height: 100%;
+  width: auto;
+  max-width: 100%;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.gn-cart-name {
+  margin: 8px auto 0;
+}
+
+.gn-now-label {
+  margin-bottom: 8px;
+}
+
+.gn-screen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 3 / 2;
+  background: #000;
+  border: 4px solid #fcfcfc;
+}
+
+.gn-screen-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.gn-hud {
+  margin-top: 12px;
+}
+
+.gn-blurb {
+  margin: 12px 0 10px;
+  color: #c9c9e8;
+  font-size: 0.95rem;
+}
+
+.gn-snippet {
+  margin: 0;
+  font-size: 0.8rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ----------------------------------------------------------------------------------------- documentation map --- */
+
+.gn-docmap {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 14px;
+}
+
+.gn-card {
+  display: block;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--bs-border-color);
+  border-radius: 8px;
+  text-decoration: none;
+  color: inherit !important;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.gn-card:hover {
+  border-color: var(--gn-pink);
+  box-shadow: 0 0 14px rgba(255, 79, 216, 0.25);
+}
+
+.gn-card span {
+  display: block;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--bs-link-color);
+}
+
+.gn-card strong {
+  display: block;
+  font-size: 1.05rem;
+  margin: 0.15rem 0 0.35rem;
+}
+
+.gn-card p {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--bs-secondary-color);
+}

@@ -1,0 +1,25 @@
+# The docs section's table of contents. Its pages are the repository's own docs/ files (docs/docfx.json's second content
+# group publishes them under docs/ on the site), and the links are relative to this file's source location, two folders
+# below docs/. The notices and the example live outside docs/, so the site links to them on GitHub.
+- name: Overview
+  href: ../../README.md
+- name: Guides
+  items:
+  - name: Getting started
+    href: ../../guides/getting_started.md
+  - name: Creating custom environments
+    href: ../../guides/creating_custom_environments.md
+  - name: Migrating from 0.2 to 2.0
+    href: ../../guides/migrating_to_2.0.md
+  - name: Development and testing
+    href: ../../guides/development_and_testing.md
+- name: Reference
+  items:
+  - name: Architecture
+    href: ../../architecture.md
+  - name: Release notes 2.0.0
+    href: ../../releases/RELEASE_2.0.0.md
+  - name: Example - CartPole
+    href: https://github.com/SciSharp/Gym.NET/blob/master/examples/CartPole/README.md
+  - name: Third-party notices
+    href: https://github.com/SciSharp/Gym.NET/blob/master/THIRD-PARTY-NOTICES.md

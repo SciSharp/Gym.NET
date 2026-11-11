@@ -1,0 +1,11 @@
+# The navbar. Links are relative to this file's source location (docfx resolves them before mapping website-src/ to
+# the site root), so the docs pages, which live one folder up in docs/, are reached with ../.
+- name: Docs
+  href: docs/
+  homepage: ../README.md
+- name: Environments
+  href: index.md#select-your-environment
+- name: API
+  href: api/
+- name: Source Code
+  href: https://github.com/SciSharp/Gym.NET

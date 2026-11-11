@@ -1,0 +1,3 @@
+# docfx's output (docfx docs/website-src/docfx.json writes the site here; CI publishes it to GitHub Pages)
+_site/
+obj/

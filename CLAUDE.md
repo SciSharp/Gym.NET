@@ -102,13 +102,18 @@ refs/Gym.NET/
 │   └── Gym.Tests.Plugin/          # A module that registers an id when loaded, for make("Gym.Tests.Plugin:RegisterDuringMake-v0")
 │
 ├── tools/parity/                  # Parity stack: manifest.json (pins), requirements.txt, setup_venv.{ps1,sh}; audit probes
+├── tools/showreel/                # The front-page media (DR-59, DR-60): the synthwave video and README GIF (docs/media), the site's 8-bit
+│                                  #   gallery (docs/website-src/images/envs), from the envs' own frames under scripted policies; its parity
+│                                  #   segment is checked against Gymnasium in Python (gymnasium_replay.py). Not in the sln; README.md has the commands
 │
 ├── examples/
 │   └── CartPole/                  # The one example (D13): the cross-entropy method over linear policies, 100 carts at once through
 │                                  #   MakeVec, then a played episode (--render: Avalonia window); in Gym.NET.sln, so API changes break its build
 │
 ├── docs/                          # README.md (index), architecture.md, guides/ (getting_started, creating_custom_environments,
-│                                  #   migrating_to_2.0, development_and_testing), releases/RELEASE_2.0.0.md (draft), plans/
+│                                  #   migrating_to_2.0, development_and_testing), releases/RELEASE_2.0.0.md (draft), plans/;
+│                                  #   media/ (the showreel); docfx.json + website-src/ (the DocFX site: landing page, template
+│                                  #   templates/gymnet, gallery images; `docfx docs/docfx.json`, deployed by .github/workflows/docs.yml)
 │
 └── refs/
     └── Gymnasium/                 # Submodule: Farama-Foundation/Gymnasium (Python Master SOT)
