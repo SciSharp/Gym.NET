@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Reviewed on 2026-11-08 in ten rounds, on branch `journey1`: 36 designs, all decided. Four more rounds on 2026-11-10 settled the questions P6 and the per-env parity coverage raised: DR-37…DR-47. Round 15 on 2026-11-11, after P8, decided CarRacing's score glyphs (DR-48) and the packages' licence (DR-49), and the maintainer confirmed the ten [interpretations](#interpretations-to-confirm). Pending: `DictInfoToList`'s result shape (deferred, with a direction). [Coverage by phase](#coverage-by-phase) says which phases can start |
+| **Status** | Reviewed on 2026-11-08 in ten rounds, on branch `journey1`: 36 designs, all decided. Four more rounds on 2026-11-10 settled the questions P6 and the per-env parity coverage raised: DR-37…DR-47. Round 15 on 2026-11-11, after P8, decided CarRacing's score glyphs (DR-48) and the packages' licence (DR-49), and the maintainer confirmed the ten [interpretations](#interpretations-to-confirm). Round 16, the same day, took the C# code review's first findings (DR-50…DR-54; DR-50's R1 was withdrawn before commit, its gain having been measured on Debug builds), and round 17 closed AOT (DR-55). Pending: `DictInfoToList`'s result shape (deferred, with a direction), the 0.2 leftovers and the registry's namespace (asked again with what the maintainer requested), and the review's other findings. [Coverage by phase](#coverage-by-phase) says which phases can start |
 | **Rule** | A step of [`COMPLETION_PLAN.md`](COMPLETION_PLAN.md) starts only when every design it depends on is **Approved** here. A design that isn't listed is not approved: a new design question found while implementing goes through the same review before the step that needs it continues |
 | **How** | The maintainer reviewed the implementation design choices four at a time, before any phase from R0 to P9 started. Each answer is recorded with the options that were on the table and what it changes in the plans. Where a later round refined an earlier answer, both rows stay and the earlier one points to the later |
 | **Earlier decisions** | D1–D22 in [`GYMNASIUM_PORT_PLAN.md`](GYMNASIUM_PORT_PLAN.md) §20 and [`COMPLETION_PLAN.md`](COMPLETION_PLAN.md) §3 still stand unless a design here overrides them |
@@ -152,6 +152,36 @@ over it). Upstream PR #13 (a 2023 Aether CarRacing that P8.4 supersedes) is left
 
 The third question reminded the maintainer of the ten readings under [Interpretations to confirm](#interpretations-to-confirm):
 "All ten stand", with the licence note DR-49 records.
+
+### Round 16: the C# code review (2026-11-11)
+
+The maintainer asked whether the design is sound C#; [`CSHARP_CODE_REVIEW.md`](CSHARP_CODE_REVIEW.md) answers with 23
+findings, and this round decided the first four groups of them.
+
+| ID | Design | Approved | Options not taken | Applies to |
+|---|---|---|---|---|
+| DR-50 | Performance (review R1–R3) | **All three, results unchanged**: Box2D's small math members (every operator of `b2Vec2`, `b2Vec3`, `b2Mat22`, `b2Mat33`, `b2Rot`, the static `b2*` helpers, 53 in all) are `[MethodImpl(AggressiveInlining)]`, measured 5.9× (LunarLander) and 6.4× (BipedalWalker); `Transform.Smoothscale`'s shrink keeps its four channel sums in locals (3.0×) and rents its temporary from `ArrayPool`; CarRacing reuses its pre-flip canvas across renders, while the flipped surface stays a new object per render, as Gymnasium's `self.surf` is. *Corrected the same day, before commit:* R1's 5.9× and 6.4× compared a Debug build of the engine with a Release one (the benchmark's libraries were Debug builds, review §4). Measured in Release, R1 gains 1.05× and 1.12×, inside the runs' spread, so it was reverted; R2 and R3 stand, CarRacing stepping 1.6× as fast at 3.6 MB a step instead of 7.1 | R1 and R2 only; no change | Gym.Box2D (withdrawn), Gym.Rendering, CarRacing |
+| DR-51 | Results that own their arrays (R10) | **`StepResult`, `ResetResult`, `DoneStepResult`, `VectorStepResult` and `VectorResetResult` are `IDisposable`**: `Dispose` releases the arrays the result holds, the observation's and the info's (nested ones included), the same arrays an `NDScope` would keep, so `using var step = env.Step(action);` replaces the hand-written `step.Observation.Dispose()` | Callers disposing by hand | Gym |
+| DR-52 | Render modes (R11) | **`Gym.Envs.RenderModes` constants** (`Human`, `RgbArray`, `Ansi`, `DepthArray`, `RgbdTuple`, `StatePixels` and the `_list` modes), each Gymnasium's own string; the literals stay valid | Strings only | Gym |
+| DR-53 | The human-mode viewer contract (R8, R9) | **Kept as it is**: the asynchronous `IEnvironmentViewerFactoryDelegate` and `IEnvViewer.Render(Image)`, with the maintainer's "Add a TODO to support via async path": a TODO at the delegate and at each of the six call sites that block on it | A synchronous factory with frames instead of ImageSharp images; a synchronous factory only | Gym, the viewers |
+| DR-54 | Nullability (R16) | **`<Nullable>enable</Nullable>` in Gym and Gym.Environments, warnings staying warnings**: the files without a nullability context are annotated (`NullEnvViewer`, `Gym.Legacy`'s `Step`, `VecEnv` and `IVecEnv`), and `Gym.Internal` keeps an explicit `#nullable disable` while its deletion is reviewed | Nullable with warnings as errors; per-file opt-in as before | Gym, Gym.Environments |
+
+The second question also offered deleting the 0.2 leftovers (R5, R6) and renaming the factory delegate (R7). The
+maintainer did not take the rename, and asked to see each leftover double-checked for use and value before deciding:
+[`CSHARP_CODE_REVIEW.md`](CSHARP_CODE_REVIEW.md) §3.7 lists all 21. Six are used by nothing; fifteen are reachable only
+through `Gym.Legacy`'s info type `Gym.Collections.Dict` (a first count said seven and fourteen, missing that
+`DefaultConstructor` calls `ReflectionHelper`'s extension methods).
+
+### Round 17: the leftovers, AOT, the registry's namespace (2026-11-11)
+
+Asked with the leftovers' double-check. The maintainer deferred the leftovers, asking that each answer show what it
+costs backward compatibility and what replaces each type: §3.7 of the review now has both, per type and per way of
+removing them, and the question goes back with them. On the registry's namespace (R14) the maintainer asked what a
+namespace is and what Gymnasium does with it; the review's R14 row answers, and that question goes back too.
+
+| ID | Design | Approved | Options not taken | Applies to |
+|---|---|---|---|---|
+| DR-55 | AOT and trimming (review R17) | **Not supported**, the maintainer: "We can't AOT, NumSharp can't." NumSharp compiles its array kernels at run time (`DynamicMethod`), so Gym.NET adds no trimming or AOT annotations; the release notes list the limitation, and the getting-started guide says what a .NET 10 file-based app needs (`#:property PublishAot=false`), since those publish AOT by default | Document and annotate (`[RequiresUnreferencedCode]`, `[RequiresDynamicCode]`, `IsAotCompatible=false`); document only; later | Gym, Gym.Environments (docs only) |
 
 ---
 

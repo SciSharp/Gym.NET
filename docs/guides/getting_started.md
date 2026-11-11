@@ -17,6 +17,10 @@ The package registers its environment ids before your `Main` runs (a C# module i
 project), so `Gymnasium.Make` works with no set-up call. F# and Visual Basic projects call
 `Gym.Environments.GymEnvironments.Register()` once instead.
 
+Gym.NET needs the JIT: NumSharp compiles its array kernels at run time, so Native AOT and trimmed publishing are not
+supported. A .NET 10 file-based app (`dotnet run app.cs`) publishes AOT by default, and its first env throws
+`PlatformNotSupportedException` until the app opts out with `#:property PublishAot=false`.
+
 ## Make an env and run an episode
 
 ```csharp
@@ -44,7 +48,7 @@ observation.Dispose();
 Console.WriteLine($"Episode return: {episodeReturn}");
 ```
 
-The later samples also use `System.Collections.Generic`, `Gym.Spaces`, `Gym.Wrappers`, `Gym.Vector`,
+The later samples also use `System.Collections.Generic`, `Gym.Observations`, `Gym.Spaces`, `Gym.Wrappers`, `Gym.Vector`,
 `Gym.Environments.Envs.Classic` and `Gym.Rendering.Avalonia`.
 
 - `Reset(seed, options)` returns a `ResetResult<TObs>`, `(Observation, Info)`.
@@ -53,6 +57,22 @@ The later samples also use `System.Collections.Generic`, `Gym.Spaces`, `Gym.Wrap
   episode short (`TimeLimit`'s step limit). Reset when either is set.
 - Rewards are `double` everywhere, also where Gymnasium returns an `int` or a float32.
 - `Info` is a Python dict: insertion-ordered, keyed by strings, compared and printed as Python does.
+
+### Releasing what an env returns
+
+The arrays an env returns belong to the caller, and they hold native memory. Both results are `IDisposable`: disposing
+one releases its observation and the arrays in its info, so `using` does it at the end of the scope:
+
+```csharp
+using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("CartPole-v1");
+using ResetResult<NDArray> reset = env.Reset(seed: 0);
+using NDArray action = env.ActionSpace.Sample();
+using StepResult<NDArray> step = env.Step(action);
+Console.WriteLine($"{step.Observation.Shape} {step.Reward}");   // (4) 1
+```
+
+A copy of a result shares its arrays: dispose one of them, after the last use, and `.copy()` an observation you keep
+longer. The vector results (`VectorStepResult`, `VectorResetResult`) work the same way.
 
 ### Typed and untyped
 
@@ -135,7 +155,8 @@ generators): dispose the ones you build yourself; an env disposes its own.
 
 ## Rendering
 
-The render mode is a constructor argument, fixed for the env's life, as in Gymnasium:
+The render mode is a constructor argument, fixed for the env's life, as in Gymnasium. `Gym.Envs.RenderModes` names
+them as constants (`RenderModes.RgbArray` is `"rgb_array"`), so either form works:
 
 - `rgb_array`: `Render()` returns `RenderResult.Rgb`, whose `Frame` is a `(height, width, 3)` uint8 array with the
   pixels Gymnasium's env draws.

@@ -23,10 +23,17 @@ namespace Gym.Vector {
     ///     Equality is exact: arrays by shape, dtype and elements; the infos by Python's <c>==</c>. Reference:
     ///     <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/vector/vector_env.py#L174">gymnasium/vector/vector_env.py (VectorEnv.step)</see>.
     /// </remarks>
-    public readonly record struct VectorStepResult<TObs>(TObs Observations, NDArray Rewards, NDArray Terminations, NDArray Truncations, Info Infos) : INDArrayCarrier {
+    public readonly record struct VectorStepResult<TObs>(TObs Observations, NDArray Rewards, NDArray Terminations, NDArray Truncations, Info Infos) : INDArrayCarrier, IDisposable {
         /// <summary>Hands every array of the result to an <see cref="NDScope"/> (D19), the infos' included, so a scoped method can return it.</summary>
         /// <param name="scope">The scope the arrays leave through.</param>
         void INDArrayCarrier.YieldTo(NDScope scope) => ResultEquality.Yield(scope, Observations, Rewards, Terminations, Truncations, Infos);
+
+        /// <summary>
+        ///     Releases every array of the result, the infos' included, so <c>using var step = envs.Step(actions);</c> frees them
+        ///     at the end of the scope (the arrays a vector env returns belong to the caller, D19).
+        /// </summary>
+        /// <remarks>Footgun: copies of this struct share the arrays; dispose once, after their last use, and copy what you keep.</remarks>
+        public void Dispose() => ResultEquality.Release(Observations, Rewards, Terminations, Truncations, Infos);
 
         /// <summary>Exact equality of every field (see the remarks), replacing the compiler's member-wise one, which would broadcast arrays.</summary>
         /// <param name="other">The other result.</param>
@@ -53,10 +60,14 @@ namespace Gym.Vector {
     ///     Equality is exact, as <see cref="VectorStepResult{TObs}"/>'s. Reference:
     ///     <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/vector/vector_env.py#L144">gymnasium/vector/vector_env.py (VectorEnv.reset)</see>.
     /// </remarks>
-    public readonly record struct VectorResetResult<TObs>(TObs Observations, Info Infos) : INDArrayCarrier {
+    public readonly record struct VectorResetResult<TObs>(TObs Observations, Info Infos) : INDArrayCarrier, IDisposable {
         /// <summary>Hands the observations' and the infos' arrays to an <see cref="NDScope"/> (D19).</summary>
         /// <param name="scope">The scope the arrays leave through.</param>
         void INDArrayCarrier.YieldTo(NDScope scope) => ResultEquality.Yield(scope, Observations, Infos);
+
+        /// <summary>Releases the observations' and the infos' arrays, as <see cref="VectorStepResult{TObs}.Dispose"/> does.</summary>
+        /// <remarks>Footgun: copies share the arrays; dispose once, after their last use.</remarks>
+        public void Dispose() => ResultEquality.Release(Observations, Infos);
 
         /// <summary>Exact equality of the observations and Python equality of the infos.</summary>
         /// <param name="other">The other result.</param>

@@ -578,6 +578,7 @@ namespace Gym.Wrappers {
             if (_window is null) {
                 IEnvironmentViewerFactoryDelegate factory = global::Gym.Gymnasium.ResolveHumanViewerFactory(null);
                 // The factory may start a UI thread and complete asynchronously; frames are shown synchronously, as pygame's.
+                // TODO(async viewer path, DR-53): blocks on the factory; see IEnvironmentViewerFactoryDelegate.
                 _window = factory(size.Width, size.Height, "HumanRendering").GetAwaiter().GetResult();
             }
 

@@ -259,6 +259,7 @@ namespace Gym.Utils {
                 axes.Draw(figure);
 
             // The factory may start a UI thread; the window is needed synchronously, as matplotlib's show is.
+            // TODO(async viewer path, DR-53): blocks on the factory; see IEnvironmentViewerFactoryDelegate.
             _window ??= _factory(Width, Height, string.Join(" | ", _axes.Select(a => a.Title ?? ""))).GetAwaiter().GetResult();
             using (Image<Rgb24> frame = Image.LoadPixelData<Rgb24>(figure.ToRgbBytes(), Width, Height))
                 _window.Render(frame);

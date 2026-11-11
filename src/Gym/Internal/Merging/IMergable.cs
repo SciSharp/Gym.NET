@@ -1,4 +1,7 @@
-﻿using System.Collections.Generic;
+﻿// Gym.Internal is 0.2's code, under review for deletion (R5 of docs/plans/CSHARP_CODE_REVIEW.md): it keeps no nullable
+// context until that decision (DR-54), rather than 89 annotations for code that may go.
+#nullable disable
+using System.Collections.Generic;
 
 namespace Gym.Merging {
     public interface IMergable {

@@ -52,8 +52,10 @@ In short:
 ## What 2.0 contains
 
 - **Core**: `Env<TObs, TAct>` and `IEnv`, `Wrapper` with the observation, action and reward wrapper bases,
-  `StepResult`/`ResetResult`, `Info`, `Metadata`, `RenderResult`, every Gymnasium error with its messages, Gymnasium's
-  logger warnings, `ValueTask` stepping, Python attributes by Python name through wrapper stacks.
+  `StepResult`/`ResetResult` (disposable: `using var step = env.Step(action);` releases the arrays the result holds),
+  `Info`, `Metadata`, `RenderResult`, `RenderModes` (the render modes as constants), every Gymnasium error with its
+  messages, Gymnasium's logger warnings, `ValueTask` stepping, Python attributes by Python name through wrapper stacks,
+  nullable annotations throughout.
 - **Seeding**: Gymnasium's `Generator(PCG64(SeedSequence(seed)))`, bit for bit, for envs and spaces.
 - **Spaces**: all ten (`Box`, `Discrete`, `MultiBinary`, `MultiDiscrete`, `Tuple`, `Dict`, `Text`, `Sequence`, `Graph`,
   `OneOf`), typed as `Space<T>`, with `SpaceUtils` (flatten, unflatten, flatdim, `is_space_dtype_shape_equiv`) and the
@@ -96,6 +98,9 @@ In short:
   | box2d | LunarLander-v3, LunarLanderContinuous-v3, BipedalWalker-v3, BipedalWalkerHardcore-v3, CarRacing-v3 (on `Gym.Box2D`, Box2D 2.3.0 in managed C#) |
   | toy_text | FrozenLake-v1, FrozenLake8x8-v1, CliffWalking-v1, CliffWalkingSlippery-v1, Taxi-v4, Blackjack-v1 |
 
+  Each steps faster than Gymnasium's on the same machine (Release builds, sampled actions, the medians of interleaved
+  runs): 1.4× CartPole to 14× Acrobot, LunarLander 1.6×, BipedalWalker 3.6×, CarRacing 2.2× (the C# code review's
+  §4 has the table).
 - **Rendering**: `Gym.Rendering`, a rasterizer with pygame's semantics (SDL_gfx's `gfxdraw` primitives, `draw.line`,
   `draw.rect`, `draw.polygon`, `draw.circle`, `draw.lines`, alpha blitting, `transform.flip`/`scale`/`smoothscale`, `image.load`), and the `human` viewers, chosen
   once with `Gymnasium.HumanViewerFactory`.
@@ -146,6 +151,7 @@ Each has a test that asserts Gymnasium's answer and fails until the gap closes (
   message is NumSharp's `"AssertionError"` instead of Python's empty one (NumSharp gap N-1).
 - **`NotImplementedError` and `ImportError`** are `Gym.Exceptions` types until NumSharp defines them, and NumSharp's
   exceptions take no inner exception yet (N-3).
+
 ## Not in 2.0 yet
 
 Nothing of P6 or P8 is deferred.
@@ -155,6 +161,8 @@ Out of 2.0 by decision:
 - **MuJoCo's environments** are postponed (DR-35). When they resume, they become a fully managed port inside
   Gym.NET.Environments, with no native binaries (DR-30).
 - `AtariPreprocessing`, which needs the Arcade Learning Environment (DR-36).
+- **Native AOT and trimming** (DR-55): NumSharp compiles its array kernels at run time, so Gym.NET needs the JIT. A .NET
+  10 file-based app (`dotnet run app.cs`), which publishes AOT by default, sets `#:property PublishAot=false`.
 - Python-only stacks: JAX and PyTorch environments and converters, pickling, Shimmy's compatibility ids.
 
 ## SixLabors.ImageSharp 2.1.13 and its advisories

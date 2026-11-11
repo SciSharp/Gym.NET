@@ -31,8 +31,8 @@ namespace Gym.Legacy {
             Environments = new List<ILegacyEnv>();
         }
 
-        /// <summary>The vector env's metadata.</summary>
-        public Dict Metadata { get; set; }
+        /// <summary>The vector env's metadata; <see langword="null"/> until a subclass or caller sets it.</summary>
+        public Dict? Metadata { get; set; }
 
         /// <summary><c>gym</c>'s <c>reward_range</c>, in float64 like the rewards.</summary>
         public (double From, double To) RewardRange { get; set; }

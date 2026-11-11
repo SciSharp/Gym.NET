@@ -136,6 +136,12 @@ namespace Gym.Environments.Envs.Box2D {
         /// <summary>Gymnasium's <c>state</c>: the last observation, kept as the env's own copy; <see langword="null"/> before the first step.</summary>
         private NDArray? _state;
 
+        /// <summary>
+        ///     The 1000×800 surface every render draws the road and the car on before the flip, reused from render to render
+        ///     (cleared each time) so a step does not allocate 3.2 MB; <see langword="null"/> until the first render after a reset.
+        /// </summary>
+        private Surface? _canvas;
+
         /// <summary>Creates the env.</summary>
         /// <param name="renderMode">Gymnasium's <c>render_mode</c>: <see langword="null"/>, <c>"human"</c>, <c>"rgb_array"</c> or <c>"state_pixels"</c>.</param>
         /// <param name="verbose">Gymnasium's <c>verbose</c>: print the track generation's progress.</param>
@@ -566,7 +572,12 @@ namespace Gym.Environments.Envs.Box2D {
             if (_t is not { } t)
                 return null; // reset() not called yet
 
-            var surf = new Surface(WindowW, WindowH);
+            // self.surf = pygame.Surface((WINDOW_W, WINDOW_H)): the env's own canvas, cleared to a new surface's black rather
+            // than allocated, since a 1000x800 surface is 3.2 MB on the large object heap every step (R3 of
+            // docs/plans/CSHARP_CODE_REVIEW.md). It is transient: Surf names it only until the flip below replaces it with the
+            // flipped surface, which stays a new object per render, as Gymnasium's self.surf is.
+            Surface surf = _canvas ??= new Surface(WindowW, WindowH);
+            surf.Fill(new Color(0, 0, 0));
             Surf = surf;
             Car car = Car!;
 

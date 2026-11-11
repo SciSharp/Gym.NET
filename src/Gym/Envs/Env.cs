@@ -17,8 +17,11 @@ namespace Gym.Envs {
     ///     The base class of every environment: an MDP driven through <see cref="Step"/> and <see cref="Reset"/>, with spaces,
     ///     metadata, a render mode, a lazily created generator and the attribute protocol (<see cref="GetWrapperAttr"/>, ...).
     /// </summary>
-    /// <typeparam name="TObs">The observation type: <see cref="NDArray"/> for <c>Box</c> spaces, <see langword="long"/> for <c>Discrete</c> (port plan §6.1).</typeparam>
-    /// <typeparam name="TAct">The action type, likewise.</typeparam>
+    /// <typeparam name="TObs">
+    ///     The observation type: <see cref="NDArray"/> for array spaces, <c>Discrete</c> included (its elements are 0-d
+    ///     int64 arrays, DR-08); a tuple type for a composite space (Blackjack's <c>object?[]</c>, DR-13).
+    /// </typeparam>
+    /// <typeparam name="TAct">The action type, likewise: every built-in env takes <see cref="NDArray"/> actions.</typeparam>
     /// <remarks>
     ///     <para>
     ///     Implementing an env: set <see cref="ActionSpace"/>, <see cref="ObservationSpace"/> and, when it renders,
@@ -34,9 +37,9 @@ namespace Gym.Envs {
     ///     <see cref="PyAttributes.SetAttr"/>).
     ///     </para>
     ///     <para>
-    ///     Deviations that follow from C#: <see cref="Metadata"/> is per instance (Python's class attribute is shared by every
-    ///     instance of the class, so mutating one env's changed all of them); spaces are the non-generic <see cref="Space"/>
-    ///     until the spaces work (P2) makes them <c>Space&lt;T&gt;</c>.
+    ///     A deviation that follows from C#: <see cref="Metadata"/> is per instance (Python's class attribute is shared by
+    ///     every instance of the class, so mutating one env's changed all of them). The spaces are typed by the env's element
+    ///     types, <see cref="Space{T}"/> of <typeparamref name="TAct"/> and <typeparamref name="TObs"/> (DR-07).
     ///     </para>
     ///     <para>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/core.py#L28">gymnasium/core.py</see>.</para>
     /// </remarks>

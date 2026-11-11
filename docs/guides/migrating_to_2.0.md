@@ -38,6 +38,7 @@ will be removed in 3.0.
 | `env.RewardRange` | removed, as in Gymnasium 1.0 |
 | `class MyEnv : Env`, `class MyEnv : Env<TAction>` | `class MyEnv : Env<TObs, TAct>` ([Creating custom environments](creating_custom_environments.md)) |
 | `GoalEnv` | removed (Gymnasium-Robotics' concern) |
+| `Gym.Threading` (`DistributedScheduler`, `DistributedThread`, `DistributedQueuedTaskScheduler`, `ThreadAffinityDistrubution`, `CancellationSourceExtensions`), which 0.2's `StepAsync` ran on | removed: built on `Thread.Abort`, which throws on .NET 5 and later. `StepAsync` runs the step on the calling thread; `Gymnasium.MakeVec(id, n, "async")` steps envs on worker threads |
 | `IVecEnv`, `VecEnv`, `DummyVecEnv`, `VecEnvWrapper` | `Gym.Vector`: `Gymnasium.MakeVec("CartPole-v1", n)`, `SyncVectorEnv`, `VectorEnv<TObs, TAct>`; the old types moved to `Gym.Legacy`, obsolete |
 | `space.Seed(int)` | `space.Seed(seed)`, which also takes Gymnasium's lists and dicts of seeds for composite spaces |
 | `new Discrete(n)` samples | 0-d int64 arrays, `start` to `start + n - 1` |

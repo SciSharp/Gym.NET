@@ -506,6 +506,7 @@ namespace Gym.Environments.Envs.Classic {
                 if (_viewer != null)
                     return;
                 _viewerFactory = global::Gym.Gymnasium.ResolveHumanViewerFactory(_viewerFactory);
+                // TODO(async viewer path, DR-53): blocks on the factory; see IEnvironmentViewerFactoryDelegate.
                 _viewer = _viewerFactory(ScreenWidth, ScreenHeight, "cartpole-v1").GetAwaiter().GetResult();
             }
         }

@@ -3,6 +3,8 @@
   <PropertyGroup>
     <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
     <LangVersion>latest</LangVersion>
+    <!-- Nullable reference types for every file, not only those that opt in (DR-54); warnings stay warnings (DR-05). -->
+    <Nullable>enable</Nullable>
     <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
     <PackageId>Gym.NET</PackageId>
     <Version>2.0.0</Version>

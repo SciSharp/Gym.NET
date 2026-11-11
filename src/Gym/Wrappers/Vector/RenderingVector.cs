@@ -185,6 +185,7 @@ namespace Gym.Wrappers.Vector {
                 LastMosaic = merged;
                 if (_window is null) {
                     IEnvironmentViewerFactoryDelegate factory = global::Gym.Gymnasium.ResolveHumanViewerFactory(null);
+                    // TODO(async viewer path, DR-53): blocks on the factory; see IEnvironmentViewerFactoryDelegate.
                     _window = factory(ScreenSize.Value.Width, ScreenSize.Value.Height, "HumanRendering").GetAwaiter().GetResult();
                 }
 

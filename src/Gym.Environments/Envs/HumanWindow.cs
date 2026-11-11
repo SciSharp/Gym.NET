@@ -50,6 +50,7 @@ namespace Gym.Environments.Envs {
                     return;
                 _factory = global::Gym.Gymnasium.ResolveHumanViewerFactory(_factory);
                 // The factory may start a UI thread and complete asynchronously; render calls are synchronous, as pygame's are.
+                // TODO(async viewer path, DR-53): blocks on the factory; see IEnvironmentViewerFactoryDelegate.
                 _viewer = _factory(width, height, _title).GetAwaiter().GetResult();
             }
         }

@@ -18,7 +18,12 @@ namespace Gym.Environments {
     ///     thread to complete (a UI framework runs its own thread, as <c>AvaloniaEnvViewer.Factory</c> does).
     /// </returns>
     /// <remarks>Usually a static <c>Factory</c> member of the viewer class: <c>AvaloniaEnvViewer.Factory</c>, <c>WinFormEnvViewer.Factory</c>, <c>NullEnvViewer.Factory</c>.</remarks>
-    public delegate Task<IEnvViewer> IEnvironmentViewerFactoryDelegate(int width, int height, string title = null);
+    // TODO(async viewer path, DR-53): rendering is synchronous, so every caller blocks on this Task with
+    // .GetAwaiter().GetResult() (CartPoleEnv, HumanWindow, HumanRendering and its vector twin, PygameDisplay, PlayPlot), which
+    // deadlocks if a factory resumes on the calling thread's synchronization context. Support an async path that awaits the
+    // factory instead: an asynchronous render entry through which human mode opens its window without blocking, the blocking
+    // calls kept for the synchronous Render (R8 of docs/plans/CSHARP_CODE_REVIEW.md; the maintainer kept this contract).
+    public delegate Task<IEnvViewer> IEnvironmentViewerFactoryDelegate(int width, int height, string? title = null);
 
     /// <summary>
     ///     A window that shows an env's human-mode frames. The env owns the viewer its factory made and closes it when the env

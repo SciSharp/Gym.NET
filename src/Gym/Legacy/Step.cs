@@ -16,8 +16,8 @@ namespace Gym.Legacy {
     /// </remarks>
     [Obsolete("The 4-tuple step API is legacy: Env<TObs, TAct>.Step returns Gym.Observations.StepResult<TObs> (done is terminated || truncated). Gym.Legacy is removed in 3.0.")]
     public class Step : IEquatable<Step>, ICloneable, IDisposable {
-        /// <summary>The observation after the action.</summary>
-        public NDArray Observation { get; set; }
+        /// <summary>The observation after the action; <see langword="null"/> in a step built empty (<see cref="Step()"/>) until it is set.</summary>
+        public NDArray? Observation { get; set; }
 
         /// <summary>The reward, float64 like every reward in Gym.NET.</summary>
         public double Reward { get; set; }
@@ -26,7 +26,7 @@ namespace Gym.Legacy {
         public bool Done { get; set; }
 
         /// <summary>The diagnostics; <c>"TimeLimit.truncated"</c> is set when the episode ended, true for a truncation.</summary>
-        [CanBeNull] public Dict Information { get; set; }
+        [CanBeNull] public Dict? Information { get; set; }
 
         /// <summary>Releases the observation, which the transition's receiver owns (D19).</summary>
         public void Dispose() {
@@ -42,7 +42,7 @@ namespace Gym.Legacy {
         /// <param name="reward">The reward.</param>
         /// <param name="done">Whether the episode ended.</param>
         /// <param name="information">The diagnostics, or <see langword="null"/>.</param>
-        public Step(NDArray observation, double reward, bool done, Dict information) {
+        public Step(NDArray? observation, double reward, bool done, Dict? information) {
             Observation = observation;
             Done = done;
             Information = information;
@@ -56,7 +56,7 @@ namespace Gym.Legacy {
         /// <param name="reward">The reward.</param>
         /// <param name="done">Whether the episode ended.</param>
         /// <param name="information">The diagnostics.</param>
-        public void Deconstruct(out NDArray observation, out double reward, out bool done, out Dict information) {
+        public void Deconstruct(out NDArray? observation, out double reward, out bool done, out Dict? information) {
             observation = Observation;
             reward = Reward;
             done = Done;
@@ -70,7 +70,7 @@ namespace Gym.Legacy {
         /// </summary>
         /// <param name="other">The step to compare with; may be <see langword="null"/>.</param>
         /// <returns><see langword="true"/> when observation, reward, done flag and information are all equal.</returns>
-        public bool Equals(Step other) {
+        public bool Equals(Step? other) {
             if (ReferenceEquals(null, other)) return false;
             if (ReferenceEquals(this, other)) return true;
             return ObservationEquals(Observation, other.Observation) && Reward.Equals(other.Reward) && Done == other.Done && Equals(Information, other.Information);
@@ -84,7 +84,7 @@ namespace Gym.Legacy {
         /// <param name="right">The second observation; may be <see langword="null"/>.</param>
         /// <returns><see langword="true"/> when both are <see langword="null"/>, the same array, or equal element for element.</returns>
         /// <remarks>An observation containing NaN is equal only to itself (by reference), as NaN never equals NaN.</remarks>
-        private static bool ObservationEquals(NDArray left, NDArray right) {
+        private static bool ObservationEquals(NDArray? left, NDArray? right) {
             if (ReferenceEquals(left, right)) return true;
             if (left is null || right is null) return false;
             return left.Shape == right.Shape && left.dtype == right.dtype && np.array_equal(left, right);
@@ -94,7 +94,7 @@ namespace Gym.Legacy {
         /// <param name="obj">The object to compare with the current object. </param>
         /// <returns>
         /// <see langword="true" /> if the specified object  is equal to the current object; otherwise, <see langword="false" />.</returns>
-        public override bool Equals(object obj) {
+        public override bool Equals(object? obj) {
             if (ReferenceEquals(null, obj)) return false;
             if (ReferenceEquals(this, obj)) return true;
             if (obj.GetType() != this.GetType()) return false;
@@ -121,16 +121,16 @@ namespace Gym.Legacy {
         }
 
         /// <summary>Creates a new object that is a copy of the current instance.</summary>
-        /// <returns>A new object that is a copy of this instance.</returns>
+        /// <returns>A new object that is a copy of this instance; an empty step's copy has no observation either.</returns>
         public object Clone() {
-            return new Step((NDArray) Observation.Clone(), Reward, Done, Information);
+            return new Step(Observation is null ? null : (NDArray)Observation.Clone(), Reward, Done, Information);
         }
 
         /// <summary>Returns a value that indicates whether the values of two <see cref="Step" /> objects are equal.</summary>
         /// <param name="left">The first value to compare.</param>
         /// <param name="right">The second value to compare.</param>
         /// <returns>true if the <paramref name="left" /> and <paramref name="right" /> parameters have the same value; otherwise, false.</returns>
-        public static bool operator ==(Step left, Step right) {
+        public static bool operator ==(Step? left, Step? right) {
             return Equals(left, right);
         }
 
@@ -138,7 +138,7 @@ namespace Gym.Legacy {
         /// <param name="left">The first value to compare.</param>
         /// <param name="right">The second value to compare.</param>
         /// <returns>true if <paramref name="left" /> and <paramref name="right" /> are not equal; otherwise, false.</returns>
-        public static bool operator !=(Step left, Step right) {
+        public static bool operator !=(Step? left, Step? right) {
             return !Equals(left, right);
         }
 

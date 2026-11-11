@@ -20,8 +20,8 @@ namespace Gym.Legacy {
         /// <summary>The sub-envs, stepped in this order.</summary>
         IList<ILegacyEnv> Environments { get; }
 
-        /// <summary>The vector env's metadata.</summary>
-        Dict Metadata { get; set; }
+        /// <summary>The vector env's metadata; <see langword="null"/> until set.</summary>
+        Dict? Metadata { get; set; }
 
         /// <summary><c>gym</c>'s <c>reward_range</c>, in float64 like the rewards.</summary>
         (double From, double To) RewardRange { get; set; }

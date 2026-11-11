@@ -23,7 +23,7 @@ namespace Gym.Environments {
         /// <param name="height">Ignored.</param>
         /// <param name="title">Ignored.</param>
         /// <returns>A completed task holding the shared viewer.</returns>
-        public static Task<IEnvViewer> Run(int width, int height, string title = null) {
+        public static Task<IEnvViewer> Run(int width, int height, string? title = null) {
             return Task.FromResult((IEnvViewer) _singleton);
         }
 

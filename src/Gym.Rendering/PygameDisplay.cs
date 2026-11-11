@@ -87,6 +87,7 @@ namespace Gym.Rendering {
             // The new window opens before the old one closes, so a missing or failing factory leaves the display as it was.
             // The factory may start a UI thread and complete asynchronously; set_mode returns with the window up.
             IEnvironmentViewerFactoryDelegate factory = Context.ResolveViewerFactory(viewerFactory);
+            // TODO(async viewer path, DR-53): blocks on the factory; see IEnvironmentViewerFactoryDelegate.
             IEnvViewer window = factory(width, height, title).GetAwaiter().GetResult();
             if (window is IInteractiveEnvViewer interactive)
                 interactive.BeginInput();

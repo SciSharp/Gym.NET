@@ -6,7 +6,8 @@
 | **Question** | The maintainer's: "is our design C# sound? We are a faithful port of Gymnasium, but we want to be using correct C# and utilize C# lang to the best" |
 | **Scope** | `src/`: 61k lines in 8 projects (Gym 31.4k, Gym.Box2D 12.7k, Gym.Environments 10.2k, Gym.Rendering 5.4k, the generator, the two viewers) |
 | **Method** | The public contract read in full (`IEnv`, `Env<TObs, TAct>`, wrappers, results, `Info`, spaces, registry, viewers); representative envs, the rasterizer, the Box2D facade and the generator sampled. Measured: build warnings by code, nullability coverage, exception hierarchies (by reflection), reflection and AOT exposure, step throughput and allocation against Gymnasium, CPU profiles (`dotnet-trace`). Two fixes were tried on scratch copies, outside the tree, and the parity suite checked one of them bit for bit (§4) |
-| **Status** | Findings only; the changes they suggest are design decisions for the maintainer (DESIGN_REVIEW's gate) |
+| **Status** | Findings; the changes they suggest are design decisions for the maintainer (DESIGN_REVIEW's gate). Decided so far: R2, R3, R10, R11 and R16 implemented (DR-50…DR-54), R8 and R9 kept with TODOs (DR-53), R7 not taken, R17 closed (DR-55); R5, R6 and R14 are with the maintainer |
+| **Second edition** | The same day. The first edition's throughput and profiles were measured on Debug builds of the libraries (§4 says how), and R1 rested on them: measured again in Release, R1 gains nothing and is withdrawn, and Gym.NET is faster than Gymnasium on every env measured. §3.7's leftovers were checked again, extension-method calls included, and each now says what removing it costs 0.2 code and what replaces it |
 
 ---
 
@@ -25,18 +26,21 @@
 **What it does not yet do is use the runtime well where it matters most, and it carries 0.2's leftovers in its public
 surface.** Ranked by value:
 
-1. **Performance (measured).** Box2D's vector math is not inlined: LunarLander and BipedalWalker run 3× slower than
-   Gymnasium (Python driving C++ Box2D). An attribute on 53 small members makes them 5.9× and 6.4× faster, 2.2× and 2.6×
-   faster than Gymnasium, with all 176 Box2D parity cells passing unchanged. CarRacing spends 68% of a step in
-   `smoothscale`, which runs 3× faster with its four channels unrolled (identical output), and it allocates 7.1 MB a step.
-2. **Public surface for 2.0.** 18 unused public types in `Gym.Internal` and 3 unused 0.2 exceptions (69 of the core
-   build's 71 warnings), a delegate named like an interface (`IEnvironmentViewerFactoryDelegate`), an `async` factory
-   every caller blocks on, and ImageSharp's `Image` in the core viewer contract.
+1. **Performance (measured in Release, §4).** Gym.NET steps faster than Gymnasium on all nine envs measured: 1.4×
+   (CartPole) to 14× (Acrobot), LunarLander 1.6×, BipedalWalker 3.6×. The one hot spot was CarRacing, which spent most
+   of a step in `smoothscale` and allocated 7.1 MB a step; unrolling the shrink's four channels (identical output) and
+   reusing its buffers (R2, R3) make it 1.6× faster at 3.6 MB a step, 2.2× Gymnasium's speed. *Corrected:* the first
+   edition found Box2D 3× slower than Gymnasium and an inlining fix 6× faster (R1); both came from Debug builds of the
+   libraries, and R1 is withdrawn.
+2. **Public surface for 2.0.** 21 public types left from 0.2, six used by nothing and fifteen reachable only through
+   the obsolete legacy API's `Dict` (69 of the core build's 71 warnings), a delegate named like an interface
+   (`IEnvironmentViewerFactoryDelegate`), an `async` factory every caller blocks on, and ImageSharp's `Image` in the
+   core viewer contract.
 3. **.NET contracts against Python semantics.** Value equality with `==` on mutable types (`Info`, `Metadata`, the
    mutable record `EnvSpec`), a process-wide registry namespace, static hiding for class metadata.
-4. **Reach.** Nullability is off project-wide in the two largest projects (29 files, `Space`/`Box`/`Discrete` among
-   them). Nothing is annotated for trimming or AOT, and NumSharp's IL kernels crash where dynamic code is off, which
-   .NET 10's file-based apps (`dotnet run app.cs`) turn on by default.
+4. **Reach.** Nullability is off project-wide in the two largest projects (26 files without it, the viewers,
+   `Seeding`, `Gym.Legacy` and `Gym.Internal`). Nothing is annotated for trimming or AOT, and NumSharp's IL kernels crash
+   where dynamic code is off, which .NET 10's file-based apps (`dotnet run app.cs`) turn on by default.
 
 ## 2. What is idiomatic and should stay
 
@@ -62,17 +66,17 @@ surface.** Ranked by value:
 
 | # | Finding | Evidence | Recommendation | Breaking |
 |---|---|---|---|---|
-| R1 | Box2D's vector, matrix and rotation operators and `b2Math` helpers are not inlined in the big solver methods (the JIT's budget runs out there), so every `a - b` is a call | LunarLander's profile: `b2Vec2.op_Subtraction`, `op_Addition`, `op_Multiply`, `..ctor`, `b2Cross`, `b2Mat33.Solve33` each a frame; 52% of the step in `b2RevoluteJoint.SolveVelocityConstraints` (180 velocity iterations a step, as Gymnasium's `world.Step(1/50, 6*30, 2*30)` asks) | `[MethodImpl(MethodImplOptions.AggressiveInlining)]` on the 53 small math members. RyuJIT never fuses or reorders float operations, so inlining keeps every rounding: measured 5.9× (LunarLander) and 6.4× (BipedalWalker), 176 of 176 Box2D parity cells passing | No |
-| R2 | `Transform.Smoothscale`'s shrink keeps its four channel sums in a `stackalloc`'d `Span<long>`, indexed per channel per pixel | CarRacing: 68% of the step in `ShrinkLine`; 13.2 ms per 1000×800 → 96×96 | Four locals, the channels unrolled: 4.4 ms (3.0×), identical on 200 random frames | No |
-| R3 | CarRacing allocates 7.1 MB a step: a new 1000×800 surface, a new flipped copy, the shrink's temporary, the frame's byte array | `GC.GetAllocatedBytesForCurrentThread`; both 3.2 MB buffers land on the Large Object Heap, which only gen-2 collections reclaim | Reuse env-owned buffers across steps (a cached surface, an in-place flip into a second cached one, `ArrayPool` for the temporary) | No |
-| R4 | The small envs are already faster than Gymnasium (1.2× CartPole to 11.9× Acrobot) and allocate 3–11 KB a step, mostly NumSharp temporaries | §4 | Nothing now; the arrays per step are the price of `NDArray` observations | — |
+| R1 | *Withdrawn.* The first edition read Box2D's small math members (`b2Vec2`'s operators, `b2Cross`, ...) as not inlined in the solver's big methods, every `a - b` a call | Its profile showed each operator as a frame, but it was a Debug build, where the JIT inlines nothing. In Release, `[MethodImpl(MethodImplOptions.AggressiveInlining)]` on the 53 members measures 1.05× (LunarLander) and 1.12× (BipedalWalker), inside the rounds' spread (§4) | None. The change passed every gate (it cannot change a float: RyuJIT never fuses or reorders float operations) and was reverted before it was committed | — |
+| R2 | `Transform.Smoothscale`'s shrink keeps its four channel sums in a `stackalloc`'d `Span<long>`, indexed per channel per pixel | CarRacing's profile; 13.2 ms per 1000×800 → 96×96 (§4) | Four locals, the channels unrolled: 4.4 ms (3.0×), identical on 200 random frames. *Done (DR-50)*: with R3, CarRacing steps 1.6× as fast; `ShrinkLine` is still 36% of its step | No |
+| R3 | CarRacing allocates 7.1 MB a step: a new 1000×800 surface, a new flipped copy, the shrink's temporary, the frame's byte array | `GC.GetAllocatedBytesForCurrentThread`; both 3.2 MB buffers land on the Large Object Heap, which only gen-2 collections reclaim | Reuse buffers across steps. *Done (DR-50)*: the pre-flip canvas is the env's, the shrink's temporary comes from `ArrayPool`; the flipped surface stays a new object per render, as Gymnasium's `self.surf` is: 3.6 MB a step | No |
+| R4 | The small envs are faster than Gymnasium (1.4× CartPole to 14× Acrobot) and allocate 3–11 KB a step, mostly NumSharp temporaries | §4 | Nothing now; the arrays per step are the price of `NDArray` observations | — |
 
 ### 3.2 The public surface for 2.0
 
 | # | Finding | Evidence | Recommendation | Breaking |
 |---|---|---|---|---|
-| R5 | `Gym.Internal`: 18 public types from 0.2 (`Dict`, `Expando`, `Merger`, `ReflectionHelper`, `ExpandableList`, `CircularQueue`, `DefaultConstructor`, `GenericCallFactory`, ...) used by nothing | No reference outside the folder, in `src`, `tests` or `examples`; 62 of the core build's 71 warnings are theirs (43 missing docs, 18 malformed docs, 1 unused field) | Delete them | Yes, to code no one should call |
-| R6 | Three 0.2 exceptions, `InvalidActionError`, `AlreadySteppingError`, `NotSteppingError`, thrown by nothing | Referenced only by their own files (Gymnasium's `InvalidAction` replaced the first); 7 more of the warnings. The last 2 are ambiguous `cref`s (`Legacy/VecEnvWrapper.cs`, `Spaces/Discrete.cs`), one-line fixes | Delete them; fix the two `cref`s | Yes |
+| R5 | `Gym.Internal`: 18 public types from 0.2 (`Dict`, `Expando`, `Merger`, `ReflectionHelper`, `ExpandableList`, `CircularQueue`, `DefaultConstructor`, `GenericCallFactory`, ...); 62 of the core build's 71 warnings are theirs (43 missing docs, 18 malformed docs, 1 unused field) | *Corrected twice after the maintainer's double-check request (§3.7):* three are used by nothing; the other fifteen are reachable through `Gym.Collections.Dict`, the info type of the `[Obsolete]` `Gym.Legacy` API (`Step.Information`, `VecEnv.Metadata`). The first search looked for `Gym.Internal` and the type names, not for `Dict` in namespace `Gym.Collections`; the second missed that `DefaultConstructor` calls `ReflectionHelper`'s extension methods, which never name their class | See §3.7: what each way of removing them costs 0.2 code, and what replaces each | Yes |
+| R6 | Three 0.2 exceptions, `InvalidActionError`, `AlreadySteppingError`, `NotSteppingError`, thrown by nothing | Referenced only by their own files (Gymnasium's `InvalidAction` replaced the first); 7 more of the warnings. The last 2 are ambiguous `cref`s (`Legacy/VecEnvWrapper.cs`, `Spaces/Discrete.cs`), one-line fixes | See §3.7; fix the two `cref`s | Yes |
 | R7 | `IEnvironmentViewerFactoryDelegate` is a delegate with an interface's `I` prefix (.NET naming rules), its `string title = null` unannotated | `src/Gym/Envs/Viewers/IEnvViewer.cs` | Rename (`EnvViewerFactory`) | Yes |
 | R8 | The viewer factory returns `Task<IEnvViewer>`, but rendering is synchronous and all six call sites block on it (`.GetAwaiter().GetResult()`), a deadlock risk wherever a factory resumes on a UI synchronization context | `CartPoleEnv`, `HumanWindow`, `HumanRendering` (both), `PygameDisplay`, `PlayPlot`; the plot figures block the same way | A synchronous factory (`IEnvViewer Create(int width, int height, string? title)`); the viewer packages keep their UI-thread startup inside | Yes |
 | R9 | `IEnvViewer.Render(Image img)` puts ImageSharp's type in the core contract | Every viewer and the core depend on it for that one parameter | Pass the frame (`NDArray` of `(H, W, 3)` uint8, or a `ReadOnlySpan<byte>` with its size); ImageSharp stays where it decodes and encodes (D18 unchanged) | Yes |
@@ -85,15 +89,15 @@ surface.** Ranked by value:
 |---|---|---|---|---|
 | R12 | `Info` (and `Metadata`, which derives from it) overloads `==` and `Equals` by value on a mutable type, with `GetHashCode() => Count`; `info.Equals(dictionary)` can be true while `dictionary.Equals(info)` is false | .NET's guidelines: no value `==` on mutable reference types; `Equals` must be symmetric. A mutated `Info` inside a `HashSet` is lost | Reference equality for the type, Python's `==` as `PyEquality.AreEqual` (already there) or an `IEqualityComparer<Info>` | Yes |
 | R13 | `EnvSpec` is a `sealed record` with public setters: value equality and a hash over mutable state | Python's non-frozen dataclass is unhashable; a C# record is hashed | `init` accessors, derived specs through `with` | Yes |
-| R14 | `EnvRegistry.CurrentNamespace` is process-wide: two threads registering under different namespaces interfere, the lock notwithstanding | `EnvRegistry.Namespace(ns)` swaps one static | Keep the `using` scope, store the namespace in an `AsyncLocal<string?>` | No |
+| R14 | `EnvRegistry.CurrentNamespace` is process-wide: two threads registering under different namespaces interfere, the lock notwithstanding | `EnvRegistry.Namespace(ns)` swaps one static. *What the namespace is:* an env id's optional prefix, `[namespace/](name)[-v(version)]`, as in `ALE/Breakout-v5` or Gymnasium's own `phys2d/CartPole-v1`; `make`'s errors (`NamespaceNotFound`) and `pprint_registry`'s groups use it. Gymnasium's `namespace(ns)` context manager sets the module global `current_namespace`, and while it is set `register` puts every id in that namespace, replacing one written in the id. Gymnasium 1.x calls it nowhere itself (its plugin loader, which did, went in 1.0); one test does. Gym.NET registers no namespaced ids | Keep the `using` scope, store the namespace in an `AsyncLocal<string?>`: each thread and async flow sees its own scope, single-threaded code behaves as now | No |
 | R15 | Class-level metadata is a `public new static Metadata ClassMetadata` that each env hides | `Env.cs` | C# 11's static abstract interface member, or leave it (reflection finds it either way) | Minor |
 
 ### 3.4 Nullability, analysis and reach
 
 | # | Finding | Evidence | Recommendation | Breaking |
 |---|---|---|---|---|
-| R16 | `<Nullable>` is not enabled in Gym and Gym.Environments; 29 files have no nullability context, the space types (`Space.cs`, `Box.cs`, `Discrete.cs`), `Seeding.cs`, the viewers and the legacy among them; Gym.Rendering and Gym.Box2D enable it and treat warnings as errors | Per-file `#nullable enable` count | Enable it project-wide, annotate the 29 files, and treat warnings as errors in all four projects | No |
-| R17 | Nothing is annotated for trimming or NativeAOT, though `make`, kwargs binding and the attribute protocol use reflection (`GetConstructors`, `MakeGenericType`, `Assembly.Load`); and NumSharp emits IL kernels (`DynamicMethod`), which throw `PlatformNotSupportedException` where dynamic code is off | Measured: a .NET 10 file-based app (`dotnet run app.cs`) defaults to AOT settings, and constructing `CartPoleEnv` throws there; `#:property PublishAot=false` is the workaround | Document it now (getting started); mark the reflection entry points `[RequiresUnreferencedCode]`/`[RequiresDynamicCode]` and the `Type` parameters `[DynamicallyAccessedMembers]`; the generated options records already offer the reflection-free path; NumSharp needs a non-emitting fallback (upstream) | No |
+| R16 | `<Nullable>` is not enabled in Gym and Gym.Environments; 26 files of Gym have no nullability context: the viewers, `Seeding.cs`, the four 0.2-era exception files, `Gym.Legacy` and `Gym.Internal` (the space types do have it; a first count missed files whose directive follows a byte-order mark). Gym.Rendering and Gym.Box2D enable it and treat warnings as errors | Per-file `#nullable enable` count | Enable it project-wide, annotate the 26 files, and treat warnings as errors in all four projects | No |
+| R17 | Nothing is annotated for trimming or NativeAOT, though `make`, kwargs binding and the attribute protocol use reflection (`GetConstructors`, `MakeGenericType`, `Assembly.Load`); and NumSharp emits IL kernels (`DynamicMethod`), which throw `PlatformNotSupportedException` where dynamic code is off | Measured: a .NET 10 file-based app (`dotnet run app.cs`) defaults to AOT settings, and constructing `CartPoleEnv` throws there; `#:property PublishAot=false` is the workaround | Document it now (getting started); mark the reflection entry points `[RequiresUnreferencedCode]`/`[RequiresDynamicCode]` and the `Type` parameters `[DynamicallyAccessedMembers]`; the generated options records already offer the reflection-free path; NumSharp needs a non-emitting fallback (upstream). *Closed (DR-55)*, the maintainer: "We can't AOT, NumSharp can't." No annotations; the guide and the release notes state the limitation | No |
 | R18 | `Gym.Box2D` ships inside Gym.NET.Environments as a `PrivateAssets` project reference, yet the envs' public API returns its types (`LunarLanderEnv.World` is a `b2World`) | A project-reference consumer cannot compile `env.World` (CS0012); the NuGet package works, since it packs the dll beside the envs' | Fine for package consumers; note it for project-reference users | — |
 
 ### 3.5 Naming and typing
@@ -113,65 +117,133 @@ surface.** Ranked by value:
 | U1 | `ValueError : ArgumentException`, `AxisError : ArgumentOutOfRangeException` and `OSError : IOException` are idiomatic, but `TypeError`, `KeyError`, `IndexError`, `AttributeError` and `AssertionError` derive only from `NumSharpException`: `catch (KeyNotFoundException)` or `catch (ArgumentException)` misses them | Derive them from `ArgumentException`, `KeyNotFoundException`, `IndexOutOfRangeException` (or `ArgumentOutOfRangeException`), `MissingMemberException` and `InvalidOperationException` |
 | U2 | The IL kernel generator has no fallback when `RuntimeFeature.IsDynamicCodeSupported` is false | An interpreted or generic-math path, so NumSharp (and Gym.NET) run under NativeAOT and in file-based apps |
 
-### 3.7 Stale documentation found
+### 3.7 The 0.2 leftovers, one by one (the maintainer's double-check)
 
-- `Env<TObs, TAct>`'s remarks still say spaces are "the non-generic `Space` until the spaces work (P2) makes them
+Every public type of `src/Gym/Internal` and the three 0.2 exceptions, searched by name in every C# file of `src`,
+`tests` and `examples` (code apart from comments), each namespace import traced, the calls of their extension methods
+followed (they never name their class), and what live code reaches closed over. `Gym.Legacy` counts as live: it ships
+in 2.0, `[Obsolete]`, and goes in 3.0. "0.2.0" is the last release, commit `666746d` (2023-03-10): all 21 types were
+public in it.
+
+*Corrected twice.* The first edition called 18 + 3 of them unused; the first double-check called seven unused, missing
+that `DefaultConstructor` calls two of `ReflectionHelper`'s extension methods, and described `CircularQueue<T>` as a
+ring buffer.
+
+**Used by nothing (6).** No 2.0 code reaches them, and none was part of 0.2's env API.
+
+| Type | What it is | In 0.2.0 | Removed, what stops compiling | What replaces it |
+|---|---|---|---|---|
+| `CircularQueue<T>` (`Gym.Collections`) | A round-robin queue: `Dequeue` returns the next item and puts it back at the end, `CircleCompleted` fires after each full circle (from QuantConnect's Lean) | Unused | Code that names it | A `Queue<T>` (`queue.Enqueue(queue.Dequeue())`), or an index modulo the count (Python's `itertools.cycle`) |
+| `CircularQueueThreadSafe<T>` (same file) | The same under a lock | Unused | Code that names it | The same under a `lock`, or `ConcurrentQueue<T>` |
+| `GenericCallFactory` (`Gym.Reflection`) | Caches `MethodInfo.MakeGenericMethod` per type and invokes the result | Unused since the 2019 initial commit | Code that names it | `method.MakeGenericMethod(type).Invoke(target, args)` |
+| `InvalidActionError` (`Gym.Exceptions`) | 0.2's invalid-action error | Thrown by 0.2's Aether `LunarLanderEnv` for an action outside its space | `catch (InvalidActionError)` and `throw new InvalidActionError(...)`. Kept, such a `catch` compiles and never fires: nothing in 2.0 throws it | `AssertionError` from the envs that assert their action, as Gymnasium's do (`assert self.action_space.contains(action)`: LunarLander, CartPole, ...); `InvalidAction` from CarRacing, and for custom envs (Gymnasium's `error.InvalidAction`) |
+| `AlreadySteppingError` (`Gym.Exceptions`) | "already running an async step" | Thrown by nothing | Code that names it | `AlreadyPendingCallError`: `AsyncVectorEnv`, a call while another is pending |
+| `NotSteppingError` (`Gym.Exceptions`) | "not running an async step" | Thrown by nothing | Code that names it | `NoAsyncCallError`: `AsyncVectorEnv`, a `*_wait` without its `*_async` |
+
+**Reachable only through the legacy API's info type (15).** `Gym.Collections.Dict` was 0.2's info and metadata type
+(`Env.Metadata`, `Step.Information`, `IVecEnv.Metadata`, `GoalEnv.ComputeReward`). In 2.0 only `Gym.Legacy` uses it:
+`Step.Information`, `ILegacyEnv.Metadata`, `IVecEnv`/`VecEnv.Metadata`, filled by `LegacyEnvAdapter`. The other
+fourteen are its machinery.
+
+| Type | What it is | Reached through | What replaces it |
+|---|---|---|---|
+| `Dict` (`Gym.Collections`) | `Dictionary<string, object>` with inline pairs (`new Dict("k", v, ...)`), `Get<T>`, `AsDynamic()`, merges, `Clone`, `RemoveWhere`/`SetWhere` | `Gym.Legacy` (5 files) | `Gym.Envs.Info` for infos (Gymnasium's dict: insertion order, `Get(key, default)`, `Update`, `Copy`/`DeepCopy`, `Pop`) and `Gym.Envs.Metadata` for metadata, the types 2.0's `Env` uses |
+| `Expando` (`Gym.Dynamic`) | A dynamic object over a dictionary (Rick Strahl's West Wind Expando) | `Dict.AsDynamic()` | `System.Dynamic.ExpandoObject` |
+| `Merger`, `IMergable`, `IMergable<T>`, `MergePrefer` (`Gym.Merging`) | A deep merge of dictionaries and lists, the old or the new value winning | `Dict`'s `Merge`, `Append`, `Override`, `Update` | `Info.Update` (Python's `dict.update`: the new value wins, one level deep) |
+| `ExpandableList`, `ExpandableList<T>`, `IExpandableList` (`Gym.Collections`) | One value that a merge expands into a list | `Merger` | `List<T>` |
+| `DefaultConstructor`, `DefaultConstructor<T>`, `DefaultConstructorNotFoundException` (`Gym.Reflection`) | Cached delegates to parameterless constructors | `Merger` | `Activator.CreateInstance<T>()`, or a `new()` constraint |
+| `ReflectionHelper` (`Gym.Reflection`) | Reflection extension methods (`GetDefaultConstructor`, `CreateDefaultConstructor`, `HasInterface`, tuple helpers, ...) | `DefaultConstructor` calls two of them | `Type.GetConstructor(Type.EmptyTypes)`, `Type.IsAssignableTo`, `System.Runtime.CompilerServices.ITuple` |
+| `DictInlineInitializationException`, `DictMergingException` (`Gym.Collections`) | `new Dict(...)`'s and the merges' errors | `Dict`, `Merger` | None needed: `new Info { ["k"] = v }` is checked when it compiles |
+
+**What each way of removing them costs 0.2 code.** In 2.0, 0.2 code reaches these types only by naming them or
+through `Gym.Legacy`; 0.2's `Env` base and its envs are gone already.
+
+| Way | What stops compiling | What changes silently |
+|---|---|---|
+| Keep all 21 until 3.0 | Nothing | A `catch (InvalidActionError)` never fires |
+| `[Obsolete]` on all 21 now, removed in 3.0 with `Gym.Legacy` | Nothing: each use warns, naming its replacement | Nothing: the exceptions' warnings say nothing throws them |
+| Remove the six unused now, `[Obsolete]` on the fifteen | Code naming one of the six; a dead `catch` becomes an error where the behavior changed | Nothing |
+| Remove all 21, the legacy info typed `Info` | The above, and `Dict`-only members used through the legacy API: `new Dict(...)`, `Get<T>`, `AsDynamic()`, `Merge`/`Append`/`Override`, `Clone`, `RemoveWhere`/`SetWhere`, `Dict` passed as a `Dictionary<string, object>`. Indexing, `ContainsKey`, `TryGetValue` and `foreach` keep compiling | Nothing |
+
+The port plan had set their direction before any of this (§4.4): `Dict` replaced by `Info`; `Internal/Dynamic`,
+`Merging` and `Reflection` deleted or made internal (for 0.2 code, internal costs what removal costs);
+`AlreadySteppingError` and `NotSteppingError` moved to `Gym.Legacy` for one major version; `InvalidActionError` kept
+"for LunarLander until P8", and P8's LunarLander raises `AssertionError`. Keeping `Dict` public has one more cost: it
+shares its name with the Dict space, `Gym.Spaces.Dict`, so a file importing both namespaces gets `CS0104`, which is why
+`Gym.Legacy`'s files alias it. Marking the types `[Obsolete]` edits their files, which then need documentation for their
+61 undocumented or malformed members (the repository's rule for edited code).
+
+The same check found 0.2's `Gym.Threading` (`DistributedScheduler`, `DistributedThread`,
+`DistributedQueuedTaskScheduler`, `ThreadAffinityDistrubution`, `CancellationSourceExtensions`), public in 0.2.0,
+already removed by P1 (`da428ab`, built on `Thread.Abort`, which throws on .NET 5+); the migration guide now lists it.
+
+### 3.8 Stale documentation found (corrected)
+
+- `Env<TObs, TAct>`'s remarks still said spaces are "the non-generic `Space` until the spaces work (P2) makes them
   `Space<T>`"; they are `Space<TAct>`/`Space<TObs>`.
-- Its `TObs` doc says Discrete observations are `long`; since DR-08 they are 0-d `NDArray`s.
+- Its `TObs` doc said Discrete observations are `long`; since DR-08 they are 0-d `NDArray`s.
 
 ## 4. Measurements
 
-**Throughput** (Release, net10.0, sampled actions, observations disposed; Gymnasium v1.4.0 on Python 3.12 the same
-way, on the same machine):
+**How the first edition went wrong.** Its benchmark was a .NET 10 file-based app with `#:property Configuration=Release`
+and `#:project` references to the libraries. The property compiles the app in Release but does not reach the
+references, which receive only a build's global properties: Gym, Gym.Environments, Gym.Box2D and Gym.Rendering ran as
+Debug builds (the copies beside the app hashed equal to `bin/Debug`), with the JIT's optimizations, inlining among them,
+switched off. Re-measuring found two more traps: `dotnet run app.cs` reuses its last build while the app's own file is
+unchanged, even after a referenced project's sources change (`--no-cache` rebuilds), and the machine's load moved
+Gymnasium's CartPole from 95,558 steps/s in the morning to the 65,464 below. Every number here was taken with
+`dotnet run -c Release app.cs`, each library's hash checked against its `bin/Release` build.
+
+**Throughput** (net10.0, Release; sampled actions, observations disposed; Gymnasium v1.4.0 on CPython 3.12.12 with the
+pinned NumPy 2.4.2, pygame-ce 2.5.8 and Box2D 2.3.10, the same loop; five rounds of the three Gym.NET builds below and
+four of Gymnasium, interleaved; medians). Single runs strayed up to 25% from the median, the ratios less:
 
 | Env | Gym.NET steps/s | Gymnasium steps/s | Ratio | Gym.NET bytes/step |
 |---|---:|---:|---:|---:|
-| CartPole | 116,148 | 95,558 | 1.2× faster | 3,269 |
-| MountainCar | 173,398 | 63,740 | 2.7× faster | 3,192 |
-| Pendulum | 64,629 | 20,083 | 3.2× faster | 11,088 |
-| Acrobot | 227,650 | 19,096 | 11.9× faster | 4,019 |
-| FrozenLake | 272,377 | 96,050 | 2.8× faster | 4,283 |
-| Taxi | 187,941 | 75,246 | 2.5× faster | 4,681 |
-| LunarLander | 7,792 | 23,936 | 3.1× slower | 9,038 |
-| BipedalWalker | 1,719 | 4,686 | 2.7× slower | 35,199 |
-| CarRacing | 50 | 104 | 2.1× slower | 7,069,106 |
+| CartPole | 93,898 | 65,464 | 1.4× faster | 3,266 |
+| MountainCar | 145,364 | 43,440 | 3.3× faster | 3,192 |
+| Pendulum | 48,601 | 12,930 | 3.8× faster | 11,088 |
+| Acrobot | 168,049 | 11,696 | 14.4× faster | 4,019 |
+| FrozenLake | 213,280 | 59,436 | 3.6× faster | 4,283 |
+| Taxi | 164,917 | 36,414 | 4.5× faster | 4,681 |
+| LunarLander | 19,744 | 12,503 | 1.6× faster | 8,993 |
+| BipedalWalker | 9,024 | 2,499 | 3.6× faster | 35,071 |
+| CarRacing | 164 | 74 | 2.2× faster | 3,631,032 |
 
-**R1's experiment.** A copy of `src/Gym.Box2D` with `[MethodImpl(MethodImplOptions.AggressiveInlining)]` on 53 members of
-`Common/b2Math.cs` (every operator of `b2Vec2`, `b2Vec3`, `b2Mat22`, `b2Mat33`, `b2Rot`, every static `b2*` helper, the
-one-line readonly members) was swapped into a copy of the app (the change is metadata only, so the binary interface is
-the same). Steps per second, two interleaved rounds each:
+Gym.NET's column is the tree with R2 and R3. The other two builds were the committed sources (`src` as it is from
+`489d589` to `610d912`), exported with `git archive`, as they were and with R1's `b2Math.cs`.
 
-| Env | Original | Inlined | Gain |
-|---|---:|---:|---:|
-| LunarLander | 8,780 | 52,130 | 5.9× |
-| BipedalWalker | 1,924 | 12,232 | 6.4× |
-| CarRacing | 65 | 62 | none (rendering-bound) |
+**R1 in Release.** LunarLander 19,697 steps/s at HEAD and 20,777 with R1 (1.05×), BipedalWalker 8,110 and 9,122
+(1.12×), while each build's five rounds spread wider than that (LunarLander 15,728–23,827, BipedalWalker
+6,028–10,511). In Release the JIT already inlines the small operators; the first edition's 5.9× and 6.4× compared a
+Debug engine with a Release one, and its "3× slower than Gymnasium" was the Debug engine too.
 
-The same copy, swapped into a copy of the parity suite's Release output: 176 of 176 cells pass. That covers
-`Box2DEngineLiveParityTests` (scenes, events, ray casts, errors against live pybox2d, float32 bits), the LunarLander,
-BipedalWalker and CarRacing suites, every golden replay and the bridge's Box2D rows.
+**R2 and R3.** CarRacing in the same rounds: 103 steps/s at HEAD, 164 with both (1.6×), and 7,065,020 bytes a step
+down to 3,631,032. R2's microbenchmark, an app with both shrinks compiled into it (so the trap did not touch it):
+identical output on 200 random frames of random sizes, 13.2 ms against 4.4 ms for CarRacing's 1000×800 → 96×96 (100
+runs after 20 warm-up runs, twice).
 
-**R2's experiment.** `ShrinkLine` as it is, against the same arithmetic with the four channel sums in locals: identical
-output on 200 random frames of random sizes, and 13.2 ms against 4.4 ms for CarRacing's 1000×800 → 96×96 (100 runs
-after 20 warm-up runs, twice).
+**Correctness.** With R2, R3, R10, R11 and R16 in the tree, the unit gate (3,549 tests) and the live parity gate
+(2,451 cells) pass on net8.0 and net10.0. R1 passed both before it was reverted, and after the revert the Box2D,
+LunarLander, BipedalWalker and CarRacing tests of both suites passed again.
 
-**Profiles** (`dotnet-trace`, sampled thread time, 6 s of sampled actions; inclusive time on the stepping thread):
-
-| LunarLander | | CarRacing | |
-|---|---:|---|---:|
-| `LunarLanderEnv.Step` | 69% | `CarRacingEnv.RenderFrame` | 91% |
-| `b2World.Step` | 66% | `Transform.Smoothscale` / `ShrinkLine` | 68% |
-| `b2RevoluteJoint.SolveVelocityConstraints` | 52% | `CarRacingEnv.RenderRoad` | 16% |
-| `b2Mat33.Solve33` | 14.5% | `GfxDraw.FilledPolygon` | 11% |
-| `b2Vec2` operators and constructor, `b2Cross` | 32% together | `Transform.Flip` | 4% |
-| NumSharp (the observation, the samples) | ~8% | `b2World.Step` | 1.4% |
+**Profiles** (`dotnet-trace`, sampled thread time, 6 s of sampled actions, Release; inclusive share of the stepping
+thread). CarRacing, with R2 and R3: `CarRacingEnv.RenderFrame` 84%, `Transform.Smoothscale` 38% (`ShrinkLine` 36%),
+`CreateImageArray` (the frame copied into an array) 20%, `RenderRoad` 19%, `Transform.Flip` 11%, SDL_gfx's filled
+polygons 10%. LunarLander's profile is rougher, the sampler putting 38% of the thread under GC-poll frames: `LunarLanderEnv.Step`
+46%, of it `b2World.Solve` 22% and `b2RevoluteJoint.SolveVelocityConstraints` 5%; building the observation
+(`np.array`) 18%; `Discrete.Sample` 9%. The first edition's profiles were Debug builds and are withdrawn: they showed
+every vector operator as a frame because Debug code inlines nothing.
 
 ## 5. Suggested order
 
-1. R1, R2, R3: no API change, measured, verified by the existing gates; R1 is a one-file change.
+1. R2, R3: no API change, measured, verified by the existing gates. *Done (DR-50)*; R1 withdrawn.
 2. R5, R6, R7, R8, R9, R10, R11: the 2.0 surface, while breaking is free; R5 and R6, with the two `cref` fixes, clear
-   every build warning.
-3. R16: nullability project-wide, then warnings as errors everywhere.
-4. R12, R13, R14: the equality and scoping semantics, each a short design decision.
-5. R17 and U1/U2: documentation now, annotations and the NumSharp items after.
+   every build warning. *R10 and R11 done (DR-51, DR-52), R8 and R9 kept with TODOs (DR-53), R7 not taken; R5 and R6
+   with the maintainer, with §3.7's costs.*
+3. R16: nullability project-wide, then warnings as errors everywhere. *Done, warnings staying warnings (DR-54).*
+4. R12, R13, R14: the equality and scoping semantics, each a short design decision. *R14 explained and with the
+   maintainer.*
+5. R17 and U1/U2: documentation now, annotations and the NumSharp items after. *R17 closed (DR-55); U1 and U2 are
+   NumSharp's.*
 6. R19, R21, R23: naming and typing decisions with no urgency.
