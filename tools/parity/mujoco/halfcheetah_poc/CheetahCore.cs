@@ -3,20 +3,32 @@ using System;
 namespace MujocoPoc;
 
 /// <summary>
-///     A from-scratch physics core for planar walkers like HalfCheetah-v5, written to step exactly as MuJoCo 3.15.0's
-///     <c>mj_step</c> does on win-x64: the same quantities in the same floating-point order, so every array it publishes
-///     (state, contacts, constraint rows, solver output) equals MuJoCo's bit for bit.
+///     A from-scratch physics core for the most-used locomotion envs (HalfCheetah-v5, Hopper-v5, Humanoid-v5), written to
+///     step exactly as MuJoCo 3.15.0's <c>mj_step</c> does on win-x64: the same quantities in the same floating-point
+///     order, so every array it publishes (state, contacts, constraint rows, solver output) equals MuJoCo's bit for bit.
 /// </summary>
 /// <remarks>
 ///     <para>
-///         It is not a translation of MuJoCo's sources: it computes only what such a model needs (hinge and slide joints,
-///         a ground plane against capsules, joint limits, pyramidal contacts, motors, the dense Newton solver, Euler with
-///         implicit joint damping) and drops MuJoCo's generality (sparse paths, sleeping, islands of many trees, flex,
-///         tendons, sensors, callbacks). <see cref="CheetahModel.Load"/> refuses models outside that scope.
+///         It is not a translation of MuJoCo's sources: it computes only what such models need (hinge and slide joints
+///         under an optional free root, a ground plane with spheres and capsules, joint limits, pyramidal and frictionless
+///         contacts, motors, the dense Newton or PGS solver, Euler with implicit joint damping or RK4, fixed tendons'
+///         lengths, the external contact forces of <c>mj_rnePostConstraint</c>) and drops MuJoCo's generality (sparse
+///         paths, sleeping, islands of many trees, flex, active tendons, sensors, callbacks).
+///         <see cref="CheetahModel.Load"/> refuses models outside that scope. The class keeps its first name because
+///         HalfCheetah's play project compiles it as it is.
 ///     </para>
 ///     <para>
 ///         Arrays carry MuJoCo's names and layouts so they can be compared with a recorded <c>mjData</c>. Not thread-safe:
 ///         one core owns its arrays, and <see cref="Step"/> reuses scratch storage.
+///     </para>
+///     <para>
+///         Verified by the checker in this folder against oracle.py's traces (docs/plans/MUJOCO_ASSESSMENT.md §11).
+///         Branches no trace has executed (measured by line coverage) are written from MuJoCo's source but unproven: the
+///         auto-reset of a bad state or bad controls, the parallel-axes case of two capsules, coincident sphere centers,
+///         geom priorities, direct (negative) or mixed-sign solref, an impedance of power 1, a contact beyond its margin,
+///         a body of zero subtree mass, PGS's cost-rise revert, Newton's fallbacks (a zero step, an exhausted or stuck
+///         line search, a lost rank in the factor update), the undamped Euler step, and the kernels' degenerate cases
+///         (tiny pivots, zero-length vectors and quaternions, a zero rotation angle).
 ///     </para>
 ///     <para>
 ///         Reference: MuJoCo 3.15.0's <see href="https://github.com/google-deepmind/mujoco/blob/3.15.0/src/engine/engine_forward.c">engine_forward.c</see>,
@@ -30,11 +42,18 @@ namespace MujocoPoc;
 ///     </para>
 /// </remarks>
 public sealed class CheetahCore {
+    private const int Free = 0;
     private const int Slide = 2;
     private const int Hinge = 3;
     private const int Plane = 0;
+    private const int Sphere = 2;
+    private const int Capsule = 3;
+    private const int SolverPgs = 0;
+    private const int IntegratorRk4 = 1;
     /// <summary>The constraint type of a joint-limit row (MuJoCo's <c>mjCNSTR_LIMIT_JOINT</c>).</summary>
     public const int LimitJoint = 3;
+    /// <summary>The constraint type of a frictionless contact row (MuJoCo's <c>mjCNSTR_CONTACT_FRICTIONLESS</c>).</summary>
+    public const int ContactFrictionless = 5;
     /// <summary>The constraint type of a pyramidal contact row (MuJoCo's <c>mjCNSTR_CONTACT_PYRAMIDAL</c>).</summary>
     public const int ContactPyramidal = 6;
     /// <summary>A constraint row that exerts no force (<c>mjCNSTRSTATE_SATISFIED</c>).</summary>
@@ -161,14 +180,33 @@ public sealed class CheetahCore {
     /// <summary>Constraint forces from the solver.</summary>
     public readonly double[] efc_force;
     /// <summary>
-    ///     Constraint states as MuJoCo publishes them: from the warm start's evaluation at <see cref="qacc_smooth"/>, since
-    ///     the island solver keeps its own states and does not copy them back.
+    ///     Constraint states as MuJoCo publishes them. Under Newton, from the warm start's evaluation at
+    ///     <see cref="qacc_smooth"/>, since the island solver keeps its own states and does not copy them back; under PGS,
+    ///     the solver's last sweep, which works on these states directly.
     /// </summary>
     public readonly int[] efc_state;
+    /// <summary>
+    ///     The dual matrix <c>J*M^-1*J' + R</c>, <see cref="nefc"/> by <see cref="nefc"/>, built for the PGS solver only
+    ///     (empty otherwise).
+    /// </summary>
+    public readonly double[] efc_AR;
     /// <summary>The number of constraint islands (0 or 1: one kinematic tree).</summary>
     public int nisland;
-    /// <summary>Newton iterations of the last solve.</summary>
+    /// <summary>Solver iterations of the last solve (Newton iterations, or PGS sweeps).</summary>
     public int solver_niter;
+
+    // ---- tendons and external forces
+    /// <summary>Tendon lengths (fixed tendons: their coefficients times the joint positions).</summary>
+    public readonly double[] ten_length;
+    /// <summary>Tendon Jacobian values in the model's sparse layout (<c>ten_J_rowadr</c>, <c>ten_J_colind</c>).</summary>
+    public readonly double[] ten_J;
+    /// <summary>Tendon velocities.</summary>
+    public readonly double[] ten_velocity;
+    /// <summary>
+    ///     External forces on each body about its subtree centre of mass (6 per body, torque then force), set by
+    ///     <see cref="RnePostConstraint"/> only: like MuJoCo's, it is not part of <see cref="Step"/>.
+    /// </summary>
+    public readonly double[] cfrc_ext;
 
     // ---- velocity, actuation, acceleration
     /// <summary>Body spatial velocities about the subtree centers of mass.</summary>
@@ -207,6 +245,20 @@ public sealed class CheetahCore {
     private readonly int[] sState, oldState;
     private double scale, cost, quadGauss1, quadGauss2;
     private int lsIter;
+    // the PGS solver: Y = J*M^-1/2 and its transpose, the inverse diagonal of AR, Nesterov's iterates, the sweep order
+    private readonly double[] efcY, efcYT, sqrtInvD, arInv, forcePrev, forceMomentum, arForce;
+    private readonly int[] blockStart;
+    private Pcg32 pgsRng;
+    // RK4: the stage states (qpos then qvel), the stage accelerations, the weighted increment
+    private readonly double[] rkX, rkF, rkdX;
+    // the collision candidates in MuJoCo's order: body pairs by (lower id, higher id), then their geom pairs as the
+    // midphase visits them; geom-level filters that depend on the pose run at each step
+    private readonly int[] candA, candB;
+
+    /// <summary>The RK4 tableau's A (3x3, row i for stage i+1), MuJoCo's <c>RK4_A</c>.</summary>
+    private static readonly double[] Rk4A = [0.5, 0, 0, 0, 0.5, 0, 0, 0, 1];
+    /// <summary>The RK4 tableau's weights, MuJoCo's <c>RK4_B</c>: 1/6, 1/3, 1/3, 1/6 as the compiler folds them.</summary>
+    private static readonly double[] Rk4B = [1.0 / 6.0, 1.0 / 3.0, 1.0 / 3.0, 1.0 / 6.0];
 
     /// <summary>A line-search point: step length, cost change, first and second derivative.</summary>
     private struct Pnt {
@@ -222,8 +274,23 @@ public sealed class CheetahCore {
         nbody = m.nbody;
         nu = m.nu;
         int njnt = m.njnt, ngeom = m.ngeom;
-        // Two contacts per plane-capsule pair at most; four pyramid rows per condim-3 contact; two sides per limit.
-        int maxcon = 2 * ngeom, maxefc = 2 * njnt + 4 * maxcon;
+        (candA, candB) = CollisionCandidates(m);
+        // Capacities from the candidates: two contacts at most per pair with a capsule, one otherwise; four pyramid rows
+        // per condim-3 contact, one row per frictionless contact; two sides per limited joint.
+        int maxcon = 0, maxefc = 0;
+        for (int c = 0; c < candA.Length; c++) {
+            int ga = candA[c], gb = candB[c];
+            int contacts = m.geom_type[ga] == Capsule || m.geom_type[gb] == Capsule ? 2 : 1;
+            int dim = m.geom_priority[ga] != m.geom_priority[gb]
+                ? m.geom_condim[m.geom_priority[ga] > m.geom_priority[gb] ? ga : gb]
+                : Math.Max(m.geom_condim[ga], m.geom_condim[gb]);
+            maxcon += contacts;
+            maxefc += contacts * (dim == 1 ? 1 : 2 * (dim - 1));
+        }
+        for (int j = 0; j < njnt; j++)
+            maxefc += m.jnt_limited[j] ? 2 : 0;
+        maxcon = Math.Max(maxcon, 1);
+        maxefc = Math.Max(maxefc, 1);
         qpos = (double[])m.qpos0.Clone();
         qvel = new double[nv];
         ctrl = new double[nu];
@@ -311,16 +378,124 @@ public sealed class CheetahCore {
         L = new double[nv * nv];
         sState = new int[maxefc];
         oldState = new int[maxefc];
+        ten_length = new double[m.ntendon];
+        ten_J = new double[m.ntendon > 0 ? m.ten_J_rowadr[m.ntendon - 1] + m.ten_J_rownnz[m.ntendon - 1] : 0];
+        ten_velocity = new double[m.ntendon];
+        cfrc_ext = new double[6 * nbody];
+        bool pgs = m.solver == SolverPgs;
+        // PGS needs the dense nefc x nefc dual matrix, the Newton solver none
+        efc_AR = pgs ? new double[maxefc * maxefc] : [];
+        efcY = pgs ? new double[maxefc * nv] : [];
+        efcYT = pgs ? new double[maxefc * nv] : [];
+        sqrtInvD = new double[nv];
+        arInv = pgs ? new double[maxefc] : [];
+        forcePrev = pgs ? new double[maxefc] : [];
+        forceMomentum = pgs ? new double[maxefc] : [];
+        arForce = pgs ? new double[maxefc] : [];
+        blockStart = pgs ? new int[maxefc] : [];
+        rkX = new double[4 * (m.nq + nv)];
+        rkF = new double[4 * nv];
+        rkdX = new double[2 * nv];
     }
 
     /// <summary>
-    ///     Advances the simulation by one time step, as <c>mj_step</c> with the Euler integrator: state checks, the forward
-    ///     dynamics at the current state, then the semi-implicit Euler update of <see cref="qvel"/>, <see cref="qpos"/> and
-    ///     <see cref="time"/>.
+    ///     The geom pairs that can collide, in MuJoCo's order (<c>mj_broadphase</c>, <c>mj_collision</c>,
+    ///     <c>mj_collideTree</c>): body pairs sorted by (lower id, higher id), keeping those MuJoCo keeps (both bodies
+    ///     collidable, not welded together, not both dof-less, not parent and child unless one is the world, compatible
+    ///     bitmasks), then each pair's geoms: the single geom of each, or all their geom pairs in the sorted order the
+    ///     midphase leaves them in. Static filters (geom bitmasks, a collider for the two types) are applied here; the
+    ///     bounding-sphere filter, which depends on the pose, runs at each step.
+    /// </summary>
+    /// <param name="m">The model.</param>
+    /// <returns>The first and second geom of each candidate, the first of the lower geom type (of either body).</returns>
+    /// <remarks>
+    ///     MuJoCo's sweep-and-prune and the midphase's box tests only prune pairs that cannot touch, so walking every body
+    ///     pair yields the same contacts in the same order. Within a pair of bodies the order is
+    ///     <see cref="GeomPairOrder"/>'s sort, which needs no bounding volume hierarchy from the dump.
+    /// </remarks>
+    private static (int[] A, int[] B) CollisionCandidates(CheetahModel m) {
+        var a = new System.Collections.Generic.List<int>();
+        var b = new System.Collections.Generic.List<int>();
+        bool CanCollide(int body) => m.body_contype[body] != 0 || m.body_conaffinity[body] != 0;
+        int GeomTypeMask(int body, bool affinity) {
+            int mask = 0;
+            for (int g = m.body_geomadr[body]; g < m.body_geomadr[body] + m.body_geomnum[body]; g++)
+                mask |= affinity ? m.geom_conaffinity[g] : m.geom_contype[g];
+            return mask;
+        }
+        bool GeomPairOk(int g1, int g2) {
+            // filterBitmask, then a collider must exist for the type pair (plane-plane has none)
+            if ((m.geom_contype[g1] & m.geom_conaffinity[g2]) == 0 && (m.geom_contype[g2] & m.geom_conaffinity[g1]) == 0)
+                return false;
+            return !(m.geom_type[g1] == Plane && m.geom_type[g2] == Plane);
+        }
+        for (int b1 = 0; b1 < m.nbody; b1++) {
+            for (int b2 = b1 + 1; b2 < m.nbody; b2++) {
+                if (!CanCollide(b1) || !CanCollide(b2))
+                    continue;
+                if (b1 == 0 && m.body_geomnum[0] == 0)
+                    continue;
+                // filterBodyPair
+                int weld1 = m.body_weldid[b1], weld2 = m.body_weldid[b2];
+                int parentWeld1 = m.body_weldid[m.body_parentid[weld1]], parentWeld2 = m.body_weldid[m.body_parentid[weld2]];
+                if (weld1 == weld2 || (m.body_dofnum[weld1] == 0 && m.body_dofnum[weld2] == 0))
+                    continue;
+                if (weld1 != 0 && weld2 != 0 && (weld1 == parentWeld2 || weld2 == parentWeld1))
+                    continue;
+                // add_pair's compatibility from the geoms' masks, then mj_collision's canCollide2 on the body masks
+                if ((GeomTypeMask(b1, false) & GeomTypeMask(b2, true)) == 0 && (GeomTypeMask(b2, false) & GeomTypeMask(b1, true)) == 0)
+                    continue;
+                if ((m.body_contype[b1] & m.body_conaffinity[b2]) == 0 && (m.body_contype[b2] & m.body_conaffinity[b1]) == 0)
+                    continue;
+                foreach ((int g1, int g2) in GeomPairOrder(m, b1, b2))
+                    if (GeomPairOk(g1, g2)) {
+                        a.Add(g1);
+                        b.Add(g2);
+                    }
+            }
+        }
+        return (a.ToArray(), b.ToArray());
+    }
+
+    /// <summary>
+    ///     The geom pairs of two bodies in the order MuJoCo's narrow phase takes them: the one pair when each body has a
+    ///     single geom, else every pair of their geoms sorted by first then second geom, as <c>mj_collideTree</c> sorts
+    ///     the pairs its traversal finds (<c>pairSort</c>). Each pair has its lower-type geom first
+    ///     (<c>pushGeomGeom</c>'s swap), and the sort keys on the swapped pair.
+    /// </summary>
+    /// <param name="m">The model.</param>
+    /// <param name="b1">The lower body.</param>
+    /// <param name="b2">The higher body.</param>
+    /// <returns>The pairs, each (lower-type geom, other geom), in narrow-phase order.</returns>
+    /// <remarks>
+    ///     The traversal (it descends the hierarchy whose stored box has the larger surface) decides only which pairs
+    ///     survive its box tests, never their order: after the sort the order depends on geom ids and types alone. Its box
+    ///     tests are conservative, so a pair it would prune makes no contact here either. Because the key is the swapped
+    ///     pair, a sphere of the higher body sorts before the capsules of the lower one (Humanoid's hands against its
+    ///     torso), which a plain ascending walk over the two bodies gets wrong. MuJoCo walks the pairs unsorted only with
+    ///     the midphase disabled, which <see cref="CheetahModel.Load"/> refuses (default flags only).
+    /// </remarks>
+    private static System.Collections.Generic.List<(int, int)> GeomPairOrder(CheetahModel m, int b1, int b2) {
+        var pairs = new System.Collections.Generic.List<(int, int)>();
+        for (int g1 = m.body_geomadr[b1]; g1 < m.body_geomadr[b1] + m.body_geomnum[b1]; g1++)
+            for (int g2 = m.body_geomadr[b2]; g2 < m.body_geomadr[b2] + m.body_geomnum[b2]; g2++)
+                pairs.Add(m.geom_type[g1] > m.geom_type[g2] ? (g2, g1) : (g1, g2));
+        // two single-geom bodies skip the midphase and its sort; one pair needs no order anyway
+        if (m.body_geomnum[b1] > 1 || m.body_geomnum[b2] > 1)
+            pairs.Sort();
+        return pairs;
+    }
+
+    /// <summary>
+    ///     Advances the simulation by one time step, as <c>mj_step</c>: state checks, the forward dynamics at the current
+    ///     state, then the model's integrator: semi-implicit Euler (HalfCheetah) or RK4 (Hopper, Humanoid), which updates
+    ///     <see cref="qvel"/>, <see cref="qpos"/> and <see cref="time"/>.
     /// </summary>
     /// <remarks>
     ///     A NaN or a value beyond 1e10 in qpos, qvel or the solved qacc resets the state to the reference configuration at
-    ///     rest (MuJoCo's auto-reset), controls included; the warning MuJoCo records is not kept.
+    ///     rest (MuJoCo's auto-reset), controls included; the warning MuJoCo records is not kept. After an RK4 step the
+    ///     published arrays (frames, contacts, constraint rows, <see cref="qacc"/>) are those of its last stage, as in
+    ///     MuJoCo's <c>mjData</c>.
     /// </remarks>
     public void Step() {
         if (AnyBad(qpos, m.nq) || AnyBad(qvel, nv))
@@ -330,7 +505,10 @@ public sealed class CheetahCore {
             ResetData();
             Forward();
         }
-        Euler();
+        if (m.integrator == IntegratorRk4)
+            RungeKutta();
+        else
+            Euler();
     }
 
     /// <summary>Whether any of the first <paramref name="n"/> values is NaN or beyond ±1e10 (<c>mju_isBad</c>).</summary>
@@ -362,6 +540,7 @@ public sealed class CheetahCore {
         // position stage
         Kinematics();
         ComPos();
+        Tendons();
         MakeM();
         Array.Copy(M, qLD, m.nC);
         Kernels.FactorI(qLD, qLDiagInv, nv, m.M_rownnz, m.M_rowadr, m.M_colind);
@@ -369,12 +548,19 @@ public sealed class CheetahCore {
         MakeConstraint();
         // one kinematic tree: any constraint row puts all of it in the single island
         nisland = nefc > 0 ? 1 : 0;
+        // mj_projectConstraint: the dual solver's matrix, built in the position stage
+        if (m.solver == SolverPgs && nefc > 0)
+            MakeDualMatrix();
         for (int i = 0; i < nu; i++) {
             int j = m.actuator_trnid[2 * i];
             actuator_length[i] = qpos[m.jnt_qposadr[j]] * m.actuator_gear[6 * i];
             actuator_moment[i] = m.actuator_gear[6 * i];
         }
-        // velocity stage
+        // velocity stage: tendon velocities (a sparse product per tendon), then the bodies
+        for (int t = 0; t < m.ntendon; t++) {
+            int adr = m.ten_J_rowadr[t];
+            ten_velocity[t] = Kernels.DotSparse(ten_J.AsSpan(adr), qvel, m.ten_J_rownnz[t], m.ten_J_colind.AsSpan(adr));
+        }
         ComVel();
         Passive();
         Kernels.MulMatVec(efc_vel, efc_J, qvel, nefc, nv);
@@ -402,7 +588,8 @@ public sealed class CheetahCore {
     /// <summary>
     ///     Body, inertial and geom frames from the joint positions (<c>mj_kinematics</c>): each body composes its parent's
     ///     frame with its fixed offset, then its joints in order (slides translate along the rotated axis, hinges rotate
-    ///     about the anchor), and its quaternion is renormalized.
+    ///     about the anchor), and its quaternion is renormalized. A free joint instead sets the body's frame from its 7
+    ///     coordinates, the quaternion normalized (and normalized again with the others).
     /// </summary>
     private void Kinematics() {
         xpos[0] = xpos[1] = xpos[2] = 0;
@@ -415,6 +602,20 @@ public sealed class CheetahCore {
         ximat[0] = ximat[4] = ximat[8] = 1;
         Span<double> xp = stackalloc double[3], xq = stackalloc double[4], qloc = stackalloc double[4], vec = stackalloc double[3];
         for (int i = 1; i < nbody; i++) {
+            int jfree = m.body_jntadr[i];
+            if (m.body_jntnum[i] == 1 && m.jnt_type[jfree] == Free) {
+                int qadr = m.jnt_qposadr[jfree];
+                qpos.AsSpan(qadr, 3).CopyTo(xp);
+                qpos.AsSpan(qadr + 3, 4).CopyTo(xq);
+                Spatial.Normalize4(xq);
+                xp.CopyTo(xanchor.AsSpan(3 * jfree));
+                m.jnt_axis.AsSpan(3 * jfree, 3).CopyTo(xaxis.AsSpan(3 * jfree));
+                Spatial.Normalize4(xq);
+                xq.CopyTo(xquat.AsSpan(4 * i));
+                xp.CopyTo(xpos.AsSpan(3 * i));
+                Spatial.Quat2Mat(xmat.AsSpan(9 * i), xq);
+                continue;
+            }
             int pid = m.body_parentid[i];
             if (pid != 0) {
                 Spatial.MulMatVec3(xp, xmat.AsSpan(9 * pid), m.body_pos.AsSpan(3 * i));
@@ -536,13 +737,27 @@ public sealed class CheetahCore {
                 offset[k] = xipos[3 * i + k] - subtree_com[3 * root + k];
             Spatial.InertCom(cinert.AsSpan(10 * i), m.body_inertia.AsSpan(3 * i), ximat.AsSpan(9 * i), offset, m.body_mass[i]);
         }
+        Span<double> ax = stackalloc double[3];
         for (int i = 1; i < nbody; i++) {
             int root = m.body_rootid[i], jend = m.body_jntadr[i] + m.body_jntnum[i];
             for (int j = m.body_jntadr[i]; j < jend; j++) {
                 Span<double> dof = cdof.AsSpan(6 * m.jnt_dofadr[j], 6);
                 for (int k = 0; k < 3; k++)
                     offset[k] = subtree_com[3 * root + k] - xanchor[3 * j + k];
-                if (m.jnt_type[j] == Slide) {
+                if (m.jnt_type[j] == Free) {
+                    // three translations along the world axes, then three rotations about the body frame's axes
+                    // (columns of xmat), each crossed with the offset like a hinge
+                    Span<double> free = cdof.AsSpan(6 * m.jnt_dofadr[j], 36);
+                    free.Slice(0, 18).Clear();
+                    free[3] = free[3 + 7] = free[3 + 14] = 1;
+                    for (int k = 0; k < 3; k++) {
+                        ax[0] = xmat[9 * i + k];
+                        ax[1] = xmat[9 * i + k + 3];
+                        ax[2] = xmat[9 * i + k + 6];
+                        ax.CopyTo(free.Slice(18 + 6 * k));
+                        Spatial.Cross(free.Slice(18 + 6 * k + 3), ax, offset);
+                    }
+                } else if (m.jnt_type[j] == Slide) {
                     dof[0] = dof[1] = dof[2] = 0;
                     xaxis.AsSpan(3 * j, 3).CopyTo(dof.Slice(3));
                 } else {
@@ -579,41 +794,72 @@ public sealed class CheetahCore {
     // ================================================================================== collision
 
     /// <summary>
-    ///     Plane-capsule contacts in MuJoCo's order (<c>mj_collision</c>): the world body's plane against each body's geoms,
-    ///     bodies ascending (the broadphase's world pairs sorted by signature), geoms ascending, each pair filtered by the
-    ///     contact bitmasks and the plane-to-bounding-sphere distance, then up to two contacts, one per capsule end.
+    ///     Contacts in MuJoCo's order (<c>mj_collision</c>): the candidate geom pairs of <see cref="CollisionCandidates"/>,
+    ///     each filtered by the bounding spheres (or the plane-to-sphere distance) at the current pose, then the pair's
+    ///     collider, which takes the lower geom type first (<c>pushGeomGeom</c>), and its contacts' parameters.
     /// </summary>
     /// <remarks>
-    ///     A body with several geoms goes through MuJoCo's bounding-volume midphase (<c>mj_collideTree</c>), which descends
-    ///     the node with the larger static bounding-box surface, so its order is a property of the model. For
-    ///     HalfCheetah's torso (torso and head) that order is ascending, as this core assumes: the flipped episodes,
-    ///     with both on the ground in 4,079 steps per pass, match MuJoCo's contact order. Another model's multi-geom
-    ///     bodies need their order taken from the model's BVH.
+    ///     A body with several geoms goes through MuJoCo's bounding-volume midphase (<c>mj_collideTree</c>), which sorts
+    ///     the pairs it finds by (first geom, second geom) after putting the lower geom type first; that order is
+    ///     <see cref="GeomPairOrder"/>'s. A depth-first order taken from the hierarchies instead broke HalfCheetah's flipped
+    ///     episodes at step 38 (torso and head on the ground), by one ulp.
     /// </remarks>
     private void Collision() {
         ncon = 0;
-        int plane = m.body_geomadr[0];
-        for (int b = 1; b < nbody; b++) {
-            int weld = m.body_weldid[b];
-            // world pairs the broadphase drops: welded to the world, both dof-less, or body masks that cannot meet
-            if (weld == 0 || m.body_dofnum[weld] == 0)
+        for (int c = 0; c < candA.Length; c++) {
+            // the candidates already have the lower geom type first (pushGeomGeom's swap, made in GeomPairOrder); the
+            // sphere filter and the summed margins are symmetric, so the swap made before them changes no bit
+            int g1 = candA[c], g2 = candB[c];
+            double margin = m.geom_margin[g1] + m.geom_margin[g2];
+            double gap = m.geom_gap[g1] + m.geom_gap[g2];
+            if (FilterSphere(g1, g2, margin + gap))
                 continue;
-            if ((m.body_contype[0] & m.body_conaffinity[b]) == 0 && (m.body_contype[b] & m.body_conaffinity[0]) == 0)
-                continue;
-            int end = m.body_geomadr[b] + m.body_geomnum[b];
-            for (int g = m.body_geomadr[b]; g < end; g++) {
-                if ((m.geom_contype[plane] & m.geom_conaffinity[g]) == 0 && (m.geom_contype[g] & m.geom_conaffinity[plane]) == 0)
-                    continue;
-                double margin = m.geom_margin[plane] + m.geom_margin[g];
-                double gap = m.geom_gap[plane] + m.geom_gap[g];
-                if (m.geom_rbound[g] > 0 && PlaneDist(plane, g) > margin + gap + m.geom_rbound[g])
-                    continue;
-                int first = ncon;
-                PlaneCapsule(plane, g, margin + gap);
-                if (ncon > first)
-                    ContactParams(first, ncon, plane, g, margin);
+            int first = ncon;
+            switch (m.geom_type[g1], m.geom_type[g2]) {
+                case (Plane, Capsule):
+                    PlaneCapsule(g1, g2, margin + gap);
+                    break;
+                case (Plane, Sphere):
+                    PlaneSphere(g1, geom_xpos.AsSpan(3 * g2, 3), m.geom_size[3 * g2], margin + gap);
+                    break;
+                case (Sphere, Sphere):
+                    SphereSphere(geom_xpos.AsSpan(3 * g1, 3), geom_xmat.AsSpan(9 * g1, 9), m.geom_size[3 * g1],
+                                 geom_xpos.AsSpan(3 * g2, 3), geom_xmat.AsSpan(9 * g2, 9), m.geom_size[3 * g2], margin + gap);
+                    break;
+                case (Sphere, Capsule):
+                    SphereCapsule(g1, g2, margin + gap);
+                    break;
+                case (Capsule, Capsule):
+                    CapsuleCapsule(g1, g2, margin + gap);
+                    break;
             }
+            if (ncon > first)
+                ContactParams(first, ncon, g1, g2, margin);
         }
+    }
+
+    /// <summary>
+    ///     The bounding-sphere filter at the current pose (<c>mj_filterSphere</c>): two spheres farther apart than their
+    ///     radii and the margin, or a geom's sphere farther from a plane than its radius and the margin, cannot touch.
+    /// </summary>
+    /// <param name="g1">The first geom.</param>
+    /// <param name="g2">The second geom.</param>
+    /// <param name="margin">The detection margin (margin plus gap).</param>
+    /// <returns><see langword="true"/> when the pair is dropped.</returns>
+    private bool FilterSphere(int g1, int g2, double margin) {
+        double r1 = m.geom_rbound[g1], r2 = m.geom_rbound[g2];
+        if (r1 > 0 && r2 > 0) {
+            double d0 = geom_xpos[3 * g1] - geom_xpos[3 * g2];
+            double d1 = geom_xpos[3 * g1 + 1] - geom_xpos[3 * g2 + 1];
+            double d2 = geom_xpos[3 * g1 + 2] - geom_xpos[3 * g2 + 2];
+            double bound = r1 + r2 + margin;
+            return d0 * d0 + d1 * d1 + d2 * d2 > bound * bound;
+        }
+        if (m.geom_type[g1] == Plane && r2 > 0 && PlaneDist(g1, g2) > margin + r2)
+            return true;
+        if (m.geom_type[g2] == Plane && r1 > 0 && PlaneDist(g2, g1) > margin + r1)
+            return true;
+        return false;
     }
 
     /// <summary>The signed distance of a geom's center above a plane (<c>planeGeomDist</c>).</summary>
@@ -680,6 +926,150 @@ public sealed class CheetahCore {
         }
         return true;
     }
+
+    /// <summary>
+    ///     Appends the contact of two spheres within <paramref name="margin"/> (<c>mjraw_SphereSphere</c>): distance
+    ///     between centers minus both radii, normal from the first center to the second (from the two z axes' cross product
+    ///     when the centers coincide), point halfway into the overlap from the first sphere's surface.
+    /// </summary>
+    /// <param name="pos1">The first center.</param>
+    /// <param name="mat1">The first geom's rotation (its z axis serves the coincident case).</param>
+    /// <param name="r1">The first radius.</param>
+    /// <param name="pos2">The second center.</param>
+    /// <param name="mat2">The second geom's rotation.</param>
+    /// <param name="r2">The second radius.</param>
+    /// <param name="margin">The detection margin.</param>
+    /// <returns>The number of contacts appended (0 or 1); the tangent is left zero.</returns>
+    private int SphereSphere(ReadOnlySpan<double> pos1, ReadOnlySpan<double> mat1, double r1,
+                             ReadOnlySpan<double> pos2, ReadOnlySpan<double> mat2, double r2, double margin) {
+        double d0 = pos1[0] - pos2[0], d1 = pos1[1] - pos2[1], d2 = pos1[2] - pos2[2];
+        double cdistSqr = d0 * d0 + d1 * d1 + d2 * d2;
+        double minDist = margin + r1 + r2;
+        if (cdistSqr > minDist * minDist)
+            return 0;
+        int c = ncon++;
+        double dist = Math.Sqrt(cdistSqr) - r1 - r2;
+        con_dist[c] = dist;
+        Span<double> normal = con_frame.AsSpan(9 * c, 3);
+        normal[0] = pos2[0] - pos1[0];
+        normal[1] = pos2[1] - pos1[1];
+        normal[2] = pos2[2] - pos1[2];
+        if (Spatial.Normalize3(normal) < Kernels.MinVal) {
+            Span<double> axis1 = stackalloc double[3] { mat1[2], mat1[5], mat1[8] };
+            Span<double> axis2 = stackalloc double[3] { mat2[2], mat2[5], mat2[8] };
+            Spatial.Cross(normal, axis1, axis2);
+            Spatial.Normalize3(normal);
+        }
+        double s = r1 + dist / 2;
+        for (int k = 0; k < 3; k++) {
+            con_pos[3 * c + k] = normal[k] * s;
+            con_pos[3 * c + k] += pos1[k];
+            con_frame[9 * c + 3 + k] = 0;
+        }
+        return 1;
+    }
+
+    /// <summary>
+    ///     Appends the contact of a sphere and a capsule (<c>mjraw_SphereCapsule</c>): the sphere against the point of the
+    ///     capsule's segment nearest its center, as two spheres.
+    /// </summary>
+    /// <param name="g1">The sphere geom.</param>
+    /// <param name="g2">The capsule geom.</param>
+    /// <param name="margin">The detection margin.</param>
+    private void SphereCapsule(int g1, int g2, double margin) {
+        ReadOnlySpan<double> pos1 = geom_xpos.AsSpan(3 * g1, 3), pos2 = geom_xpos.AsSpan(3 * g2, 3);
+        ReadOnlySpan<double> mat2 = geom_xmat.AsSpan(9 * g2, 9);
+        double len = m.geom_size[3 * g2 + 1];
+        Span<double> axis = stackalloc double[3] { mat2[2], mat2[5], mat2[8] };
+        Span<double> vec = stackalloc double[3] { pos1[0] - pos2[0], pos1[1] - pos2[1], pos1[2] - pos2[2] };
+        double x = Clip(Spatial.Dot3(axis, vec), -len, len);
+        for (int k = 0; k < 3; k++) {
+            vec[k] = axis[k] * x;
+            vec[k] += pos2[k];
+        }
+        SphereSphere(pos1, geom_xmat.AsSpan(9 * g1, 9), m.geom_size[3 * g1], vec, mat2, m.geom_size[3 * g2], margin);
+    }
+
+    /// <summary>
+    ///     Appends the contacts of two capsules (<c>mjraw_CapsuleCapsule</c>): the closest points of the two segments,
+    ///     clipped to their ends, as two spheres; for (nearly) parallel axes, up to two contacts from the segments' ends.
+    /// </summary>
+    /// <param name="g1">The first capsule.</param>
+    /// <param name="g2">The second capsule.</param>
+    /// <param name="margin">The detection margin.</param>
+    private void CapsuleCapsule(int g1, int g2, double margin) {
+        ReadOnlySpan<double> pos1 = geom_xpos.AsSpan(3 * g1, 3), pos2 = geom_xpos.AsSpan(3 * g2, 3);
+        ReadOnlySpan<double> mat1 = geom_xmat.AsSpan(9 * g1, 9), mat2 = geom_xmat.AsSpan(9 * g2, 9);
+        double r1 = m.geom_size[3 * g1], h1 = m.geom_size[3 * g1 + 1];
+        double r2 = m.geom_size[3 * g2], h2 = m.geom_size[3 * g2 + 1];
+        Span<double> axis1 = stackalloc double[3] { mat1[2] * h1, mat1[5] * h1, mat1[8] * h1 };
+        Span<double> axis2 = stackalloc double[3] { mat2[2] * h2, mat2[5] * h2, mat2[8] * h2 };
+        Span<double> dif = stackalloc double[3] { pos1[0] - pos2[0], pos1[1] - pos2[1], pos1[2] - pos2[2] };
+        double ma = Spatial.Dot3(axis1, axis1);
+        double mb = -Spatial.Dot3(axis1, axis2);
+        double mc = Spatial.Dot3(axis2, axis2);
+        double u = -Spatial.Dot3(axis1, dif);
+        double v = Spatial.Dot3(axis2, dif);
+        double det = ma * mc - mb * mb;
+        Span<double> vec1 = stackalloc double[3], vec2 = stackalloc double[3];
+        // the points pos + axis*x of each segment, scaled then offset as MuJoCo does
+        void Point(Span<double> res, ReadOnlySpan<double> pos, ReadOnlySpan<double> axis, double x) {
+            for (int k = 0; k < 3; k++) {
+                res[k] = axis[k] * x;
+                res[k] += pos[k];
+            }
+        }
+        if (Math.Abs(det) >= Kernels.MinVal) {
+            double x1 = (mc * u - mb * v) / det;
+            double x2 = (ma * v - mb * u) / det;
+            if (x1 > 1) {
+                x1 = 1;
+                x2 = (v - mb) / mc;
+            } else if (x1 < -1) {
+                x1 = -1;
+                x2 = (v + mb) / mc;
+            }
+            if (x2 > 1) {
+                x2 = 1;
+                x1 = Clip((u - mb) / ma, -1, 1);
+            } else if (x2 < -1) {
+                x2 = -1;
+                x1 = Clip((u + mb) / ma, -1, 1);
+            }
+            Point(vec1, pos1, axis1, x1);
+            Point(vec2, pos2, axis2, x2);
+            SphereSphere(vec1, mat1, r1, vec2, mat2, r2, margin);
+            return;
+        }
+        // parallel axes: the first segment's ends against the second, then the second's ends against the first
+        for (int k = 0; k < 3; k++)
+            vec1[k] = pos1[k] + axis1[k];
+        Point(vec2, pos2, axis2, Clip((v - mb) / mc, -1, 1));
+        int n = SphereSphere(vec1, mat1, r1, vec2, mat2, r2, margin);
+        for (int k = 0; k < 3; k++)
+            vec1[k] = pos1[k] - axis1[k];
+        Point(vec2, pos2, axis2, Clip((v + mb) / mc, -1, 1));
+        n += SphereSphere(vec1, mat1, r1, vec2, mat2, r2, margin);
+        if (n >= 2)
+            return;
+        for (int k = 0; k < 3; k++)
+            vec2[k] = pos2[k] + axis2[k];
+        Point(vec1, pos1, axis1, Clip((u - mb) / ma, -1, 1));
+        n += SphereSphere(vec1, mat1, r1, vec2, mat2, r2, margin);
+        if (n >= 2)
+            return;
+        for (int k = 0; k < 3; k++)
+            vec2[k] = pos2[k] - axis2[k];
+        Point(vec1, pos1, axis1, Clip((u + mb) / ma, -1, 1));
+        SphereSphere(vec1, mat1, r1, vec2, mat2, r2, margin);
+    }
+
+    /// <summary><c>mju_clip</c>: <paramref name="lo"/> below it, <paramref name="hi"/> above it, else the value.</summary>
+    /// <param name="x">The value.</param>
+    /// <param name="lo">The lower bound.</param>
+    /// <param name="hi">The upper bound.</param>
+    /// <returns>The clipped value.</returns>
+    private static double Clip(double x, double lo, double hi) => x < lo ? lo : x > hi ? hi : x;
 
     /// <summary>
     ///     Sets the parameters of a pair's contacts (<c>mj_contactParam</c>, <c>mj_setContact</c>): priority or mixed
@@ -772,7 +1162,8 @@ public sealed class CheetahCore {
 
     /// <summary>
     ///     Builds the constraint rows (<c>mj_makeConstraint</c>): joint limits that are violated within their margin, then
-    ///     four pyramid edges per active contact; then their approximate inverse inertia and impedance.
+    ///     per active contact one frictionless row (condim 1) or four pyramid edges (condim 3); then their approximate
+    ///     inverse inertia and impedance.
     /// </summary>
     private void MakeConstraint() {
         nefc = 0;
@@ -804,8 +1195,15 @@ public sealed class CheetahCore {
             Jac(jac1, pos, b1);
             Jac(jac2, pos, b2);
             Kernels.Sub(jacdif, jac2, jac1, 3 * nv);
-            Kernels.MulMatMat(jacrot, con_frame.AsSpan(9 * c, 9), jacdif, 3, 3, nv);
-            for (int k = 1; k < con_dim[c]; k++) {
+            int dim = con_dim[c];
+            // a frictionless contact rotates only the normal row of the Jacobian difference
+            Kernels.MulMatMat(jacrot, con_frame.AsSpan(9 * c, 9), jacdif, dim > 1 ? 3 : 1, 3, nv);
+            if (dim == 1) {
+                jacrot.AsSpan(0, nv).CopyTo(efc_J.AsSpan(nefc * nv, nv));
+                AddRow(con_dist[c], con_includemargin[c], ContactFrictionless, c);
+                continue;
+            }
+            for (int k = 1; k < dim; k++) {
                 double f = con_friction[5 * c + k - 1];
                 // the pair of opposing pyramid edges: normal row plus and minus friction times tangent row k
                 Kernels.AddScl(efc_J.AsSpan(nefc * nv, nv), jacrot, jacrot.AsSpan(k * nv), f, nv);
@@ -862,7 +1260,8 @@ public sealed class CheetahCore {
 
     /// <summary>
     ///     The approximate inverse inertia of each row (<c>mj_diagApprox</c>): a limit takes its dof's reference weight; a
-    ///     pyramidal contact's edges take the two bodies' translational weight scaled by <c>1 + friction²</c>.
+    ///     frictionless contact the two bodies' translational weight; a pyramidal contact's edges that weight scaled by
+    ///     <c>1 + friction²</c>.
     /// </summary>
     private void DiagApprox() {
         for (int i = 0; i < nefc; i++) {
@@ -878,6 +1277,10 @@ public sealed class CheetahCore {
             rot += m.body_invweight0[2 * b1 + 1] * 1.0;
             tran += m.body_invweight0[2 * b2] * 1.0;
             rot += m.body_invweight0[2 * b2 + 1] * 1.0;
+            if (efc_type[i] == ContactFrictionless) {
+                efc_diagA[i] = tran;
+                continue;
+            }
             int dim = con_dim[id];
             for (int j = 0; j < dim - 1; j++) {
                 double fri = con_friction[5 * id + j];
@@ -901,7 +1304,8 @@ public sealed class CheetahCore {
             } else {
                 con_solref.AsSpan(2 * id, 2).CopyTo(solref);
                 con_solimp.AsSpan(5 * id, 5).CopyTo(solimp);
-                dim = 2 * (con_dim[id] - 1);
+                // getposdim: a pyramid's rows share one impedance, a frictionless contact has its one row
+                dim = efc_type[i] == ContactPyramidal ? 2 * (con_dim[id] - 1) : 1;
             }
             if ((solref[0] > 0) ^ (solref[1] > 0)) {
                 solref[0] = 0.02;
@@ -999,7 +1403,9 @@ public sealed class CheetahCore {
 
     /// <summary>
     ///     Body spatial velocities and the dof axis derivatives (<c>mj_comVel</c>): each body starts from its parent's
-    ///     velocity and adds its dofs one by one, each dof's derivative taken against the velocity before it.
+    ///     velocity and adds its dofs one by one, each dof's derivative taken against the velocity before it. A free
+    ///     joint adds its three translations at once (their derivatives zero), then derives its three rotations against
+    ///     that velocity and adds them at once.
     /// </summary>
     private void ComVel() {
         Array.Clear(cvel, 0, 6);
@@ -1009,6 +1415,19 @@ public sealed class CheetahCore {
             int bda = m.body_dofadr[i];
             for (int j = 0; j < m.body_dofnum[i]; j++) {
                 int d = bda + j;
+                if (m.jnt_type[m.dof_jntid[d]] == Free) {
+                    cdof_dot.AsSpan(6 * d, 18).Clear();
+                    Kernels.MulMatTVec(tmp, cdof.AsSpan(6 * d), qvel.AsSpan(d), 3, 6);
+                    Kernels.AddTo(cv, tmp, 6);
+                    j += 3;
+                    d = bda + j;
+                    for (int k = 0; k < 3; k++)
+                        Spatial.CrossMotion(cdof_dot.AsSpan(6 * (d + k)), cv, cdof.AsSpan(6 * (d + k)));
+                    Kernels.MulMatTVec(tmp, cdof.AsSpan(6 * d), qvel.AsSpan(d), 3, 6);
+                    Kernels.AddTo(cv, tmp, 6);
+                    j += 2;
+                    continue;
+                }
                 Spatial.CrossMotion(cdof_dot.AsSpan(6 * d), cv, cdof.AsSpan(6 * d));
                 Kernels.Scl(tmp, cdof.AsSpan(6 * d), qvel[d], 6);
                 Kernels.AddTo(cv, tmp, 6);
@@ -1144,8 +1563,10 @@ public sealed class CheetahCore {
     // ================================================================================== constraint solver
 
     /// <summary>
-    ///     The constrained acceleration (<c>mj_fwdConstraint</c> with the Newton solver on the single island): the
-    ///     unconstrained residual, the warm start chosen by cost, then the primal Newton iterations.
+    ///     The constrained acceleration (<c>mj_fwdConstraint</c> on the single island): the unconstrained residual, the
+    ///     warm start, then the model's solver. Newton: the warm start chosen by primal cost, then the primal Newton
+    ///     iterations. PGS: the warm start's forces kept unless their dual cost is positive, the sweeps, then the
+    ///     acceleration from the forces (<c>dualFinish</c>).
     /// </summary>
     private void FwdConstraint() {
         Array.Clear(qfrc_constraint);
@@ -1162,6 +1583,24 @@ public sealed class CheetahCore {
         Kernels.SubFrom(jar, efc_aref, nefc);
         double costWarm = ConstraintUpdate(jar, efc_force, efc_state);
         Kernels.MulMatTVec(qfrc_constraint, efc_J, efc_force, nefc, nv);
+        if (m.solver == SolverPgs) {
+            // the dual cost of the warm start's forces, f'*b + 0.5*f'*AR*f: positive means worse than no force
+            double pgsWarm = Kernels.Dot(efc_force, efc_b, nefc);
+            Kernels.MulMatVec(arForce, efc_AR, efc_force, nefc, nefc);
+            pgsWarm += 0.5 * Kernels.Dot(efc_force, arForce, nefc);
+            if (pgsWarm > 0) {
+                Array.Clear(efc_force, 0, nefc);
+                Array.Clear(qfrc_constraint);
+            }
+            solver_niter = 0;
+            SolvePgs();
+            // dualFinish: qfrc_constraint = J'*f, qacc = M^-1*qfrc_constraint + qacc_smooth
+            Kernels.MulMatTVec(qfrc_constraint, efc_J, efc_force, nefc, nv);
+            Array.Copy(qfrc_constraint, qacc, nv);
+            Kernels.SolveLD(qacc, qLD, qLDiagInv, nv, m.M_rownnz, m.M_rowadr, m.M_colind);
+            Kernels.AddTo(qacc, qacc_smooth, nv);
+            return;
+        }
         Kernels.Sub(da, qacc_warmstart, qacc_smooth, nv);
         Kernels.MulSymVecSparse(Mda, M, da, nv, m.M_rownnz, m.M_rowadr, m.M_colind);
         costWarm += 0.5 * Kernels.Dot(da, Mda, nv);
@@ -1172,6 +1611,122 @@ public sealed class CheetahCore {
             Array.Copy(qacc_smooth, qacc, nv);
         solver_niter = 0;
         SolveNewton();
+    }
+
+    /// <summary>
+    ///     MuJoCo's projected Gauss-Seidel on the one island (<c>solPGS</c> for limit, frictionless and pyramidal rows):
+    ///     per sweep a Nesterov extrapolation of the forces (restarted when the correction opposes it), then every row in
+    ///     a shuffled order, its force moved to the minimum of the dual along it and clamped at zero, kept only if the
+    ///     dual cost does not rise by more than 1e-10; the sweeps end when the scaled improvement falls below the
+    ///     tolerance or after <c>iterations</c> sweeps.
+    /// </summary>
+    /// <remarks>
+    ///     The shuffle restarts its generator in every solve, so the sweep orders repeat from step to step. The
+    ///     improvement is scaled by the model's mean inertia, not the island's (unlike Newton). <see cref="efc_state"/>
+    ///     follows the sweeps.
+    /// </remarks>
+    private void SolvePgs() {
+        double pgsScale = 1 / (m.meaninertia * Math.Max(1, nv));
+        for (int c = 0; c < nefc; c++)
+            arInv[c] = 1 / efc_AR[c * (nefc + 1)];
+        Array.Copy(efc_force, forcePrev, nefc);
+        DualState();
+        // every row is a block of its own: limits, frictionless contacts and pyramid edges have one dimension
+        for (int c = 0; c < nefc; c++)
+            blockStart[c] = c;
+        pgsRng.Restart();
+        int iter = 0, nesterovK = 0;
+        while (iter < m.iterations) {
+            double beta = 0;
+            if (iter > 0)
+                beta = (double)(nesterovK - 1) / (double)(nesterovK + 2);
+            if (beta > 0) {
+                for (int c = 0; c < nefc; c++) {
+                    double saved = efc_force[c];
+                    efc_force[c] += beta * (efc_force[c] - forcePrev[c]);
+                    forcePrev[c] = saved;
+                }
+                // the cone of a limit or pyramid row is the half-line: project by clamping at zero
+                for (int c = 0; c < nefc; c++)
+                    if (efc_force[c] < 0)
+                        efc_force[c] = 0;
+            } else {
+                Array.Copy(efc_force, forcePrev, nefc);
+            }
+            Array.Copy(efc_force, forceMomentum, nefc);
+            double improvement = 0;
+            pgsRng.Shuffle(blockStart, nefc);
+            for (int bi = 0; bi < nefc; bi++) {
+                int c = blockStart[bi];
+                double res = efc_b[c] + Kernels.Dot(efc_AR.AsSpan(c * nefc), efc_force, nefc);
+                double old = efc_force[c];
+                efc_force[c] -= res * arInv[c];
+                if (efc_force[c] < 0)
+                    efc_force[c] = 0;
+                // costChange with the diagonal as 1/(1/AR_cc), as MuJoCo recomputes it
+                double athis = 1 / arInv[c];
+                double delta = efc_force[c] - old;
+                double change = 0.5 * delta * delta * athis + delta * res;
+                if (change > 1e-10) {
+                    efc_force[c] = old;
+                    change = 0;
+                }
+                improvement -= change;
+            }
+            DualState();
+            improvement *= pgsScale;
+            // O'Donoghue-Candes gradient restart: the correction against the extrapolation
+            bool restart = false;
+            if (iter > 0) {
+                double dot = 0;
+                for (int c = 0; c < nefc; c++) {
+                    double correction = efc_force[c] - forceMomentum[c];
+                    double extrapolation = forceMomentum[c] - forcePrev[c];
+                    dot += correction * extrapolation;
+                }
+                restart = dot < 0;
+            }
+            nesterovK = restart ? 0 : nesterovK + 1;
+            iter++;
+            if (improvement < m.tolerance)
+                break;
+        }
+        solver_niter += iter;
+    }
+
+    /// <summary>The dual states of the rows (<c>dualState</c>): a positive force is quadratic, otherwise satisfied.</summary>
+    private void DualState() {
+        for (int c = 0; c < nefc; c++)
+            efc_state[c] = efc_force[c] <= 0 ? Satisfied : Quadratic;
+    }
+
+    /// <summary>
+    ///     The dual matrix <c>AR = Y*Y' + R</c> with <c>Y = J*M^-1/2</c> (<c>mj_projectConstraint</c>, dense): each row of
+    ///     <c>J</c> is back-substituted through the factor's <c>L'</c> from the last dof down, then scaled by
+    ///     <c>1/sqrt(D)</c> (<c>mj_solveM2_impl</c>); <c>Y*Y'</c> is MuJoCo's unweighted <c>mju_sqrMatTD</c> of
+    ///     <c>Y'</c>, and <c>R</c> is added to the diagonal.
+    /// </summary>
+    private void MakeDualMatrix() {
+        for (int i = 0; i < nv; i++)
+            sqrtInvD[i] = 1 / Math.Sqrt(qLD[m.M_rowadr[i] + m.M_rownnz[i] - 1]);
+        Array.Copy(efc_J, efcY, nefc * nv);
+        for (int i = nv - 1; i > 0; i--) {
+            int start = m.M_rowadr[i], end = start + m.M_rownnz[i] - 1;
+            for (int r = 0; r < nefc; r++) {
+                double xi = efcY[r * nv + i];
+                if (xi == 0)
+                    continue;
+                for (int adr = start; adr < end; adr++)
+                    efcY[r * nv + m.M_colind[adr]] -= qLD[adr] * xi;
+            }
+        }
+        for (int i = 0; i < nv; i++)
+            for (int r = 0; r < nefc; r++)
+                efcY[r * nv + i] *= sqrtInvD[i];
+        Kernels.Transpose(efcYT, efcY, nefc, nv);
+        Kernels.SqrMatT(efc_AR, efcYT, nv, nefc);
+        for (int r = 0; r < nefc; r++)
+            efc_AR[r * (nefc + 1)] += efc_R[r];
     }
 
     /// <summary>
@@ -1483,12 +2038,190 @@ public sealed class CheetahCore {
             Kernels.SolveLD(qaccEuler, qH, qHDiagInv, nv, m.M_rownnz, m.M_rowadr, m.M_colind);
         }
         Kernels.AddToScl(qvel, qaccEuler, m.timestep, nv);
-        for (int b = 1; b < nbody; b++) {
-            int jend = m.body_jntadr[b] + m.body_jntnum[b];
-            for (int j = m.body_jntadr[b]; j < jend; j++)
-                qpos[m.jnt_qposadr[j]] += m.timestep * qvel[m.jnt_dofadr[j]];
-        }
+        IntegratePos(qpos, qvel, m.timestep);
         time += m.timestep;
         Array.Copy(qacc, qacc_warmstart, nv);
+    }
+
+    /// <summary>
+    ///     Integrates positions over <paramref name="dt"/> with the velocities <paramref name="vel"/>
+    ///     (<c>mj_integratePos</c>): hinges and slides add <c>dt*vel</c>; a free joint adds <c>dt*vel</c> to its position
+    ///     and rotates its quaternion by <c>vel*dt</c> (<c>mju_quatIntegrate</c>).
+    /// </summary>
+    /// <param name="pos">The positions, updated in place.</param>
+    /// <param name="vel">The velocities.</param>
+    /// <param name="dt">The time step.</param>
+    private void IntegratePos(Span<double> pos, ReadOnlySpan<double> vel, double dt) {
+        for (int b = 1; b < nbody; b++) {
+            int jend = m.body_jntadr[b] + m.body_jntnum[b];
+            for (int j = m.body_jntadr[b]; j < jend; j++) {
+                int padr = m.jnt_qposadr[j], vadr = m.jnt_dofadr[j];
+                if (m.jnt_type[j] == Free) {
+                    for (int k = 0; k < 3; k++)
+                        pos[padr + k] += dt * vel[vadr + k];
+                    QuatIntegrate(pos.Slice(padr + 3, 4), vel.Slice(vadr + 3, 3), dt);
+                } else {
+                    pos[padr] += dt * vel[vadr];
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    ///     Rotates a quaternion by an angular velocity over a time scale (<c>mju_quatIntegrate</c>): the rotation of angle
+    ///     <c>scale*|vel|</c> about <c>vel</c>, applied after normalizing the quaternion.
+    /// </summary>
+    /// <param name="quat">The quaternion, updated in place.</param>
+    /// <param name="vel">The angular velocity.</param>
+    /// <param name="scale">The time scale.</param>
+    private static void QuatIntegrate(Span<double> quat, ReadOnlySpan<double> vel, double scale) {
+        Span<double> axis = stackalloc double[3] { vel[0], vel[1], vel[2] }, qrot = stackalloc double[4];
+        double angle = scale * Spatial.Normalize3(axis);
+        Spatial.AxisAngle2Quat(qrot, axis, angle);
+        Spatial.Normalize4(quat);
+        Spatial.MulQuat(quat, quat, qrot);
+    }
+
+    /// <summary>
+    ///     The RK4 step (<c>mj_RungeKutta</c> with MuJoCo's tableau): three more forward passes at the intermediate states
+    ///     <c>X0 + h*sum(A_ij*(v_j, a_j))</c> (positions integrated, velocities added) and times, then the state advanced
+    ///     from <c>X0</c> by the weighted increment with the B weights; <see cref="qacc"/>, which the last pass solved,
+    ///     becomes the next warm start.
+    /// </summary>
+    /// <remarks>
+    ///     The increments are accumulated with MuJoCo's <c>addToScl</c>, zero weights included (their products can turn a
+    ///     -0 into +0). Every published array afterwards is the last pass's, at the third intermediate state.
+    /// </remarks>
+    private void RungeKutta() {
+        int nq = m.nq, stride = nq + nv;
+        double h = m.timestep, time0 = time;
+        Span<double> c = stackalloc double[3], t = stackalloc double[3];
+        for (int i = 1; i < 4; i++) {
+            c[i - 1] = 0;
+            for (int j = 0; j < i; j++)
+                c[i - 1] += Rk4A[(i - 1) * 3 + j];
+            t[i - 1] = time + c[i - 1] * h;
+        }
+        Span<double> x0 = rkX.AsSpan(0, stride);
+        qpos.AsSpan(0, nq).CopyTo(x0);
+        qvel.AsSpan(0, nv).CopyTo(x0.Slice(nq));
+        qacc.AsSpan(0, nv).CopyTo(rkF);
+        for (int i = 1; i < 4; i++) {
+            Span<double> dX = rkdX;
+            dX.Clear();
+            for (int j = 0; j < i; j++) {
+                Kernels.AddToScl(dX, rkX.AsSpan(j * stride + nq, nv), Rk4A[(i - 1) * 3 + j], nv);
+                Kernels.AddToScl(dX.Slice(nv), rkF.AsSpan(j * nv, nv), Rk4A[(i - 1) * 3 + j], nv);
+            }
+            Span<double> xi = rkX.AsSpan(i * stride, stride);
+            x0.CopyTo(xi);
+            IntegratePos(xi.Slice(0, nq), dX.Slice(0, nv), h);
+            Kernels.AddToScl(xi.Slice(nq), dX.Slice(nv), h, nv);
+            xi.Slice(0, nq).CopyTo(qpos);
+            xi.Slice(nq, nv).CopyTo(qvel);
+            time = t[i - 1];
+            Forward();
+            qacc.AsSpan(0, nv).CopyTo(rkF.AsSpan(i * nv));
+        }
+        rkdX.AsSpan().Clear();
+        for (int j = 0; j < 4; j++) {
+            Kernels.AddToScl(rkdX, rkX.AsSpan(j * stride + nq, nv), Rk4B[j], nv);
+            Kernels.AddToScl(rkdX.AsSpan(nv), rkF.AsSpan(j * nv, nv), Rk4B[j], nv);
+        }
+        time = time0;
+        x0.Slice(0, nq).CopyTo(qpos);
+        x0.Slice(nq, nv).CopyTo(qvel);
+        // mj_advance: velocities with the weighted acceleration, positions with the weighted velocity
+        Kernels.AddToScl(qvel, rkdX.AsSpan(nv, nv), h, nv);
+        IntegratePos(qpos, rkdX.AsSpan(0, nv), h);
+        time += h;
+        Array.Copy(qacc, qacc_warmstart, nv);
+    }
+
+    /// <summary>
+    ///     Fixed tendons' lengths and Jacobians (<c>mj_tendon</c>): each length is the sum of its coefficients times its
+    ///     joints' positions, added in wrap order from zero; each Jacobian holds the coefficients at the joints' dofs.
+    /// </summary>
+    private void Tendons() {
+        for (int t = 0; t < m.ntendon; t++) {
+            ten_length[t] = 0;
+            int rowadr = m.ten_J_rowadr[t], rownnz = m.ten_J_rownnz[t];
+            ten_J.AsSpan(rowadr, rownnz).Clear();
+            int adr = m.tendon_adr[t];
+            for (int j = 0; j < m.tendon_num[t]; j++) {
+                int k = m.wrap_objid[adr + j];
+                ten_length[t] += m.wrap_prm[adr + j] * qpos[m.jnt_qposadr[k]];
+                // mju_combineSparseInc: J = 1*J + coef*1 at the joint's dof
+                int dof = m.jnt_dofadr[k];
+                for (int p = 0; p < rownnz; p++)
+                    if (m.ten_J_colind[rowadr + p] == dof)
+                        ten_J[rowadr + p] = 1 * ten_J[rowadr + p] + m.wrap_prm[adr + j] * 1;
+            }
+        }
+    }
+
+    /// <summary>
+    ///     The external forces of <c>mj_rnePostConstraint</c> into <see cref="cfrc_ext"/>: each active contact's force
+    ///     (the pyramid decoded, or the frictionless normal) rotated to the world, moved to the subtree centre of mass of
+    ///     each body, minus on the first geom's body and plus on the second's; the world gets nothing.
+    /// </summary>
+    /// <remarks>
+    ///     Call after <see cref="Step"/>, as Gymnasium's <c>do_simulation</c> calls <c>mj_rnePostConstraint</c>. MuJoCo's
+    ///     body accelerations and internal forces (<c>cacc</c>, <c>cfrc_int</c>), which no env here reads, are not
+    ///     computed; fixed tendons add nothing.
+    /// </remarks>
+    public void RnePostConstraint() {
+        Array.Clear(cfrc_ext);
+        Span<double> lfrc = stackalloc double[6], frc = stackalloc double[6], com = stackalloc double[6];
+        for (int c = 0; c < ncon; c++) {
+            int adr = con_efc_address[c];
+            if (adr < 0)
+                continue;
+            lfrc.Clear();
+            int dim = con_dim[c];
+            if (dim == 1) {
+                lfrc[0] = efc_force[adr];
+            } else {
+                // mju_decodePyramid: the normal is the edges' sum, each tangent its pair's difference times friction
+                lfrc[0] = 0;
+                for (int i = 0; i < 2 * (dim - 1); i++)
+                    lfrc[0] += efc_force[adr + i];
+                for (int i = 0; i < dim - 1; i++)
+                    lfrc[i + 1] = (efc_force[adr + 2 * i] - efc_force[adr + 2 * i + 1]) * con_friction[5 * c + i];
+            }
+            lfrc[0] -= 0.0;
+            // torque from the local torque, force from the local force, each through frame' (mju_mulMatTVec3)
+            ReadOnlySpan<double> f = con_frame.AsSpan(9 * c, 9);
+            for (int k = 0; k < 3; k++) {
+                frc[k] = f[k] * lfrc[3] + f[3 + k] * lfrc[4] + f[6 + k] * lfrc[5];
+                frc[3 + k] = f[k] * lfrc[0] + f[3 + k] * lfrc[1] + f[6 + k] * lfrc[2];
+            }
+            AddExternal(m.geom_bodyid[con_geom1[c]], con_pos.AsSpan(3 * c, 3), frc, -1, com);
+            AddExternal(m.geom_bodyid[con_geom2[c]], con_pos.AsSpan(3 * c, 3), frc, 1, com);
+        }
+    }
+
+    /// <summary>
+    ///     Adds a world wrench applied at a point to a body's <see cref="cfrc_ext"/> (<c>addExternal</c>): the torque
+    ///     moved to the body's subtree centre of mass (<c>mju_transformSpatial</c> for a force), times the scale.
+    /// </summary>
+    /// <param name="body">The body (the world takes nothing).</param>
+    /// <param name="point">The application point.</param>
+    /// <param name="frc">The wrench, torque then force.</param>
+    /// <param name="scl">The scale, -1 or 1.</param>
+    /// <param name="com">Scratch for the moved wrench.</param>
+    private void AddExternal(int body, ReadOnlySpan<double> point, ReadOnlySpan<double> frc, double scl, Span<double> com) {
+        if (body == 0)
+            return;
+        int root = m.body_rootid[body];
+        Span<double> dif = stackalloc double[3], cros = stackalloc double[3];
+        for (int k = 0; k < 3; k++)
+            dif[k] = subtree_com[3 * root + k] - point[k];
+        Spatial.Cross(cros, dif, frc.Slice(3));
+        for (int k = 0; k < 3; k++) {
+            com[k] = frc[k] - cros[k];
+            com[3 + k] = frc[3 + k];
+        }
+        Kernels.AddToScl(cfrc_ext.AsSpan(6 * body), com, scl, 6);
     }
 }

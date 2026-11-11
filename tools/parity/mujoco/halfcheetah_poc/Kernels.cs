@@ -448,6 +448,81 @@ internal static class Kernels {
     /// <param name="b">The second value.</param>
     /// <returns>The smaller value, MuJoCo's way.</returns>
     public static double Min(double a, double b) => a <= b ? a : b;
+
+    /// <summary><c>res = mat'</c> for a dense row-major <paramref name="nr"/>-by-<paramref name="nc"/> matrix.</summary>
+    /// <param name="res">The <paramref name="nc"/>-by-<paramref name="nr"/> output (must not alias <paramref name="mat"/>).</param>
+    /// <param name="mat">The matrix.</param>
+    /// <param name="nr">Rows.</param>
+    /// <param name="nc">Columns.</param>
+    public static void Transpose(Span<double> res, ReadOnlySpan<double> mat, int nr, int nc) {
+        for (int i = 0; i < nr; i++)
+            for (int j = 0; j < nc; j++)
+                res[j * nr + i] = mat[i * nc + j];
+    }
+
+    /// <summary>
+    ///     <c>mat'*mat</c> without weights, symmetric (<c>mju_sqrMatTD</c> with <c>diag = NULL</c>): MuJoCo's unweighted
+    ///     branch loops columns outside and rows inside, the reverse of the weighted branch of <see cref="SqrMatTDLower"/>,
+    ///     and each nonzero <c>mat[j,i]</c> adds <c>mat[j,0..i]*mat[j,i]</c> into row <c>i</c>; the upper triangle is
+    ///     then copied from the lower.
+    /// </summary>
+    /// <param name="res">The <paramref name="nc"/>-by-<paramref name="nc"/> output.</param>
+    /// <param name="mat">The <paramref name="nr"/>-by-<paramref name="nc"/> matrix.</param>
+    /// <param name="nr">Rows.</param>
+    /// <param name="nc">Columns.</param>
+    public static void SqrMatT(Span<double> res, ReadOnlySpan<double> mat, int nr, int nc) {
+        res.Slice(0, nc * nc).Clear();
+        for (int i = 0; i < nc; i++)
+            for (int j = 0; j < nr; j++) {
+                double tmp = mat[j * nc + i];
+                if (tmp != 0)
+                    AddToScl(res.Slice(i * nc), mat.Slice(j * nc), tmp, i + 1);
+            }
+        for (int i = 0; i < nc; i++)
+            for (int j = i + 1; j < nc; j++)
+                res[i * nc + j] = res[j * nc + i];
+    }
+}
+
+/// <summary>
+///     The PCG32 generator MuJoCo's PGS solver shuffles its sweep order with (<c>pcg32_next</c> in
+///     <c>engine_solver.c</c>): a 64-bit LCG state, output by an xorshift and a data-dependent rotation.
+/// </summary>
+/// <remarks>
+///     MuJoCo restarts it at state 0, increment 1, and draws one value before every solve, so the shuffles repeat from
+///     solve to solve; <see cref="Restart"/> does the same. A mutable struct: pass it by reference.
+/// </remarks>
+internal struct Pcg32 {
+    private ulong state;
+    private ulong inc;
+
+    /// <summary>Restarts the sequence as <c>solPGS</c> does: state 0, increment 1, one value drawn and discarded.</summary>
+    public void Restart() {
+        state = 0;
+        inc = 1;
+        Next();
+    }
+
+    /// <summary>The next 32-bit value.</summary>
+    /// <returns>The value.</returns>
+    public uint Next() {
+        ulong old = state;
+        state = unchecked(old * 6364136223846793005UL + (inc | 1));
+        uint xorshifted = (uint)(((old >> 18) ^ old) >> 27);
+        int rot = (int)(old >> 59);
+        // C's (-rot) & 31 on an unsigned rotation count is (32 - rot) & 31
+        return (xorshifted >> rot) | (xorshifted << ((32 - rot) & 31));
+    }
+
+    /// <summary>Fisher-Yates in place, from the last element down (<c>shuffle_int</c>).</summary>
+    /// <param name="array">The values to shuffle.</param>
+    /// <param name="n">How many.</param>
+    public void Shuffle(Span<int> array, int n) {
+        for (int i = n - 1; i > 0; i--) {
+            int j = (int)(Next() % (uint)(i + 1));
+            (array[i], array[j]) = (array[j], array[i]);
+        }
+    }
 }
 
 /// <summary>

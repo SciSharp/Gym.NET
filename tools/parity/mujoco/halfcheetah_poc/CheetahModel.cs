@@ -7,19 +7,22 @@ using System.Text.Json;
 namespace MujocoPoc;
 
 /// <summary>
-///     A compiled MuJoCo model reduced to what a planar walker needs: a kinematic tree of hinge and slide joints, a ground
-///     plane and capsules, motors on joints, Euler integration, pyramidal contacts and the dense Newton solver. Read from
-///     the JSON dump of a model MuJoCo compiled (oracle.py's model.json), so the numbers are MuJoCo's own; no MJCF compiler.
+///     A compiled MuJoCo model reduced to what the most-used locomotion envs need (HalfCheetah, Hopper, Humanoid): a
+///     kinematic tree of hinge and slide joints under an optional free root, a ground plane with spheres and capsules,
+///     motors on joints, Euler or RK4, pyramidal and frictionless contacts, the dense Newton or PGS solver, and inert fixed
+///     tendons. Read from the JSON dump of a model MuJoCo compiled (oracle.py's model.json), so the numbers are MuJoCo's
+///     own; no MJCF compiler.
 /// </summary>
 /// <remarks>
-///     <see cref="Load"/> refuses any model that uses a feature the core does not reproduce (free or ball joints, tendons,
-///     equality constraints, frictionloss, other geom types, contact pairs between bodies, stateful actuators, other
-///     integrators or solvers), so a model that loads is one the core steps exactly. Arrays keep MuJoCo's names and
-///     layouts (row-major, <c>3*i</c>, <c>4*i</c>, <c>9*i</c> strides).
+///     <see cref="Load"/> refuses any model that uses a feature the core does not reproduce (ball joints, springs on free
+///     joints, active tendons, equality constraints, frictionloss, other geom types, elliptic cones, stateful actuators,
+///     other integrators or solvers), so a model that loads is one the core steps exactly. Arrays keep MuJoCo's names and
+///     layouts (row-major, <c>3*i</c>, <c>4*i</c>, <c>9*i</c> strides). The class keeps its first name: HalfCheetah's
+///     play project compiles it as it is.
 /// </remarks>
 public sealed class CheetahModel {
     // sizes
-    /// <summary>Number of position coordinates (equals <see cref="nv"/>: hinge and slide joints only).</summary>
+    /// <summary>Number of position coordinates (a free joint has 7 for its 6 dofs).</summary>
     public int nq;
     /// <summary>Number of degrees of freedom.</summary>
     public int nv;
@@ -197,6 +200,32 @@ public sealed class CheetahModel {
     public int ls_iterations;
     /// <summary>The number of physics steps per env step (Gymnasium's frame_skip).</summary>
     public int frame_skip;
+    /// <summary>The integrator: 0 Euler (HalfCheetah), 1 RK4 (Hopper, Humanoid).</summary>
+    public int integrator;
+    /// <summary>The constraint solver: 2 Newton (HalfCheetah, Hopper), 0 PGS (Humanoid).</summary>
+    public int solver;
+    /// <summary>The model's mean inertia, which scales PGS's improvement test (<c>stat.meaninertia</c>).</summary>
+    public double meaninertia;
+
+    // fixed tendons (Humanoid's two; inert in the dynamics, reported in the env's info)
+    /// <summary>The number of tendons.</summary>
+    public int ntendon;
+    /// <summary>First wrap object of each tendon.</summary>
+    public int[] tendon_adr = [];
+    /// <summary>Wrap objects per tendon.</summary>
+    public int[] tendon_num = [];
+    /// <summary>The type of each wrap object (1: a joint of a fixed tendon).</summary>
+    public int[] wrap_type = [];
+    /// <summary>The joint of each wrap object.</summary>
+    public int[] wrap_objid = [];
+    /// <summary>The coefficient of each wrap object.</summary>
+    public double[] wrap_prm = [];
+    /// <summary>Nonzeros per tendon Jacobian row.</summary>
+    public int[] ten_J_rownnz = [];
+    /// <summary>Tendon Jacobian row addresses.</summary>
+    public int[] ten_J_rowadr = [];
+    /// <summary>Tendon Jacobian column indices (dofs).</summary>
+    public int[] ten_J_colind = [];
 
     /// <summary>
     ///     Reads model.json and checks that the model stays inside what the core reproduces.
@@ -250,7 +279,21 @@ public sealed class CheetahModel {
             tolerance = Opt("tolerance"), ls_tolerance = Opt("ls_tolerance"), impratio = Opt("impratio"),
             iterations = (int)Opt("iterations"), ls_iterations = (int)Opt("ls_iterations"),
             frame_skip = r.GetProperty("frame_skip").GetInt32(),
+            integrator = (int)Opt("integrator"), solver = (int)Opt("solver"),
+            meaninertia = r.GetProperty("stat").GetProperty("meaninertia").GetDouble(),
         };
+        // the tendon arrays are read only when the model has tendons, so a dump without them (HalfCheetah's) still loads
+        m.ntendon = sizes.TryGetProperty("ntendon", out JsonElement nten) ? nten.GetInt32() : 0;
+        if (m.ntendon > 0) {
+            m.tendon_adr = I("tendon_adr");
+            m.tendon_num = I("tendon_num");
+            m.wrap_type = I("wrap_type");
+            m.wrap_objid = I("wrap_objid");
+            m.wrap_prm = D("wrap_prm");
+            m.ten_J_rownnz = I("ten_J_rownnz");
+            m.ten_J_rowadr = I("ten_J_rowadr");
+            m.ten_J_colind = I("ten_J_colind");
+        }
         m.Validate(r, sizes, opt);
         return m;
     }
@@ -265,45 +308,66 @@ public sealed class CheetahModel {
     private void Validate(JsonElement r, JsonElement sizes, JsonElement opt) {
         void Require(bool ok, string what) {
             if (!ok)
-                throw new NotSupportedException("HalfCheetah core: " + what);
+                throw new NotSupportedException("the core: " + what);
         }
         int Size(string name) => sizes.TryGetProperty(name, out JsonElement e) ? e.GetInt32() : 0;
         double Opt(string name) => opt.GetProperty(name)[0].GetDouble();
         int[] I(string name) => r.GetProperty(name).EnumerateArray().Select(e => e.ValueKind == JsonValueKind.True ? 1 : e.ValueKind == JsonValueKind.False ? 0 : e.GetInt32()).ToArray();
         double[] D(string name) => r.GetProperty(name).EnumerateArray().Select(e => e.GetDouble()).ToArray();
 
-        foreach (string s in new[] { "nexclude", "npair", "neq", "ntendon", "nflex", "nplugin", "na", "nmocap", "nsensor" })
+        foreach (string s in new[] { "nexclude", "npair", "neq", "nflex", "nplugin", "na", "nmocap", "nsensor" })
             Require(Size(s) == 0, $"{s} must be 0");
-        Require(nq == nv, "only hinge and slide joints (nq == nv)");
         Require(nv < 60, "the dense solver path (jacobian=auto with nv < 60)");
-        Require(Opt("integrator") == 0, "Euler integrator only");
+        Require(integrator == 0 || integrator == 1, "the Euler or RK4 integrator");
         Require(Opt("cone") == 0, "pyramidal friction cone only");
-        Require(Opt("solver") == 2, "Newton solver only");
+        Require(solver == 2 || solver == 0, "the Newton or PGS solver");
         Require(Opt("jacobian") == 2 || Opt("jacobian") == 0, "dense Jacobian only");
         Require(Opt("disableflags") == 0 && Opt("enableflags") == 0, "default flags only");
         Require(Opt("noslip_iterations") == 0, "no noslip");
         Require(Opt("density") == 0 && Opt("viscosity") == 0, "no fluid forces");
-        for (int j = 0; j < njnt; j++)
-            Require(jnt_type[j] == 2 || jnt_type[j] == 3, $"joint {j}: hinge or slide only");
-        for (int b = 0; b < nbody; b++)
-            Require(body_jntnum[b] == body_dofnum[b], $"body {b}: one dof per joint");
+        // joints: slides and hinges, and free joints as the only joint of a body, without a spring (the core's springs are
+        // the scalar ones of slides and hinges)
+        for (int j = 0; j < njnt; j++) {
+            Require(jnt_type[j] == 0 || jnt_type[j] == 2 || jnt_type[j] == 3, $"joint {j}: free, hinge or slide only");
+            if (jnt_type[j] == 0) {
+                int b = Array.IndexOf(body_jntadr, j);
+                Require(b > 0 && body_jntnum[b] == 1, $"joint {j}: a free joint must be its body's only joint");
+                Require(jnt_stiffness[j] == 0 && jnt_stiffnesspoly[2 * j] == 0 && jnt_stiffnesspoly[2 * j + 1] == 0,
+                        $"joint {j}: no spring on a free joint");
+                Require(!jnt_limited[j], $"joint {j}: no limit on a free joint");
+            }
+        }
+        for (int b = 0; b < nbody; b++) {
+            int dofs = 0;
+            for (int j = body_jntadr[b]; j < body_jntadr[b] + body_jntnum[b]; j++)
+                dofs += jnt_type[j] == 0 ? 6 : 1;
+            Require(dofs == body_dofnum[b], $"body {b}: its dofs are its joints'");
+        }
         Require(I("dof_simplenum").All(v => v == 0), "no simple dofs");
         Require(D("dof_frictionloss").All(v => v == 0), "no dof frictionloss");
         Require(I("jnt_actuatorid").All(v => v == -1), "no actuator-inherited damping or armature");
         Require(D("geom_adhesion").All(v => v == 0), "no adhesion");
         Require(I("body_mocapid").All(v => v == -1), "no mocap bodies");
+        // geoms: one plane on the world body; spheres and capsules on bodies, whose every pair has a primitive collider
         for (int g = 0; g < ngeom; g++) {
             bool plane = geom_type[g] == 0 && geom_bodyid[g] == 0;
-            Require(plane || geom_type[g] == 3, $"geom {g}: a plane on the world body or a capsule");
-            Require(geom_condim[g] == 3, $"geom {g}: condim 3");
+            Require(plane || ((geom_type[g] == 2 || geom_type[g] == 3) && geom_bodyid[g] > 0),
+                    $"geom {g}: a plane on the world body, or a sphere or capsule on a body");
+            Require(geom_condim[g] == 1 || geom_condim[g] == 3, $"geom {g}: condim 1 or 3");
         }
         Require(body_geomnum[0] == 1 && geom_type[body_geomadr[0]] == 0, "exactly one geom, a plane, on the world body");
-        // Contacts between two moving bodies would need capsule-capsule collision, which the core leaves out: the body
-        // bitmasks must already exclude every such pair (as HalfCheetah's conaffinity 0 does).
-        for (int b1 = 1; b1 < nbody; b1++)
-            for (int b2 = b1 + 1; b2 < nbody; b2++)
-                Require((body_contype[b1] & body_conaffinity[b2]) == 0 && (body_contype[b2] & body_conaffinity[b1]) == 0,
-                        $"bodies {b1} and {b2} could collide");
+        // tendons: fixed, and inert in the dynamics (no limit, spring, damper, armature, friction loss or actuator), so the
+        // core only reports their lengths and velocities
+        if (ntendon > 0) {
+            Require(wrap_type.All(t => t == 1), "fixed tendons only (joint wraps)");
+            Require(I("tendon_limited").All(v => v == 0), "no tendon limits");
+            Require(D("tendon_stiffness").All(v => v == 0) && D("tendon_stiffnesspoly").All(v => v == 0), "no tendon springs");
+            Require(D("tendon_damping").All(v => v == 0) && D("tendon_dampingpoly").All(v => v == 0), "no tendon dampers");
+            Require(D("tendon_armature").All(v => v == 0), "no tendon armature");
+            Require(D("tendon_frictionloss").All(v => v == 0), "no tendon friction loss");
+            if (r.TryGetProperty("tendon_actuatorid", out _))
+                Require(I("tendon_actuatorid").All(v => v == -1), "no actuator on a tendon");
+        }
         int[] trntype = I("actuator_trntype"), dyntype = I("actuator_dyntype"), gaintype = I("actuator_gaintype"),
               biastype = I("actuator_biastype");
         bool[] forcelimited = I("actuator_forcelimited").Select(v => v != 0).ToArray();
@@ -311,6 +375,7 @@ public sealed class CheetahModel {
             Require(trntype[i] == 0 && dyntype[i] == 0 && gaintype[i] == 0 && biastype[i] == 0,
                     $"actuator {i}: a motor (joint transmission, no dynamics, fixed gain, no bias)");
             Require(!forcelimited[i], $"actuator {i}: no force limit");
+            Require(jnt_type[actuator_trnid[2 * i]] != 0, $"actuator {i}: on a hinge or slide joint");
         }
         Require(I("jnt_actfrclimited").All(v => v == 0), "no joint actuator force limits");
     }

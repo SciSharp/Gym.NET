@@ -993,6 +993,10 @@ Specs: the port plan's §5.7 and §11.4; sources 6,153 lines. Nothing here start
   managed engine for them at about 2,200 lines, not the static subset's 22,000: Hopper adds about 140 lines to
   HalfCheetah's core, Humanoid about 380 more, Walker2d and Ant nothing. The choice between it and native MuJoCo comes
   down to `xml_file` and frames rather than cost.
+- **Hopper and Humanoid** ([§11](MUJOCO_ASSESSMENT.md#11-hopper-v5-and-humanoid-v5-on-the-same-core-2026-11-11)): they
+  now run on the same core, grown to 2,264 lines of code (594 added, against an estimate of 520). It steps all three
+  envs bit for bit with MuJoCo 3.15.0 and Gymnasium over 249 episodes and 138,490 physics steps, PGS, RK4 and the
+  free joint included. Walker2d and Ant remain to be run on it.
 
 The approved designs for that time are:
 

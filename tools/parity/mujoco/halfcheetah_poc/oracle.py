@@ -1,26 +1,35 @@
-"""HalfCheetah-v5 oracle for the from-scratch core: records MuJoCo 3.15.0's exact state after every mj_step of a seeded
-episode, and Gymnasium's env results, as binary files the C# proof of concept compares against bit for bit.
+"""Oracle for the from-scratch cores (HalfCheetah-v5, Hopper-v5, Humanoid-v5): records MuJoCo 3.15.0's exact state
+after every mj_step of seeded episodes, and Gymnasium's env results, as binary files the C# checker compares against
+bit for bit.
 
 Writes into the output folder:
-    model.json  every compiled model array the core reads, as exact doubles (Python's repr round-trips), plus the
-                options, the sizes and frame_skip.
-    run.json    the episode's seed, length and start ({"seed", "steps", "flip"}).
-    trace.bin   records of an int32 count and that many little-endian float64. Header: qpos, qvel, qacc_warmstart and
-                [time] at the start. Then per env step the action, and per mj_step (frame_skip of them) the state block
-                (STATE below), [time, ncon, nefc, solver_niter, nisland], the contacts (dist, geom pairs, pos, frame),
-                efc_J, the efc arrays (EFC below) and the position/velocity-stage arrays (DEBUG below).
-    env.bin     the observation after reset, then per env step the observation and [reward, terminated, truncated,
-                x_position, x_velocity, reward_forward, reward_ctrl], from a second env stepped through Gymnasium.
+    model.json  every compiled model array the cores read, as exact doubles (Python's repr round-trips), plus the
+                options, the statistics, the sizes and frame_skip.
+    run.json    {"env", "seeds", "steps" (env steps per episode), "flip", "terminate", "frame_skip", "debug_episodes",
+                "info_keys" ([key, size] in the order env.bin stores them)}.
+    trace.bin   records of an int32 count and that many little-endian float64. First [2, n_episodes] (the format and
+                the episode count). Per episode: [n_steps, has_debug]; qpos, qvel, qacc_warmstart and [time] at the
+                start; then per env step the action, and per mj_step (frame_skip of them) the state block (STATE below),
+                [time, ncon, nefc, solver_niter, nisland], the contacts (dist, geom pairs, pos, frame), efc_J, the efc
+                arrays (EFC below), and when has_debug the dual matrix efc_AR (dual solvers, else empty) and the
+                position/velocity-stage arrays (DEBUG below); after the env step's mj_rnePostConstraint, POST below.
+    env.bin     per episode the observation after reset, then per env step the observation and [reward, terminated,
+                truncated, the info values in info_keys order], from a second env stepped through Gymnasium.
 
 Args (command line):
-    --out DIR     output folder (required; a 1,000-step episode writes about 40 MB, so keep it outside the repo).
-    --seed N      reset and action-space seed (default 42).
-    --steps N     env steps (default 1000).
-    --flip        turn the cheetah upside down after the reset (qpos[2] += pi), so its torso and head land on the
-                  ground; both envs get the same start.
+    --out DIR         output folder (required; HalfCheetah writes about 40 MB per 1,000 env steps, Humanoid more: keep it
+                      outside the repo).
+    --env ID          HalfCheetah-v5 (default), Hopper-v5 or Humanoid-v5.
+    --seed N          the first episode's reset and action-space seed (default 42); episode k uses seed + k.
+    --episodes N      how many episodes (default 1).
+    --steps N         the most env steps per episode (default 1000; Gymnasium also truncates at 1,000).
+    --flip            turn the model upside down after the reset (qpos[2] += pi, hinge-rooted models only), so its body
+                      lands on the ground; both envs get the same start.
+    --no-terminate    pass terminate_when_unhealthy=False (Hopper, Humanoid), so episodes run past a fall.
+    --debug-episodes N  record efc_AR and the DEBUG arrays for the first N episodes only (default: all), to bound the size.
 
 Raises:
-    AssertionError: the manual stepping stops matching Gymnasium's own step (checked on the first steps).
+    AssertionError: the manual stepping stops matching Gymnasium's own step (checked on each episode's first steps).
 """
 import argparse
 import json
@@ -36,18 +45,24 @@ import numpy as np  # noqa: E402
 
 ap = argparse.ArgumentParser()
 ap.add_argument("--out", required=True)
+ap.add_argument("--env", default="HalfCheetah-v5")
 ap.add_argument("--seed", type=int, default=42)
+ap.add_argument("--episodes", type=int, default=1)
 ap.add_argument("--steps", type=int, default=1000)
 ap.add_argument("--flip", action="store_true")
+ap.add_argument("--no-terminate", action="store_true")
+ap.add_argument("--debug-episodes", type=int, default=-1)
 args = ap.parse_args()
-OUT, SEED, STEPS = args.out, args.seed, args.steps
+OUT = args.out
 os.makedirs(OUT, exist_ok=True)
+KWARGS = {"terminate_when_unhealthy": False} if args.no_terminate else {}
+DEBUG_EPISODES = args.episodes if args.debug_episodes < 0 else args.debug_episodes
 
-env = gym.make("HalfCheetah-v5")
+env = gym.make(args.env, **KWARGS)
 u = env.unwrapped
 m, d = u.model, u.data
 
-# ---- the compiled model, every array the core reads
+# ---- the compiled model, every array the cores read
 fields = {}
 for name in ["body_parentid", "body_rootid", "body_weldid", "body_jntnum", "body_jntadr", "body_dofnum", "body_dofadr",
              "body_pos", "body_quat", "body_ipos", "body_iquat", "body_mass", "body_subtreemass", "body_inertia",
@@ -68,7 +83,12 @@ for name in ["body_parentid", "body_rootid", "body_weldid", "body_jntnum", "body
              "jnt_actuatorid", "jnt_stiffnesspoly", "jnt_actfrclimited", "actuator_damping", "actuator_armature",
              "actuator_dampingpoly", "actuator_actadr", "actuator_actnum", "actuator_ctrladr", "actuator_outadr",
              "actuator_delay", "actuator_ctrlnum", "geom_adhesion", "body_geomadr", "body_geomnum", "body_mocapid",
-             "body_contype", "body_conaffinity"]:
+             "body_contype", "body_conaffinity",
+             # tendons (Humanoid's two fixed ones)
+             "tendon_adr", "tendon_num", "tendon_limited", "tendon_actfrclimited", "tendon_range",
+             "tendon_stiffness", "tendon_stiffnesspoly", "tendon_damping", "tendon_dampingpoly", "tendon_armature",
+             "tendon_frictionloss", "tendon_lengthspring", "tendon_margin", "tendon_actuatorid",
+             "wrap_type", "wrap_objid", "wrap_prm", "ten_J_rownnz", "ten_J_rowadr", "ten_J_colind"]:
     if hasattr(m, name):
         fields[name] = np.asarray(getattr(m, name)).ravel().tolist()
 o = m.opt
@@ -79,18 +99,17 @@ fields["opt"] = {k: (np.asarray(getattr(o, k)).ravel().tolist()) for k in
                   "magnetic", "ccd_tolerance", "ccd_iterations", "sdf_iterations", "sdf_initpoints"] if hasattr(o, k)}
 fields["stat"] = {"meaninertia": float(m.stat.meaninertia), "meanmass": float(m.stat.meanmass), "extent": float(m.stat.extent)}
 fields["sizes"] = {k: int(getattr(m, k)) for k in ["nq", "nv", "nu", "nbody", "njnt", "ngeom", "nM", "nC", "nD", "nB",
-                                                   "nexclude", "npair", "neq", "ntendon", "nflex", "nsite", "nplugin",
-                                                   "na", "nmocap", "nsensor"] if hasattr(m, k)}
+                                                   "nexclude", "npair", "neq", "ntendon", "nwrap", "nJten", "nflex",
+                                                   "nsite", "nplugin", "na", "nmocap", "nsensor"]
+                   if hasattr(m, k)}
 fields["frame_skip"] = int(u.frame_skip)
 fields["mujoco"] = mujoco.__version__
 with open(os.path.join(OUT, "model.json"), "w") as f:
     json.dump(fields, f, indent=0)
-with open(os.path.join(OUT, "run.json"), "w") as f:
-    json.dump({"seed": SEED, "steps": STEPS, "flip": args.flip}, f)
 
 
 def flip(e):
-    """Turns an env's cheetah upside down in place and recomputes its derived quantities.
+    """Turns an env's model upside down in place and recomputes its derived quantities.
 
     Args:
         e: the unwrapped MujocoEnv.
@@ -99,13 +118,17 @@ def flip(e):
     mujoco.mj_forward(e.model, e.data)
 
 
-# ---- a seeded episode, stepped as Gymnasium's do_simulation does, recording MuJoCo's state after every mj_step
-obs, info = env.reset(seed=SEED)
-if args.flip:
-    flip(u)
-env.action_space.seed(SEED)
-actions = [env.action_space.sample() for _ in range(STEPS)]
-init = (d.qpos.copy(), d.qvel.copy(), d.qacc_warmstart.copy(), float(d.time))
+def info_vector(info, keys):
+    """Flattens an info dict in a fixed key order.
+
+    Args:
+        info: the step's info dict.
+        keys: the [key, size] pairs.
+    Returns:
+        The values as one float64 list.
+    """
+    return [float(v) for k, _ in keys for v in np.ravel(np.asarray(info[k], dtype=np.float64))]
+
 
 STATE = ["qpos", "qvel", "qacc", "qacc_warmstart", "qacc_smooth", "qfrc_constraint", "qfrc_passive", "qfrc_bias",
          "qfrc_actuator", "actuator_force"]
@@ -113,6 +136,10 @@ EFC = ["efc_type", "efc_id", "efc_pos", "efc_margin", "efc_frictionloss", "efc_d
        "efc_vel", "efc_aref", "efc_b", "efc_force", "efc_state"]
 DEBUG = ["xpos", "xquat", "xmat", "xipos", "ximat", "geom_xpos", "geom_xmat", "subtree_com", "cinert", "cdof", "crb",
          "M", "qLD", "qLDiagInv", "cvel", "cdof_dot"]
+POST = ["cfrc_ext", "ten_length", "ten_velocity"]
+DUAL = m.opt.solver == mujoco.mjtSolver.mjSOL_PGS or m.opt.noslip_iterations > 0
+
+seeds, lengths, info_keys = [], [], None
 with open(os.path.join(OUT, "trace.bin"), "wb") as trace, open(os.path.join(OUT, "env.bin"), "wb") as envf:
     def put(f, arr):
         """Writes one record: the element count, then the values as little-endian float64.
@@ -125,41 +152,71 @@ with open(os.path.join(OUT, "trace.bin"), "wb") as trace, open(os.path.join(OUT,
         f.write(struct.pack("<i", a.size))
         f.write(a.tobytes())
 
-    for a in init[:3]:
-        put(trace, a)
-    put(trace, [init[3]])
-    # replay the same actions on a second env through Gymnasium's own step, for the env-level results
-    env2 = gym.make("HalfCheetah-v5")
-    obs2, _ = env2.reset(seed=SEED)
-    if args.flip:
-        flip(env2.unwrapped)
-        obs2 = env2.unwrapped._get_obs()
-    put(envf, obs2)
-    for t, action in enumerate(actions):
-        put(trace, action)
-        d.ctrl[:] = action
-        for k in range(u.frame_skip):
-            mujoco.mj_step(m, d)
-            for name in STATE:
-                put(trace, getattr(d, name))
-            put(trace, [d.time, d.ncon, d.nefc, d.solver_niter[0] if d.nisland else 0, d.nisland])
-            put(trace, [d.contact.dist[i] for i in range(d.ncon)])
-            put(trace, [d.contact.geom[i][j] for i in range(d.ncon) for j in range(2)])
-            put(trace, [d.contact.pos[i][j] for i in range(d.ncon) for j in range(3)])
-            put(trace, [d.contact.frame[i][j] for i in range(d.ncon) for j in range(9)])
-            put(trace, d.efc_J[: d.nefc * m.nv] if d.nefc else [])
-            for name in EFC:
-                arr = getattr(d, name)
-                put(trace, np.asarray(arr)[: d.nefc * (4 if name == "efc_KBIP" else 1)] if d.nefc else [])
-            for name in DEBUG:
-                put(trace, getattr(d, name))
-        mujoco.mj_rnePostConstraint(m, d)
-        obs2, r2, term2, trunc2, info2 = env2.step(action)
-        put(envf, obs2)
-        put(envf, [r2, float(term2), float(trunc2), info2["x_position"], info2["x_velocity"], info2["reward_forward"],
-                   info2["reward_ctrl"]])
-        if t < 3:
-            # sanity: the manual stepping is Gymnasium's
-            assert np.array_equal(d.qpos, env2.unwrapped.data.qpos) and np.array_equal(d.qvel, env2.unwrapped.data.qvel)
-print(f"mujoco {mujoco.__version__}: seed {SEED}{' flipped' if args.flip else ''}, {STEPS} env steps, "
-      f"{STEPS * u.frame_skip} mj_steps -> {OUT}")
+    put(trace, [2, args.episodes])
+    env2 = gym.make(args.env, **KWARGS)
+    for e in range(args.episodes):
+        seed = args.seed + e
+        seeds.append(seed)
+        debug = e < DEBUG_EPISODES
+        env.reset(seed=seed)
+        obs2, _ = env2.reset(seed=seed)
+        if args.flip:
+            flip(u)
+            flip(env2.unwrapped)
+            obs2 = env2.unwrapped._get_obs()
+        env.action_space.seed(seed)
+        # the episode is recorded in memory first: its length is only known at its end
+        records, envrecs = [], [obs2]
+        records.append(d.qpos.copy())
+        records.append(d.qvel.copy())
+        records.append(d.qacc_warmstart.copy())
+        records.append([float(d.time)])
+        t = 0
+        while t < args.steps:
+            action = env.action_space.sample()
+            records.append(action)
+            d.ctrl[:] = action
+            for k in range(u.frame_skip):
+                mujoco.mj_step(m, d)
+                for name in STATE:
+                    records.append(getattr(d, name).copy())
+                records.append([d.time, d.ncon, d.nefc, d.solver_niter[0] if d.nisland else 0, d.nisland])
+                records.append([d.contact.dist[i] for i in range(d.ncon)])
+                records.append([d.contact.geom[i][j] for i in range(d.ncon) for j in range(2)])
+                records.append([d.contact.pos[i][j] for i in range(d.ncon) for j in range(3)])
+                records.append([d.contact.frame[i][j] for i in range(d.ncon) for j in range(9)])
+                records.append(d.efc_J[: d.nefc * m.nv].copy() if d.nefc else [])
+                for name in EFC:
+                    arr = getattr(d, name)
+                    records.append(np.asarray(arr)[: d.nefc * (4 if name == "efc_KBIP" else 1)].copy() if d.nefc else [])
+                if debug:
+                    records.append(np.asarray(d.efc_AR)[: d.nefc * d.nefc].copy() if (DUAL and d.nefc) else [])
+                    for name in DEBUG:
+                        records.append(getattr(d, name).copy())
+            mujoco.mj_rnePostConstraint(m, d)
+            for name in POST:
+                records.append(getattr(d, name).copy())
+            obs2, r2, term2, trunc2, info2 = env2.step(action)
+            if info_keys is None:
+                info_keys = [[k, int(np.size(v))] for k, v in info2.items()]
+            envrecs.append(obs2)
+            envrecs.append([r2, float(term2), float(trunc2)] + info_vector(info2, info_keys))
+            if t < 3:
+                # sanity: the manual stepping is Gymnasium's
+                assert np.array_equal(d.qpos, env2.unwrapped.data.qpos) and np.array_equal(d.qvel, env2.unwrapped.data.qvel)
+            t += 1
+            if term2 or trunc2:
+                break
+        lengths.append(t)
+        put(trace, [t, 1.0 if debug else 0.0])
+        for r in records:
+            put(trace, r)
+        for r in envrecs:
+            put(envf, r)
+
+with open(os.path.join(OUT, "run.json"), "w") as f:
+    json.dump({"env": args.env, "seeds": seeds, "steps": lengths, "flip": args.flip, "terminate": not args.no_terminate,
+               "frame_skip": int(u.frame_skip), "debug_episodes": DEBUG_EPISODES, "info_keys": info_keys}, f)
+print(f"mujoco {mujoco.__version__}: {args.env} seeds {seeds[0]}..{seeds[-1]}{' flipped' if args.flip else ''}"
+      f"{' no-terminate' if args.no_terminate else ''}: {len(lengths)} episodes, {sum(lengths)} env steps "
+      f"(lengths min {min(lengths)} max {max(lengths)}), {sum(lengths) * u.frame_skip} mj_steps -> {OUT}")
