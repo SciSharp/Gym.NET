@@ -989,9 +989,10 @@ Specs: the port plan's §5.7 and §11.4; sources 6,153 lines. Nothing here start
 - **Plan:** steps P9.0–P9.6, with six decisions to review, the MuJoCo pin first.
 - **Proof of concept** ([§10](MUJOCO_ASSESSMENT.md#10-proof-of-concept-halfcheetah-v5-from-scratch-2026-11-11)): a
   HalfCheetah-v5 core written from scratch, 1,670 lines of code, steps bit for bit with MuJoCo 3.15.0 over 80,000
-  physics steps and 16 episodes. A model-specialized managed engine for the five most-used envs is therefore about
-  4,000–5,000 lines, not the static subset's 22,000, and the choice between it and native MuJoCo comes down to
-  `xml_file` and frames rather than cost.
+  physics steps and 16 episodes. Line coverage of the five most-used envs (§10.6) puts a shared model-specialized
+  managed engine for them at about 2,200 lines, not the static subset's 22,000: Hopper adds about 140 lines to
+  HalfCheetah's core, Humanoid about 380 more, Walker2d and Ant nothing. The choice between it and native MuJoCo comes
+  down to `xml_file` and frames rather than cost.
 
 The approved designs for that time are:
 

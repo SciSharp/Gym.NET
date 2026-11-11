@@ -584,8 +584,11 @@ public sealed class CheetahCore {
     ///     contact bitmasks and the plane-to-bounding-sphere distance, then up to two contacts, one per capsule end.
     /// </summary>
     /// <remarks>
-    ///     A body with several geoms goes through MuJoCo's bounding-volume midphase, whose visiting order this core assumes
-    ///     to be ascending; the HalfCheetah traces never have two such geoms in contact at once, so it is unverified.
+    ///     A body with several geoms goes through MuJoCo's bounding-volume midphase (<c>mj_collideTree</c>), which descends
+    ///     the node with the larger static bounding-box surface, so its order is a property of the model. For
+    ///     HalfCheetah's torso (torso and head) that order is ascending, as this core assumes: the flipped episodes,
+    ///     with both on the ground in 4,079 steps per pass, match MuJoCo's contact order. Another model's multi-geom
+    ///     bodies need their order taken from the model's BVH.
     /// </remarks>
     private void Collision() {
         ncon = 0;

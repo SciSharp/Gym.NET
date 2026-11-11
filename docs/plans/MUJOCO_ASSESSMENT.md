@@ -5,7 +5,7 @@
 | **Date** | 2026-11-11 |
 | **Status** | Assessment for P9, which DR-35 postponed out of 2.0. The approved designs stand: DR-30 (a 100% managed port inside Gym.NET.Environments), DR-31 (MuJoCo's own renderer, ported, drawing through a managed OpenGL binding), DR-33 (scope: what Gymnasium's envs reach, proven bitwise) |
 | **Measured against** | Gymnasium `8ba8c3a6` (v1.4.0, committed 2026-10-05); MuJoCo 3.15.0 (released the same day): its source, and its `win_amd64` wheel for Python 3.12 in an isolated venv |
-| **Reproduce** | §8; the probes are in `tools/parity/mujoco/`, the HalfCheetah proof of concept (§10) in `tools/parity/mujoco/halfcheetah_poc/` |
+| **Reproduce** | §8; the probes are in `tools/parity/mujoco/`, the HalfCheetah proof of concept (§10) in `tools/parity/mujoco/halfcheetah_poc/`, the line coverage (§10.6) in `tools/parity/mujoco/coverage/` |
 
 ---
 
@@ -42,7 +42,9 @@
   - OpenGL contexts.
 - **A model-specialized core is far smaller (§10):** HalfCheetah-v5's, written from scratch in 1,670 lines of code,
   steps bit for bit with MuJoCo 3.15.0 over 80,000 physics steps, Newton line search and Cholesky updates included.
-  The engine sizes above are static upper bounds for a general port.
+  Measured by line coverage, the five most-used envs together execute 4,337 engine lines, and Walker2d and Ant add none
+  to HalfCheetah, Hopper and Humanoid. A shared core for the five is therefore about 2,200 lines (§10.6). The engine
+  sizes above are static upper bounds for a general port.
 
 ## 2. What Gymnasium needs
 
@@ -234,6 +236,24 @@ the folders outside the repo:
 dotnet run --project tools/parity/mujoco/halfcheetah_poc -c Release -- <dir>/ep_s42 <dir>/ep_s0_flip   # --verbose: per-pass tallies
 ```
 
+The line coverage of §10.6 needs Linux or WSL (gcc, make, curl) for the instrumented build, and the measuring Python for
+the plans:
+
+```bash
+bash tools/parity/mujoco/coverage/build_mujoco_cov.sh <mujoco-3.15.0-source>      # once: ~/mjcov/build/lib/libmujoco.so
+<venv>/bin/python tools/parity/mujoco/coverage/gen_plans.py HalfCheetah-v5 <plans>/hc_a --seeds 0:10
+<venv>/bin/python tools/parity/mujoco/coverage/gen_plans.py HalfCheetah-v5 <plans>/hc_42 --seeds 42:43
+<venv>/bin/python tools/parity/mujoco/coverage/gen_plans.py HalfCheetah-v5 <plans>/hc_flip --seeds 0:5 --flip
+<venv>/bin/python tools/parity/mujoco/coverage/gen_plans.py Hopper-v5 <plans>/hop_term --budget 16000
+<venv>/bin/python tools/parity/mujoco/coverage/gen_plans.py Hopper-v5 <plans>/hop_long --seeds 0:16 --no-terminate
+<venv>/bin/python tools/parity/mujoco/coverage/gen_plans.py Humanoid-v5 <plans>/hum_term --budget 16000 --rnepost
+<venv>/bin/python tools/parity/mujoco/coverage/gen_plans.py Humanoid-v5 <plans>/hum_long --seeds 0:16 --no-terminate --rnepost
+# likewise Walker2d-v5 (wal_term, wal_long) and Ant-v5 with --rnepost (ant_term, ant_long)
+bash tools/parity/mujoco/coverage/cov_measure.sh <plans> hc_a hc_42 hc_flip hop_term hop_long hum_term hum_long
+python3 tools/parity/mujoco/coverage/cov_report.py HalfCheetah=hc_a,hc_42,hc_flip Hopper=hop_term,hop_long \
+  Humanoid=hum_term,hum_long Walker2d=wal_term,wal_long Ant=ant_term,ant_long
+```
+
 The visualizer's figure uses the roots `mjv_updateScene`, `mjv_moveCamera`, `mjv_initGeom`, `mjv_defaultScene`,
 `mjv_makeScene`, `mjv_defaultOption`, `mjv_defaultCamera`, `mjv_defaultPerturb` and `mjv_freeScene`, and excludes the
 physics files.
@@ -407,24 +427,140 @@ a specialized core omits it without changing a bit of the result.
 
 ### 10.5 The routes, revised
 
-The estimates for the other four envs are extrapolations from this proof of concept, not measurements. Each addition is
-verified the same way: oracle traces and the two-pass checker.
+Measured by line coverage (§10.6) rather than extrapolated: the engine lines each of the five envs executes, what each
+adds to HalfCheetah's, and the C# that takes at the ratios this proof of concept measured.
 
-| Env | Adds to HalfCheetah's core | Code lines (estimate) |
-|---|---|---:|
-| Walker2d | RK4 | +100 |
-| Hopper | RK4, capsule-capsule collision and the body-pair order | +250 |
-| Ant | RK4, the free joint (quaternion kinematics and integration), plane-sphere, `mj_rnePostConstraint` for `cfrc_ext` (the contact cost) | +700 |
-| Humanoid | RK4, the free joint, PGS with its dual matrix `J*M^-1*J' + R`, two fixed tendons, sphere-capsule, sphere-sphere and capsule-capsule collision, the body-pair broad-phase order, `cinert`/`cvel`/`qfrc_actuator`/`cfrc_ext` observations | +1,500 to 2,000 |
+| Env | Executed engine lines | New beyond HalfCheetah | Adds to the core | C# lines added (estimate) |
+|---|---:|---:|---|---:|
+| HalfCheetah | 3,636 | | (this proof of concept: 1,670 lines) | |
+| Hopper | 3,542 | 130 | RK4; capsule-capsule and sphere-sphere collision; contacts between two moving bodies | about 140 |
+| Humanoid | 3,746 | 692 (571 beyond Hopper's) | PGS and its dual matrix; `mj_rnePostConstraint` for `cfrc_ext`; the free joint; sphere-capsule and plane-sphere collision; the midphase order of bodies with several geoms | about 380 beyond Hopper's |
+| Walker2d | 3,483 | 56 | nothing beyond Hopper's additions | 0 |
+| Ant | 3,601 | 200 | nothing beyond Humanoid's additions | 0 |
+| **The five together** | **4,337** | | | **a core of about 2,200** |
 
-- **A. Each env self-contained, managed:** about 12,000 lines across five copies (1,700 to 3,700 each), each exact on its
-  own; five copies to re-verify per MuJoCo pin. Feasible, but more to maintain than C.
-- **C. One shared, specialized managed core for the five:** about 4,000–5,000 lines of code. The engine work is a day or
-  two at this proof of concept's pace; with the env classes and every parity layer, which cost the same as in route B,
-  that is three to four days, frames excluded. It keeps DR-30 (no native binaries) and refuses `xml_file` and any model
-  outside its scope.
-- **B. Native MuJoCo through MuJoCo's own bindings:** unchanged at two to three days. It is now about as fast as C, and
-  still the only route with `xml_file` and MuJoCo's own frames by construction.
+- **A. Each env self-contained, managed:** about 1,700 to 1,900 lines each (Hopper about 1,800, Humanoid about 1,900),
+  about 9,000 for the five; five copies to re-verify per MuJoCo pin.
+- **C. One shared, specialized managed core for the five:** about 2,200 lines of code. That is HalfCheetah's core with
+  Hopper's and Humanoid's additions, since Walker2d and Ant execute no engine line beyond them. The engine work is a
+  few hours at this proof of concept's pace. The env classes and every parity layer cost the same as in route B, so
+  the total is two to three days plus those hours, frames excluded. It keeps DR-30 (no native binaries) and refuses
+  `xml_file` and any model outside its scope.
+- **B. Native MuJoCo through MuJoCo's own bindings:** unchanged at two to three days. It costs about the same as C, and
+  is still the only route with `xml_file` and MuJoCo's own frames by construction.
 
 The decision P9 needs is therefore no longer about cost. It is whether `xml_file` and frames are worth native binaries
 (B, which reverses DR-30), or whether the five envs ship managed and exact, refusing custom models (C).
+
+### 10.6 The next two, measured: Humanoid and Hopper (2026-11-11)
+
+After HalfCheetah (106 models on the Hugging Face Hub), the most-used envs are Humanoid (105) and Hopper (98). Their
+estimate is measured, not extrapolated: the MuJoCo lines each env executes, compared with HalfCheetah's, and converted
+to C# with the ratios the proof of concept measured.
+
+#### 10.6.1 Method
+
+The tools are in `tools/parity/mujoco/coverage/`:
+- **The build** (`build_mujoco_cov.sh`): MuJoCo 3.15.0 built with gcov (Debug, `-O0`, no LTO) in WSL.
+- **The plans** (`gen_plans.py`): each env's compiled model, saved as MJB from Gymnasium's env, so no compiler code is on
+  the measured path. With it, the episodes as Gymnasium plays them: the seeded reset, then the seeded action space's
+  samples until termination.
+- **The replay** (`cov_run.c`): a C program steps the plans as `MujocoEnv` does: `mj_resetData`, `set_state` with
+  `mj_forward`, the controls, `mj_step` × `frame_skip`, and `mj_rnePostConstraint` for the envs that read `cfrc_ext`.
+- **The count** (`cov_measure.sh`, `cov_report.py`): a line counts as executed when its count in the full run exceeds
+  its count in a setup-only run (loading the model and making the data).
+
+Per env: 16,000 env steps as Gymnasium plays them, and 16 episodes of 1,000 steps with `terminate_when_unhealthy=False`
+(fallen states); HalfCheetah: the proof of concept's 16 episodes.
+
+| Env | Episodes | Physics steps | Executed engine lines | New beyond HalfCheetah | HalfCheetah's lines it does not run |
+|---|---|---:|---:|---:|---|
+| HalfCheetah | 16 | 80,000 | 3,636 | | |
+| Hopper | 715 (median 19 env steps) + 16 | 128,080 | 3,542 | 130 | 224: the torso's midphase, Euler with implicit damping |
+| Humanoid | 658 (median 22) + 16 | 160,105 | 3,746 | 692 | 582: the Newton solver and the dense Cholesky (Humanoid uses PGS), Euler |
+| Walker2d | 742 (median 19) + 16 | 128,000 | 3,483 | 56 | 209 |
+| Ant | 77 (median 82) + 16 | 160,290 | 3,601 | 200 | 235 |
+| All five | | | 4,337 | | |
+
+The fallen-state episodes add 76 lines for Hopper and 5 for Humanoid: the episodes Gymnasium plays already reach nearly
+all of it.
+
+**Calibration** (HalfCheetah: its executed lines by area, and the proof of concept's C# for them):
+
+| Area | Executed C lines | C# lines | Ratio |
+|---|---:|---:|---:|
+| Utilities, inline helpers, AVX kernels, Jacobians | 841 | 399 (`Kernels.cs`) | 0.47 |
+| Smooth dynamics, passive forces | 426 | 235 | 0.55 |
+| Constraint assembly | 416 | 177 | 0.43 |
+| The Newton solver | 383 | 246 | 0.64 |
+| Collision driver and primitives | 695 | 134 | 0.19 |
+| The pipeline (forward, step, Euler) | 380 | 106 | 0.28 |
+| Islands, sleep, memory, I/O, sensors, and stubs of inactive features | 495 | 8 | ~0 |
+| Fields, constructor, model loader | | 373 | |
+| **Total** | **3,636** | **1,670** | **0.46** |
+
+The low ratios are where a specialized core drops MuJoCo's general machinery: the broad phase's sweep and pair
+bookkeeping, island discovery for a single tree, the arena.
+
+#### 10.6.2 Hopper
+
+| What it executes beyond HalfCheetah | Lines | C# (estimate) |
+|---|---:|---:|
+| `mj_RungeKutta` and the stage calls it makes | 52 | ~45 |
+| Capsule-capsule collision (`mjc_CapsuleCapsule`, `mjraw_CapsuleCapsule`, and `mjraw_SphereSphere` through it) | 52 | ~50 |
+| Pairs of two moving bodies (filters and order; the proof of concept walks world pairs only) | 9 | ~30 |
+| New branches of functions the core already has (impedance, frame, line search) | 17 | 0 |
+| Model loader and validation | | ~15 |
+| **Total** | **130** | **about 140** |
+
+On HalfCheetah's core that is about 1,810 lines; self-contained (RK4 instead of Euler), about 1,800. The env layer is
+small:
+- **Observation:** `qpos[1:]` and `clip(qvel, -10, 10)`.
+- **Health:** z at least 0.7, torso angle within ±0.2, state within ±100.
+- **Reward:** the healthy reward, plus the forward velocity, minus a float32 control cost `1e-3*sum(a²)`.
+
+#### 10.6.3 Humanoid
+
+| What it executes beyond HalfCheetah and Hopper | Lines | C# (estimate) | Note |
+|---|---:|---:|---|
+| PGS: `solPGS`, the dual states, residual, cost change, `AR` diagonal, the pyramid's projection, `dualFinish`, its warm start and island path, and the row shuffle | 188 | ~120 | Deterministic: the shuffle's `pcg32` restarts at state 0, increment 1, in every solve |
+| The dual matrix `AR = Y*Y' + R` with `Y = J*M^-1/2`: `mj_projectConstraint`, `Y` and `AR` (symbolic and numeric), `mj_solveM2_impl`, sparse combine, transpose | 98 | ~60 | The sparse supports fix the summation order |
+| `mj_rnePostConstraint` for `cfrc_ext`: contact forces from the pyramid rows, spatial transforms | 97 | ~55 | `cfrc_ext` is in the observation and the contact cost |
+| The free joint: kinematics, centre of mass, velocities, quaternion integration | 48 | ~35 | |
+| Sphere-capsule, sphere-sphere and plane-sphere collision; the midphase traversal | 65 | ~55 | The torso has three geoms and each forearm two, so the traversal's order decides the contact order when several touch |
+| Two fixed tendons | 49 | ~5 | Inert in `humanoid.xml` (no limit, spring, damper, armature or actuator): a validation check, no tendon code |
+| Early returns of inactive features; new branches of functions the core has | 26 | ~10 | |
+| Model loader and validation | | ~40 | |
+| **Total** | **571** | **about 380** | |
+
+On the HalfCheetah and Hopper core that is about 2,200 lines (the five envs' shared core). Self-contained, with PGS
+instead of Newton and RK4 instead of Euler, it is about 1,900. The env layer is larger:
+- **Observation:** 348 numbers: `qpos[2:]`, `qvel`, `cinert[1:]`, `cvel[1:]`, `qfrc_actuator[6:]` and `cfrc_ext[1:]`.
+  At reset they come from `mj_forward`, so `cfrc_ext` is still zero.
+- **Forward velocity:** from the mass centre, whose NumPy sums over the bodies must be reproduced in NumPy's order.
+- **Costs:** the contact cost `5e-7*sum(cfrc_ext²)`, capped at 10, and the float32 control cost `0.1*sum(a²)`.
+- **Health:** the torso's z within [1, 2].
+
+#### 10.6.4 Time and risks
+
+At the proof of concept's pace (HalfCheetah took under an hour from nothing, oracle and checker included), and to the
+same evidence (two passes over many episodes, the env layer, negative controls):
+
+| Env | Session time | Why |
+|---|---|---|
+| Hopper | 30–45 minutes | 130 lines; the oracle and checker gain RK4, terminating episodes and Hopper's env layer |
+| Humanoid | 1.5–2.5 hours | 571 lines in five subsystems, and the larger env layer |
+| Both | about two to three hours | |
+
+Productizing them (env classes, registration, parity cells, goldens) is the separate cost of §10.5.
+
+The risks, in order:
+1. **PGS:** its exactness rests on the construction order of `AR` (the sparse supports of `Y`) and on the sweeps. It is
+   deterministic, but it carries more numerics than Newton.
+2. **The midphase:** its depth-first order for the torso and forearms decides the contact order when several of their
+   geoms touch at once. `mj_collideTree` always descends the node whose static bounding box has the larger surface, so
+   the order is fixed by the model. Its pose-dependent overlap tests only prune pairs that cannot touch, so the order
+   can be precomputed per body pair at load, without reproducing the tests.
+3. **The mass centre:** the velocity's NumPy reductions.
+4. **Capsule-capsule collision:** its geometric branches (parallel segments, sphere fallbacks); the coverage shows
+   which ones ran.
