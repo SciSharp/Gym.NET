@@ -29,8 +29,8 @@
     <FileVersion>2.0.0.0</FileVersion>
   </PropertyGroup>
 
-  <!-- The test suites reach ScoreFont.Current, the hook through which the parity suite installs CarRacing's score glyphs
-       recorded from live pygame while the recorded data does not ship (DR-27's licence check). -->
+  <!-- The test suites reach CarRacing's internal score text directly: ScoreFont (its embedded glyph data and layout,
+       compared with pygame's own renders and a live recording) and CarRacingEnv.FormatScore (Python's format). -->
   <ItemGroup>
     <InternalsVisibleTo Include="Gym.Tests" />
     <InternalsVisibleTo Include="Gym.Tests.Parity" />
@@ -80,9 +80,11 @@
 
   <!-- The envs' images (DR-19): copied once from the pinned Gymnasium (Assets/README.md lists sources and hashes) and
        embedded, so the package carries them. Each is named assets/<path> with forward slashes on every OS (RecursiveDir
-       uses the OS separator), which is the name EnvAssets.Load asks for. -->
+       uses the OS separator), which is the name EnvAssets.Load asks for. CarRacing's score glyphs (DR-48) are recorded
+       data, Assets/fonts/*.json, embedded under the same naming for ScoreFont. -->
   <ItemGroup>
     <EmbeddedResource Include="Assets\**\*.png" LogicalName="assets/$([System.String]::Copy('%(RecursiveDir)').Replace('\','/'))%(Filename)%(Extension)" />
+    <EmbeddedResource Include="Assets\**\*.json" LogicalName="assets/$([System.String]::Copy('%(RecursiveDir)').Replace('\','/'))%(Filename)%(Extension)" />
   </ItemGroup>
 
   <!-- The package's icon and readme, packed at its root (NuGet's PackageIcon / PackageReadmeFile). They replace the

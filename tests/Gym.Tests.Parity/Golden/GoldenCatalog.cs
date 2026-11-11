@@ -248,6 +248,34 @@ namespace Gym.Tests.Parity.Golden {
                 PlatformDependence = "Box2D's sinf/cosf and BipedalWalker's sin/cos",
                 CreateDotNet = renderMode => new GymNetEnv(new BipedalWalkerEnv(renderMode: renderMode, hardcore: true)),
             },
+            // CarRacing-v3 under seeded continuous actions for 60 steps, a frame every 30: the track a seed builds, the
+            // opening second's zoom, tiles visited and paid, and the score's text (DR-48's embedded glyphs) in every
+            // observation, each a whole 96×96 frame (about 27 KB a step, which keeps the case short).
+            new GoldenCase {
+                Suite = "box2d",
+                Name = "CarRacing-v3.sampled.seed0",
+                EnvId = "CarRacing-v3",
+                Seed = 0,
+                Actions = new GoldenActions.Sampled(0),
+                MaxSteps = 60,
+                FrameEvery = 30,
+                PlatformDependence = "Box2D's sinf/cosf and the track's atan2/sin/cos",
+                CreateDotNet = renderMode => new GymNetEnv(new CarRacingEnv(renderMode: renderMode)),
+            },
+            // CarRacing-v3's discrete mode (continuous=False) under seeded actions for 40 steps, a frame every 20: the five
+            // fixed controls and another seed's track.
+            new GoldenCase {
+                Suite = "box2d",
+                Name = "CarRacing-v3.discrete.sampled.seed4",
+                EnvId = "CarRacing-v3",
+                Kwargs = new Dictionary<string, object?> { ["continuous"] = false },
+                Seed = 4,
+                Actions = new GoldenActions.Sampled(4),
+                MaxSteps = 40,
+                FrameEvery = 20,
+                PlatformDependence = "Box2D's sinf/cosf and the track's atan2/sin/cos",
+                CreateDotNet = renderMode => new GymNetEnv(new CarRacingEnv(renderMode: renderMode, continuous: false)),
+            },
         }.ToDictionary(c => c.Key, StringComparer.Ordinal);
 
         /// <summary>Every case's key, as MSTest data rows: one row per case, named by its key in test results.</summary>

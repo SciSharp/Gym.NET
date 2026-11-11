@@ -35,7 +35,9 @@ namespace Gym.Environments.Envs.Box2D {
     ///     <para>
     ///     Every step renders the observation, as Gymnasium does: a 1000×800 frame of the road and grass (anti-aliased and
     ///     filled polygons), the car, the indicators and the score, shrunk with pygame's <c>smoothscale</c>. The score is
-    ///     pygame's default font at size 42 laid out as SDL_ttf lays it out (DR-27). Python's attributes are properties under
+    ///     pygame's default font at size 42 laid out as SDL_ttf lays it out, from glyph data recorded from pygame and embedded
+    ///     in this package (DR-27, DR-48), for every text <c>f"{reward:04.0f}"</c> can show (NaN and the infinities included).
+    ///     Python's attributes are properties under
     ///     their names (<c>tile_visited_count</c> is <see cref="TileVisitedCount"/>); the tiles' attributes live in
     ///     <see cref="RoadTile"/>. The class prints as Gymnasium's <c>CarRacing</c> (DR-32).
     ///     </para>
@@ -685,16 +687,15 @@ namespace Gym.Environments.Envs.Box2D {
         }
 
         /// <summary>
-        ///     The score, as Gymnasium draws it: <c>f"{self.reward:04.0f}"</c> in pygame's default font at size 42, white on
-        ///     black, centred on (60, 750) of the flipped frame. Nothing is drawn when the font's glyph data is not available
-        ///     (<see cref="ScoreFont.Current"/>), which leaves the bar black there.
+        ///     The score, as Gymnasium draws it: <c>f"{self.reward:04.0f}"</c> in pygame's default font at size 42 (the embedded
+        ///     <see cref="ScoreFont"/>), white on black, centred on (60, 750) of the flipped frame. A long score's box is wider
+        ///     than the frame (309 characters for <see cref="double.MaxValue"/>) and is clipped at both edges, as pygame's blit
+        ///     clips it.
         /// </summary>
         /// <param name="surf">The frame, already flipped.</param>
+        /// <exception cref="InvalidOperationException">Thrown when the assembly lacks the embedded glyph data (a build that dropped the asset).</exception>
         private void RenderScore(Surface surf) {
-            ScoreFont? font = ScoreFont.Current;
-            if (font is null)
-                return;
-            (byte[] indices, int width, int height) = font.RenderShaded(FormatScore(Reward));
+            (byte[] indices, int width, int height) = ScoreFont.Embedded.RenderShaded(FormatScore(Reward));
             // The shaded surface's palette runs from the background (black) to the foreground (white), so index i is (i, i, i).
             byte[] bytes = new byte[width * height * 3];
             for (int x = 0, j = 0; x < width; x++) {
@@ -716,18 +717,22 @@ namespace Gym.Environments.Envs.Box2D {
         }
 
         /// <summary>
-        ///     Python's <c>f"{x:04.0f}"</c>: rounded half to even on the exact value, the sign kept for a negative zero, and zeros
-        ///     padded after the sign to four characters.
+        ///     Python's <c>f"{x:04.0f}"</c>: rounded half to even on the exact value, every digit of the exact integer the double
+        ///     holds, the sign kept for a negative zero, zeros padded after the sign to four characters; <c>0nan</c> for a NaN of
+        ///     either sign, <c>0inf</c> and <c>-inf</c> for the infinities.
         /// </summary>
         /// <param name="x">The score.</param>
-        /// <returns>The text, for example <c>-000</c>, <c>0012</c> or <c>1000</c>.</returns>
+        /// <returns>The text, for example <c>-000</c>, <c>0012</c>, <c>1000</c>, <c>0nan</c> or <c>99999999999999991611392</c> (1e23).</returns>
         internal static string FormatScore(double x) {
+            // Python writes "nan" whatever the NaN's sign and pads it, and "inf", with zeros as it pads digits under the '0' flag.
             if (double.IsNaN(x))
-                return " nan";
+                return "0nan";
             if (double.IsInfinity(x))
-                return x > 0 ? " inf" : "-inf";
+                return x > 0 ? "0inf" : "-inf";
             double rounded = Math.Round(x, MidpointRounding.ToEven);
-            string digits = Math.Abs(rounded).ToString("0", CultureInfo.InvariantCulture);
+            // BigInteger gives every digit of the integer the double holds, as Python prints it; .NET's own numeric formats stop
+            // at 15 significant digits for "0" (9007199254740992 would print as 9007199254740990).
+            string digits = new BigInteger(Math.Abs(rounded)).ToString(CultureInfo.InvariantCulture);
             string sign = double.IsNegative(rounded) ? "-" : "";
             return sign + digits.PadLeft(4 - sign.Length, '0');
         }

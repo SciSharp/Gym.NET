@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using Gym.Environments.Envs.Box2D;
 using Gym.Envs;
@@ -17,18 +18,17 @@ using Python.Runtime;
 namespace Gym.Tests.Parity.Tests.Envs {
     /// <summary>
     ///     CarRacing-v3 against Gymnasium's <c>CarRacing</c>, live and in lockstep with Gym.NET's <see cref="CarRacingEnv"/> on
-    ///     its managed Box2D: the score's text against pygame's own renders, resets and the tracks they generate, episodes of
-    ///     sampled actions and of a track-following driver that visits tiles and completes laps, domain randomization, the
-    ///     refused actions, <c>rgb_array</c> frames with skid marks, leaving the playfield, spaces, metadata and <c>make</c>'s
-    ///     stack.
+    ///     its managed Box2D: the score's embedded glyph data against a live recording, its text against pygame's own renders
+    ///     and its box for every kind of value in both frame kinds, resets and the tracks they generate, episodes of sampled
+    ///     actions and of a track-following driver that visits tiles and completes laps, domain randomization, the refused
+    ///     actions, <c>rgb_array</c> frames with skid marks, leaving the playfield, spaces, metadata and <c>make</c>'s stack.
     /// </summary>
     /// <remarks>
     ///     Every observation is a 96×96 frame, so every lockstep step compares a rendering (the road and grass through SDL_gfx,
     ///     the car through <c>draw.polygon</c>, the indicators, the score) besides the reward, the flags, the info and the
-    ///     generator. The score's glyph data does not ship yet (DR-27's licence check), so each cell first installs data
-    ///     recorded live from pygame by <c>tools/parity/record_score_font.py</c>, the recorder the shipped data would come from.
-    ///     Cells that step or draw are pinned to the reference platform (Box2D's <c>sinf</c>/<c>cosf</c>, the track's
-    ///     <c>atan2</c>/<c>sin</c>/<c>cos</c>). Reference:
+    ///     generator. The score's glyphs are data embedded in Gym.NET.Environments (DR-48), recorded from pygame by
+    ///     <c>tools/parity/record_score_font.py</c>. Cells that step or draw are pinned to the reference platform (Box2D's
+    ///     <c>sinf</c>/<c>cosf</c>, the track's <c>atan2</c>/<c>sin</c>/<c>cos</c>). Reference:
     ///     <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/envs/box2d/car_racing.py#L106">gymnasium/envs/box2d/car_racing.py</see>.
     /// </remarks>
     [TestClass]
@@ -39,14 +39,36 @@ namespace Gym.Tests.Parity.Tests.Envs {
         /// <summary>The platform qualification of every cell that steps or draws.</summary>
         private const string Platform = "Box2D's sinf/cosf and the track's atan2/sin/cos";
 
-        /// <summary>Records the score font from the running pygame (the recorder in <c>tools/parity</c>), as JSON.</summary>
-        private const string RecordFontStatements = """
+        /// <summary>
+        ///     Records the score font from the running pygame (the recorder in <c>tools/parity</c>) and lists where the embedded
+        ///     data differs from it: each differing top-level field, and each differing glyph or kerned pair by name.
+        /// </summary>
+        private const string CompareFontStatements = """
             import sys, json
             if tools_dir not in sys.path:
                 sys.path.insert(0, tools_dir)
             import record_score_font
-            result = json.dumps(record_score_font.record())
+            live = record_score_font.record()
+            shipped = json.loads(embedded)
+            result = [key for key in sorted(set(live) | set(shipped)) if live.get(key) != shipped.get(key)]
+            for name in ("glyphs", "kerning"):
+                if name in result:
+                    a, b = live.get(name) or {}, shipped.get(name) or {}
+                    result += [f"{name}[{key!r}]" for key in sorted(set(a) | set(b)) if a.get(key) != b.get(key)]
             """;
+
+        /// <summary>
+        ///     Every kind of score <c>f"{self.reward:04.0f}"</c> can show (DR-48, the maintainer's "all cases of what might be
+        ///     plotted in that box"): NaN of both signs (<c>0nan</c>), both infinities, both zeros and the halves around them
+        ///     (rounded to even, <c>-000</c>), the four-digit scores and their carries (<c>10000</c>, <c>-1000</c>), an episode's
+        ///     usual values, scores far beyond any episode (2^53's neighbour, 1e20, 1e23's exact digits) and the extreme doubles
+        ///     (309 digits, a box seven times the frame's width, and the subnormal ±5e-324).
+        /// </summary>
+        private static readonly double[] ScoreValues = {
+            double.NaN, BitConverter.Int64BitsToDouble(0x7FF8000000000000), double.PositiveInfinity, double.NegativeInfinity,
+            0.0, -0.0, 0.5, -0.5, 1.5, 2.5, -0.4, -0.6, 12.3, -12.3, 99.5, 999.5, 9999.5, -999.5, -100.1, 932.9, 12345.678, -12345.678,
+            1e6, -1e6, 9007199254740993.0, 1e20, -1e20, 1e23, double.MaxValue, double.MinValue, double.Epsilon, -double.Epsilon,
+        };
 
         /// <summary>pygame's shaded renders of the given strings: each one's width, height and palette indices, concatenated.</summary>
         private const string RenderTextStatements = """
@@ -98,15 +120,52 @@ namespace Gym.Tests.Parity.Tests.Envs {
             """;
 
         /// <summary>
-        ///     The score's text, <see cref="ScoreFont"/> against pygame-ce 2.5.8's own shaded renders, level for level: every
-        ///     string of one and two characters, the scores -300 to 1,100 (and their halves, rounded to even), and 600 random
-        ///     strings of up to 12 characters, laid out with SDL_ttf 2.24's kerning and floored 26.6 positions.
+        ///     The embedded glyph data (DR-48) is what <c>tools/parity/record_score_font.py</c> records from the running pygame
+        ///     now: the same font file (name and SHA-256), metrics, glyphs, kerning and ligatures. A pygame-ce re-pin that
+        ///     changes the font fails here, with the recorder's command to refresh the asset.
+        /// </summary>
+        /// <exception cref="AssertFailedException">Thrown when the resource or the repository layout is missing, or the data differs.</exception>
+        [TestMethod]
+        public void GymNet_ScoreFont_EmbeddedDataIsTheLiveRecording() {
+            string embedded;
+            using (Stream stream = typeof(CarRacingEnv).Assembly.GetManifestResourceStream(ScoreFont.ResourceName)
+                                   ?? throw new AssertFailedException($"Gym.Environments lacks the resource '{ScoreFont.ResourceName}'."))
+            using (var reader = new StreamReader(stream))
+                embedded = reader.ReadToEnd();
+
+            List<string> differences = PythonRuntime.Run(() => {
+                string tools = GymPythonSession.Repository?.ParityTools ?? throw new AssertFailedException("The repository layout was not found.");
+                using var toolsDir = new PyString(tools);
+                using var embeddedText = new PyString(embedded);
+                using PyObject result = Python.evalStmts(CompareFontStatements, "result", ("tools_dir", toolsDir), ("embedded", embeddedText));
+                var listed = new List<string>();
+                long count = result.Length();
+                for (long i = 0; i < count; i++) {
+                    using PyObject item = result[(int)i];
+                    listed.Add(item.As<string>());
+                }
+
+                return listed;
+            });
+
+            Assert.AreEqual(0, differences.Count,
+                            "The embedded score font differs from pygame's in: " + string.Join(", ", differences)
+                            + ". Re-record it: python tools/parity/record_score_font.py src/Gym.Environments/Assets/fonts/freesansbold-42.json");
+        }
+
+        /// <summary>
+        ///     The score's text, the embedded <see cref="ScoreFont"/> against pygame-ce 2.5.8's own shaded renders, level for
+        ///     level, over the 15 characters a score can show (the digits, <c>-</c> and the letters of <c>nan</c> and
+        ///     <c>inf</c>): every string of one and two characters, the scores -300 to 1,100 (and their halves, rounded to even),
+        ///     the text of every kind of score (<see cref="ScoreValues"/>, up to 309 characters), and 600 random strings of up
+        ///     to 12 characters, laid out with SDL_ttf 2.24's kerning and floored 26.6 positions. Strings with the ligature
+        ///     sequence <c>fi</c>, which no score contains and <see cref="ScoreFont"/> refuses, are left out.
         /// </summary>
         [TestMethod]
         public void GymNet_ScoreFont_RendersAsPygame() {
-            ScoreFont font = EnsureScoreFont();
+            ScoreFont font = ScoreFont.Embedded;
             var texts = new List<string>();
-            const string chars = "0123456789-";
+            const string chars = "0123456789-afin";
             foreach (char a in chars) {
                 texts.Add(a.ToString());
                 foreach (char b in chars)
@@ -118,9 +177,12 @@ namespace Gym.Tests.Parity.Tests.Envs {
                 texts.Add(CarRacingEnv.FormatScore(r + 0.5));
             }
 
+            texts.AddRange(ScoreValues.Select(CarRacingEnv.FormatScore));
             var rng = new Random(20261111);
             for (int i = 0; i < 600; i++)
                 texts.Add(new string(Enumerable.Range(0, rng.Next(1, 13)).Select(_ => chars[rng.Next(chars.Length)]).ToArray()));
+            // pygame shapes "fi" into one ligature glyph; no score contains it, and the font refuses it (CarRacingTests).
+            texts.RemoveAll(text => text.Contains("fi", StringComparison.Ordinal));
 
             (List<(int W, int H)> sizes, byte[] levels) = PythonRuntime.Run(() => {
                 using var list = new PyList(texts.Select(t => (PyObject)new PyString(t)).ToArray());
@@ -155,6 +217,36 @@ namespace Gym.Tests.Parity.Tests.Envs {
             TestContext.WriteLine($"{texts.Count} strings, every level identical");
         }
 
+        /// <summary>
+        ///     The score's box for every kind of value (<see cref="ScoreValues"/>), set as <c>reward</c> on both envs after a
+        ///     reset and rendered as the 600×400 <c>rgb_array</c> frame and as the 96×96 observation (<c>state_pixels</c>), pixel
+        ///     for pixel: the text's surface, its centring by truncated halves, and the blit's clipping when the box is wider
+        ///     than the frame.
+        /// </summary>
+        /// <exception cref="InvalidOperationException">Thrown when the pair's .NET side is not a CarRacing env.</exception>
+        /// <exception cref="ParityException">Thrown at the first frame that differs, with its artifacts.</exception>
+        [TestMethod]
+        public void GymNet_ScoreBox_EveryKindOfValue_MatchesGymnasium() {
+            SkipOffReferencePlatform(Platform);
+            foreach (string mode in new[] { "rgb_array", "state_pixels" }) {
+                using GymPair pair = Pair(true, mode);
+                pair.Reset(23);
+                IEnv unwrapped = ((GymNetEnv)pair.DotNet).Env.Unwrapped;
+                CarRacingEnv dotnet = unwrapped as CarRacingEnv ?? throw new InvalidOperationException("The pair's .NET side is not CarRacing.");
+                foreach (double score in ScoreValues) {
+                    pair.Python.WithUnwrapped(env => {
+                        using var value = new PyFloat(score);
+                        using PyObject none = Python.builtins.setattr(env, "reward", value);
+                    });
+                    dotnet.Reward = score;
+                    string text = CarRacingEnv.FormatScore(score);
+                    pair.CompareFrame($"{mode}, reward {score:R} ('{(text.Length > 24 ? text[..12] + $"... {text.Length} characters" : text)}')");
+                }
+
+                TestContext.WriteLine($"{mode}: {ScoreValues.Length} scores, every frame identical");
+            }
+        }
+
         /// <summary><c>reset(seed=seed)</c> of both action modes: the track's draws, the car, and the first observation's frame.</summary>
         /// <param name="continuous">Which action mode.</param>
         /// <param name="seed">The reset seed.</param>
@@ -165,9 +257,7 @@ namespace Gym.Tests.Parity.Tests.Envs {
         [DataRow(false, 0L)]
         [DataRow(false, 7L)]
         public void GymNet_Reset_MatchesGymnasium(bool continuous, long seed) {
-            SkipOffReferencePlatform(Platform);
-            EnsureScoreFont();
-            using GymPair pair = Pair(continuous);
+            SkipOffReferencePlatform(Platform);            using GymPair pair = Pair(continuous);
             pair.Reset(seed);
         }
 
@@ -185,9 +275,7 @@ namespace Gym.Tests.Parity.Tests.Envs {
         [DataRow(0L, true)]
         [DataRow(5L, true)]
         public void GymNet_Track_MatchesGymnasium(long seed, bool domainRandomize) {
-            SkipOffReferencePlatform(Platform);
-            EnsureScoreFont();
-            ValueFacts python = Outcome.CapturePython(() => {
+            SkipOffReferencePlatform(Platform);            ValueFacts python = Outcome.CapturePython(() => {
                 using PyObject flag = domainRandomize.ToPython();
                 using var seedValue = new PyInt(seed);
                 return Python.evalStmts(TrackStatements, "result", ("domain_randomize", flag), ("seed", seedValue));
@@ -226,9 +314,7 @@ namespace Gym.Tests.Parity.Tests.Envs {
         [DataRow(false, 0L)]
         [DataRow(false, 4L)]
         public void GymNet_SampledEpisodes_MatchGymnasium(bool continuous, long seed) {
-            SkipOffReferencePlatform(Platform);
-            EnsureScoreFont();
-            using GymPair pair = Pair(continuous);
+            SkipOffReferencePlatform(Platform);            using GymPair pair = Pair(continuous);
             PairRun run = pair.Run(seed, ActionSources.Sampled(seed), maxSteps: 250);
             TestContext.WriteLine(run.ToString());
         }
@@ -242,9 +328,7 @@ namespace Gym.Tests.Parity.Tests.Envs {
         [DataRow(0L)]
         [DataRow(2L)]
         public void GymNet_FollowerEpisodes_MatchGymnasium(long seed) {
-            SkipOffReferencePlatform(Platform);
-            EnsureScoreFont();
-            using GymPair pair = Pair(true);
+            SkipOffReferencePlatform(Platform);            using GymPair pair = Pair(true);
             PairRun run = pair.Run(seed, new FollowerSource(), maxSteps: 3000);
             TestContext.WriteLine(run.ToString());
         }
@@ -258,9 +342,7 @@ namespace Gym.Tests.Parity.Tests.Envs {
         [DataRow(true)]
         [DataRow(false)]
         public void GymNet_Frames_MatchGymnasium(bool follower) {
-            SkipOffReferencePlatform(Platform);
-            EnsureScoreFont();
-            using GymPair pair = Pair(true, "rgb_array");
+            SkipOffReferencePlatform(Platform);            using GymPair pair = Pair(true, "rgb_array");
             PairRun run = pair.Run(5, follower ? new FollowerSource() : ActionSources.Sampled(5), maxSteps: 400, frameEvery: 5);
             TestContext.WriteLine(run.ToString());
         }
@@ -272,9 +354,7 @@ namespace Gym.Tests.Parity.Tests.Envs {
         /// </summary>
         [TestMethod]
         public void GymNet_DomainRandomize_MatchesGymnasium() {
-            SkipOffReferencePlatform(Platform);
-            EnsureScoreFont();
-            ValueFacts python = Outcome.CapturePython(() => Python.evalStmts(DomainRandomizeStatements, "result")).Expect("Gymnasium's randomized resets");
+            SkipOffReferencePlatform(Platform);            ValueFacts python = Outcome.CapturePython(() => Python.evalStmts(DomainRandomizeStatements, "result")).Expect("Gymnasium's randomized resets");
             ValueFacts dotnet = Outcome.Capture(() => {
                 using var env = new CarRacingEnv(domainRandomize: true);
                 var results = new List<object?>();
@@ -296,9 +376,7 @@ namespace Gym.Tests.Parity.Tests.Envs {
         /// </summary>
         [TestMethod]
         public void GymNet_ActionForms_MatchGymnasium() {
-            SkipOffReferencePlatform(Platform);
-            EnsureScoreFont();
-            var continuous = new (string What, Func<NDArray> Make)[] {
+            SkipOffReferencePlatform(Platform);            var continuous = new (string What, Func<NDArray> Make)[] {
                 ("float32 [0.5, 0.8, 0.0]", () => np.array(new[] { 0.5f, 0.8f, 0.0f })),
                 ("float64 [-3.0, 2.0, 0.95]", () => np.array(new[] { -3.0, 2.0, 0.95 })),
                 ("int64 [1, 1, 0]", () => np.array(new[] { 1L, 1L, 0L })),
@@ -335,9 +413,7 @@ namespace Gym.Tests.Parity.Tests.Envs {
         /// </summary>
         [TestMethod]
         public void GymNet_LeavingThePlayfield_MatchesGymnasium() {
-            SkipOffReferencePlatform(Platform);
-            EnsureScoreFont();
-            using GymPair pair = Pair(true);
+            SkipOffReferencePlatform(Platform);            using GymPair pair = Pair(true);
             PairRun run = pair.Run(17, new ConstantSource(new[] { 0.0, 0.3, 0.0 }), maxSteps: 600);
             Assert.IsTrue(run.Ended, $"The car must leave the playfield: {run}");
             TestContext.WriteLine(run.ToString());
@@ -399,31 +475,9 @@ namespace Gym.Tests.Parity.Tests.Envs {
         /// <summary><c>make</c>'s stack (<c>TimeLimit</c> at 1,000 steps) against <c>Gymnasium.Make</c>: the driver until the limit or the lap.</summary>
         [TestMethod]
         public void GymNet_MakeStack_MatchesGymnasium() {
-            SkipOffReferencePlatform(Platform);
-            EnsureScoreFont();
-            using var pair = new GymPair(PyGymEnv.Make(Id, viaMake: true), new GymNetEnv(Gymnasium.Make(Id)));
+            SkipOffReferencePlatform(Platform);            using var pair = new GymPair(PyGymEnv.Make(Id, viaMake: true), new GymNetEnv(Gymnasium.Make(Id)));
             PairRun run = pair.Run(31, new FollowerSource(), maxSteps: 1100);
             Assert.IsTrue(run.Ended, $"The episode must end: {run}");
-        }
-
-        /// <summary>
-        ///     Installs the score font recorded live from pygame when none is installed (DR-27's data does not ship yet), so both
-        ///     sides draw the score; returns it.
-        /// </summary>
-        /// <returns>The installed font.</returns>
-        /// <exception cref="AssertFailedException">Thrown when the recorder fails.</exception>
-        internal static ScoreFont EnsureScoreFont() {
-            if (ScoreFont.Current is { } installed)
-                return installed;
-            string json = PythonRuntime.Run(() => {
-                string tools = GymPythonSession.Repository?.ParityTools ?? throw new AssertFailedException("The repository layout was not found.");
-                using var toolsDir = new PyString(tools);
-                using PyObject result = Python.evalStmts(RecordFontStatements, "result", ("tools_dir", toolsDir));
-                return result.As<string>();
-            });
-            ScoreFont font = ScoreFont.Parse(json);
-            ScoreFont.Current = font;
-            return font;
         }
 
         /// <summary>A lockstep pair of Gymnasium's unwrapped env and Gym.NET's, built with the same arguments.</summary>

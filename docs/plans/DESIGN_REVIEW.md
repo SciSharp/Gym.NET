@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Reviewed on 2026-11-08 in ten rounds, on branch `journey1`: 36 designs, all decided. Four more rounds on 2026-11-10 settled the questions P6 and the per-env parity coverage raised: DR-37…DR-47. Pending: `DictInfoToList`'s result shape (deferred, with a direction) and six earlier readings the maintainer asked to be reminded of once implementing is finished ([Interpretations to confirm](#interpretations-to-confirm)). [Coverage by phase](#coverage-by-phase) says which phases can start |
+| **Status** | Reviewed on 2026-11-08 in ten rounds, on branch `journey1`: 36 designs, all decided. Four more rounds on 2026-11-10 settled the questions P6 and the per-env parity coverage raised: DR-37…DR-47. Round 15 on 2026-11-11, after P8, decided CarRacing's score glyphs (DR-48) and the packages' licence (DR-49), and the maintainer confirmed the ten [interpretations](#interpretations-to-confirm). Pending: `DictInfoToList`'s result shape (deferred, with a direction). [Coverage by phase](#coverage-by-phase) says which phases can start |
 | **Rule** | A step of [`COMPLETION_PLAN.md`](COMPLETION_PLAN.md) starts only when every design it depends on is **Approved** here. A design that isn't listed is not approved: a new design question found while implementing goes through the same review before the step that needs it continues |
 | **How** | The maintainer reviewed the implementation design choices four at a time, before any phase from R0 to P9 started. Each answer is recorded with the options that were on the table and what it changes in the plans. Where a later round refined an earlier answer, both rows stay and the earlier one points to the later |
 | **Earlier decisions** | D1–D22 in [`GYMNASIUM_PORT_PLAN.md`](GYMNASIUM_PORT_PLAN.md) §20 and [`COMPLETION_PLAN.md`](COMPLETION_PLAN.md) §3 still stand unless a design here overrides them |
@@ -100,7 +100,7 @@ DR-22's three-mode plan was approved, with the auto-switch for thread-bound envs
 
 | ID | Design | Approved | Options not taken | Applies to |
 |---|---|---|---|---|
-| DR-37 | `draw.aaline`/`draw.aalines` (D4, P7) | **Read pygame-ce 2.5.8's `src_c/draw.c` for these two functions only** and translate their algorithm, so MountainCar's frames become pixel-exact and the P7 cells (8 MountainCar frame cells, 2 draw corpus cells) become gates. D4's black-box rule stays for every other drawing function. The translated code derives from LGPL-2.1 source: it carries pygame-ce's notice in THIRD-PARTY-NOTICES. Asked on 2026-11-10 where it lives, the maintainer chose **inside `Gym.Rendering`**: the translation replaces the model there, and the `Gym.NET.Rendering` package's license expression gains the LGPL term named by `draw.c`'s own header, `LGPL-2.0-or-later` (the Library GPL version 2 or any later version), making it `Apache-2.0 AND LGPL-2.0-or-later` (not taken: an LGPL assembly of its own behind an interface). *Implemented 2026-11-10 in `Draw.Aaline.cs`; pygame's two-point read past its buffer is taken as 0 and accepted either way by the parity corpus* | A documented deviation gated outside the measured gap; more black-box probing | P7, P4 (MountainCar) |
+| DR-37 | `draw.aaline`/`draw.aalines` (D4, P7) | **Read pygame-ce 2.5.8's `src_c/draw.c` for these two functions only** and translate their algorithm, so MountainCar's frames become pixel-exact and the P7 cells (8 MountainCar frame cells, 2 draw corpus cells) become gates. D4's black-box rule stays for every other drawing function. The translated code derives from LGPL-2.1 source: it carries pygame-ce's notice in THIRD-PARTY-NOTICES. Asked on 2026-11-10 where it lives, the maintainer chose **inside `Gym.Rendering`**: the translation replaces the model there, and the `Gym.NET.Rendering` package's license expression gains the LGPL term named by `draw.c`'s own header, `LGPL-2.0-or-later` (the Library GPL version 2 or any later version), making it `Apache-2.0 AND LGPL-2.0-or-later` (not taken: an LGPL assembly of its own behind an interface). *Implemented 2026-11-10 in `Draw.Aaline.cs`; pygame's two-point read past its buffer is taken as 0 and accepted either way by the parity corpus. The license expression was replaced on 2026-11-11 by DR-49: the package is Apache-2.0* | A documented deviation gated outside the measured gap; more black-box probing | P7, P4 (MountainCar) |
 | DR-38 | `AsyncVectorEnv`'s process options (DR-22) | **`worker` as a public delegate** over the per-sub-env channel, the counterpart of Gymnasium's pipe, with Gymnasium's eight arguments (index, env function, pipe, parent pipe, shared memory, error queue, autoreset mode, semaphore); the default worker becomes public as Gymnasium's worker loop. `daemon` maps to background threads; `context` is accepted and has nothing to choose (documented). Gymnasium's two custom-worker tests port; the arity check becomes a compile-time fact | Accepting `context`/`daemon` and refusing a custom worker; leaving all three out | P6.2 |
 | DR-39 | `PlayPlot`'s chart backend (DR-36) | **ScottPlot adapters in the viewer packages**: `Gym.NET.Rendering.Avalonia` and `Gym.NET.Rendering.WinForm` each ship a ScottPlot-backed `IPlotFigure` (titles, ticks, labels, live updates). The core keeps the plain built-in `PlotFigure` and gains no chart dependency | The built-in figure only; the built-in figure with an embedded bitmap font | P6.7 |
 | DR-40 | Shared spaces (D19) | **One owner per space, enforced**: a space records the env that owns it, and handing it to a second live env throws at once (`InvalidOperationException` naming the fix: give each env its own space). Ownership clears when the env disposes the space; a wrapper that passes its env's space through is not an owner | Envs copying the spaces they are given; keeping the rule documented only | P2 (spaces), every env and wrapper |
@@ -138,6 +138,21 @@ The fourth question of round 14 listed six readings recorded earlier (DR-02, DR-
 consequences, `HumanRendering` in the core, D13's one example). The maintainer answered "after we finished
 implementing, remind me of all these": they stay as built until then ([Interpretations to confirm](#interpretations-to-confirm)).
 
+### Round 15: CarRacing's score glyphs, the licences, the readings (2026-11-11)
+
+Asked when P8's implementing was finished. The first question offered four ways to treat the glyph data after DR-27's
+licence check; the maintainer answered "Ask this question again as if license/GPL has no importance", and the question
+was asked again on technical grounds alone (embedded recorded data, a managed FreeType over the font file, native FreeType
+over it). Upstream PR #13 (a 2023 Aether CarRacing that P8.4 supersedes) is left to the maintainer: nothing is posted.
+
+| ID | Design | Approved | Options not taken | Applies to |
+|---|---|---|---|---|
+| DR-48 | CarRacing's score glyphs (DR-27) | **Embed the recorded data, DR-27 as designed**: `Assets/fonts/freesansbold-42.json` in Gym.NET.Environments, read by `ScoreFont` on the first score render, so every CarRacing frame and observation is Gymnasium's out of the box and CarRacing gets goldens. The maintainer added "Make sure to handle all cases of what might be plotted in that box": the data covers every character `f"{self.reward:04.0f}"` can show (the digits, `-`, and the letters of `nan` and `inf`: 15 glyphs, 109 kerned pairs), `FormatScore` gives Python's text for every double (`0nan` for a NaN of either sign, `0inf`, `-inf`, every digit of the integer a large double holds), and a box wider than the frame is clipped as pygame clips it. The font's one ligature among those characters (`fi`, which no score contains) is refused rather than drawn wrong. A parity cell compares the asset with a live recording | A managed FreeType translation over the embedded font file; native FreeType over it (both rejected by DR-27 before); first asked with the licence weighed: no glyph data with a public opt-in loader, a separate GPL-labelled package, the score left out | P8.4 |
+| DR-49 | The packages' licences (DR-37's term, interpretation 6) | **Every package under the repository's base licence, Apache-2.0**: the maintainer's note on confirming the readings, "all of our licenses are unified and same as base license of the repo and not random, set it all to the base license". `Gym.NET.Rendering` drops DR-37's `Apache-2.0 AND LGPL-2.0-or-later`; translated sources and recorded data keep their sources' notices as attribution in their files and in THIRD-PARTY-NOTICES.md | DR-37's combined expression for `Gym.NET.Rendering` | P10 (packaging) |
+
+The third question reminded the maintainer of the ten readings under [Interpretations to confirm](#interpretations-to-confirm):
+"All ten stand", with the licence note DR-49 records.
+
 ---
 
 ## Coverage by phase
@@ -154,13 +169,16 @@ Every design each phase of [`COMPLETION_PLAN.md`](COMPLETION_PLAN.md) depends on
 | P4 classic_control | DR-08, DR-19, DR-20, DR-32 (`MountainCarEnv(continuous)`) | Yes |
 | P5 toy_text | DR-08, DR-13, DR-19, DR-20 | Yes |
 | P6 Vector and wrappers | DR-21, DR-22, DR-23, DR-24, DR-25, DR-36; since 2026-11-10 DR-38, DR-39, DR-41…DR-47 (`DictInfoToList`'s result shape deferred) | Yes |
-| P8 Box2D | D5, DR-26, DR-27, DR-28, DR-29 (its measurement opens P8.1), DR-32 | Yes |
+| P8 Box2D | D5, DR-26, DR-27, DR-28, DR-29 (its measurement opens P8.1), DR-32; since 2026-11-11 DR-48 (the score's glyphs embedded) | Yes |
 | P9 MuJoCo | DR-30, DR-31, DR-33 | **Postponed** (DR-35) |
-| P10 Release | DR-35, DR-36; D9, D13 | Yes |
+| P10 Release | DR-35, DR-36; D9, D13; since 2026-11-11 DR-49 (every package Apache-2.0) | Yes |
 
 ## Interpretations to confirm
 
-On 2026-11-10 (round 14) the maintainer asked to be reminded of these once implementing is finished, so each stays as
+**Confirmed on 2026-11-11 (round 15): all ten stand as built.** The maintainer added that every package takes the
+repository's base licence, which replaces item 6's term (DR-49).
+
+On 2026-11-10 (round 14) the maintainer asked to be reminded of these once implementing is finished, so each stayed as
 built until then:
 
 1. The three readings below (DR-02, DR-29, DR-32).
@@ -418,6 +436,9 @@ Effects of approved designs that only showed up in code. None changes a design; 
   FreeSans Bold of 2002, licensed "subject to GNU General Public License" with no font exception. So, as DR-27 provides,
   the recorded data does not ship until the maintainer decides. The layout (`ScoreFont`, an SDL_ttf 2.24 translation)
   and the recorder are in; without data the env leaves the score out, and the parity suite installs data recorded live.
+  None of GNU FreeFont's eight archived releases (2003–2012, the later ones with the font exception) renders the same
+  glyphs: 0 of 4,633 score strings match pygame's, the vertical metrics and most digit outlines differ. The maintainer
+  then decided to ship the recorded data (DR-48, round 15).
 - **D4's rasterizer and non-finite coordinates** (P8.2, 2026-11-11): pygame's C code converts a NaN, infinite or
   out-of-range coordinate to `INT_MIN` and draws the visible part. P7's `Draw.Line(double…)` raised `ValueError` there
   instead; it now converts as pygame does, like the new `Polygon`, `Circle` and `Lines`. `Aaline`/`Aalines` (DR-37's

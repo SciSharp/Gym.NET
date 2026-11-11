@@ -20,9 +20,11 @@
     <Authors>Eli Belash</Authors>
     <Company>SciSharp STACK</Company>
     <Product>Gym.NET.Rendering</Product>
-    <Description>The software rasterizer Gym.NET's environments draw their rgb_array frames with, pixel for pixel as pygame-ce draws Gymnasium's: a Surface with pygame's semantics, SDL_gfx 2.0.26's gfxdraw primitives in C#, draw.line and draw.rect, draw.aaline and draw.aalines translated from pygame-ce (LGPL-2.0-or-later), alpha blitting, transform.flip/scale/smoothscale, image loading, surfarray and Vector2.</Description>
+    <Description>The software rasterizer Gym.NET's environments draw their rgb_array frames with, pixel for pixel as pygame-ce draws Gymnasium's: a Surface with pygame's semantics, SDL_gfx 2.0.26's gfxdraw primitives in C#, draw.line and draw.rect, draw.aaline and draw.aalines translated from pygame-ce's draw.c, alpha blitting, transform.flip/scale/smoothscale, image loading, surfarray and Vector2.</Description>
     <Copyright>2019-2026 © SciSharp STACK Team</Copyright>
-    <PackageLicenseExpression>Apache-2.0 AND LGPL-2.0-or-later</PackageLicenseExpression>
+    <!-- The repository's base license, as every Gym.NET package (the maintainer's decision DR-49, which replaced DR-37's
+         combined expression on 2026-11-11). Draw.Aaline.cs keeps its source's notice as attribution (THIRD-PARTY-NOTICES.md). -->
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/SciSharp/Gym.NET</PackageProjectUrl>
     <PackageIcon>icon.png</PackageIcon>
     <PackageReadmeFile>README.md</PackageReadmeFile>

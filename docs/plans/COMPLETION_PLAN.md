@@ -121,7 +121,7 @@ Gymnasium.
 |---|---|---|---|
 | D2 | Gymnasium pin | **Re-pin to v1.4.0 now** | R0.4, before any further port |
 | D3 | NumSharp consumption | **NuGet 0.80.0 by default; `-p:NumSharpSource=Submodule` kept** for co-developing NumSharp fixes, with `refs/NumSharp` at `v0.80.0` | R0.1 |
-| D4 | pygame `draw.*` (LGPL-2.1) | **Gym.NET's own implementations**, proven pixel-exact against live pygame-ce by the parity suite; no LGPL code enters Gym.NET. *Amended 2026-11-10 by DR-37: `draw.aaline`/`aalines` alone are translated from pygame-ce's `draw.c` and keep its LGPL, inside `Gym.Rendering`* | P7 |
+| D4 | pygame `draw.*` (LGPL-2.1) | **Gym.NET's own implementations**, proven pixel-exact against live pygame-ce by the parity suite; no LGPL code enters Gym.NET. *Amended 2026-11-10 by DR-37: `draw.aaline`/`aalines` alone are translated from pygame-ce's `draw.c` and keep its LGPL, inside `Gym.Rendering`; on 2026-11-11 by DR-49: every package, `Gym.NET.Rendering` included, is Apache-2.0, with the source's notice kept as attribution* | P7 |
 | D5 | Box2D | **Managed C# port of the Box2D 2.3.x core** that `box2d==2.3.10` compiles, float32, C++ operation order kept, proven by engine goldens first | P8 |
 | D10 | The Aether LunarLander | Removed when LunarLander-v3 lands in P8, which is before 2.0 (follows from D21) | P8.5 |
 | D18 | ImageSharp advisories | **Suppress the five advisories and keep ImageSharp 2.1.13** | R0.2; consumers of the packages still see the advisories in their own restores (§8) |
@@ -775,7 +775,8 @@ Specs: the port plan's §9 and §10; sources `vector` 3,113 lines and `wrappers`
     maintainer's choice):*
     - `src/Gym.Rendering/Draw.Aaline.cs` translates `aaline`, `aalines`, `draw_aaline` and `get_antialiased_color`
       statement for statement in float32, under pygame-ce's LGPL notice and a dated change notice. The package is
-      `Apache-2.0 AND LGPL-2.0-or-later`, and THIRD-PARTY-NOTICES carries the notice.
+      `Apache-2.0 AND LGPL-2.0-or-later`, and THIRD-PARTY-NOTICES carries the notice. *Amended 2026-11-11 by DR-49:
+      every package is Apache-2.0, the repository's base licence; the notice stays as attribution.*
     - The 2 corpus cells and MountainCar's 8 whole-frame cells are gates. New cells: starts in (-1, 0), where pygame's
       blend wraps, and zero-length segments. Two headless unit tests pin pygame's pixels for the wrap and for the
       two-point quirk.
@@ -788,6 +789,10 @@ Specs: the port plan's §9 and §10; sources `vector` 3,113 lines and `wrappers`
 ### P8 Box2D
 
 Specs: the port plan's §5.6 and §11.3; sources 2,979 lines.
+
+*Done 2026-11-11 (P8.1–P8.5): the five ids run on the managed engine with every parity layer green, each with goldens
+(CarRacing's since its score glyphs ship, DR-48), and no `[OpenBugs]` cell of P8's own is left (each id's step before a
+reset waits on NumSharp's N-1).*
 
 - **P8.1 The Box2D engine (D5, DR-26, DR-29):** an assembly `Gym.Box2D` inside `Gym.NET.Environments` (DR-16; the
   NuGet id `Box2D.NET` is taken). It opens with DR-29's measurement: the contact solver's and broad-phase's hot loops
@@ -906,7 +911,7 @@ Specs: the port plan's §5.6 and §11.3; sources 2,979 lines.
     does. The inventory lists three fewer missing names.
 - **P8.4** CarRacing-v3 as `CarRacingEnv` with `car_dynamics`; its score text drawn from glyph data recorded once from
   live pygame and SDL_ttf's shaded layout (DR-27), after the font-data license check; coordinate with PR #13.
-  *Done 2026-11-11, except shipping the score's glyph data, which waits on the maintainer:*
+  *Done 2026-11-11; the score's glyph data ships since the maintainer's round-15 answer (DR-48, below):*
   - `src/Gym.Environments/Envs/Box2D/CarDynamics.cs`: Gymnasium's `car_dynamics` (`Car`, `Particle`, and `CarWheel` for
     the attributes Python hangs on wheel bodies). The wheel physics is float64 over the bodies' float32 state. One
     pybox2d quirk is kept: a skid's start point is `body.position`, a live view in pybox2d, so a new mark's two first
@@ -929,23 +934,33 @@ Specs: the port plan's §5.6 and §11.3; sources 2,979 lines.
     score from -1500 to 2600, 3,000 random strings, 65-glyph runs).
   - **The licence check (DR-27) found** that pygame-ce 2.5.8's `freesansbold.ttf` is GNU FreeFont's FreeSans Bold of 2002,
     whose embedded licence reads "The use of this font is granted subject to GNU General Public License", with no font
-    exception (later FreeFont releases added one). So, as DR-27 requires, the data is not committed: the env draws no
-    score without it (`ScoreFont.Current` is null), and the parity suite installs data recorded live. Whether the
-    rasterized glyphs may ship is the maintainer's question (asked with the deferred ones). Until it is answered,
-    CarRacing has no golden, since a replay without Python would need the data.
-  - Parity: `CarRacingLiveParityTests` (27 gated): the score font against pygame; resets (5); the world a reset builds
+    exception (later FreeFont releases added one, but none of the eight archived releases renders the same glyphs: 0 of
+    4,633 score strings). So, as DR-27 requires, the data waited for the maintainer, who decided in round 15 to ship it,
+    licence set aside, and to "handle all cases of what might be plotted in that box" (DR-48).
+  - **The glyph data ships (DR-48)** as `src/Gym.Environments/Assets/fonts/freesansbold-42.json`, read once by
+    `ScoreFont.Embedded`. It holds every character `f"{self.reward:04.0f}"` can show: the digits, `-`, and the letters
+    of `nan` and `inf` (15 glyphs, 109 kerned pairs, and the font's one ligature among them, `fi`, which `ScoreFont`
+    refuses since no score contains it). `FormatScore` was fixed on the way: a NaN of either sign is `0nan` and the
+    infinities `0inf`/`-inf` as Python pads them (it gave C's ` nan`), and a large double shows every digit of the
+    integer it holds (.NET's `"0"` format stopped at 15 significant digits). The layout matches pygame on 14,758 strings
+    over the 15 characters (the prototype) and 3,663 live; the score's box matches Gymnasium's in both frame kinds for 32
+    kinds of value, NaN, the infinities and 309-digit boxes clipped at both edges included.
+  - Parity: `CarRacingLiveParityTests` (29 gated): the embedded glyph data against a live recording; the score font
+    against pygame; the score's box for every kind of value; resets (5); the world a reset builds
     (track, polygons and colours, tiles' hulled vertices, the car; 5 seeds with and without randomization); sampled
     episodes of both modes; two laps of a track-following driver (1,709 and 1,767 steps to the lap's end); `rgb_array`
     frames with skid marks; randomized resets with `{"randomize": False/True}`; 10 action forms and 3 refused discrete
     actions; leaving the playfield (-100); render before reset (`None`); spaces; metadata; `make`'s stack. The step
     before a reset is open (N-1). Also: registration (threshold `900` printing `900.0`), `check_env` and
-    `check_environments_match` through the bridge (`BridgeReward.FloatOrOffFieldInt`), and the coverage cells.
-  - Unit tests: `CarRacingTests` (the demo's keyboard handler, the score's format, an env without glyph data). The
+    `check_environments_match` through the bridge (`BridgeReward.FloatOrOffFieldInt`), two goldens (60 continuous and
+    40 discrete sampled steps), and the coverage cells.
+  - Unit tests: `CarRacingTests` (the demo's keyboard handler, the score's format against CPython's own texts, the
+    embedded font over every kind of score text, frames at extreme scores). The
     `[OpenBugs("P8")]` tests that waited for CarRacing run: domain randomization, discrete validation, `make`'s kwargs
     error, `NormalizeObservation`, `ResizeObservation` and the image vector wrappers. The inventory lists five fewer
     missing names; only the two private `ContactDetector`s remain among box2d's, by design.
   - PR #13 (an open 2023 CarRacing on Aether, with a LEM lander that is not Gymnasium's) is superseded by this env;
-    what to tell its author is the maintainer's call, so nothing was posted.
+    asked in round 15, the maintainer keeps answering its author for themselves, so nothing was posted.
 - **P8.5** Delete the Aether LunarLander (D10) and the `Aether.Physics2D`, `ImageSharp.Drawing` and `Fonts`
   references in `Gym.Environments`; B-17…B-30 close.
   *Done 2026-11-11 (ahead of P8.4, which it does not depend on):*
@@ -1099,7 +1114,7 @@ one:
 | pygame `draw` from our own code (D4) | A primitive that won't converge stalls P7 | The random-shape harness reports the first differing pixel and its neighbourhood; the maintainer decides before any other route |
 | Box2D float32 trigonometry (D5) | Box2D calls `sinf`/`cosf`/`atan2f` from MSVC's CRT; .NET's `MathF` must agree on win-x64 | The first engine goldens include rotation-heavy scenes; a mismatch surfaces at P8.1, before any env. **Closed 2026-11-10:** every engine scene is bit-identical with pybox2d on win-x64, net8.0 and net10.0 |
 | Box2D on NumSharp (DR-29) | `NDArray`s in the solver's hot loops could cost performance or code size | P8.1 measures both forms per subsystem before choosing; float32 structs where NDArrays lose. **Closed 2026-11-10:** NDArrays lost in both measured loops (6.2× and 1.6× slower), so the engine is float32 structs |
-| CarRacing's recorded glyphs (DR-27) | The font is GNU FreeFont (GPL with a font exception); its glyph data ships in Gym.NET | License check before P8.4; if the data can't ship, the text design goes back to review before P8.4 continues |
+| CarRacing's recorded glyphs (DR-27) | The font is GNU FreeFont (GPL with a font exception); its glyph data ships in Gym.NET | License check before P8.4; if the data can't ship, the text design goes back to review before P8.4 continues. *Checked 2026-11-11: plain GPL, no font exception; the maintainer decided to ship the data, licence set aside (DR-48)* |
 | The source generator (DR-13, DR-34) | One generator project feeds composite records and options records; a defect there reaches every env | Its output is covered by the same parity cells as hand-written code (`repr`, `==`, kwargs binding) |
 | MuJoCo postponed (DR-35) | 2.0 ships without Gymnasium's mujoco family | Release notes say so; DR-30, DR-31 and DR-33 keep the approved design for when it resumes (a managed port is XXL, and its bitwise parity with native MuJoCo is uncertain until measured) |
 | Gymnasium moves past v1.4.0 | Work against a superseded pin | Re-pin only at a release tag, by the port plan's §14.10, between phases |

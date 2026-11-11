@@ -1,6 +1,7 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Gym.Environments.Envs.Box2D;
 using Gym.Envs;
 using Gym.Observations;
@@ -10,9 +11,9 @@ using NumSharp;
 
 namespace Gym.Tests.Envs.Box2D {
     /// <summary>
-    ///     What the parity suite cannot compare live about <see cref="CarRacingEnv"/>: its demo keyboard handler
-    ///     (<c>register_input</c> exists only when Gymnasium's module runs as a script), the score's text format, and the
-    ///     frames without the score's glyph data (DR-27's data does not ship yet).
+    ///     What runs without Python about <see cref="CarRacingEnv"/>: its demo keyboard handler (<c>register_input</c> exists
+    ///     only when Gymnasium's module runs as a script), the score's text format against Python's own outputs, and the
+    ///     embedded score font over every text the score can show (DR-48); the parity suite compares the pixels live.
     /// </summary>
     /// <remarks>
     ///     The events go through the process-wide <see cref="EventQueue"/>, so the class runs its tests one at a time
@@ -77,40 +78,65 @@ namespace Gym.Tests.Envs.Box2D {
         }
 
         /// <summary>
-        ///     The score's text is Python's <c>f"{reward:04.0f}"</c>: rounded half to even, a negative zero keeps its sign, and
-        ///     zeros pad after the sign to four characters.
+        ///     The score's text is Python's <c>f"{reward:04.0f}"</c>, each expectation printed by CPython 3.12: rounded half to
+        ///     even, a negative zero keeps its sign, zeros pad after the sign to four characters, a large double shows every digit
+        ///     of the integer it holds (not .NET's 15 significant digits), a NaN of either sign is <c>0nan</c> and the infinities
+        ///     <c>0inf</c> and <c>-inf</c>.
         /// </summary>
         [TestMethod]
         public void FormatScore_IsPythonsZeroPaddedFormat() {
+            const string maxValue = "179769313486231570814527423731704356798070567525844996598917476803157260780028538760589558632766878171540458953514382464234321326889464182768467546703537516986049910576551282076245490090389328944075868508455133942304583236903222948165808559332123348274797826204144723168738177180919299881250404026184124858368";
             // Pairs, not a dictionary: 0.0 and -0.0 are equal keys, and the negative zero is a case of its own.
             var cases = new List<(double Value, string Expected)> {
                 (0.0, "0000"), (-0.0, "-000"), (-0.1, "-000"), (-0.5, "-000"), (-0.6, "-001"), (12.5, "0012"), (13.5, "0014"),
                 (999.7, "1000"), (1000.0, "1000"), (-100.0, "-100"), (-1234.4, "-1234"), (54321.0, "54321"),
+                (2.5, "0002"), (-2.5, "-002"), (9999.5, "10000"), (-999.5, "-1000"), (double.Epsilon, "0000"), (-double.Epsilon, "-000"),
+                (9007199254740993.0, "9007199254740992"), (1e23, "99999999999999991611392"), (-1e20, "-100000000000000000000"),
+                (double.MaxValue, maxValue), (double.MinValue, "-" + maxValue),
+                (double.NaN, "0nan"), (BitConverter.Int64BitsToDouble(0x7FF8000000000000), "0nan"),
+                (double.PositiveInfinity, "0inf"), (double.NegativeInfinity, "-inf"),
             };
             foreach ((double value, string expected) in cases)
                 Assert.AreEqual(expected, CarRacingEnv.FormatScore(value), $"format({value:R}, '04.0f')");
         }
 
         /// <summary>
-        ///     Without glyph data CarRacing still steps and renders, leaving the score's area black: the observation stays in
-        ///     its space and the 600×400 frame has its size.
+        ///     The embedded score font holds every character the score can show and lays out every kind of score text, up to
+        ///     the 309 characters of <see cref="double.MaxValue"/>: one row of the line skip's 46 pixels each time. It refuses
+        ///     the ligature sequence <c>fi</c> (pygame draws one glyph the data does not hold) and a character it has no glyph
+        ///     for.
         /// </summary>
         [TestMethod]
-        public void WithoutScoreGlyphs_TheEnvStillStepsAndRenders() {
-            ScoreFont? installed = ScoreFont.Current;
-            ScoreFont.Current = null;
-            try {
-                using var env = new CarRacingEnv(renderMode: "rgb_array");
-                using NDArray observation = env.Reset(1).Observation;
-                Assert.IsTrue(env.ObservationSpace.Contains(observation));
-                using NDArray action = np.array(new[] { 0.0f, 1.0f, 0.0f });
+        public void EmbeddedScoreFont_LaysOutEveryTextTheScoreCanShow() {
+            ScoreFont font = ScoreFont.Embedded;
+            foreach (string text in new[] { "0123456789-", "0nan", "0inf", "-inf", "-000", CarRacingEnv.FormatScore(double.MinValue) }) {
+                (byte[] levels, int width, int height) = font.RenderShaded(text);
+                Assert.AreEqual(46, height, $"'{text}' height");
+                Assert.AreEqual(width * height, levels.Length, $"'{text}' levels");
+                Assert.IsTrue(levels.Any(level => level == 255), $"'{text}' draws full coverage somewhere.");
+            }
+
+            Assert.ThrowsExactly<ArgumentException>(() => font.RenderShaded("fi"));
+            Assert.ThrowsExactly<ArgumentException>(() => font.RenderShaded("0x"));
+        }
+
+        /// <summary>
+        ///     CarRacing renders the observation and the 600×400 frame for every kind of score: NaN, both infinities and the
+        ///     widest finite scores, whose box is clipped at both edges of the frame.
+        /// </summary>
+        [TestMethod]
+        public void ExtremeScores_RenderInBothFrameKinds() {
+            using var env = new CarRacingEnv(renderMode: "rgb_array");
+            using NDArray observation = env.Reset(1).Observation;
+            foreach (double score in new[] { double.NaN, double.PositiveInfinity, double.NegativeInfinity, double.MaxValue, double.MinValue }) {
+                env.Reward = score;
+                using NDArray action = np.array(new[] { 0.0f, 0.0f, 0.0f });
                 StepResult<NDArray> step = env.Step(action);
-                step.Observation.Dispose();
+                using (step.Observation)
+                    Assert.IsTrue(env.ObservationSpace.Contains(step.Observation), $"Observation at score {score:R}.");
                 var frame = (RenderResult.Rgb)env.Render();
                 using (frame.Frame)
-                    CollectionAssert.AreEqual(new long[] { 400, 600, 3 }, frame.Frame.shape);
-            } finally {
-                ScoreFont.Current = installed;
+                    CollectionAssert.AreEqual(new long[] { 400, 600, 3 }, frame.Frame.shape, $"Frame at score {score:R}.");
             }
         }
 

@@ -1,16 +1,23 @@
-"""Records the glyph data CarRacing's score is drawn with (DR-27): pygame's default font at size 42.
+"""Records the glyph data CarRacing's score is drawn with (DR-27, DR-48): pygame's default font at size 42.
 
-For each of '0'-'9' and '-': SDL_ttf's glyph box (left, top, width, rows from TTF_GlyphMetrics), its 8-bit coverage
-(read from a one-glyph shaded render), and its hinted advance in 26.6 (whole pixels: FreeType's autohinter rounds
-them); for each pair of them, the kerning HarfBuzz adds, from the font's kern table scaled as hb_font_t::em_scale_x
-does; and the font's ascent, height and line skip. Gym.NET's ScoreFont lays these out as SDL_ttf 2.24 does.
+The score is Python's f"{reward:04.0f}" of a float, which can show 15 characters: the digits, '-', and the letters of
+"nan" and "inf" (any NaN shows as "0nan", the infinities as "0inf" and "-inf"). For each of them: SDL_ttf's glyph box
+(left, top, width, rows from TTF_GlyphMetrics), its 8-bit coverage (read from a one-glyph shaded render), and its hinted
+advance in 26.6 (whole pixels: FreeType rounds them); for each pair of them, the kerning HarfBuzz adds, from the font's
+kern table scaled as hb_font_t::em_scale_x does; the sequences of them HarfBuzz replaces by a ligature (the font's
+'liga' feature turns "fi" into one glyph), which Gym.NET's ScoreFont refuses, since no score contains them; the font's
+ascent, height and line skip; and the font file's name and SHA-256. Gym.NET's ScoreFont lays these out as SDL_ttf 2.24
+does.
 
-Usage: python record_score_font.py OUTPUT.json   (needs the parity stack's pygame-ce 2.5.8)
+The data ships embedded in Gym.NET.Environments as src/Gym.Environments/Assets/fonts/freesansbold-42.json (the
+maintainer's decision of 2026-11-11, DR-48). The parity cell
+CarRacingLiveParityTests.GymNet_ScoreFont_EmbeddedDataIsTheLiveRecording compares it with a live recording, so a
+pygame-ce re-pin that changes the font fails there. Re-record with the parity stack's pygame-ce 2.5.8:
 
-The data is not committed until the maintainer decides it may ship (DR-27's licence check): the font is GNU FreeFont's
-FreeSans Bold of 2002, whose embedded licence is the GPL. The parity suite records it live instead.
+    python tools/parity/record_score_font.py src/Gym.Environments/Assets/fonts/freesansbold-42.json
 """
 import base64
+import hashlib
 import json
 import os
 import struct
@@ -19,8 +26,13 @@ import sys
 import numpy as np
 import pygame
 
-CHARS = "0123456789-"
+# Every character f"{x:04.0f}" can produce for a float: the digits, the sign, and the letters of "nan" and "inf".
+CHARS = "0123456789-afin"
 SIZE = 42
+
+# The GSUB features HarfBuzz applies to horizontal text by default (its common and horizontal features). The font's other
+# features, 'init' and 'medi', belong to the Arabic shaper and never apply to these characters.
+DEFAULT_GSUB_FEATURES = {"ccmp", "locl", "rlig", "calt", "clig", "liga", "rclt"}
 
 
 def _tables(data):
@@ -110,17 +122,108 @@ def _kern_units(data, tables):
     return pairs
 
 
+def _coverage(data, offset):
+    """An OpenType coverage table's glyphs, in coverage-index order.
+
+    Args:
+        data: The TrueType file's bytes.
+        offset: The coverage table's offset in the file.
+
+    Returns:
+        list: The glyph ids; the i-th one is covered with index i.
+
+    Raises:
+        RuntimeError: The table has a format other than 1 (a glyph array) or 2 (glyph ranges).
+    """
+    fmt, count = struct.unpack(">HH", data[offset: offset + 4])
+    if fmt == 1:
+        return list(struct.unpack(f">{count}H", data[offset + 4: offset + 4 + 2 * count]))
+    if fmt != 2:
+        raise RuntimeError(f"coverage format {fmt}")
+    glyphs = []
+    for r in range(count):
+        # Ranges come in coverage-index order, so their glyphs line up with the indices when concatenated.
+        start, end, _first_index = struct.unpack(">HHH", data[offset + 4 + 6 * r: offset + 10 + 6 * r])
+        glyphs.extend(range(start, end + 1))
+    return glyphs
+
+
+def _ligatures(data, tables, ids):
+    """The sequences of recorded characters that the font's default GSUB features replace by one ligature glyph.
+
+    Only the FeatureList is read, not the ScriptList's per-script choice: pygame's font has one script ('latn'), whose
+    default language system lists every feature.
+
+    Args:
+        data: The TrueType file's bytes.
+        tables: The table directory from _tables.
+        ids: Each recorded character's glyph id, from _glyph_ids.
+
+    Returns:
+        list: The sequences (strings of two or more recorded characters), sorted; empty without a GSUB table.
+
+    Raises:
+        RuntimeError: A default feature uses a lookup other than a ligature substitution, which the layout does not
+            model, or a coverage table of an unknown format.
+    """
+    if "GSUB" not in tables:
+        return []
+    chars = {g: ch for ch, g in ids.items() if g}
+    base = tables["GSUB"][0]
+
+    def u16(offset):
+        return struct.unpack(">H", data[offset: offset + 2])[0]
+
+    feature_list = base + u16(base + 6)
+    lookup_list = base + u16(base + 8)
+    lookups = set()
+    for i in range(u16(feature_list)):
+        record = feature_list + 2 + 6 * i
+        if data[record: record + 4].decode("latin-1") in DEFAULT_GSUB_FEATURES:
+            feature = feature_list + u16(record + 4)
+            lookups.update(u16(feature + 4 + 2 * j) for j in range(u16(feature + 2)))
+    found = set()
+    for index in sorted(lookups):
+        lookup = lookup_list + u16(lookup_list + 2 + 2 * index)
+        kind = u16(lookup)
+        for k in range(u16(lookup + 4)):
+            sub = lookup + u16(lookup + 6 + 2 * k)
+            sub_kind = kind
+            if kind == 7:
+                # An extension lookup: the real subtable and its type sit behind a 32-bit offset.
+                sub_kind = u16(sub + 2)
+                sub += struct.unpack(">I", data[sub + 4: sub + 8])[0]
+            if sub_kind != 4:
+                raise RuntimeError(f"GSUB lookup {index} (type {sub_kind}) of a default feature is not modelled")
+            for position, first in enumerate(_coverage(data, sub + u16(sub + 2))):
+                if first not in chars:
+                    continue
+                ligature_set = sub + u16(sub + 6 + 2 * position)
+                for m in range(u16(ligature_set)):
+                    ligature = ligature_set + u16(ligature_set + 2 + 2 * m)
+                    # ligatureGlyph, componentCount, then the components after the first (the covered glyph).
+                    components = [u16(ligature + 4 + 2 * c) for c in range(u16(ligature + 2) - 1)]
+                    if all(c in chars for c in components):
+                        found.add(chars[first] + "".join(chars[c] for c in components))
+    return sorted(found)
+
+
 def record():
     """Records the score font's data from the running pygame.
 
     Returns:
-        dict: JSON-ready: font, size, ascent, height and lineskip; glyphs (each character's left, top, width, rows,
-        26.6 advance and base64 coverage); kerning (each kerned pair of characters mapped to its 26.6 adjustment).
+        dict: JSON-ready: font, sha256, size, ascent, height and lineskip; glyphs (each character's left, top, width,
+        rows, 26.6 advance and base64 coverage); kerning (each kerned pair of characters mapped to its 26.6
+        adjustment); ligatures (the character sequences the font's default GSUB features substitute).
+
+    Raises:
+        RuntimeError: The font lacks a format-4 Unicode cmap, or its GSUB uses what _ligatures does not model.
     """
     pygame.font.init()
     path = os.path.join(os.path.dirname(pygame.__file__), pygame.font.get_default_font())
     font = pygame.font.Font(path, SIZE)
-    data = open(path, "rb").read()
+    with open(path, "rb") as f:
+        data = f.read()
     tables = _tables(data)
     head = tables["head"][0]
     upem = struct.unpack(">H", data[head + 18: head + 20])[0]
@@ -132,7 +235,7 @@ def record():
         surf = font.render(ch, True, (255, 255, 255), (0, 0, 0))
         levels = np.array(pygame.surfarray.pixels2d(surf)).T  # rows of palette indices = coverage
         x0 = max(minx, 0)  # a negative bearing shifts the line right by -minx (xstart)
-        y0 = ascent - maxy
+        y0 = max(ascent - maxy, 0)  # a glyph above the ascent shifts the line down (ystart)
         box = np.ascontiguousarray(levels[y0: y0 + rows, x0: x0 + width], dtype=np.uint8)
         glyphs[ch] = {"left": minx, "top": maxy, "width": width, "rows": rows, "advance": advance * 64,
                       "coverage": base64.b64encode(box.tobytes()).decode("ascii")}
@@ -147,10 +250,13 @@ def record():
             v = units.get((ids[a], ids[b]), 0)
             if v:
                 kerning[a + b] = (v * mult + 32768) >> 16
-    return {"font": os.path.basename(path), "size": SIZE, "ascent": ascent, "height": font.get_height(),
-            "lineskip": font.get_linesize(), "glyphs": glyphs, "kerning": kerning}
+    return {"font": os.path.basename(path), "sha256": hashlib.sha256(data).hexdigest(), "size": SIZE, "ascent": ascent,
+            "height": font.get_height(), "lineskip": font.get_linesize(), "glyphs": glyphs, "kerning": kerning,
+            "ligatures": _ligatures(data, tables, ids)}
 
 
 if __name__ == "__main__":
-    with open(sys.argv[1], "w", encoding="utf-8") as out:
+    # LF endings and a final newline, so the committed file reads the same on every OS.
+    with open(sys.argv[1], "w", encoding="utf-8", newline="\n") as out:
         json.dump(record(), out, indent=1)
+        out.write("\n")

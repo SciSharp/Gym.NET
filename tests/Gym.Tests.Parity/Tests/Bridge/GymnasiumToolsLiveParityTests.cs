@@ -391,8 +391,6 @@ namespace Gym.Tests.Parity.Tests.Bridge {
         [DataRow("CarRacing-v3")]
         public void CheckEnv_PassesGymNetsBox2DEnvs_AsGymnasiumsOwn(string id) {
             SkipOffReferencePlatform("Box2D's sinf/cosf");
-            // CarRacing's frames carry its score, whose glyph data the suite records live (DR-27's data does not ship yet).
-            Envs.CarRacingLiveParityTests.EnsureScoreFont();
             IEnvironmentViewerFactoryDelegate? previous = Gymnasium.HumanViewerFactory;
             // check_env makes the env in human mode too; Gym.NET's renders into a headless viewer, as pygame does under SDL's dummy driver.
             Gymnasium.HumanViewerFactory = NullEnvViewer.Factory;
@@ -435,7 +433,6 @@ namespace Gym.Tests.Parity.Tests.Bridge {
         [DataRow("CarRacing-v3")]
         public void CheckEnvironmentsMatch_GymNetsBox2DEnvs_AsGymnasiumsOwn(string id) {
             SkipOffReferencePlatform("Box2D's sinf/cosf");
-            Envs.CarRacingLiveParityTests.EnsureScoreFont();
             using var bridge = new ReverseBridge();
             foreach (long seed in new long[] { 0, 123 }) {
                 using PyRef reference = PyRef.Of(() => Python.gymnasium.make(id, render_mode: "rgb_array"));

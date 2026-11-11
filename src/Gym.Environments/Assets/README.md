@@ -14,6 +14,9 @@ hashes in step when a re-pin re-copies the files.
 Each file is embedded under the resource name `assets/<path>` (forward slashes on every OS), read through
 `EnvAssets.Load` and decoded with `ImageIO.Load(Stream)`.
 
+One file is not an image and not a copy: `fonts/freesansbold-42.json`, CarRacing's score glyphs, recorded from pygame-ce
+(see [fonts](#fonts) below).
+
 ## classic_control
 
 | File | Source | SHA-256 | Used by |
@@ -124,3 +127,19 @@ FrozenLake's tiles and overlays (`toy_text/*.png`), CliffWalking's (`toy_text/cl
 | `toy_text/blackjack/label_dealer.png` | `refs/Gymnasium/gymnasium/envs/toy_text/img/blackjack/label_dealer.png` | `3caf50e1d24e93ed6e2d7b289be33c622b9c806fee25a9769d5708b15c00aa94` |
 | `toy_text/blackjack/label_player.png` | `refs/Gymnasium/gymnasium/envs/toy_text/img/blackjack/label_player.png` | `572060fc4835852e5b131b2d6d05a3518fe357e765ae743d332f04ee8a938277` |
 | `toy_text/blackjack/label_usable_ace.png` | `refs/Gymnasium/gymnasium/envs/toy_text/img/blackjack/label_usable_ace.png` | `4db00a4cfabeb98d68d0890762e1eb0c8d82abaea367aac9c363bec07a64b2bf` |
+
+## fonts
+
+CarRacing's score (`f"{self.reward:04.0f}"` in pygame's default font at size 42) as glyph data, embedded on the
+maintainer's decision of 2026-11-11 (DR-48) and read by `ScoreFont`, which lays it out as SDL_ttf 2.24 does. It holds
+the 15 characters the score can show (the digits, `-`, and the letters of `nan` and `inf`): each glyph's box, bearings,
+hinted 26.6 advance and 8-bit coverage; the kerning of their 109 kerned pairs; the one ligature among them (`fi`), which
+`ScoreFont` refuses; the font's ascent, height and line skip; and the source font's name and SHA-256.
+
+| File | Source | Source SHA-256 | SHA-256 |
+|---|---|---|---|
+| `fonts/freesansbold-42.json` | pygame-ce 2.5.8's `freesansbold.ttf` (GNU FreeFont's FreeSans Bold, 2002), recorded by `tools/parity/record_score_font.py` | `bf9251269f11e4b35582a99376096deee3d0c4973a459cbd97b0bebc01f440ad` | `5b00872b898cbbebe2dad843c850a937a931e80bc45b45ceb42480606125b072` |
+
+The parity cell `CarRacingLiveParityTests.GymNet_ScoreFont_EmbeddedDataIsTheLiveRecording` compares the file with a live
+recording, so a pygame-ce re-pin that changes the font fails there. Re-record with the parity stack's pygame-ce:
+`python tools/parity/record_score_font.py src/Gym.Environments/Assets/fonts/freesansbold-42.json`.

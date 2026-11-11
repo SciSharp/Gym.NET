@@ -20,8 +20,9 @@
     License along with this library; if not, write to the Free
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
-    This file is therefore distributed under the GNU Library General Public License, version 2 or (at your option) any
-    later version (SPDX: LGPL-2.0-or-later), while the rest of Gym.NET.Rendering is Apache-2.0; see THIRD-PARTY-NOTICES.md.
+    Gym.NET.Rendering, this file included, is licensed under the repository's Apache License 2.0, as every Gym.NET
+    package is (the maintainer's decision DR-49 of docs/plans/DESIGN_REVIEW.md, 2026-11-11); the notice above credits the
+    source, which THIRD-PARTY-NOTICES.md lists.
 
     Changes from the original, made on 2026-11-10 by the Gym.NET authors: translated from C to C#; reduced to width 1 on
     32-bit surfaces without per-pixel alpha, whose clip rectangle is the whole surface; the bounding box of the drawn
@@ -48,7 +49,7 @@ namespace Gym.Rendering {
         /// <exception cref="NotSupportedException">Thrown for a surface with per-pixel alpha (not modelled).</exception>
         /// <exception cref="ValueError">Thrown for a coordinate that is NaN or infinite, which pygame's C code would cast to an integer with undefined results.</exception>
         /// <remarks>
-        ///     Translated from pygame-ce 2.5.8's <c>draw_aaline</c> (DR-37, LGPL-2.0-or-later, see this file's header): the
+        ///     Translated from pygame-ce 2.5.8's <c>draw_aaline</c> (DR-37; its notice is in this file's header): the
         ///     coordinates are float32, as pygame converts them, and every step is a float32 operation in pygame's order, which
         ///     C# reproduces bit for bit (x64 single precision, no fused multiply-adds). Width 1 only, which is all Gymnasium
         ///     draws. Reference: <see href="https://github.com/pygame-community/pygame-ce/blob/2.5.8/src_c/draw.c#L132">src_c/draw.c</see>.

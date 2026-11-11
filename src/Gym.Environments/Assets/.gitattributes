@@ -1,0 +1,3 @@
+# The recorded score glyphs (fonts/*.json) are embedded byte for byte and listed with their SHA-256 in README.md, so every
+# checkout keeps the LF endings the recorder writes, whatever core.autocrlf says. The images are binary to Git already.
+*.json text eol=lf

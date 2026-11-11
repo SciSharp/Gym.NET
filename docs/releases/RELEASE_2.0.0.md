@@ -1,13 +1,12 @@
 # Gym.NET 2.0.0
 
 > **Draft, not released.** Prepared on 2026-11-09 on the working branch `journey1`; nothing is merged into `master`,
-> tagged or published. Before the release (completion plan P10.5):
+> tagged or published. Since then the Box2D environments (P8: LunarLander-v3, LunarLanderContinuous-v3,
+> BipedalWalker-v3, BipedalWalkerHardcore-v3, CarRacing-v3) landed on 2026-11-11, and the inventory's list of missing
+> names holds only MuJoCo's names and `AtariPreprocessing`, besides names that do not apply to .NET (JAX, pickling,
+> process workers) or that Gym.NET merges by design. What remains is the release itself (completion plan P10.5).
 >
-> - **P8, the Box2D environments** (LunarLander-v3, LunarLanderContinuous-v3, BipedalWalker-v3,
->   BipedalWalkerHardcore-v3, CarRacing-v3), which the approved 2.0 scope includes (D21).
-> - The exit check: the inventory's list of missing names holds only MuJoCo's names and `AtariPreprocessing`.
->
-> Update this page when any of these lands; the numbers under "Verification" are those of the preparing commit.
+> Update this page when anything changes; the numbers under "Verification" are those of 2026-11-11, after P8.
 
 Gym.NET 2.0 gives .NET reinforcement-learning environments with Farama Gymnasium's API and behavior. For the same
 seed and actions, its environments return the same observations, rewards, flags and infos as Gymnasium v1.4.0's, bit
@@ -19,15 +18,15 @@ It replaces 0.2's API, which followed gym before 0.26, with Gymnasium's.
 | Package | Contents |
 |---|---|
 | Gym.NET | The env contract, wrappers, spaces, registry (`Gymnasium.Make`, `MakeVec`), vector envs, checkers, seeding, errors; `Gym.Legacy` |
-| Gym.NET.Rendering (new) | The rasterizer `rgb_array` frames are drawn with, equal to pygame-ce's pixels; licensed `Apache-2.0 AND LGPL-2.0-or-later` (below) |
+| Gym.NET.Rendering (new) | The rasterizer `rgb_array` frames are drawn with, equal to pygame-ce's pixels |
 | Gym.NET.Environments | classic_control, toy_text and box2d (LunarLander, BipedalWalker, CarRacing), CartPole's vector env, their registration; inside it, `Gym.Box2D`: Box2D 2.3.0 in managed C#, bit for bit as pybox2d 2.3.10, with pybox2d's surface (zlib notices in THIRD-PARTY-NOTICES.md) |
 | Gym.NET.Rendering.Avalonia | A window for `human` mode on Avalonia 12 (Windows, Linux, macOS), and `PlayPlot`'s live charts on ScottPlot (`AvaloniaPlotFigure`) |
 | Gym.NET.Rendering.WinForm | The same on Windows Forms (`WinFormPlotFigure`) |
 
-All target .NET 8 and .NET 10, and depend on NumSharp 0.80.0. All are Apache-2.0 except Gym.NET.Rendering, which is
-`Apache-2.0 AND LGPL-2.0-or-later`: its `draw.aaline`/`aalines` (MountainCar's hill) are translated from pygame-ce's
-`draw.c` and keep pygame-ce's license, the GNU Library GPL version 2 or later (decision DR-37; the notice is in
-THIRD-PARTY-NOTICES.md).
+All target .NET 8 and .NET 10, depend on NumSharp 0.80.0, and are Apache-2.0, the repository's license (decision
+DR-49). The sources Gym.NET translates (Box2D 2.3.0 and pybox2d, SDL_gfx, SDL_ttf, OpenCV's resize, pygame-ce's
+`draw.aaline`/`aalines`) and the glyphs CarRacing's score is drawn with are credited, with their notices, in
+THIRD-PARTY-NOTICES.md.
 
 ## Breaking changes
 
@@ -147,15 +146,9 @@ Each has a test that asserts Gymnasium's answer and fails until the gap closes (
   message is NumSharp's `"AssertionError"` instead of Python's empty one (NumSharp gap N-1).
 - **`NotImplementedError` and `ImportError`** are `Gym.Exceptions` types until NumSharp defines them, and NumSharp's
   exceptions take no inner exception yet (N-3).
-- **CarRacing-v3's score text** is drawn from glyph data of pygame's default font (GNU FreeFont's FreeSans Bold),
-  recorded from live pygame and laid out as SDL_ttf 2.24 lays it out, exact on every score string. The data does not
-  ship until the maintainer decides it may (the font's embedded licence is the GPL; DR-27's licence check), so the
-  packaged env leaves the score out: its observations and frames match Gymnasium's everywhere but the score's few
-  pixels. The parity suite installs the recorded data and proves the rest.
-
 ## Not in 2.0 yet
 
-Nothing of P6 is deferred any more; the Box2D environments (P8) are still to come, as the note at the top says.
+Nothing of P6 or P8 is deferred.
 
 Out of 2.0 by decision:
 
@@ -196,12 +189,14 @@ A new advisory against 2.1.13 gets the same review before Gym.NET suppresses it.
 
 ## Verification
 
-At the preparing commit, on Windows x64, in Release, on net8.0 and net10.0 alike:
+On 2026-11-11, after P8, on Windows x64, in Release, on net8.0 and net10.0 alike:
 
-- the unit suite (Gymnasium's own tests rewritten in C#, and Gym.NET's): 1225 of 1225 pass, and the 10 open tests fail
-  only at their documented gaps (NumSharp's N-1, N-2 and N-3, and `make`'s human rendering);
-- the live parity suite against Gymnasium v1.4.0 on Python 3.12, NumPy 2.4.2 and pygame-ce 2.5.8: 1783 of 1783 gated
-  cells pass, and the 15 open cells fail only at their documented divergences (the gaps above and the P8 LunarLander);
-- Gymnasium's own `check_env` and `check_environments_match` pass through the reverse bridge on CartPole-v1, the four
-  other classic_control ids and the six toy_text ids;
-- the golden trajectories replay without Python.
+- the unit suite (Gymnasium's own tests rewritten in C#, and Gym.NET's): 3,549 of 3,549 pass (19 data rows skip where
+  Gymnasium's own tests call `pytest.skip`), and the 11 open tests fail only at their documented gaps (NumSharp's N-1
+  to N-4, and MuJoCo's Ant, postponed with P9);
+- the live parity suite against Gymnasium v1.4.0 on Python 3.12, NumPy 2.4.2, pygame-ce 2.5.8, Box2D 2.3.10 and
+  OpenCV 4.13.0: 2,451 of 2,451 gated cells pass, and the 7 open cells fail only at their documented divergences
+  (six at NumSharp's N-1, the bare assertion's empty message; one at Intel IPP's float32 bilinear, DR-46);
+- Gymnasium's own `check_env` and `check_environments_match` pass through the reverse bridge on all seventeen registered
+  ids;
+- the 19 golden trajectories, at least one per registered id, replay without Python.

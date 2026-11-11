@@ -960,7 +960,7 @@ release cut above: one 2.0 ships after all of them, Box2D and MuJoCo included.
 | Transcendental functions differ across platforms (libm, NumPy SIMD kernels) | L3 fails off the reference platform | Pinned reference platform (§1.3); per-function tracking on Linux (§14.9); verified bit-identical on Windows for CartPole |
 | NEP 50 promotion subtleties (float32 × Python float stays float32) | Silent divergence | §3.2 table; per-expression dtype review; goldens catch every miss |
 | Box2D port size and exactness | Box2D envs delayed | Engine-level goldens from day one; native interop fallback (D5); schedule as parallel track |
-| pygame `draw` is LGPL-2.1 | Licensing of `Gym.Rendering` | Decision D4 before P7 starts; DR-37 (2026-11-10) translates `aaline`/`aalines` alone, so `Gym.NET.Rendering` is `Apache-2.0 AND LGPL-2.0-or-later` |
+| pygame `draw` is LGPL-2.1 | Licensing of `Gym.Rendering` | Decision D4 before P7 starts; DR-37 (2026-11-10) translates `aaline`/`aalines` alone, so `Gym.NET.Rendering` is `Apache-2.0 AND LGPL-2.0-or-later`; DR-49 (2026-11-11) sets every package to the repository's Apache-2.0, the source's notice kept as attribution |
 | FreeType text rendering parity | Blackjack and CarRacing frames | FreeType interop; fonts limited to two envs |
 | MuJoCo native distribution and version drift | L3 depends on the exact native build | Pin version (D6); ship per-RID native packages |
 | NumSharp gaps (`geometric`, array-parameter distributions, `'c'` dtype) | Blocks `Sequence`; forces emulations | Upstream in NumSharp (same maintainer); exact emulation until then |
@@ -1401,7 +1401,7 @@ Every pygame and `gfxdraw` call made by in-scope Gymnasium code, with the famili
 | `Minecraft.ttf` | `gymnasium/envs/toy_text/font/` | Blackjack | License to confirm (D14) |
 | `clockwise.png` | `gymnasium/envs/classic_control/assets/` | Pendulum | Ships with Gymnasium (MIT); confirm |
 | 14 MuJoCo XML models | `gymnasium/envs/mujoco/assets/` | MuJoCo envs | Ships with Gymnasium (MIT); confirm per-file headers |
-| pygame default font (`freesansbold.ttf`) | pygame-ce package | CarRacing text | GPL with font exception; confirm |
+| pygame default font (`freesansbold.ttf`) | pygame-ce package | CarRacing text | Checked 2026-11-11: FreeSans Bold of 2002, plain GPL without the font exception; its recorded glyph data ships, the licence set aside by the maintainer (DR-48); the font file itself does not |
 
 Code licenses:
 

@@ -19,8 +19,8 @@ namespace Gym.Rendering {
     ///     <see cref="Aaline"/> and <see cref="Aalines"/> are the exception (decision DR-37): D4's black-box model of them did
     ///     not converge where segments join, so they are translated from pygame-ce 2.5.8's <c>src_c/draw.c</c>, statement for
     ///     statement in float32, and MountainCar's frames match pygame's pixel for pixel. That translation lives in its own
-    ///     file, <c>Draw.Aaline.cs</c>, under its source's license (LGPL-2.0-or-later, see THIRD-PARTY-NOTICES.md), which makes
-    ///     the Gym.NET.Rendering package <c>Apache-2.0 AND LGPL-2.0-or-later</c>.
+    ///     file, <c>Draw.Aaline.cs</c>, which carries its source's notice (THIRD-PARTY-NOTICES.md); the package is Apache-2.0,
+    ///     as every Gym.NET package is (DR-49).
     ///     </para>
     ///     <para>
     ///     The colour is written as the surface maps it: its alpha is dropped on a surface without per-pixel alpha (no

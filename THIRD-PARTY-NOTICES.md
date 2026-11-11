@@ -1,9 +1,8 @@
 # Third-party notices
 
-Gym.NET is licensed under the Apache License 2.0 (see [LICENSE](LICENSE)), except one file translated from pygame-ce,
-which keeps pygame-ce's LGPL and makes the `Gym.NET.Rendering` package `Apache-2.0 AND LGPL-2.0-or-later` (see its
-section below). Parts of Gym.NET follow third-party source code or carry third-party files; they are listed below with
-the notices their licenses require. The port plan's §4.3
+Gym.NET is licensed under the Apache License 2.0 (see [LICENSE](LICENSE)), every package of it (the maintainer's
+decision DR-49 of [docs/plans/DESIGN_REVIEW.md](docs/plans/DESIGN_REVIEW.md), 2026-11-11). Parts of Gym.NET follow
+third-party source code or carry third-party files and data; they are listed below with their sources' notices. The port plan's §4.3
 ([docs/plans/GYMNASIUM_PORT_PLAN.md](docs/plans/GYMNASIUM_PORT_PLAN.md)) keeps this list in step with the code.
 
 ---
@@ -151,8 +150,8 @@ misrepresented as being the original software.
 [SDL_ttf](https://github.com/libsdl-org/SDL_ttf) 2.24.0, the library behind `pygame.font`: the HarfBuzz layout of
 `TTF_Size_Internal`, the row height of `TTF_Render_Wrapped_Internal` and the shaded blit of `Render_Line`, which lay out
 CarRacing's score. It is an altered version, marked as such in the file: translated to C# and driven by recorded glyph
-data instead of FreeType and HarfBuzz. The glyph data itself (pygame's default font, GNU FreeFont's FreeSans Bold) does
-not ship; see DR-27 in `docs/plans/DESIGN_REVIEW.md`.
+data instead of FreeType and HarfBuzz, refusing the texts HarfBuzz would shape into a ligature. The glyph data has its
+own section below.
 
 ```
 SDL_ttf:  A companion library to SDL for working with TrueType (tm) fonts
@@ -173,6 +172,24 @@ freely, subject to the following restrictions:
 2. Altered source versions must be plainly marked as such, and must not be
    misrepresented as being the original software.
 3. This notice may not be removed or altered from any source distribution.
+```
+
+---
+
+## FreeSans Bold (GNU FreeFont): CarRacing's score glyphs
+
+`src/Gym.Environments/Assets/fonts/freesansbold-42.json`, embedded in Gym.NET.Environments, holds glyph data recorded
+from pygame-ce 2.5.8's default font, `freesansbold.ttf` (SHA-256
+`bf9251269f11e4b35582a99376096deee3d0c4973a459cbd97b0bebc01f440ad`): the size-42 rasterizations (8-bit coverage,
+bearings, hinted advances) of the 15 characters CarRacing's score can show, the kerning of their pairs and their one
+ligature, recorded by `tools/parity/record_score_font.py` (decisions DR-27 and DR-48 of
+[docs/plans/DESIGN_REVIEW.md](docs/plans/DESIGN_REVIEW.md)). The font file itself is not included. The font is GNU
+FreeFont's FreeSans Bold, whose name table reads:
+
+```
+Copyright 2002 Free Software Foundation.
+$Revision: 0.4 $
+The use of this font is granted subject to GNU General Public License.
 ```
 
 ---
@@ -306,10 +323,9 @@ the date of the change (2026-11-10): translated from C to C#, reduced to width 1
 alpha, without pygame's drawn-area bookkeeping and deprecated `blend` argument, and refusing NaN and infinite
 coordinates.
 
-That file keeps its source's license, the GNU Library General Public License, version 2 or (at your option) any later
-version. The `Gym.NET.Rendering` package, which compiles it, is therefore licensed `Apache-2.0 AND LGPL-2.0-or-later`;
-every other Gym.NET package stays Apache-2.0. The complete corresponding source is this repository. The license text:
-<https://www.gnu.org/licenses/old-licenses/lgpl-2.0.html> (SPDX `LGPL-2.0-or-later`).
+Its source's notice, which the file keeps, follows. The `Gym.NET.Rendering` package that compiles it is licensed
+Apache-2.0, as every Gym.NET package is (DR-49, which replaced DR-37's `Apache-2.0 AND LGPL-2.0-or-later` on
+2026-11-11). The complete source is this repository.
 
 ```
 pygame-ce - Python Game Library

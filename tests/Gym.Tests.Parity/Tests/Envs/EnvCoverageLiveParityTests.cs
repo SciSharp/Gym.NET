@@ -327,9 +327,6 @@ namespace Gym.Tests.Parity.Tests.Envs {
         private void SkipClassicOffReferencePlatform(string id) {
             if (IsToyText(id))
                 return;
-            // CarRacing's frames carry its score, whose glyph data the suite records live (DR-27's data does not ship yet).
-            if (id.StartsWith("CarRacing", StringComparison.Ordinal))
-                CarRacingLiveParityTests.EnsureScoreFont();
             SkipOffReferencePlatform(IsBox2D(id) ? "Box2D's sinf/cosf" : "the classic envs' cos/sin");
         }
 

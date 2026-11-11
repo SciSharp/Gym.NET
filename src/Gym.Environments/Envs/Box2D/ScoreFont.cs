@@ -21,19 +21,22 @@
 // Altered source version (Gym.NET, 2026-11-11): the single-line path of SDL_ttf 2.24.0's TTF_RenderUTF8_Shaded_Wrapped,
 // translated to C# for recorded glyph data: TTF_Size_Internal's HarfBuzz layout (26.6 positions floored per glyph, the
 // bounding box, the start offsets), TTF_Render_Wrapped_Internal's row height (the larger of the text's height and the
-// line skip), and Render_Line's shaded blit (each glyph's coverage OR-ed into an 8-bit buffer, clipped to it).
+// line skip), and Render_Line's shaded blit (each glyph's coverage OR-ed into an 8-bit buffer, clipped to it). A text
+// HarfBuzz would shape into a ligature is refused instead of drawn.
 #nullable enable
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Reflection;
 using System.Text.Json;
 
 namespace Gym.Environments.Envs.Box2D {
     /// <summary>
-    ///     The font CarRacing draws its score with (DR-27): pygame's default font at size 42, as recorded glyph data (each
-    ///     glyph's 8-bit coverage, bearings and advance, the pairs' kerning) laid out the way SDL_ttf 2.24 lays out shaded text,
-    ///     so the score's pixels are pygame's for every string of <c>0</c>–<c>9</c> and <c>-</c>.
+    ///     The font CarRacing draws its score with (DR-27, DR-48): pygame's default font at size 42, as recorded glyph data
+    ///     (each glyph's 8-bit coverage, bearings and advance, the pairs' kerning) laid out the way SDL_ttf 2.24 lays out shaded
+    ///     text, so the score's pixels are pygame's for every text Python's <c>f"{reward:04.0f}"</c> can produce: the digits,
+    ///     <c>-</c>, and the letters of <c>nan</c> and <c>inf</c>, at any length.
     /// </summary>
     /// <remarks>
     ///     <para>
@@ -44,16 +47,17 @@ namespace Gym.Environments.Envs.Box2D {
     ///     advances are FreeType's hinted ones and its kerning HarfBuzz's scaling of the font's kern table.
     ///     </para>
     ///     <para>
-    ///     The data is recorded from live pygame (<c>tools/parity/record_score_font.py</c>) and is not shipped yet: the font
-    ///     is GNU FreeFont's FreeSans Bold of 2002, whose embedded licence is the GPL, and whether its rasterized glyphs may ship
-    ///     in Gym.NET is the maintainer's decision (DR-27's licence check). Until then <see cref="Current"/> is
-    ///     <see langword="null"/> unless a caller installs data, and CarRacing leaves the score out. Thread-safe once built:
-    ///     rendering only reads.
+    ///     The data ships embedded in Gym.NET.Environments (<see cref="ResourceName"/>; the maintainer's decision of
+    ///     2026-11-11, DR-48), recorded from pygame-ce 2.5.8's <c>freesansbold.ttf</c> (GNU FreeFont's FreeSans Bold of 2002)
+    ///     by <c>tools/parity/record_score_font.py</c>; the parity suite compares it with a live recording and with pygame's
+    ///     own renders. Footgun: the font's GSUB turns <c>fi</c> into one ligature glyph, which the data does not hold, so a
+    ///     text containing a recorded ligature sequence is refused rather than drawn wrong; no score contains one. Immutable,
+    ///     so rendering is thread-safe.
     ///     </para>
     ///     <para>Reference: <see href="https://github.com/libsdl-org/SDL_ttf/blob/release-2.24.0/SDL_ttf.c#L3156">SDL_ttf.c</see> (TTF_Size_Internal, Render_Line, TTF_Render_Wrapped_Internal).</para>
     /// </remarks>
     internal sealed class ScoreFont {
-        /// <summary>The embedded resource the recorded data ships as, once it may ship.</summary>
+        /// <summary>The embedded resource the recorded data ships as (<c>Assets/fonts/freesansbold-42.json</c> in the project).</summary>
         internal const string ResourceName = "assets/fonts/freesansbold-42.json";
 
         /// <summary>The glyphs by character.</summary>
@@ -62,32 +66,34 @@ namespace Gym.Environments.Envs.Box2D {
         /// <summary>The kerning of each kerned pair, in 26.6 pixels.</summary>
         private readonly Dictionary<(char Left, char Right), int> _kerning;
 
-        /// <summary>The data a caller installed, or the embedded data, or <see langword="null"/>; see <see cref="Current"/>.</summary>
-        private static ScoreFont? _current = LoadEmbedded();
+        /// <summary>The character sequences HarfBuzz replaces by a ligature glyph, which <see cref="RenderShaded"/> refuses.</summary>
+        private readonly string[] _ligatures;
+
+        /// <summary>The embedded data, parsed once on first use; a failure is cached and rethrown on every later use.</summary>
+        private static readonly Lazy<ScoreFont> EmbeddedFont = new(LoadEmbedded);
 
         /// <summary>A font from its parts.</summary>
         /// <param name="glyphs">The glyphs by character.</param>
         /// <param name="kerning">The kerned pairs' adjustments in 26.6 pixels.</param>
+        /// <param name="ligatures">The character sequences the font's GSUB replaces by a ligature glyph.</param>
         /// <param name="ascent">SDL_ttf's ascent in pixels (the baseline's row).</param>
         /// <param name="height">SDL_ttf's font height in pixels.</param>
         /// <param name="lineSkip">SDL_ttf's line skip in pixels.</param>
-        private ScoreFont(Dictionary<char, Glyph> glyphs, Dictionary<(char Left, char Right), int> kerning, int ascent, int height, int lineSkip) {
+        private ScoreFont(Dictionary<char, Glyph> glyphs, Dictionary<(char Left, char Right), int> kerning, string[] ligatures, int ascent, int height,
+                          int lineSkip) {
             _glyphs = glyphs;
             _kerning = kerning;
+            _ligatures = ligatures;
             Ascent = ascent;
             Height = height;
             LineSkip = lineSkip;
         }
 
-        /// <summary>
-        ///     The font CarRacing uses: data a caller installed (the parity suite installs data it records from live pygame),
-        ///     else the embedded resource, else <see langword="null"/>, and then the score is not drawn.
-        /// </summary>
-        /// <remarks>Footgun: process-wide; installing data changes every CarRacing env's frames from their next render.</remarks>
-        internal static ScoreFont? Current {
-            get => _current;
-            set => _current = value;
-        }
+        /// <summary>The font CarRacing draws its score with: the embedded data, parsed on first use and shared process-wide.</summary>
+        /// <exception cref="InvalidOperationException">Thrown when the assembly lacks the embedded data (a build that dropped the asset), or a field of it has the wrong JSON kind.</exception>
+        /// <exception cref="InvalidDataException">Thrown when the embedded data lacks a field or a glyph's coverage does not fill its box.</exception>
+        /// <exception cref="JsonException">Thrown when the embedded data is not JSON.</exception>
+        internal static ScoreFont Embedded => EmbeddedFont.Value;
 
         /// <summary>The baseline's row from the top, in pixels (34).</summary>
         internal int Ascent { get; }
@@ -102,15 +108,23 @@ namespace Gym.Environments.Envs.Box2D {
         ///     Lays a text out and draws it as SDL_ttf's shaded rendering does: the coverage levels 0 (background) to 255
         ///     (foreground) of a <c>width × height</c> surface, row by row.
         /// </summary>
-        /// <param name="text">The text, of characters the data has (<c>0</c>–<c>9</c> and <c>-</c>).</param>
+        /// <param name="text">The text, of characters the data has (<c>0</c>–<c>9</c>, <c>-</c>, <c>a</c>, <c>f</c>, <c>i</c>, <c>n</c>).</param>
         /// <returns>The levels (row-major), the width and the height.</returns>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="text"/> is <see langword="null"/>.</exception>
-        /// <exception cref="ArgumentException">Thrown for an empty text (SDL_ttf's "Text has zero width") or a character without a glyph.</exception>
+        /// <exception cref="ArgumentException">
+        ///     Thrown for an empty text (SDL_ttf's "Text has zero width"), a character without a glyph, or a text containing a
+        ///     sequence HarfBuzz would draw as a ligature (<c>fi</c>).
+        /// </exception>
         internal (byte[] Levels, int Width, int Height) RenderShaded(string text) {
             if (text is null)
                 throw new ArgumentNullException(nameof(text));
             if (text.Length == 0)
                 throw new ArgumentException("Text has zero width", nameof(text));
+            // pygame shapes through HarfBuzz, whose 'liga' feature draws these sequences as one glyph the data does not hold.
+            foreach (string ligature in _ligatures) {
+                if (text.Contains(ligature, StringComparison.Ordinal))
+                    throw new ArgumentException($"pygame draws '{ligature}' as one ligature glyph, which the score font does not hold; no score contains it.", nameof(text));
+            }
 
             // TTF_Size_Internal, the HarfBuzz path: pen positions in 26.6, each glyph's box from its floored position.
             var placed = new (int PosX, int PosY, Glyph Glyph)[text.Length];
@@ -169,14 +183,16 @@ namespace Gym.Environments.Envs.Box2D {
 
         /// <summary>
         ///     Reads recorded data (the JSON <c>tools/parity/record_score_font.py</c> writes): the metrics, each glyph's
-        ///     <c>left</c>, <c>top</c>, <c>width</c>, <c>rows</c>, 26.6 <c>advance</c> and base64 <c>coverage</c>, and the
-        ///     kerning of character pairs in 26.6.
+        ///     <c>left</c>, <c>top</c>, <c>width</c>, <c>rows</c>, 26.6 <c>advance</c> and base64 <c>coverage</c>, the
+        ///     kerning of character pairs in 26.6, and the <c>ligatures</c> the font's GSUB substitutes. Other fields (the
+        ///     font's name and SHA-256, the size) are provenance and are not read.
         /// </summary>
         /// <param name="json">The JSON text.</param>
         /// <returns>The font.</returns>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="json"/> is <see langword="null"/>.</exception>
         /// <exception cref="JsonException">Thrown for text that is not JSON.</exception>
         /// <exception cref="InvalidDataException">Thrown for JSON missing a field, or a glyph whose coverage does not fill its box.</exception>
+        /// <exception cref="InvalidOperationException">Thrown for a field of the wrong JSON kind (a string where a number belongs).</exception>
         internal static ScoreFont Parse(string json) {
             if (json is null)
                 throw new ArgumentNullException(nameof(json));
@@ -197,7 +213,8 @@ namespace Gym.Environments.Envs.Box2D {
                 var kerning = new Dictionary<(char Left, char Right), int>();
                 foreach (JsonProperty pair in root.GetProperty("kerning").EnumerateObject())
                     kerning[(pair.Name[0], pair.Name[1])] = pair.Value.GetInt32();
-                return new ScoreFont(glyphs, kerning, root.GetProperty("ascent").GetInt32(), root.GetProperty("height").GetInt32(),
+                string[] ligatures = root.GetProperty("ligatures").EnumerateArray().Select(sequence => sequence.GetString()!).ToArray();
+                return new ScoreFont(glyphs, kerning, ligatures, root.GetProperty("ascent").GetInt32(), root.GetProperty("height").GetInt32(),
                                      root.GetProperty("lineskip").GetInt32());
             } catch (KeyNotFoundException e) {
                 throw new InvalidDataException("The score font's data lacks a field: " + e.Message, e);
@@ -206,13 +223,15 @@ namespace Gym.Environments.Envs.Box2D {
             }
         }
 
-        /// <summary>The embedded data, or <see langword="null"/> when the resource is not shipped.</summary>
-        /// <returns>The font, or <see langword="null"/>.</returns>
-        private static ScoreFont? LoadEmbedded() {
+        /// <summary>Reads the embedded data, for <see cref="Embedded"/>.</summary>
+        /// <returns>The font.</returns>
+        /// <exception cref="InvalidOperationException">Thrown when the assembly lacks the resource (a build that dropped the asset), or a field has the wrong JSON kind.</exception>
+        /// <exception cref="InvalidDataException">Thrown when the data lacks a field or a glyph's coverage does not fill its box.</exception>
+        /// <exception cref="JsonException">Thrown when the data is not JSON.</exception>
+        private static ScoreFont LoadEmbedded() {
             Assembly assembly = typeof(ScoreFont).Assembly;
-            using Stream? stream = assembly.GetManifestResourceStream(ResourceName);
-            if (stream is null)
-                return null;
+            using Stream stream = assembly.GetManifestResourceStream(ResourceName)
+                                  ?? throw new InvalidOperationException($"{assembly.GetName().Name} lacks its embedded resource '{ResourceName}', CarRacing's score glyphs.");
             using var reader = new StreamReader(stream);
             return Parse(reader.ReadToEnd());
         }
