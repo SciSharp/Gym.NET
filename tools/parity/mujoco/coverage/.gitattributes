@@ -1,0 +1,3 @@
+# The scripts here run in Linux or WSL, whose bash fails on CRLF ("$'\r': command not found"), so every checkout keeps
+# their LF endings, whatever core.autocrlf says (it is true on Windows checkouts, where WSL then reads them).
+*.sh text eol=lf
