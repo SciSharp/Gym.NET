@@ -987,6 +987,11 @@ Specs: the port plan's §5.7 and §11.4; sources 6,153 lines. Nothing here start
   a compiler subset of 23 MJCF elements, and about 10,500 lines of visualizer and classic renderer.
 - **Bitwise parity:** reachable on win-x64, since the builds fuse no multiply-adds and call the C runtime's scalar libm.
 - **Plan:** steps P9.0–P9.6, with six decisions to review, the MuJoCo pin first.
+- **Proof of concept** ([§10](MUJOCO_ASSESSMENT.md#10-proof-of-concept-halfcheetah-v5-from-scratch-2026-11-11)): a
+  HalfCheetah-v5 core written from scratch, 1,670 lines of code, steps bit for bit with MuJoCo 3.15.0 over 80,000
+  physics steps and 16 episodes. A model-specialized managed engine for the five most-used envs is therefore about
+  4,000–5,000 lines, not the static subset's 22,000, and the choice between it and native MuJoCo comes down to
+  `xml_file` and frames rather than cost.
 
 The approved designs for that time are:
 

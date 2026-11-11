@@ -5,7 +5,7 @@
 | **Date** | 2026-11-11 |
 | **Status** | Assessment for P9, which DR-35 postponed out of 2.0. The approved designs stand: DR-30 (a 100% managed port inside Gym.NET.Environments), DR-31 (MuJoCo's own renderer, ported, drawing through a managed OpenGL binding), DR-33 (scope: what Gymnasium's envs reach, proven bitwise) |
 | **Measured against** | Gymnasium `8ba8c3a6` (v1.4.0, committed 2026-10-05); MuJoCo 3.15.0 (released the same day): its source, and its `win_amd64` wheel for Python 3.12 in an isolated venv |
-| **Reproduce** | §8; the probes are in `tools/parity/mujoco/` |
+| **Reproduce** | §8; the probes are in `tools/parity/mujoco/`, the HalfCheetah proof of concept (§10) in `tools/parity/mujoco/halfcheetah_poc/` |
 
 ---
 
@@ -40,6 +40,9 @@
   - the Newton solver's line search and Cholesky updates;
   - the compiler's derived quantities (inertias, `mj_setConst`);
   - OpenGL contexts.
+- **A model-specialized core is far smaller (§10):** HalfCheetah-v5's, written from scratch in 1,670 lines of code,
+  steps bit for bit with MuJoCo 3.15.0 over 80,000 physics steps, Newton line search and Cholesky updates included.
+  The engine sizes above are static upper bounds for a general port.
 
 ## 2. What Gymnasium needs
 
@@ -222,6 +225,15 @@ python tools/parity/mujoco/callgraph.py <mujoco>/src/engine \
   engine_sleep.c,engine_ipc.c,engine_derivative.c,engine_derivative_fd.c,engine_collision_sdf.c,engine_collision_flex.c,engine_collision_box.c,engine_collision_continuous.c,engine_sensor.c,engine_ray.c,engine_print.c,engine_vis_visualize.c,engine_vis_interact.c
 ```
 
+The HalfCheetah proof of concept (§10) records each episode in its own folder, about 40 MB per 1,000 env steps, so keep
+the folders outside the repo:
+
+```bash
+<venv>/bin/python tools/parity/mujoco/halfcheetah_poc/oracle.py --out <dir>/ep_s42 --seed 42
+<venv>/bin/python tools/parity/mujoco/halfcheetah_poc/oracle.py --out <dir>/ep_s0_flip --seed 0 --flip
+dotnet run --project tools/parity/mujoco/halfcheetah_poc -c Release -- <dir>/ep_s42 <dir>/ep_s0_flip   # --verbose: per-pass tallies
+```
+
 The visualizer's figure uses the roots `mjv_updateScene`, `mjv_moveCamera`, `mjv_initGeom`, `mjv_defaultScene`,
 `mjv_makeScene`, `mjv_defaultOption`, `mjv_defaultCamera`, `mjv_defaultPerturb` and `mjv_freeScene`, and excludes the
 physics files.
@@ -296,3 +308,123 @@ closed-form planar model rounds differently from MuJoCo's general algorithms.
 Measured with `hf_usage.py`, `env_logic.py` and `pe_compare.py` (in `tools/parity/mujoco/`; the release archive is
 `mujoco-3.15.0-windows-x86_64.zip` from DeepMind's GitHub release), and with `callgraph.py`'s `definitions` for the
 function sizes.
+
+> **Corrected by §10.** Routes A and C above size a managed core by the static closure of the functions the models
+> reach (about 22,000 lines). A core written for one model is an order of magnitude smaller: HalfCheetah's, built from
+> scratch and bit-exact over 80,000 physics steps, is 1,670 lines of code. Route A's estimate and the first bullet of
+> §9.4 do not hold; §10.5 gives the revised routes.
+
+## 10. Proof of concept: HalfCheetah-v5 from scratch (2026-11-11)
+
+The maintainer challenged §9.4 and asked for a proof of concept: the most-used env (HalfCheetah, §9.1), byte for byte,
+with its core written from scratch and inlined, not converted line by line from the engine.
+
+### 10.1 What was built
+
+`tools/parity/mujoco/halfcheetah_poc/`, a .NET 10 project outside `Gym.NET.sln`; nothing ships from it.
+
+| File | Code lines (with docs) | Contents |
+|---|---:|---|
+| `Kernels.cs` | 399 (692) | Dot products in the AVX lane order, element-wise kernels, dense Cholesky (factor, solve, rank-one update), MuJoCo's sparse `L'DL` factor and solve, quaternion and spatial helpers |
+| `CheetahModel.cs` | 184 (317) | The compiled model, read from MuJoCo's own arrays (oracle.py's `model.json`); `Load` refuses any feature the core does not reproduce |
+| `CheetahCore.cs` | 1,087 (1,491) | `Step()`: kinematics, centre of mass, composite inertia, plane-capsule contacts, joint limits, pyramidal contact rows, impedance, springs and damping, RNE, motors, the warm start, the island Newton solver with its exact line search and Cholesky updates, Euler with implicit damping |
+| **Core** | **1,670 (2,500)** | |
+| `Program.cs` | 273 (427) | The checker: the reset and actions drawn with NumSharp, two passes over a trace, the env layer, a benchmark |
+| `oracle.py` | 146 (165) | Records MuJoCo 3.15.0's state after every `mj_step` (46 arrays) and Gymnasium's step results |
+
+The core is specialized, not general. It covers hinge and slide joints, one ground plane against capsules, motors,
+Euler, pyramidal cones and the dense Newton solver. It leaves out what HalfCheetah never executes: sparse paths,
+sleeping, multi-tree islands, flex, tendons, sensors, the other colliders and solvers. It replaces no equation with a
+simpler one. It performs only the operations MuJoCo executes for this model, in MuJoCo's order, and keeps MuJoCo's
+footguns: zero-skipping that preserves +0, `x + 0` that turns -0 into +0, and the solver's states as the island path
+leaves them.
+
+### 10.2 Results
+
+16 episodes of 1,000 env steps (5,000 physics steps each): seeds 0–9 and 42 as Gymnasium plays them, and seeds 0–4
+started upside down (`qpos[2] += pi`), so that the torso and head land on the ground. Each episode ran two passes:
+- **Closed loop:** the core runs on its own from its own reset, as an env would.
+- **Resync:** each physics step starts from MuJoCo's recorded state.
+
+| Check | Result |
+|---|---|
+| Reset noise (`uniform`, `standard_normal`) and the 16,000 sampled actions, through NumSharp's `Generator` | bit-exact |
+| Closed loop: 80,000 physics steps × 46 arrays (state, `qacc`, forces, contacts, `efc_J` and the 14 `efc_*` arrays, frames, `cinert`, `cdof`, `M`, `qLD`, `cvel`, …) | 3,680,000 of 3,680,000 comparisons bit-exact |
+| Resync: the same | bit-exact |
+| Env layer: observation, reward, terminated, truncated, `x_position`, `x_velocity`, `reward_forward`, `reward_ctrl`, for 16,000 env steps | bit-exact |
+| Speed (best of five) | 5.1–7.5 µs per physics step for the managed core; 8.1 µs for MuJoCo through Python (one `mj_step(nstep=5)` call per env step) |
+
+**Coverage per pass**, from an instrumented copy of the core (since the core matches MuJoCo bit for bit, these are
+MuJoCo's own paths):
+- 47,478 steps had constraint rows: 52,572 active contacts and 12,044 joint-limit rows.
+- Every capsule touched the ground. In 4,079 steps the torso and head did so at once, which exercises the contact order
+  of a body with two geoms.
+- 63,327 Newton iterations and as many line searches: 40,991 converged at the first Newton step, 22,121 in the one-sided
+  phase and 215 in the bracketed phase.
+- 6,480 certificate exits; 11,741 rank-one Hessian updates and 28,889 downdates.
+- The warm start lost to `qacc_smooth` 32,266 times.
+
+Never reached, so written from the source but untested:
+- the Hessian refactorization after a lost rank;
+- the line search's midpoint, bracket-failure and budget exits;
+- a contact excluded at `dist >= margin`;
+- the bad-state auto-reset;
+- solref's direct form and contact priorities.
+
+**Negative controls**, each on a copy of the core:
+
+| Change | Effect |
+|---|---|
+| Sum the four AVX lanes as `((l0 + l1) + l2) + l3` instead of `(l0 + l2) + (l1 + l3)` | First difference at step 13 (2 ulp in `qpos[6]`); 2,401 of 5,000 resync steps differ |
+| A fused multiply-add in the scaled-add kernel | Step 0 differs (1 ulp) |
+| The monolithic solver scale `1/(meaninertia*nv)` instead of the island's `1/sum(diag M)` | No difference: the Newton solver ends far from its thresholds, so these traces do not discriminate the two; the core follows the source |
+| Left-to-right 6-vector dot instead of the AVX order | No difference: a planar model's motion axes have zeros in the same three slots, so both orders add the same products |
+
+The checker therefore sees single-ulp differences, and the AVX lane order and the absence of FMA are what the parity
+rests on, as §4 measured. .NET's `Math.Sin` and `Math.Cos` (every hinge rotation) come from the same Universal CRT
+import as `mujoco.dll`'s: `coreclr.dll` 10.0.1 and `mujoco.dll` both import `sin` and `cos` from
+`api-ms-win-crt-math-l1-1-0.dll`.
+
+**Time:** under an hour of one session, from the request to the 80,000 verified steps. That covers reading the source
+paths HalfCheetah executes, writing the core, and checking it; the first run was already exact.
+
+### 10.3 What it does not cover
+
+- **The compiler:** the core reads MuJoCo's compiled arrays. A product would embed them per model, as route C planned;
+  v5's `xml_file` stays refused until a compiler exists.
+- **Frames:** nothing is rendered.
+- **Other platforms:** like every parity claim here, exactness is on win-x64 (§4).
+- **The MuJoCo pin:** a re-pin can change MuJoCo's arithmetic. The oracle and checker re-verify a pin in about a minute
+  per episode, and a model outside the core's scope is refused by name at `Load`.
+
+### 10.4 Why §9 was wrong
+
+§9.2's premise holds: no equation can be simplified under byte parity. The error was in the size. §3's 26,028 lines
+and route A's 22,000 are a static closure: every branch of every function a model can reach. The arithmetic one model
+executes is about a tenth of that. MuJoCo's generality (sparse and dense variants, sleep, islands of many trees, flex,
+tendons, the other solvers and colliders, derivative support) dominates its source but never runs for HalfCheetah, and
+a specialized core omits it without changing a bit of the result.
+
+### 10.5 The routes, revised
+
+The estimates for the other four envs are extrapolations from this proof of concept, not measurements. Each addition is
+verified the same way: oracle traces and the two-pass checker.
+
+| Env | Adds to HalfCheetah's core | Code lines (estimate) |
+|---|---|---:|
+| Walker2d | RK4 | +100 |
+| Hopper | RK4, capsule-capsule collision and the body-pair order | +250 |
+| Ant | RK4, the free joint (quaternion kinematics and integration), plane-sphere, `mj_rnePostConstraint` for `cfrc_ext` (the contact cost) | +700 |
+| Humanoid | RK4, the free joint, PGS with its dual matrix `J*M^-1*J' + R`, two fixed tendons, sphere-capsule, sphere-sphere and capsule-capsule collision, the body-pair broad-phase order, `cinert`/`cvel`/`qfrc_actuator`/`cfrc_ext` observations | +1,500 to 2,000 |
+
+- **A. Each env self-contained, managed:** about 12,000 lines across five copies (1,700 to 3,700 each), each exact on its
+  own; five copies to re-verify per MuJoCo pin. Feasible, but more to maintain than C.
+- **C. One shared, specialized managed core for the five:** about 4,000–5,000 lines of code. The engine work is a day or
+  two at this proof of concept's pace; with the env classes and every parity layer, which cost the same as in route B,
+  that is three to four days, frames excluded. It keeps DR-30 (no native binaries) and refuses `xml_file` and any model
+  outside its scope.
+- **B. Native MuJoCo through MuJoCo's own bindings:** unchanged at two to three days. It is now about as fast as C, and
+  still the only route with `xml_file` and MuJoCo's own frames by construction.
+
+The decision P9 needs is therefore no longer about cost. It is whether `xml_file` and frames are worth native binaries
+(B, which reverses DR-30), or whether the five envs ship managed and exact, refusing custom models (C).
