@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- HalfCheetah-v5 to play: the proof of concept's managed core (compiled in from the folder above) in a Gym.NET viewer
+       window, keyboard-driven or on an autopilot trained by Augmented Random Search on the same core. Not part of
+       Gym.NET.sln; nothing ships from here. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>MujocoPoc.Play</RootNamespace>
+    <ServerGarbageCollection>false</ServerGarbageCollection>
+  </PropertyGroup>
+
+  <!-- The core is the proof of concept's own source, the one the checker proves bit-exact; it is compiled in, not copied. -->
+  <ItemGroup>
+    <Compile Include="..\Kernels.cs" Link="Core\Kernels.cs" />
+    <Compile Include="..\CheetahModel.cs" Link="Core\CheetahModel.cs" />
+    <Compile Include="..\CheetahCore.cs" Link="Core\CheetahCore.cs" />
+  </ItemGroup>
+
+  <!-- MuJoCo's compiled HalfCheetah (oracle.py's model dump) and the trained autopilot, next to the program. -->
+  <ItemGroup>
+    <None Include="half_cheetah.mjmodel.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="policy.json" CopyToOutputDirectory="PreserveNewest" Condition="Exists('policy.json')" />
+  </ItemGroup>
+
+  <!-- Gym.NET's pygame-compatible rasterizer draws the frames; its Avalonia viewer shows them and reports the keys. -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\..\..\src\Gym.Rendering\Gym.Rendering.csproj" />
+    <ProjectReference Include="..\..\..\..\..\src\Gym.Rendering.Avalonia\Gym.Rendering.Avalonia.csproj" />
+  </ItemGroup>
+
+  <!-- Used directly: ImageSharp carries frames to the viewer, NumSharp draws Gymnasium's reset noise. -->
+  <ItemGroup>
+    <PackageReference Include="SixLabors.ImageSharp" Version="2.1.13" />
+    <PackageReference Include="NumSharp" Version="0.80.0" />
+  </ItemGroup>
+
+</Project>

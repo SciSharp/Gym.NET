@@ -20,6 +20,12 @@ namespace MujocoPoc;
 ///     difference shows in the step that makes it. Exit code 0 when both passes and the env layer are exact.
 /// </remarks>
 internal static class Program {
+    /// <summary>
+    ///     HalfCheetah-v5's <c>max_episode_steps</c>: Gymnasium's TimeLimit truncates at this step, so a shorter trace never
+    ///     sees <c>truncated</c> set.
+    /// </summary>
+    private const int MaxEpisodeSteps = 1000;
+
     /// <summary>The names of the per-step records, in oracle.py's order after the state block.</summary>
     private static readonly string[] StateNames =
         ["qpos", "qvel", "qacc", "qacc_warmstart", "qacc_smooth", "qfrc_constraint", "qfrc_passive", "qfrc_bias", "qfrc_actuator", "actuator_force"];
@@ -129,7 +135,7 @@ internal static class Program {
                 for (int c = 0; c < core.ncon; c++)
                     touched.Add(core.con_geom2[c]);
             }
-            EnvCheck(env, core, actions[t], xBefore, dt, t, envSteps, envRecords);
+            EnvCheck(env, core, actions[t], xBefore, dt, t, MaxEpisodeSteps, envRecords);
         }
 
         // ---- resync: every physics step from MuJoCo's recorded pre-step state
@@ -231,7 +237,7 @@ internal static class Program {
     /// <param name="xBefore">qpos[0] before the step.</param>
     /// <param name="dt">The env time step.</param>
     /// <param name="t">The step index.</param>
-    /// <param name="steps">The episode length (TimeLimit truncates at its end).</param>
+    /// <param name="steps">The registered episode limit: TimeLimit truncates at that step, whatever the trace's length.</param>
     /// <param name="envRecords">The recorded env results.</param>
     private static void EnvCheck(Checker env, CheetahCore core, double[] action, double xBefore, double dt, int t, int steps, List<double[]> envRecords) {
         double xAfter = core.qpos[0];

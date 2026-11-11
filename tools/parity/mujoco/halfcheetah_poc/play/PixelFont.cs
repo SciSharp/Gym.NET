@@ -1,0 +1,103 @@
+using System;
+using Gym.Rendering;
+
+namespace MujocoPoc.Play;
+
+/// <summary>
+///     A 5x7 bitmap font for the heads-up display, drawn with <see cref="Draw.Rect"/> squares so the frames need nothing
+///     beyond Gym.Rendering. Covers ASCII 32-95 (space, digits, punctuation, capitals); lower case is drawn as upper case
+///     and any other character as a space.
+/// </summary>
+/// <remarks>
+///     The glyphs are the classic 5x7 LCD font: five column bytes per character, bit 0 the top row. Each pixel becomes a
+///     <c>scale</c>-sized square, so text at scale 2 is 12 pixels per character cell and 14 pixels tall.
+/// </remarks>
+internal static class PixelFont {
+    /// <summary>Width of one character cell in font pixels (five columns and one of spacing).</summary>
+    public const int CellWidth = 6;
+
+    /// <summary>Height of one character in font pixels.</summary>
+    public const int Height = 7;
+
+    private static readonly byte[] Glyphs = {
+        0x00, 0x00, 0x00, 0x00, 0x00, /* ' ' */ 0x00, 0x00, 0x5F, 0x00, 0x00, /* ! */
+        0x00, 0x07, 0x00, 0x07, 0x00, /* " */ 0x14, 0x7F, 0x14, 0x7F, 0x14, /* # */
+        0x24, 0x2A, 0x7F, 0x2A, 0x12, /* $ */ 0x23, 0x13, 0x08, 0x64, 0x62, /* % */
+        0x36, 0x49, 0x55, 0x22, 0x50, /* & */ 0x00, 0x05, 0x03, 0x00, 0x00, /* ' */
+        0x00, 0x1C, 0x22, 0x41, 0x00, /* ( */ 0x00, 0x41, 0x22, 0x1C, 0x00, /* ) */
+        0x2A, 0x1C, 0x7F, 0x1C, 0x2A, /* * */ 0x08, 0x08, 0x3E, 0x08, 0x08, /* + */
+        0x00, 0x50, 0x30, 0x00, 0x00, /* , */ 0x08, 0x08, 0x08, 0x08, 0x08, /* - */
+        0x00, 0x60, 0x60, 0x00, 0x00, /* . */ 0x20, 0x10, 0x08, 0x04, 0x02, /* / */
+        0x3E, 0x51, 0x49, 0x45, 0x3E, /* 0 */ 0x00, 0x42, 0x7F, 0x40, 0x00, /* 1 */
+        0x42, 0x61, 0x51, 0x49, 0x46, /* 2 */ 0x21, 0x41, 0x45, 0x4B, 0x31, /* 3 */
+        0x18, 0x14, 0x12, 0x7F, 0x10, /* 4 */ 0x27, 0x45, 0x45, 0x45, 0x39, /* 5 */
+        0x3C, 0x4A, 0x49, 0x49, 0x30, /* 6 */ 0x01, 0x71, 0x09, 0x05, 0x03, /* 7 */
+        0x36, 0x49, 0x49, 0x49, 0x36, /* 8 */ 0x06, 0x49, 0x49, 0x29, 0x1E, /* 9 */
+        0x00, 0x36, 0x36, 0x00, 0x00, /* : */ 0x00, 0x56, 0x36, 0x00, 0x00, /* ; */
+        0x08, 0x14, 0x22, 0x41, 0x00, /* < */ 0x14, 0x14, 0x14, 0x14, 0x14, /* = */
+        0x00, 0x41, 0x22, 0x14, 0x08, /* > */ 0x02, 0x01, 0x51, 0x09, 0x06, /* ? */
+        0x32, 0x49, 0x79, 0x41, 0x3E, /* @ */ 0x7E, 0x11, 0x11, 0x11, 0x7E, /* A */
+        0x7F, 0x49, 0x49, 0x49, 0x36, /* B */ 0x3E, 0x41, 0x41, 0x41, 0x22, /* C */
+        0x7F, 0x41, 0x41, 0x22, 0x1C, /* D */ 0x7F, 0x49, 0x49, 0x49, 0x41, /* E */
+        0x7F, 0x09, 0x09, 0x09, 0x01, /* F */ 0x3E, 0x41, 0x49, 0x49, 0x7A, /* G */
+        0x7F, 0x08, 0x08, 0x08, 0x7F, /* H */ 0x00, 0x41, 0x7F, 0x41, 0x00, /* I */
+        0x20, 0x40, 0x41, 0x3F, 0x01, /* J */ 0x7F, 0x08, 0x14, 0x22, 0x41, /* K */
+        0x7F, 0x40, 0x40, 0x40, 0x40, /* L */ 0x7F, 0x02, 0x0C, 0x02, 0x7F, /* M */
+        0x7F, 0x04, 0x08, 0x10, 0x7F, /* N */ 0x3E, 0x41, 0x41, 0x41, 0x3E, /* O */
+        0x7F, 0x09, 0x09, 0x09, 0x06, /* P */ 0x3E, 0x41, 0x51, 0x21, 0x5E, /* Q */
+        0x7F, 0x09, 0x19, 0x29, 0x46, /* R */ 0x46, 0x49, 0x49, 0x49, 0x31, /* S */
+        0x01, 0x01, 0x7F, 0x01, 0x01, /* T */ 0x3F, 0x40, 0x40, 0x40, 0x3F, /* U */
+        0x1F, 0x20, 0x40, 0x20, 0x1F, /* V */ 0x3F, 0x40, 0x38, 0x40, 0x3F, /* W */
+        0x63, 0x14, 0x08, 0x14, 0x63, /* X */ 0x07, 0x08, 0x70, 0x08, 0x07, /* Y */
+        0x61, 0x51, 0x49, 0x45, 0x43, /* Z */ 0x00, 0x7F, 0x41, 0x41, 0x00, /* [ */
+        0x02, 0x04, 0x08, 0x10, 0x20, /* \ */ 0x00, 0x41, 0x41, 0x7F, 0x00, /* ] */
+        0x04, 0x02, 0x01, 0x02, 0x04, /* ^ */ 0x40, 0x40, 0x40, 0x40, 0x40, /* _ */
+    };
+
+    /// <summary>The width in screen pixels of a text at a scale (no trailing spacing column).</summary>
+    /// <param name="text">The text.</param>
+    /// <param name="scale">Screen pixels per font pixel.</param>
+    /// <returns>The width; 0 for an empty text.</returns>
+    public static int Measure(string text, int scale) => text.Length == 0 ? 0 : (text.Length * CellWidth - 1) * scale;
+
+    /// <summary>
+    ///     Draws a text with its top-left corner at (<paramref name="x"/>, <paramref name="y"/>), optionally over a one-pixel
+    ///     drop shadow so it stays readable on any background.
+    /// </summary>
+    /// <param name="surface">The frame.</param>
+    /// <param name="text">The text; characters outside the font draw as spaces.</param>
+    /// <param name="x">Left edge in pixels.</param>
+    /// <param name="y">Top edge in pixels.</param>
+    /// <param name="scale">Screen pixels per font pixel (1 or more).</param>
+    /// <param name="color">The text color.</param>
+    /// <param name="shadow">A shadow color drawn one font pixel down and right first, or <see langword="null"/> for none.</param>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="scale"/> is less than 1.</exception>
+    public static void Draw(Surface surface, string text, int x, int y, int scale, Color color, Color? shadow = null) {
+        if (scale < 1)
+            throw new ArgumentOutOfRangeException(nameof(scale), scale, "scale must be at least 1");
+        if (shadow is Color s)
+            DrawRun(surface, text, x + scale, y + scale, scale, s);
+        DrawRun(surface, text, x, y, scale, color);
+    }
+
+    /// <summary>Draws the glyphs of a text in one color.</summary>
+    /// <param name="surface">The frame.</param>
+    /// <param name="text">The text.</param>
+    /// <param name="x">Left edge.</param>
+    /// <param name="y">Top edge.</param>
+    /// <param name="scale">Screen pixels per font pixel.</param>
+    /// <param name="color">The color.</param>
+    private static void DrawRun(Surface surface, string text, int x, int y, int scale, Color color) {
+        for (int i = 0; i < text.Length; i++) {
+            char c = char.ToUpperInvariant(text[i]);
+            int glyph = c is >= ' ' and <= '_' ? c - ' ' : 0;
+            int left = x + i * CellWidth * scale;
+            for (int col = 0; col < 5; col++) {
+                byte bits = Glyphs[5 * glyph + col];
+                for (int row = 0; row < Height; row++)
+                    if ((bits & (1 << row)) != 0)
+                        Gym.Rendering.Draw.Rect(surface, color, left + col * scale, y + row * scale, scale, scale);
+            }
+        }
+    }
+}
