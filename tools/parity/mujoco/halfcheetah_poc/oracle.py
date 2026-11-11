@@ -1,6 +1,6 @@
-"""Oracle for the from-scratch cores (HalfCheetah-v5, Hopper-v5, Humanoid-v5): records MuJoCo 3.15.0's exact state
-after every mj_step of seeded episodes, and Gymnasium's env results, as binary files the C# checker compares against
-bit for bit.
+"""Oracle for the from-scratch core (HalfCheetah-v5, Hopper-v5, Humanoid-v5, and any other MuJoCo env physics only):
+records MuJoCo 3.15.0's exact state after every mj_step of seeded episodes, and Gymnasium's env results, as binary
+files the C# checker compares against bit for bit.
 
 Writes into the output folder:
     model.json  every compiled model array the cores read, as exact doubles (Python's repr round-trips), plus the
@@ -19,7 +19,8 @@ Writes into the output folder:
 Args (command line):
     --out DIR         output folder (required; HalfCheetah writes about 40 MB per 1,000 env steps, Humanoid more: keep it
                       outside the repo).
-    --env ID          HalfCheetah-v5 (default), Hopper-v5 or Humanoid-v5.
+    --env ID          any Gymnasium MuJoCo id (default HalfCheetah-v5). The checker has env rules for HalfCheetah-v5,
+                      Hopper-v5 and Humanoid-v5, and checks any other id physics only.
     --seed N          the first episode's reset and action-space seed (default 42); episode k uses seed + k.
     --episodes N      how many episodes (default 1).
     --steps N         the most env steps per episode (default 1000; Gymnasium also truncates at 1,000).

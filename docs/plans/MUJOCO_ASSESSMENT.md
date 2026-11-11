@@ -5,7 +5,7 @@
 | **Date** | 2026-11-11 |
 | **Status** | Assessment for P9, which DR-35 postponed out of 2.0. The approved designs stand: DR-30 (a 100% managed port inside Gym.NET.Environments), DR-31 (MuJoCo's own renderer, ported, drawing through a managed OpenGL binding), DR-33 (scope: what Gymnasium's envs reach, proven bitwise) |
 | **Measured against** | Gymnasium `8ba8c3a6` (v1.4.0, committed 2026-10-05); MuJoCo 3.15.0 (released the same day): its source, and its `win_amd64` wheel for Python 3.12 in an isolated venv |
-| **Reproduce** | §8; the probes are in `tools/parity/mujoco/`, the proof of concept for HalfCheetah (§10), Hopper and Humanoid (§11) in `tools/parity/mujoco/halfcheetah_poc/`, the line coverage (§10.6) in `tools/parity/mujoco/coverage/` |
+| **Reproduce** | §8; the probes are in `tools/parity/mujoco/`, the proof of concept for HalfCheetah (§10), Hopper and Humanoid (§11), with its physics-only check of the other envs (§12), in `tools/parity/mujoco/halfcheetah_poc/`, the line coverage (§10.6, §12) in `tools/parity/mujoco/coverage/` |
 
 ---
 
@@ -48,6 +48,12 @@
 - **Hopper-v5 and Humanoid-v5 now run on that core (§11):** 2,264 lines of code, 14% above the estimate, step all three
   envs bit for bit with MuJoCo 3.15.0 and Gymnasium over 249 episodes and 138,490 physics steps, PGS, RK4, the free
   joint and the env layers included. It took 36 minutes of one session, against an estimate of two to three hours.
+- **The other 18 ids (§12), measured:** Walker2d, Ant and HumanoidStandup already run bit-exact on that core with no
+  change. InvertedPendulum, InvertedDoublePendulum and Reacher need about 20 lines: two small generalizations, tried in
+  a copy of the core, make all three match, and InvertedDoublePendulum's reward adds site positions. Swimmer needs about
+  70 for fluid forces. Pusher needs about 1,050: MuJoCo's GJK/EPA convex collider and
+  island-local solving. Together that is about 1,140 lines of core and 490 of env rules, about 3.5 to 6.5 hours, of which
+  Pusher is 2 to 4.
 
 ## 2. What Gymnasium needs
 
@@ -266,6 +272,34 @@ bash tools/parity/mujoco/coverage/cov_measure.sh <plans> hc_a hc_42 hc_flip hop_
 python3 tools/parity/mujoco/coverage/cov_report.py HalfCheetah=hc_a,hc_42,hc_flip Hopper=hop_term,hop_long \
   Humanoid=hum_term,hum_long Walker2d=wal_term,wal_long Ant=ant_term,ant_long
 ```
+
+§12's plans add the remaining envs (`--budget 16000` each; `--rnepost` for HumanoidStandup; Walker2d-v4 also with
+`--seeds 0:16 --no-terminate`). The first group of `cov_report.py` is the baseline, so the core's three envs together
+form one group:
+
+```bash
+<venv>/bin/python tools/parity/mujoco/coverage/gen_plans.py HumanoidStandup-v5 <plans>/hst_term --budget 16000 --rnepost
+<venv>/bin/python tools/parity/mujoco/coverage/gen_plans.py Pusher-v5 <plans>/pus_term --budget 16000
+# likewise InvertedPendulum-v5 (ip_term), InvertedDoublePendulum-v5 (idp_term), Reacher-v5 (rea_term),
+# Swimmer-v5 (swi_term), Walker2d-v4 (wal4_term; wal4_long with --seeds 0:16 --no-terminate)
+python3 tools/parity/mujoco/coverage/cov_report.py Core=hc_a,hc_42,hc_flip,hop_term,hop_long,hum_term,hum_long \
+  Walker2d=wal_term,wal_long Walker2dV4=wal4_term,wal4_long Ant=ant_term,ant_long HumanoidStandup=hst_term \
+  InvertedPendulum=ip_term InvertedDoublePendulum=idp_term Reacher=rea_term Pusher=pus_term Swimmer=swi_term
+```
+
+§12.3's physics-only traces come from the same oracle with any id. The checker checks an env without env rules physics
+only, and reports a model the core refuses by the feature `Load` names:
+
+```bash
+<venv>/bin/python $oracle --out <dir>/ant --env Ant-v5 --seed 0 --episodes 20 --debug-episodes 2
+<venv>/bin/python $oracle --out <dir>/ant_nt --env Ant-v5 --seed 0 --no-terminate --debug-episodes 0
+# likewise Walker2d-v5/-v4 (50 episodes, and no-termination ones), HumanoidStandup-v5 (2 episodes),
+# InvertedPendulum-v5 and InvertedDoublePendulum-v5 (200), Reacher-v5 (40), Swimmer-v5 (1), Pusher-v5 (10)
+dotnet run --project tools/parity/mujoco/halfcheetah_poc -c Release -- <dir>/ant <dir>/ant_nt ...
+```
+
+The probe copy of §12.3 makes the two edits described there in a copy of the project; the repo's core refuses those
+models until they land.
 
 The visualizer's figure uses the roots `mjv_updateScene`, `mjv_moveCamera`, `mjv_initGeom`, `mjv_defaultScene`,
 `mjv_makeScene`, `mjv_defaultOption`, `mjv_defaultCamera`, `mjv_defaultPerturb` and `mjv_freeScene`, and excludes the
@@ -715,7 +749,137 @@ line estimate 14% too low.
 ### 11.8 Still open
 
 - **Walker2d and Ant:** by §10.6's coverage they execute no engine line beyond these three envs. Neither has run on the
-  core yet. Each needs its env rules in the checker, and Ant's model must pass `Load`'s validation.
+  core yet. Each needs its env rules in the checker, and Ant's model must pass `Load`'s validation. (§12.3: both now run
+  bit-exact on the core as it is.)
 - **The unexecuted branches** of §11.4.
 - **§10.3 still holds:** no compiler, no frames, exactness on win-x64 only, and re-verification at each MuJoCo pin.
 - **Productizing:** env classes, registration, parity cells and goldens are §10.5's separate cost.
+
+## 12. The remaining envs, measured (2026-11-11)
+
+The maintainer asked for an estimate of the rest. It rests on two measurements:
+- **Engine lines:** what each remaining env executes in MuJoCo, against the union of the three envs the core already
+  runs (§10.6's method).
+- **The core itself on their models:** physics only. The checker starts from Gymnasium's recorded reset, replays the
+  recorded actions, and compares every recorded array, without env rules yet.
+
+### 12.1 The ids
+
+Of the 22 ids, 18 remain:
+- **The v5s:** Walker2d, Ant, HumanoidStandup, InvertedPendulum, InvertedDoublePendulum, Reacher, Pusher and Swimmer.
+- **The v4s of every env but Pusher:** Pusher-v4 raises `ImportError` on MuJoCo 3 (§1), and Gym.NET reproduces that
+  refusal with no core at all.
+
+A v4 shares its v5's model, except Walker2d-v4 (`walker2d.xml`). A v4 therefore adds env rules only, not core code.
+
+### 12.2 Engine lines
+
+The plans are Gymnasium's own episodes: 16,000 env steps per env, as in §10.6. The never-terminating envs played
+16 × 1,000 steps. Walker2d-v5's and Ant's runs are §10.6's.
+
+| Env | Episodes | Physics steps | Executed engine lines | Beyond the core | What is new |
+|---|---:|---:|---:|---:|---|
+| Walker2d-v5 | 742 + 16 | 128,000 | 3,483 | 0 | |
+| Walker2d-v4 | 742 + 16 | 128,100 | 3,483 | 0 | |
+| Ant | 77 + 16 | 160,290 | 3,601 | 0 | |
+| HumanoidStandup | 16 | 80,000 | 3,746 | 0 | |
+| InvertedPendulum | 2,618 (median 5 env steps) | 32,002 | 1,884 | 0 | |
+| InvertedDoublePendulum | 2,491 (median 6) | 80,025 | 2,777 | 5 | Site positions (`mj_kinematics2`); the reward reads `site_xpos` |
+| Reacher | 320 | 32,000 | 2,776 | 9 | A second kinematic tree (the islands' union-find, and the warm start of dofs in no island), and simple dofs' constant inertia (`mj_crb`) |
+| Swimmer | 16 | 64,000 | 2,811 | 90 | Fluid forces: the inertia-box model (33), `mj_applyFT` (17), `mj_fluid` (14), the body's velocity (9), helpers (17) |
+| Pusher | 160 | 80,000 | 4,489 | 928 | The gripper's capsules against the object's cylinder take MuJoCo's general convex collider: GJK and EPA (`engine_collision_gjk.c`, 650) and its glue (`engine_collision_convex.c`, 162). Also plane-cylinder (56), several islands at once (22) and utilities (38) |
+
+The ten envs other than Pusher execute 4,440 engine lines, 103 beyond the core's 4,337. With Pusher, the eleven
+execute 5,359.
+
+### 12.3 The core on their models
+
+The checker gained a physics-only mode for envs without env rules. Run on the core as committed:
+
+| Env | Episodes | Physics steps | Result |
+|---|---:|---:|---|
+| Walker2d-v5 | 50, and 2 without termination | 12,380 | bit-exact |
+| Walker2d-v4 | 50, and 1 without termination | 8,432 | bit-exact |
+| Ant-v5 | 20, and 1 without termination | 30,995 | bit-exact, `cfrc_ext` included |
+| HumanoidStandup-v5 | 2 × 1,000 | 10,000 | bit-exact, `cfrc_ext` included (181,753 PGS sweeps) |
+| InvertedPendulum-v5 | 200 | 2,602 | refused: a capsule on the world body |
+| InvertedDoublePendulum-v5 | 200 | 6,440 | refused: the same |
+| Reacher-v5 | 40 | 4,000 | refused: simple dofs |
+| Swimmer-v5 | 1 | 4,000 | refused: fluid forces |
+| Pusher-v5 | 10 | 5,000 | refused: simple dofs, then the object's cylinder |
+
+So Walker2d, Ant and HumanoidStandup need no core code: 61,807 physics steps match MuJoCo bit for bit.
+
+A probe copy of the core, outside the repo, made two generalizations:
+1. **Non-colliding geoms:** a geom that can never collide (no geom of another body has a compatible bitmask) may be of
+   any type and on any body, the world body included. This covers InvertedPendulum's rail and cart and Reacher's arena.
+   It changes about five lines of the loader's validation.
+2. **Simple dofs:** their mass-matrix diagonal is the model's constant `dof_M0`, as `mj_crb` sets it. That is four lines
+   in the core and two fields in the loader.
+
+With them, InvertedPendulum, InvertedDoublePendulum and Reacher match bit for bit too: 13,042 more physics steps,
+including Reacher's 246 steps with a joint-limit row. The probe still matches the earlier folders it was run on.
+
+**Islands.** The core solves every constraint as one island over all dofs. Reacher has two kinematic trees, the arm and
+the target, and MuJoCo solves the arm's island alone, with its own inertia scale. Reacher still matches for two
+reasons:
+- its only rows are one joint limit, which Newton solves in a single iteration;
+- the target carries no force, so its dofs never move away from `qacc_smooth`.
+
+That is a property of this model, not a proof. Pusher has the arm and the object in separate islands at once, so it
+needs the island-local solve.
+
+### 12.4 C# per env
+
+The core estimates come from §11.1's measured ratios. Comparable dense arithmetic converted at 0.44 to 0.96, and
+colliders at about 0.9. The env-rule estimates scale each Gymnasium file's code lines by the 0.16 to 0.28 that the
+checker's rules for HalfCheetah, Hopper and Humanoid took (20, 30 and 64 lines).
+
+| Ids | Core C# | Basis | Env rules (v5 + v4) |
+|---|---:|---|---:|
+| Walker2d | 0 | measured: runs as is | ~30 + ~28 |
+| Ant | 0 | measured: runs as is | ~45 + ~40 |
+| HumanoidStandup | 0 | measured: runs as is | ~50 + ~35 |
+| HalfCheetah-v4, Hopper-v4, Humanoid-v4 | 0 | their v5's model | ~18, ~28, ~45 |
+| InvertedPendulum | ~5 | measured: the geom generalization, which the next two need as well | ~12 + ~10 |
+| InvertedDoublePendulum | ~11 | site positions for the reward, estimated from 5 engine lines; its physics measured | ~20 + ~18 |
+| Reacher | ~6 | measured: simple dofs | ~20 + ~18 |
+| Swimmer | ~70 | 90 engine lines of fluid arithmetic, no iteration | ~20 + ~18 |
+| Pusher-v5 | ~1,050 | GJK, EPA and their glue (812 engine lines, at about 1.0: MuJoCo's code is already compact geometry), plane-cylinder (~60), the island-local solve (~150: its engine lines already run for one island, but the core specialized them away), utilities (~20) | ~30 |
+| **Total** | **~1,140** | | **~490** |
+
+Without Pusher, the core grows by about 90 lines, to about 2,360, and runs 20 of the 22 ids (Pusher-v4 refuses as
+Gymnasium does). Pusher-v5 takes it to about 3,400.
+
+The env layers hold no hidden BLAS order. Reacher and Pusher reward with `np.linalg.norm` of 3-vectors, which is the
+square root of the left-to-right sum of squares, with no fused multiply-add, in 20,000 of 20,000 trials. Their float32
+control costs of 2 and 7 actions also sum left to right.
+
+### 12.5 Time
+
+Estimated at §11.7's pace: Hopper and Humanoid, 594 core lines and 187 checker lines, were exact in 36 minutes. The
+envs are grouped by the work they share:
+
+| Work | Ids | Core C# | Env rules | Session time |
+|---|---:|---:|---:|---|
+| Walker2d, Ant, HumanoidStandup (v4 and v5); HalfCheetah-v4, Hopper-v4, Humanoid-v4 | 9 | 0 | ~320 | 45–90 minutes |
+| InvertedPendulum, InvertedDoublePendulum, Reacher (v4 and v5) | 6 | ~20 | ~100 | 20–40 minutes |
+| Swimmer (v4 and v5) | 2 | ~70 | ~40 | 20–40 minutes |
+| Pusher-v5 | 1 | ~1,050 | ~30 | 2–4 hours |
+| **All 18** | **18** | **~1,140** | **~490** | **about 3.5–6.5 hours** |
+
+Without Pusher, the 17 other ids take about 1.5–3 hours.
+
+### 12.6 Risks
+
+1. **Pusher's convex collider:** GJK and EPA iterate on simplices and polytopes, with many branches. Exactness rests on
+   reproducing each branch in MuJoCo's order. At 812 executed lines it is the largest single piece, and coverage shows
+   only the branches 16,000 random steps reach.
+2. **Islands:** the island-local solve is new C# for engine lines the core already reproduces for one island: the order
+   of dofs and rows, the sparse sub-matrix, the per-island scale. Reacher shows the one-island shortcut survives only by
+   a property of its model.
+3. **Swimmer's fluid forces:** deterministic arithmetic with no iteration. Low risk.
+4. **The env layers:** each v4 has its own observation and reward, and NumPy's reductions to match per env, as §11.5's
+   controls showed for the first three. Pusher's reset also draws the object's position in a rejection loop of
+   `uniform` calls.
+5. **Productizing** (env classes, registration, parity cells, goldens, frames) remains §10.5's separate cost.

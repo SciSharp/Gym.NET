@@ -996,7 +996,12 @@ Specs: the port plan's §5.7 and §11.4; sources 6,153 lines. Nothing here start
 - **Hopper and Humanoid** ([§11](MUJOCO_ASSESSMENT.md#11-hopper-v5-and-humanoid-v5-on-the-same-core-2026-11-11)): they
   now run on the same core, grown to 2,264 lines of code (594 added, against an estimate of 520). It steps all three
   envs bit for bit with MuJoCo 3.15.0 and Gymnasium over 249 episodes and 138,490 physics steps, PGS, RK4 and the
-  free joint included. Walker2d and Ant remain to be run on it.
+  free joint included.
+- **The other 18 ids** ([§12](MUJOCO_ASSESSMENT.md#12-the-remaining-envs-measured-2026-11-11)), measured. Walker2d, Ant
+  and HumanoidStandup already step bit-exact on that core with no change. InvertedPendulum, InvertedDoublePendulum and
+  Reacher need about 20 lines, Swimmer about 70 (fluid forces), and Pusher about 1,050 (MuJoCo's GJK/EPA collider and
+  island-local solving). Add about 490 lines of env rules for all 18; the estimate is 3.5 to 6.5 hours, of which Pusher
+  takes 2 to 4.
 
 The approved designs for that time are:
 

@@ -19,6 +19,9 @@ namespace MujocoPoc;
 ///     Two passes over each recorded episode. Closed loop: the core runs on its own from its own reset, as an env would, so
 ///     any difference compounds. Resync: before each physics step the core is put back on MuJoCo's recorded state, so a
 ///     difference shows in the step that makes it. Exit code 0 when every episode is exact in both passes and the env layer.
+///     Any other env oracle.py recorded is checked physics only: the closed loop starts from Gymnasium's recorded reset
+///     and replays its actions, and its env layer is not checked (its report says so). A model outside the core's scope
+///     stops the run at <see cref="CheetahModel.Load"/>, which names the feature.
 /// </remarks>
 internal static class Program {
     /// <summary>
@@ -47,9 +50,8 @@ internal static class Program {
     ///     Folders, each holding one oracle.py recording (model.json, run.json, trace.bin, env.bin); default: the current
     ///     folder. <c>--verbose</c> prints each pass's tally and first difference.
     /// </param>
-    /// <returns>0 when every trace is bit-exact in every pass, 1 otherwise.</returns>
+    /// <returns>0 when every trace is bit-exact in every pass, 1 otherwise (a model the core refuses counts as failed).</returns>
     /// <exception cref="IOException">A trace file cannot be read.</exception>
-    /// <exception cref="NotSupportedException">A model is outside the core's scope, or the env is not one of the three.</exception>
     private static int Main(string[] args) {
         CultureInfo.DefaultThreadCurrentCulture = CultureInfo.InvariantCulture;
         bool verbose = args.Contains("--verbose");
@@ -59,9 +61,17 @@ internal static class Program {
         int failed = 0;
         long physicsSteps = 0, envSteps = 0, comparisons = 0;
         // the first trace of each env is the one its speed is measured on, in the order the envs first appear
-        var benchmarks = new List<(CheetahModel Model, RunInfo Run)>();
+        var benchmarks = new List<(CheetahModel Model, RunInfo Run, string Dir)>();
         foreach (string dir in dirs) {
-            CheetahModel model = CheetahModel.Load(Path.Combine(dir, "model.json"));
+            CheetahModel model;
+            try {
+                model = CheetahModel.Load(Path.Combine(dir, "model.json"));
+            } catch (NotSupportedException e) {
+                // a model beyond the core's scope is a finding, not a crash: report it and go on with the other folders
+                Console.WriteLine($"{Path.GetFileName(dir.TrimEnd('/', '\\'))}: refused by the core: {e.Message}");
+                failed++;
+                continue;
+            }
             RunInfo run = RunInfo.Load(Path.Combine(dir, "run.json"));
             TraceResult r = CheckTrace(dir, model, run, verbose);
             Console.WriteLine($"{Path.GetFileName(dir.TrimEnd('/', '\\'))}: {r.Summary}");
@@ -70,12 +80,12 @@ internal static class Program {
             envSteps += r.EnvSteps;
             comparisons += r.Comparisons;
             if (benchmarks.All(b => b.Run.Env != run.Env))
-                benchmarks.Add((model, run));
+                benchmarks.Add((model, run, dir));
         }
         Console.WriteLine($"total: {dirs.Length - failed}/{dirs.Length} traces bit-exact; {envSteps} env steps, {physicsSteps} physics steps, "
                           + $"{comparisons} array comparisons per pass");
-        foreach ((CheetahModel model, RunInfo run) in benchmarks)
-            Benchmark(model, run);
+        foreach ((CheetahModel model, RunInfo run, string dir) in benchmarks)
+            Benchmark(model, run, dir);
         return failed == 0 ? 0 : 1;
     }
 
@@ -115,7 +125,8 @@ internal static class Program {
 
     /// <summary>
     ///     Checks one recording: per episode the reset and actions drawn with NumSharp, the closed loop with the env layer,
-    ///     and the resync pass.
+    ///     and the resync pass. For an env the checker has no rules for, physics only: the closed loop starts from
+    ///     Gymnasium's recorded reset and replays the recorded actions, and the env layer is not checked.
     /// </summary>
     /// <param name="dir">The recording's folder.</param>
     /// <param name="model">The model.</param>
@@ -124,12 +135,16 @@ internal static class Program {
     /// <returns>The trace's results.</returns>
     /// <exception cref="IOException">A trace file cannot be read.</exception>
     /// <exception cref="InvalidDataException">The trace is not oracle.py's format 2.</exception>
+    /// <remarks>
+    ///     A physics-only pass proves the core's arithmetic for the model, not the env: the reset noise, the action
+    ///     sampling and the env's observation, reward and info stay unverified until the env has rules here.
+    /// </remarks>
     private static TraceResult CheckTrace(string dir, CheetahModel model, RunInfo run, bool verbose) {
         List<double[]> trace = Records.ReadAll(Path.Combine(dir, "trace.bin"));
         List<double[]> envRecords = Records.ReadAll(Path.Combine(dir, "env.bin"));
         if (trace[0].Length != 2 || trace[0][0] != 2)
             throw new InvalidDataException($"{dir}: not an oracle.py format-2 trace");
-        EnvRules rules = EnvRules.For(run.Env, model, run.Terminate);
+        EnvRules? rules = EnvRules.TryFor(run.Env, model, run.Terminate);
         var closed = new Checker("closed loop");
         var resync = new Checker("resync");
         var env = new Checker("env layer");
@@ -146,19 +161,30 @@ internal static class Program {
             rec += 4;
             // ---- closed loop with the env layer, from the core's own reset and actions
             var core = new CheetahCore(model);
-            rules.Reset(core, seed, run.Flip);
-            if (Program.SameBits(core.qpos, trace[start]) && Program.SameBits(core.qvel, trace[start + 1])
-                && Program.SameBits(core.qacc_warmstart, trace[start + 2]))
-                resetsOk++;
-            env.Check("reset obs", rules.Obs(core), envRecords[envRec++], -1);
-            double[][] actions = SampleActions(rules, seed, steps);
+            double[][]? actions = null;
+            if (rules != null) {
+                rules.Reset(core, seed, run.Flip);
+                if (Program.SameBits(core.qpos, trace[start]) && Program.SameBits(core.qvel, trace[start + 1])
+                    && Program.SameBits(core.qacc_warmstart, trace[start + 2]))
+                    resetsOk++;
+                env.Check("reset obs", rules.Obs(core), envRecords[envRec++], -1);
+                actions = SampleActions(rules, seed, steps);
+            } else {
+                // physics only: Gymnasium's reset as recorded (Step's own forward pass recomputes everything else)
+                Array.Copy(trace[start], core.qpos, model.nq);
+                Array.Copy(trace[start + 1], core.qvel, model.nv);
+                Array.Copy(trace[start + 2], core.qacc_warmstart, model.nv);
+                core.time = trace[start + 3][0];
+            }
             int recClosed = rec;
             for (int t = 0; t < steps; t++) {
-                if (SameBits(actions[t], trace[recClosed]))
+                // physics only replays the recorded action, so the action check is trivially exact there
+                double[] action = actions?[t] ?? trace[recClosed];
+                if (SameBits(action, trace[recClosed]))
                     actionsOk++;
                 recClosed++;
-                rules.Before(core);
-                Array.Copy(actions[t], core.ctrl, model.nu);
+                rules?.Before(core);
+                Array.Copy(action, core.ctrl, model.nu);
                 for (int k = 0; k < model.frame_skip; k++) {
                     core.Step();
                     CompareStep(closed, core, trace, ref recClosed, debug, t * model.frame_skip + k);
@@ -171,9 +197,11 @@ internal static class Program {
                 }
                 core.RnePostConstraint();
                 ComparePost(closed, core, trace, ref recClosed, t);
-                (double[] obs, double[] row) = rules.After(core, actions[t], t, run.InfoKeys);
-                env.Check("obs", obs, envRecords[envRec++], t);
-                env.Check("reward, terminated, truncated, info", row, envRecords[envRec++], t);
+                if (rules != null) {
+                    (double[] obs, double[] row) = rules.After(core, action, t, run.InfoKeys);
+                    env.Check("obs", obs, envRecords[envRec++], t);
+                    env.Check("reward, terminated, truncated, info", row, envRecords[envRec++], t);
+                }
             }
             // ---- resync: every physics step from MuJoCo's recorded pre-step state
             var fresh = new CheetahCore(model);
@@ -205,11 +233,15 @@ internal static class Program {
             resync.Report();
             env.Report();
         }
-        bool exact = resetsOk == run.Seeds.Length && actionsOk == envStepsTotal && closed.Clean && resync.Clean && env.Clean;
+        bool envExact = rules == null || (resetsOk == run.Seeds.Length && actionsOk == envStepsTotal && env.Clean);
+        bool exact = envExact && closed.Clean && resync.Clean;
+        string envPart = rules == null
+            ? "env not checked (physics only: no env rules)"
+            : $"resets {resetsOk}/{run.Seeds.Length}, actions {actionsOk}/{envStepsTotal}, env {(env.Clean ? "exact" : "DIFFERS")}";
         string summary = $"{run.Env}{(run.Flip ? " flipped" : "")}{(run.Terminate ? "" : " no-terminate")}, {run.Seeds.Length} episodes "
-                         + $"({envStepsTotal} env steps): resets {resetsOk}/{run.Seeds.Length}, actions {actionsOk}/{envStepsTotal}, "
-                         + $"closed loop {closed.ExactSteps}/{closed.Steps}, resync {resync.ExactSteps}/{resync.Steps}, env {(env.Clean ? "exact" : "DIFFERS")}; "
-                         + $"{constraintSteps} steps with constraints, {iterations} solver iterations, geoms touching {string.Join(",", touched)}"
+                         + $"({envStepsTotal} env steps): closed loop {closed.ExactSteps}/{closed.Steps}, resync {resync.ExactSteps}/{resync.Steps}, "
+                         + $"{envPart}; {constraintSteps} steps with constraints, {iterations} solver iterations, "
+                         + $"geoms touching {string.Join(",", touched)}"
                          + (exact ? "" : $"; first difference: {closed.First ?? resync.First ?? env.First}");
         return new TraceResult(exact, summary, envStepsTotal, closed.Steps, closed.Comparisons);
     }
@@ -297,13 +329,27 @@ internal static class Program {
     /// </summary>
     /// <param name="model">The model.</param>
     /// <param name="run">The run, for the env, seed and length.</param>
-    private static void Benchmark(CheetahModel model, RunInfo run) {
-        EnvRules rules = EnvRules.For(run.Env, model, run.Terminate);
-        double[][] actions = SampleActions(rules, run.Seeds[0], run.Steps[0]);
+    /// <param name="dir">
+    ///     The recording's folder: an env without rules is timed on the reset and actions recorded there, the others on
+    ///     their own NumSharp reset and actions.
+    /// </param>
+    /// <exception cref="IOException">The trace of an env without rules cannot be read.</exception>
+    private static void Benchmark(CheetahModel model, RunInfo run, string dir) {
+        EnvRules? rules = EnvRules.TryFor(run.Env, model, run.Terminate);
+        (double[] Qpos, double[] Qvel, double[] Warm, double Time, double[][] Actions)? recorded =
+            rules == null ? FirstEpisode(Records.ReadAll(Path.Combine(dir, "trace.bin")), model) : null;
+        double[][] actions = recorded?.Actions ?? SampleActions(rules!, run.Seeds[0], run.Steps[0]);
         double best = double.MaxValue;
         for (int r = 0; r < 5; r++) {
             var core = new CheetahCore(model);
-            rules.Reset(core, run.Seeds[0], run.Flip);
+            if (rules != null) {
+                rules.Reset(core, run.Seeds[0], run.Flip);
+            } else {
+                Array.Copy(recorded!.Value.Qpos, core.qpos, model.nq);
+                Array.Copy(recorded.Value.Qvel, core.qvel, model.nv);
+                Array.Copy(recorded.Value.Warm, core.qacc_warmstart, model.nv);
+                core.time = recorded.Value.Time;
+            }
             var sw = Stopwatch.StartNew();
             foreach (double[] a in actions) {
                 Array.Copy(a, core.ctrl, model.nu);
@@ -314,6 +360,30 @@ internal static class Program {
             best = Math.Min(best, sw.Elapsed.TotalMicroseconds / (actions.Length * model.frame_skip));
         }
         Console.WriteLine($"speed ({run.Env}): {best:F2} us per physics step (managed core, best of 5 runs of one episode)");
+    }
+
+    /// <summary>
+    ///     A trace's first episode as recorded: Gymnasium's reset state and the actions it sampled, for timing an env the
+    ///     checker has no rules for.
+    /// </summary>
+    /// <param name="trace">The trace's records.</param>
+    /// <param name="model">The model, for the frame skip.</param>
+    /// <returns>The reset's qpos, qvel, qacc_warmstart and time, and the episode's actions.</returns>
+    /// <remarks>
+    ///     The records of an env step are its action, then per physics step 30 records (47 in a debug episode), then the
+    ///     three recorded after <c>mj_rnePostConstraint</c>; a change to oracle.py's layout must change the stride here.
+    /// </remarks>
+    private static (double[] Qpos, double[] Qvel, double[] Warm, double Time, double[][] Actions) FirstEpisode(
+        List<double[]> trace, CheetahModel model) {
+        int steps = (int)trace[1][0];
+        bool debug = trace[1][1] != 0;
+        // the state block, the meta record, 4 contact records, efc_J and the efc arrays; then efc_AR and DEBUG
+        int perStep = StateNames.Length + 6 + EfcNames.Length + (debug ? 1 + DebugNames.Length : 0);
+        int stride = 1 + model.frame_skip * perStep + PostNames.Length;
+        var actions = new double[steps][];
+        for (int t = 0; t < steps; t++)
+            actions[t] = trace[6 + t * stride];
+        return (trace[2], trace[3], trace[4], trace[5][0], actions);
     }
 }
 
@@ -349,17 +419,19 @@ internal abstract class EnvRules {
         ActionHigh = Enumerable.Range(0, model.nu).Select(i => (double)(float)model.actuator_ctrlrange[2 * i + 1]).ToArray();
     }
 
-    /// <summary>The rules of an env id.</summary>
-    /// <param name="env">HalfCheetah-v5, Hopper-v5 or Humanoid-v5.</param>
+    /// <summary>
+    ///     The rules of an env id, or <see langword="null"/> for an env the checker has no rules for, which it then checks
+    ///     physics only (from the recorded reset and actions, without the env layer).
+    /// </summary>
+    /// <param name="env">The Gymnasium id: HalfCheetah-v5, Hopper-v5 and Humanoid-v5 have rules.</param>
     /// <param name="model">The model.</param>
     /// <param name="terminate">Whether an unhealthy state terminates the episode.</param>
-    /// <returns>The rules.</returns>
-    /// <exception cref="NotSupportedException">Another env.</exception>
-    public static EnvRules For(string env, CheetahModel model, bool terminate) => env switch {
+    /// <returns>The rules, or <see langword="null"/>.</returns>
+    public static EnvRules? TryFor(string env, CheetahModel model, bool terminate) => env switch {
         "HalfCheetah-v5" => new HalfCheetahRules(model),
         "Hopper-v5" => new HopperRules(model, terminate),
         "Humanoid-v5" => new HumanoidRules(model, terminate),
-        _ => throw new NotSupportedException($"no env rules for {env}"),
+        _ => null,
     };
 
     /// <summary>

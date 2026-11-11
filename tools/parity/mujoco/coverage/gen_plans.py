@@ -19,7 +19,7 @@ Args (command line):
     --flip          turn the model upside down after reset (qpos[2] += pi), as the HalfCheetah proof of concept did.
     --no-terminate  pass terminate_when_unhealthy=False, so episodes run to the 1,000-step limit.
     --rnepost       mark the plan for mj_rnePostConstraint after every env step, as MujocoEnv runs it; only envs that read
-                    cfrc_ext (Ant, Humanoid) need its lines ported.
+                    cfrc_ext (Ant, Humanoid, HumanoidStandup) need its lines ported.
 
 Raises:
     SystemExit: bad arguments.
