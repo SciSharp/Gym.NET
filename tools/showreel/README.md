@@ -1,25 +1,26 @@
 # The showreel
 
-Makes Gym.NET's front-page media from the environments themselves: every frame comes from an env's own `rgb_array`
-render, played by a scripted policy, then composed in C# over a synthwave backdrop and encoded by ffmpeg.
+Makes Gym.NET's front-page media from the environments themselves: every panel shows an env's own `rgb_array` frames,
+played by a scripted or trained policy, composed in C# over a synthwave backdrop and encoded by ffmpeg.
 
 | Output | Where it is used |
 |---|---|
-| `docs/media/gym-net-showreel.mp4`: 60 s, 1280x720, 30 fps, H.264 (about 8 MB) | The docs site's landing page, and linked from the README |
-| `docs/media/gym-net-hero.gif`: a 12 s loop, 800x450, 15 fps (about 4 MB) | The top of `README.md` (GitHub and nuget.org) |
+| `docs/media/gym-net-showreel.mp4`: 85 s, 1280x720, 30 fps, H.264 (about 13 MB) | The docs site's landing page, and linked from the README |
+| `docs/media/gym-net-hero.gif`: a 12 s loop, 800x450, 15 fps (about 4.6 MB; it must stay under 5 MB, see below) | The top of `README.md` (GitHub and nuget.org) |
 | `docs/website-src/images/envs/*.webp`, `*.png`, `envs.json` | The site's 8-bit "select your environment" gallery |
 | `docs/website-src/images/showreel-poster.jpg`, `gymnet-logo.png`, `gymnet-icon.png` | The video's poster, the site's navbar logo and favicon |
 
 ```bash
-dotnet run --project tools/showreel -c Release                  # everything (about 4 minutes)
+dotnet run --project tools/showreel -c Release                  # everything (about 12 minutes on 32 threads)
 dotnet run --project tools/showreel -c Release -- video         # or one output: video, hero, gallery
-dotnet run --project tools/showreel -c Release -- stills --board video --at 2.6,13.5,48 --out stills
+dotnet run --project tools/showreel -c Release -- stills --board video --at 2.6,17.5,50 --out stills
 dotnet run --project tools/showreel -c Release -- parity        # only the Gymnasium comparison
+dotnet run --project tools/showreel -c Release -- train --env Hopper-v5   # retrain a committed MuJoCo policy
 ```
 
 Pass the command after `--`. Options: `--repo DIR` (default: the checkout it runs in), `--ffmpeg EXE`, `--python EXE`,
 `--gymnasium DIR` (default `refs/Gymnasium`), `--work DIR` (the Python exchange files, about 1 GB while it runs),
-`--no-parity`, `--gif-width N`.
+`--no-parity`, `--gif-width N`, and for `train`, `--env ID[,ID...]` and `--minutes M`.
 
 ## Requirements
 
@@ -28,13 +29,25 @@ Pass the command after `--`. Options: `--repo DIR` (default: the checkout it run
   (`tools/parity/requirements.txt`: Python 3.12, NumPy 2.4.2, pygame-ce 2.5.8, Box2D 2.3.10;
   `pwsh tools/parity/setup_venv.ps1` makes one), passed with `--python`, and the `refs/Gymnasium` submodule
   initialized. `--no-parity` renders the video without that segment.
+- Time: the MuJoCo frames cost 17 ms (InvertedPendulum) to 380 ms (HumanoidStandup) each, drawn in software on every
+  core, so they take most of the render.
+- Size: GitHub shows README images through its camo proxy, which refuses files over 5 MB, so a larger GIF shows as a
+  broken image. MuJoCo's shaded panels compress worse than the 2-D envs': the GIF's dithering is set for that budget
+  (`FfmpegPipe.Gif`), so check the size after changing the hero storyboard or `--gif-width`.
 
 ## What it shows
 
-The look and structure are the maintainer's choices (2026-11-11): a synthwave video in which a playful layout switches
-between one, two and four envs; below it on the site, an 8-bit cartridge-select gallery; the 13 visually distinct
-registered ids (the continuous and slippery twins look the same and are left out); and a parity segment. Stamps such as
-`LANDED!` mark how an episode ended.
+The look and structure are the maintainer's choices (DR-59, 2026-11-11): a synthwave video in which a playful layout
+switches between one, two and four envs; below it on the site, an 8-bit cartridge-select gallery; one id per visually
+distinct env (twins such as LunarLanderContinuous-v3 or the MuJoCo v4 ids look the same and are left out); and a parity
+segment. The MuJoCo envs were inserted between the existing sections when they landed (DR-72, 2026-11-12: "insert
+between existing envs the new envs"):
+
+intro, classic control, MuJoCo's control tasks (CartPole stays on beside InvertedPendulum, MuJoCo's cart-pole), Box2D,
+MuJoCo's locomotion (CarRacing stays on beside HalfCheetah), toy text, the parity segment, a finale flipping through all
+24 ids, the outro.
+
+Stamps such as `LANDED!` mark how an episode ended.
 
 | Id | Seed | Policy | The episode |
 |---|---|---|---|
@@ -42,14 +55,48 @@ registered ids (the continuous and slippery twins look the same and are left out
 | MountainCar-v0 | 4 | Accelerate with the velocity | Summit in 122 steps |
 | Pendulum-v1 | 5 | Energy pumping, then a PD catch at the top | Return -114.1 |
 | Acrobot-v1 | 1 | Torque with the second joint's swing | Over the line in 65 steps |
+| InvertedPendulum-v5 | 0 | Linear state feedback found by random search | 1,000 steps, the cart centred (mean \|x\| 0.003 on seeds 0-9) |
+| InvertedDoublePendulum-v5 | 0 | Linear policy trained by ARS | 1,000 steps, return 9,359.6 |
+| Reacher-v5 | 0-3 | Analytic inverse kinematics and a joint-space PD | Mean return -4.14 a target (seeds 0-19) |
+| Pusher-v5 | 73 | Operational-space control of the fingertip (numerical Jacobian) | Sweeps to the puck; it ends 0.145 from the goal, return -39.0 |
 | LunarLander-v3 | 7 | Gymnasium's heuristic (`LunarLanderEnv.Heuristic`) | Landed, return 248.6 |
 | BipedalWalker-v3 | 0 | Gymnasium's gait (`BipedalWalkerHeuristics`) | The whole course, return 314.5 |
 | BipedalWalkerHardcore-v3 | 10 | The same gait | Trips over a stump at step 157 (on purpose: GAME OVER) |
 | CarRacing-v3 | 11 | Pure pursuit on the track's centre line | Return 880.7 in 1,000 steps |
+| HalfCheetah-v5 | 0 | The ARS autopilot of `tools/parity/mujoco/halfcheetah_poc/play`, trained on the same physics | 1,000 steps, return 5,797.0; Gymnasium's is the same to the last bit (that folder's `replay_in_gymnasium.py`) |
+| Hopper-v5 | 0 | Linear policy trained by ARS | 1,000 steps, return 3,614.8 |
+| Walker2d-v5 | 0 | Linear policy trained by ARS | 1,000 steps, return 2,446.0 |
+| Ant-v5 | 0 | Linear policy trained by ARS | 1,000 steps, return 3,131.8 |
+| Humanoid-v5 | 73 | Linear policy trained by ARS, played at three-quarter speed | Falls at step 203, return 993.4 (the longest of seeds 0-199; the policy averages about 120 steps) |
+| HumanoidStandup-v5 | 0 | Linear policy trained by ARS | 1,000 steps, return 124,315.4 |
+| Swimmer-v5 | 0 | Linear policy trained by ARS, played at twice its speed | 1,000 steps, return 357.0 |
 | Blackjack-v1 | 40-44 | Basic strategy | Four hands won of five |
 | FrozenLake-v1, FrozenLake8x8-v1 | 1, 2 | Value iteration over the env's transition table `P` | Goal in 41 and 63 steps |
 | CliffWalking-v1 | 0 | Value iteration | The edge path, 13 steps |
 | Taxi-v4 | 12 | Value iteration | Delivered in 16 steps, return 5 |
+
+### The MuJoCo policies
+
+`train` runs Augmented Random Search V2-t (Mania, Guy and Recht 2018; `Ars.cs`) through `Gymnasium.Make`, with the
+paper's hyperparameters where it reports the env and a time budget per env (`Ars.For`). Locomotion trains with the
+survival bonus subtracted, as in the paper, except Humanoid: without its bonus the policy still fell within about 100
+steps after 5M env steps (the paper trains on the order of 100M), and keeping it teaches standing first. The best
+snapshot is chosen by the true return on seeds 0-4, and each
+`policies/<id>.json` records its iteration, steps, settings and evaluation returns. Three envs are scripted instead,
+each because its trained policy looked wrong on screen: InvertedPendulum's drifted to the end of its rail, Reacher's
+plateaued at -9, and Pusher's barely moved the arm.
+
+### Presentation arguments
+
+Two constructor arguments change what the camera sees, never the dynamics:
+
+- The seven locomotion envs name their model's own `track` camera (`camera_name="track"`, mode `trackcom`). With no
+  camera named, Gymnasium 1.4 forces MuJoCo's free camera, which never follows a body, so a runner leaves the frame
+  within a second; Gym.NET draws it the same way.
+- InvertedDoublePendulum gets a closer `default_camera_config`: Gymnasium sets none for it, and MuJoCo's free camera
+  showed it a few pixels tall in a quarter panel.
+
+The site's gallery shows each env's exact `Gymnasium.Make` call, these arguments included.
 
 ## The parity segment
 
@@ -63,12 +110,17 @@ Both columns come from those recorded every-step renders rather than from a live
 particles inside `render()`, as Gymnasium does, so a panel that rendered only the displayed steps would show other
 particles than the replay that was proven equal.
 
+The segment stays on those two envs: MuJoCo's physics is bit for bit, but its frames are drawn by Gym.NET's own renderer
+and differ from Gymnasium's GPU frames on 0.07% to 16% of the pixels, by about one level (`MUJOCO_ASSESSMENT.md` §17),
+so "0 pixels different" would not hold. The MuJoCo caption says what does: "MUJOCO PHYSICS · BIT FOR BIT, IN C#".
+
 ## Where to change things
 
-- `Episodes.cs`: the recipes (id, seed, policy, speed, stamp, the gallery's blurb).
+- `Episodes.cs`: the recipes (id, seed, policy, speed, stamp, the gallery's blurb, presentation arguments).
 - `Storyboard.cs`: the two timelines: which panel is where, when, with what easing; captions and titles.
 - `Synthwave.cs`, `Compositor.cs`, `PixelFont.cs`: the backdrop, the panels and post-processing, the lettering. The
   site's gallery script ports the same 5x7 font (`docs/website-src/templates/gymnet/public/main.js`).
+- `Ars.cs`, `LinearPolicy.cs`, `policies/`: the MuJoCo trainer, the policy format, the committed policies.
 
 ## The docs site
 

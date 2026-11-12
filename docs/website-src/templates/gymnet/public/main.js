@@ -196,7 +196,11 @@ async function installArcade() {
     const result = env.result ? `  ${env.result}` : ''
     paintPixelText(hud, `SEED ${env.seed}  STEPS ${env.steps}\nRETURN ${env.return}${result}`, 2, '#fcfcfc')
     blurb.textContent = `${env.blurb} Actions: ${env.actionSpace}.`
-    snippet.textContent = `using IEnv env = Gymnasium.Make("${env.id}", new { render_mode = "rgb_array" });`
+    // The manifest carries the exact call the loop was rendered with (the locomotion envs name their track camera);
+    // the fallback keeps a manifest written before that field from showing nothing.
+    snippet.textContent = env.make?.startsWith('using ')
+      ? env.make
+      : `using IEnv env = Gymnasium.Make("${env.id}", new { render_mode = "rgb_array" });`
   }
 
   // Arrow keys move the cursor through the grid while focus is inside the gallery; Home and End jump to the ends.

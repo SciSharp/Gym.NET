@@ -145,8 +145,15 @@ internal sealed class FfmpegPipe : IDisposable {
     /// </summary>
     /// <param name="width">Output width; the height follows the aspect.</param>
     /// <returns>The output options.</returns>
+    /// <remarks>
+    ///     The GIF must stay under 5 MB: GitHub serves README images through its camo proxy, which refuses larger files,
+    ///     and the README would show a broken image. MuJoCo's shaded panels dither into more distinct runs than the 2-D
+    ///     envs, so with the loop's MuJoCo panels <c>bayer_scale=3</c> made 5.4 MB at 800 px; scale 4 (a fainter
+    ///     pattern, slightly more banding in the glows) makes 4.6 MB from the same frames. A wider <c>--gif-width</c>
+    ///     or more MuJoCo in <see cref="Storyboards.Hero"/> needs that budget checked again.
+    /// </remarks>
     public static string[] Gif(int width) => new[] {
-        "-vf", $"scale={width}:-2:flags=area,split[a][b];[a]palettegen=max_colors=256:stats_mode=full[p];[b][p]paletteuse=dither=bayer:bayer_scale=3:diff_mode=rectangle",
+        "-vf", $"scale={width}:-2:flags=area,split[a][b];[a]palettegen=max_colors=256:stats_mode=full[p];[b][p]paletteuse=dither=bayer:bayer_scale=4:diff_mode=rectangle",
         "-loop", "0",
     };
 

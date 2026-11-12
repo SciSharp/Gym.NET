@@ -24,9 +24,11 @@
     <ProjectReference Include="..\..\src\Gym.Environments\Gym.Environments.csproj" />
   </ItemGroup>
 
-  <!-- The Python half of the parity segment, run as a separate process, sits next to the program. -->
+  <!-- The Python half of the parity segment, run as a separate process, and the MuJoCo policies the recipes play
+       (trained by the train command) sit next to the program. -->
   <ItemGroup>
     <None Include="gymnasium_replay.py" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="policies\*.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <!-- What the Gym.NET.Environments package's buildTransitive targets do for a C# app (DR-17): register the built-in

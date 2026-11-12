@@ -235,24 +235,35 @@ internal static class Storyboards {
     public static readonly Rgb Orange = Rgb.Hex("#ff9e3d");
 
     /// <summary>
-    ///     The 60-second video: intro, classic control (1, 2, then 4 panels), Box2D (1, 2, 1), toy text (4, then 1), the
-    ///     parity segment (Gymnasium beside Gym.NET), a finale of four panels flipping through every env, and the outro.
+    ///     The 85-second video: intro; classic control (1, 2, then 4 panels); MuJoCo's control tasks (CartPole stays on
+    ///     beside its MuJoCo twin, then 4); Box2D (1, 2, 1); MuJoCo's locomotion (CarRacing stays on beside HalfCheetah,
+    ///     then 1, 2 and 4); toy text (4, then 1); the parity segment (Gymnasium beside Gym.NET); a finale of four panels
+    ///     flipping through all 24 ids; the outro.
     /// </summary>
     /// <param name="parity">The Gymnasium replays for the parity segment, or <see langword="null"/> to leave it out.</param>
     /// <returns>The storyboard.</returns>
+    /// <remarks>
+    ///     The MuJoCo sections were inserted between the existing ones (the maintainer, 2026-11-12: "insert between existing
+    ///     envs the new envs"). Each section hands over to the next through a panel that stays on screen: CartPole meets
+    ///     InvertedPendulum, MuJoCo's cart-pole, and CarRacing races beside HalfCheetah.
+    /// </remarks>
     public static Storyboard Video(ParityReplays? parity) {
         var tracks = new List<Track>();
         var overlays = new List<Overlay>();
         var flashes = new List<double> { 1.62 };
 
         Title(overlays, 0.55, 4.25);
-        HeaderLogo(overlays, 3.7, parity is null ? 49.9 : 56.2);
 
-        // Classic control: one panel, then two, then four.
-        Caption(overlays, 4.0, 15.4, "CLASSIC CONTROL", Cyan);
-        tracks.Add(Panel(Cyan, Play("CartPole-v1", 4.0),
+        // Classic control: one panel, then two, then four; CartPole stays for the hand-over to MuJoCo.
+        Caption(overlays, 4.0, 15.2, "CLASSIC CONTROL", Cyan);
+        tracks.Add(Panel(Cyan, new[] {
+                new Content(4.0, () => new EpisodeSource(Episodes.Get("CartPole-v1"), 4.0, 1, 0)),
+                // Its first episode ends at 500 steps (14 s); a fresh one, flipped in mid-move, keeps it balancing beside its twin.
+                new Content(15.3, Mid("CartPole-v1", 15.3, 60)),
+            },
             K(4.0, Slots.OffBottom(Slots.One)), K(4.6, Slots.One, Ease.OutBack), K(8.0, Slots.One), K(8.6, Slots.TwoLeft, Ease.InOutCubic),
-            K(11.4, Slots.TwoLeft), K(12.0, Slots.FourTL, Ease.InOutCubic), K(15.0, Slots.FourTL), K(15.6, Slots.OffLeft(Slots.FourTL), Ease.InBack)));
+            K(11.4, Slots.TwoLeft), K(12.0, Slots.FourTL, Ease.InOutCubic), K(15.0, Slots.FourTL), K(15.6, Slots.TwoLeft, Ease.InOutCubic),
+            K(18.6, Slots.TwoLeft), K(19.2, Slots.OffLeft(Slots.TwoLeft), Ease.InBack)));
         tracks.Add(Panel(Pink, Play("MountainCar-v0", 8.0),
             K(8.0, Slots.OffRight(Slots.TwoRight)), K(8.6, Slots.TwoRight, Ease.OutBack), K(11.4, Slots.TwoRight), K(12.0, Slots.FourTR, Ease.InOutCubic),
             K(15.0, Slots.FourTR), K(15.6, Slots.OffRight(Slots.FourTR), Ease.InBack)));
@@ -261,70 +272,108 @@ internal static class Storyboards {
         tracks.Add(Panel(Green, Play("Acrobot-v1", 11.65, speed: 20.0 / 15.0),
             K(11.65, Slots.OffBottom(Slots.FourBR)), K(12.25, Slots.FourBR, Ease.OutBack), K(15.1, Slots.FourBR), K(15.7, Slots.OffBottom(Slots.FourBR), Ease.InBack)));
 
-        // Box2D: the lander alone, the two walkers side by side, then the race car alone.
-        Caption(overlays, 15.8, 33.4, "BOX2D", Pink);
-        tracks.Add(Panel(Cyan, Play("LunarLander-v3", 15.8),
-            K(15.8, Slots.Point(Slots.One)), K(16.4, Slots.One, Ease.OutBack), K(22.6, Slots.One), K(23.1, Slots.OffTop(Slots.One), Ease.InBack)));
-        tracks.Add(Panel(Yellow, Play("BipedalWalker-v3", 22.8),
-            K(22.8, Slots.OffLeft(Slots.TwoLeft)), K(23.4, Slots.TwoLeft, Ease.OutBack), K(28.0, Slots.TwoLeft), K(28.5, Slots.OffLeft(Slots.TwoLeft), Ease.InBack)));
-        tracks.Add(Panel(Orange, Play("BipedalWalkerHardcore-v3", 22.9),
-            K(22.9, Slots.OffRight(Slots.TwoRight)), K(23.5, Slots.TwoRight, Ease.OutBack), K(28.0, Slots.TwoRight), K(28.5, Slots.OffRight(Slots.TwoRight), Ease.InBack)));
-        tracks.Add(Panel(Pink, Play("CarRacing-v3", 28.3),
-            K(28.3, Slots.OffBottom(Slots.One)), K(28.9, Slots.One, Ease.OutBack), K(33.6, Slots.One), K(34.1, Slots.Point(Slots.One), Ease.InBack)));
+        // MuJoCo's control tasks: InvertedPendulum beside CartPole, then four panels.
+        Caption(overlays, 15.3, 23.9, "MUJOCO PHYSICS · BIT FOR BIT, IN C#", Orange);
+        tracks.Add(Panel(Orange, Play("InvertedPendulum-v5", 15.3),
+            K(15.3, Slots.OffRight(Slots.TwoRight)), K(15.9, Slots.TwoRight, Ease.OutBack), K(18.6, Slots.TwoRight), K(19.2, Slots.FourTL, Ease.InOutCubic),
+            K(23.2, Slots.FourTL), K(23.8, Slots.OffLeft(Slots.FourTL), Ease.InBack)));
+        var control = new[] { ("InvertedDoublePendulum-v5", Slots.FourTR, Pink), ("Reacher-v5", Slots.FourBL, Yellow), ("Pusher-v5", Slots.FourBR, Green) };
+        for (int i = 0; i < control.Length; i++) {
+            var (id, slot, neon) = control[i];
+            double t0 = 18.7 + 0.1 * i;
+            RectF entry = slot.Cy < 360 ? Slots.OffTop(slot) : Slots.OffBottom(slot);
+            RectF exit = slot.Cx < 640 ? Slots.OffLeft(slot) : Slots.OffRight(slot);
+            tracks.Add(Panel(neon, Play(id, t0), K(t0, entry), K(t0 + 0.7, slot, Ease.OutBack), K(23.25 + 0.05 * i, slot),
+                K(23.85 + 0.05 * i, exit, Ease.InBack)));
+        }
+
+        // Box2D: the lander alone, the two walkers side by side, then the race car, which stays for the hand-over.
+        Caption(overlays, 24.0, 41.8, "BOX2D", Pink);
+        tracks.Add(Panel(Cyan, Play("LunarLander-v3", 24.0),
+            K(24.0, Slots.Point(Slots.One)), K(24.6, Slots.One, Ease.OutBack), K(30.8, Slots.One), K(31.3, Slots.OffTop(Slots.One), Ease.InBack)));
+        tracks.Add(Panel(Yellow, Play("BipedalWalker-v3", 31.0),
+            K(31.0, Slots.OffLeft(Slots.TwoLeft)), K(31.6, Slots.TwoLeft, Ease.OutBack), K(36.2, Slots.TwoLeft), K(36.7, Slots.OffLeft(Slots.TwoLeft), Ease.InBack)));
+        tracks.Add(Panel(Orange, Play("BipedalWalkerHardcore-v3", 31.1),
+            K(31.1, Slots.OffRight(Slots.TwoRight)), K(31.7, Slots.TwoRight, Ease.OutBack), K(36.2, Slots.TwoRight), K(36.7, Slots.OffRight(Slots.TwoRight), Ease.InBack)));
+        tracks.Add(Panel(Pink, Play("CarRacing-v3", 36.5),
+            K(36.5, Slots.OffBottom(Slots.One)), K(37.1, Slots.One, Ease.OutBack), K(41.8, Slots.One), K(42.4, Slots.TwoLeft, Ease.InOutCubic),
+            K(45.2, Slots.TwoLeft), K(45.7, Slots.OffLeft(Slots.TwoLeft), Ease.InBack)));
+
+        // MuJoCo's locomotion: HalfCheetah beside CarRacing, then alone; the hopper and the walker; four more.
+        Caption(overlays, 41.9, 57.6, "MUJOCO · LOCOMOTION", Orange);
+        tracks.Add(Panel(Orange, Play("HalfCheetah-v5", 41.9),
+            K(41.9, Slots.OffRight(Slots.TwoRight)), K(42.5, Slots.TwoRight, Ease.OutBack), K(45.2, Slots.TwoRight), K(45.8, Slots.One, Ease.InOutCubic),
+            K(48.4, Slots.One), K(48.9, Slots.OffTop(Slots.One), Ease.InBack)));
+        tracks.Add(Panel(Cyan, Play("Hopper-v5", 48.6),
+            K(48.6, Slots.OffLeft(Slots.TwoLeft)), K(49.2, Slots.TwoLeft, Ease.OutBack), K(52.6, Slots.TwoLeft), K(53.1, Slots.OffLeft(Slots.TwoLeft), Ease.InBack)));
+        tracks.Add(Panel(Pink, Play("Walker2d-v5", 48.7),
+            K(48.7, Slots.OffRight(Slots.TwoRight)), K(49.3, Slots.TwoRight, Ease.OutBack), K(52.6, Slots.TwoRight), K(53.1, Slots.OffRight(Slots.TwoRight), Ease.InBack)));
+        var locomotion = new[] { ("Ant-v5", Slots.FourTL, Yellow), ("Humanoid-v5", Slots.FourTR, Green), ("Swimmer-v5", Slots.FourBL, Cyan), ("HumanoidStandup-v5", Slots.FourBR, Pink) };
+        for (int i = 0; i < locomotion.Length; i++) {
+            var (id, slot, neon) = locomotion[i];
+            double t0 = 52.9 + 0.1 * i;
+            RectF exit = slot.Cx < 640 ? Slots.OffLeft(slot) : Slots.OffRight(slot);
+            tracks.Add(Panel(neon, Play(id, t0 + 0.7), K(t0, Slots.OffTop(slot)), K(t0 + 0.8, slot, Ease.OutBounce), K(57.6, slot), K(58.1, exit, Ease.InBack)));
+        }
 
         // Toy text: four panels dropping in with a bounce, then the small lake alone.
-        Caption(overlays, 34.0, 45.4, "TOY TEXT", Yellow);
+        Caption(overlays, 58.1, 69.5, "TOY TEXT", Yellow);
         var toy = new[] { ("FrozenLake8x8-v1", Slots.FourTL, Cyan), ("CliffWalking-v1", Slots.FourTR, Pink), ("Taxi-v4", Slots.FourBL, Yellow), ("Blackjack-v1", Slots.FourBR, Green) };
         for (int i = 0; i < toy.Length; i++) {
             var (id, slot, neon) = toy[i];
-            double t0 = 33.9 + 0.1 * i;
+            double t0 = 58.0 + 0.1 * i;
             RectF exit = slot.Cx < 640 ? Slots.OffLeft(slot) : Slots.OffRight(slot);
-            tracks.Add(Panel(neon, Play(id, t0 + 0.7), K(t0, Slots.OffTop(slot)), K(t0 + 0.8, slot, Ease.OutBounce), K(39.9, slot), K(40.4, exit, Ease.InBack)));
+            tracks.Add(Panel(neon, Play(id, t0 + 0.7), K(t0, Slots.OffTop(slot)), K(t0 + 0.8, slot, Ease.OutBounce), K(64.0, slot), K(64.5, exit, Ease.InBack)));
         }
-        tracks.Add(Panel(Cyan, Play("FrozenLake-v1", 40.2, speed: 10.0 / 8.0),
-            K(40.2, Slots.Point(Slots.One)), K(40.8, Slots.One, Ease.OutBack), K(45.0, Slots.One), K(45.5, Slots.OffBottom(Slots.One), Ease.InBack)));
+        tracks.Add(Panel(Cyan, Play("FrozenLake-v1", 64.3, speed: 10.0 / 8.0),
+            K(64.3, Slots.Point(Slots.One)), K(64.9, Slots.One, Ease.OutBack), K(69.1, Slots.One), K(69.6, Slots.OffBottom(Slots.One), Ease.InBack)));
 
-        double finale = 45.6;
+        double finale = 69.7;
         if (parity is not null) {
             // Parity: Gymnasium on the left, Gym.NET on the right, the same seeds and actions, a pixel count between them.
-            Caption(overlays, 45.6, 52.4, "SAME SEED · SAME ACTIONS · SAME PIXELS", Green);
-            Columns(overlays, 45.9, 52.2);
+            Caption(overlays, 69.7, 76.5, "SAME SEED · SAME ACTIONS · SAME PIXELS", Green);
+            Columns(overlays, 70.0, 76.3);
             var rows = new[] { (parity.Lander, Slots.FourTL, Slots.FourTR), (parity.Racer, Slots.FourBL, Slots.FourBR) };
             for (int i = 0; i < rows.Length; i++) {
                 var (replay, left, right) = rows[i];
-                double t0 = 45.6 + 0.15 * i;
+                double t0 = 69.7 + 0.15 * i;
                 tracks.Add(Panel(Cyan, new[] { new Content(t0, () => new ReplaySource(replay, t0, gymNet: false)) },
-                    K(t0, Slots.Point(left)), K(t0 + 0.6, left, Ease.OutBack), K(52.0, left), K(52.5, Slots.OffLeft(left), Ease.InBack)));
+                    K(t0, Slots.Point(left)), K(t0 + 0.6, left, Ease.OutBack), K(76.1, left), K(76.6, Slots.OffLeft(left), Ease.InBack)));
                 tracks.Add(Panel(Pink, new[] { new Content(t0, () => new ReplaySource(replay, t0, gymNet: true)) },
-                    K(t0, Slots.Point(right)), K(t0 + 0.6, right, Ease.OutBack), K(52.0, right), K(52.5, Slots.OffRight(right), Ease.InBack)));
-                DiffBadge(overlays, replay, t0, 52.2, (left.Cy + right.Cy) / 2);
+                    K(t0, Slots.Point(right)), K(t0 + 0.6, right, Ease.OutBack), K(76.1, right), K(76.6, Slots.OffRight(right), Ease.InBack)));
+                DiffBadge(overlays, replay, t0, 76.3, (left.Cy + right.Cy) / 2);
             }
-            finale = 52.4;
+            finale = 76.5;
         }
 
-        // Finale: four panels flipping through every env, mid-episode, every 0.6 s.
-        Caption(overlays, finale, finale + 3.4, "11 ENVS · 17 IDS · ONE API", Cyan);
-        string[] order = {
-            "LunarLander-v3", "Taxi-v4", "CartPole-v1", "CarRacing-v3", "FrozenLake8x8-v1", "BipedalWalker-v3", "Acrobot-v1", "Blackjack-v1",
-            "MountainCar-v0", "CliffWalking-v1", "Pendulum-v1", "BipedalWalkerHardcore-v3", "FrozenLake-v1",
+        // Finale: four panels flipping through all 24 ids, mid-episode, every 0.6 s. Each row of the table is one moment of
+        // the four panels, so every moment mixes families; each column is one panel's run of six.
+        Caption(overlays, finale, finale + 4.0, "22 ENVS · 39 IDS · ONE API", Cyan);
+        string[,] order = {
+            { "LunarLander-v3", "HalfCheetah-v5", "Taxi-v4", "Ant-v5" },
+            { "Hopper-v5", "CartPole-v1", "Humanoid-v5", "CarRacing-v3" },
+            { "FrozenLake8x8-v1", "Walker2d-v5", "Acrobot-v1", "Reacher-v5" },
+            { "InvertedDoublePendulum-v5", "BipedalWalker-v3", "Swimmer-v5", "Blackjack-v1" },
+            { "MountainCar-v0", "Pusher-v5", "CliffWalking-v1", "HumanoidStandup-v5" },
+            { "InvertedPendulum-v5", "Pendulum-v1", "BipedalWalkerHardcore-v3", "FrozenLake-v1" },
         };
         RectF[] quad = { Slots.FourTL, Slots.FourTR, Slots.FourBL, Slots.FourBR };
         Rgb[] neons = { Cyan, Pink, Yellow, Green };
         for (int q = 0; q < 4; q++) {
             var contents = new List<Content>();
-            for (int k = 0; k < 5; k++) {
-                string id = order[(q + 4 * k) % order.Length];
+            for (int k = 0; k < order.GetLength(0); k++) {
                 double at = finale + 0.05 * q + 0.6 * k;
-                contents.Add(new Content(at, Mid(id, at)));
+                contents.Add(new Content(at, Mid(order[k, q], at)));
             }
             RectF slot = quad[q];
             double t0 = finale + 0.05 * q;
-            tracks.Add(Panel(neons[q], contents, K(t0, Slots.Point(slot)), K(t0 + 0.5, slot, Ease.OutBack), K(finale + 3.1, slot),
-                K(finale + 3.6, Slots.Point(slot), Ease.InBack)));
+            tracks.Add(Panel(neons[q], contents, K(t0, Slots.Point(slot)), K(t0 + 0.5, slot, Ease.OutBack), K(finale + 3.7, slot),
+                K(finale + 4.2, Slots.Point(slot), Ease.InBack)));
         }
 
-        double outro = finale + 3.6;
+        double outro = finale + 4.2;
         flashes.Add(outro);
+        HeaderLogo(overlays, 3.7, outro + 0.2);
         Outro(overlays, outro, outro + 4.4);
         double seconds = outro + 4.4;
         return new Storyboard(seconds, 30, tracks, overlays, flashes,
@@ -333,22 +382,22 @@ internal static class Storyboards {
     }
 
     /// <summary>
-    ///     The README's 12-second loop: the lander alone, the walker and the racer side by side, four toy-text and classic
-    ///     envs, then a white flash that hides the seam where the GIF starts over.
+    ///     The README's 12-second loop: the lander alone; HalfCheetah and the race car side by side; FrozenLake, Ant,
+    ///     CartPole and Hopper; then a white flash that hides the seam where the GIF starts over.
     /// </summary>
     /// <returns>The storyboard (rendered at 1280x720, scaled down by the encoder).</returns>
     public static Storyboard Hero() {
         var tracks = new List<Track>();
         var overlays = new List<Overlay>();
         HeaderLogo(overlays, 0, 12);
-        Caption(overlays, 0, 12, "RL ENVIRONMENTS FOR .NET · PIXEL FOR PIXEL", Cyan, typeOn: false);
+        Caption(overlays, 0, 12, "RL ENVIRONMENTS FOR .NET · BIT FOR BIT", Cyan, typeOn: false);
         tracks.Add(Panel(Cyan, new[] { new Content(0, Mid("LunarLander-v3", 0, 165)) },
             K(0, Slots.One), K(3.0, Slots.One), K(3.5, Slots.OffTop(Slots.One), Ease.InBack)));
-        tracks.Add(Panel(Yellow, new[] { new Content(3.0, Mid("BipedalWalker-v3", 3.0, 300)) },
+        tracks.Add(Panel(Orange, new[] { new Content(3.0, Mid("HalfCheetah-v5", 3.0, 40)) },
             K(3.0, Slots.OffLeft(Slots.TwoLeft)), K(3.6, Slots.TwoLeft, Ease.OutBack), K(6.6, Slots.TwoLeft), K(7.1, Slots.OffLeft(Slots.TwoLeft), Ease.InBack)));
         tracks.Add(Panel(Pink, new[] { new Content(3.1, Mid("CarRacing-v3", 3.1, 140)) },
             K(3.1, Slots.OffRight(Slots.TwoRight)), K(3.7, Slots.TwoRight, Ease.OutBack), K(6.6, Slots.TwoRight), K(7.1, Slots.OffRight(Slots.TwoRight), Ease.InBack)));
-        var four = new[] { ("FrozenLake8x8-v1", Slots.FourTL, Cyan, 20), ("Taxi-v4", Slots.FourTR, Pink, 0), ("CartPole-v1", Slots.FourBL, Yellow, 100), ("Acrobot-v1", Slots.FourBR, Green, 0) };
+        var four = new[] { ("FrozenLake8x8-v1", Slots.FourTL, Cyan, 20), ("Ant-v5", Slots.FourTR, Yellow, 40), ("CartPole-v1", Slots.FourBL, Green, 100), ("Hopper-v5", Slots.FourBR, Pink, 150) };
         for (int i = 0; i < four.Length; i++) {
             var (id, slot, neon, tick) = four[i];
             double t0 = 6.9 + 0.1 * i;
@@ -408,7 +457,7 @@ internal static class Storyboards {
             float fadeLines = 1 - leave;
             // The pitch sits on the dark floor under the horizon, on plates, where it never crosses the bright sun.
             TypeOn(img, "REINFORCEMENT LEARNING ENVIRONMENTS FOR .NET", 640, 486, 3, Cyan, local - 1.25, fadeLines, plate: true);
-            TypeOn(img, "BIT FOR BIT · PIXEL FOR PIXEL WITH GYMNASIUM", 640, 534, 3, Pink, local - 2.0, fadeLines, plate: true);
+            TypeOn(img, "BIT FOR BIT WITH GYMNASIUM", 640, 534, 3, Pink, local - 2.0, fadeLines, plate: true);
         }));
     }
 

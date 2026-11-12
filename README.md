@@ -3,12 +3,12 @@
 [![NuGet](https://img.shields.io/nuget/v/Gym.NET.Environments?label=Gym.NET.Environments)](https://www.nuget.org/packages/Gym.NET.Environments)
 [![NuGet downloads](https://img.shields.io/nuget/dt/Gym.NET)](https://www.nuget.org/packages/Gym.NET)
 
-[![Gym.NET's environments playing in neon panels over a synthwave grid: LunarLander, BipedalWalker, CarRacing, FrozenLake, Taxi, CartPole and Acrobot, each played by a scripted policy](https://raw.githubusercontent.com/SciSharp/Gym.NET/master/docs/media/gym-net-hero.gif)](https://github.com/SciSharp/Gym.NET/blob/master/docs/media/gym-net-showreel.mp4)
+[![Gym.NET's environments playing in neon panels over a synthwave grid: LunarLander, HalfCheetah, CarRacing, FrozenLake, Ant, CartPole and Hopper, each played by a scripted or trained policy](https://raw.githubusercontent.com/SciSharp/Gym.NET/master/docs/media/gym-net-hero.gif)](https://github.com/SciSharp/Gym.NET/blob/master/docs/media/gym-net-showreel.mp4)
 
-Each panel above shows an environment's own `rgb_array` frames, played by a scripted policy. The
-[one-minute showreel](https://github.com/SciSharp/Gym.NET/blob/master/docs/media/gym-net-showreel.mp4) plays thirteen
-of them, then puts Gymnasium and Gym.NET side by side on the same seed and actions and counts the pixels that differ:
-zero. [tools/showreel](https://github.com/SciSharp/Gym.NET/tree/master/tools/showreel) makes both.
+Each panel above shows an environment's own `rgb_array` frames, played by a scripted or trained policy. The
+[showreel](https://github.com/SciSharp/Gym.NET/blob/master/docs/media/gym-net-showreel.mp4) plays 24 of them, MuJoCo's
+among the rest, then puts Gymnasium and Gym.NET side by side on the same seed and actions and counts the pixels that
+differ: zero. [tools/showreel](https://github.com/SciSharp/Gym.NET/tree/master/tools/showreel) makes both.
 
 Reinforcement-learning environments for .NET with [Farama Gymnasium](https://github.com/Farama-Foundation/Gymnasium)'s
 API and behavior. Given the same seed and actions, Gym.NET's environments return the same observations, rewards,
@@ -74,7 +74,7 @@ the pole, playing 100 carts at once through `Gymnasium.MakeVec`.
 | Vector envs | `VectorEnv<TObs, TAct>`, `SyncVectorEnv` in every autoreset mode, `AsyncVectorEnv` on worker threads, every vector wrapper, `CartPoleVectorEnv` |
 | Checkers | `EnvChecker.CheckEnv`, `PassiveChecker`, `EnvMatch` |
 | Environments | classic_control: CartPole-v0/v1, MountainCar-v0, MountainCarContinuous-v0, Pendulum-v1, Acrobot-v1. box2d: LunarLander-v3, LunarLanderContinuous-v3, BipedalWalker-v3, BipedalWalkerHardcore-v3, CarRacing-v3 (on Box2D 2.3.0 in managed C#). toy_text: FrozenLake-v1, FrozenLake8x8-v1, CliffWalking-v1, CliffWalkingSlippery-v1, Taxi-v4, Blackjack-v1. mujoco: Ant, HalfCheetah, Hopper, Humanoid, HumanoidStandup, InvertedPendulum, InvertedDoublePendulum, Pusher, Reacher, Swimmer, Walker2d, each -v4 and -v5 (on Gym.NET's own engine, bit for bit with MuJoCo 4.0.0) |
-| Rendering | `rgb_array` and `ansi` frames equal to Gymnasium's; `human` mode in an Avalonia or Windows Forms window |
+| Rendering | `rgb_array` and `ansi` frames equal to Gymnasium's (MuJoCo's within one level, below); `human` mode in an Avalonia or Windows Forms window |
 
 MuJoCo's environments step bit for bit with MuJoCo 4.0.0. Gym.NET draws their frames itself: against Gymnasium's GPU
 frames, 0.07% (InvertedPendulum) to 16% (Humanoid) of the pixels differ, nearly all by one level. The release notes

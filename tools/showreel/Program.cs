@@ -18,9 +18,15 @@ namespace Gym.Showreel;
 ///     Showreel gallery     docs/website-src/images/envs/*, the site's logo and icon
 ///     Showreel parity      only the Gymnasium comparison, printing what was compared
 ///     Showreel stills      PNG frames of a storyboard: --board video|hero --at 1.5,20,33 [--out DIR]
+///     Showreel train       trains MuJoCo policies with ARS into tools/showreel/policies: --env Hopper-v5,Ant-v5 [--minutes M]
 ///     options: --repo DIR (default: the checkout this runs in), --ffmpeg EXE, --python EXE, --gymnasium DIR,
 ///              --work DIR (Python exchange files), --no-parity, --gif-width N (default 800)
 ///     </code>
+///     <para>
+///     The MuJoCo recipes play the committed policies in <c>tools/showreel/policies</c>; <c>train</c> is only needed to
+///     replace one. Training is deterministic for its seed but takes minutes per env (the budgets are in
+///     <see cref="Ars.For"/>).
+///     </para>
 /// </remarks>
 internal static class Program {
     /// <summary>Runs a command.</summary>
@@ -52,8 +58,11 @@ internal static class Program {
                 case "stills":
                     Stills(options);
                     return 0;
+                case "train":
+                    Train(options);
+                    return 0;
                 default:
-                    Console.Error.WriteLine($"unknown command '{command}': all, video, hero, gallery, parity or stills");
+                    Console.Error.WriteLine($"unknown command '{command}': all, video, hero, gallery, parity, stills or train");
                     return 2;
             }
         } catch (ArgumentException e) {
@@ -62,6 +71,28 @@ internal static class Program {
         } catch (Exception e) when (e is InvalidOperationException or IOException) {
             Console.Error.WriteLine(e.Message);
             return 1;
+        }
+    }
+
+    /// <summary>
+    ///     Trains a policy per <c>--env</c> id with Augmented Random Search and writes it to
+    ///     <c>tools/showreel/policies/&lt;id&gt;.json</c> in the repository (rebuild the tool to ship it next to the program).
+    /// </summary>
+    /// <param name="o">The options.</param>
+    /// <exception cref="ArgumentException">No <c>--env</c>, or an id without training settings.</exception>
+    private static void Train(Options o) {
+        if (o.Envs.Count == 0)
+            throw new ArgumentException("train needs --env with comma-separated ids");
+        string folder = Path.Combine(o.Repo, "tools", "showreel", "policies");
+        Directory.CreateDirectory(folder);
+        foreach (string id in o.Envs) {
+            Ars.Settings settings = Ars.For(id);
+            if (o.Minutes is double minutes)
+                settings = settings with { Minutes = minutes };
+            LinearPolicy policy = Ars.Train(id, settings, Console.Out);
+            string path = Path.Combine(folder, id + ".json");
+            policy.Save(path);
+            Console.WriteLine($"{path}: evaluation mean {policy.Info["evaluation_mean"]}");
         }
     }
 
@@ -167,6 +198,12 @@ internal static class Program {
         /// <summary>The times for <c>stills</c>.</summary>
         public List<double> At { get; } = new();
 
+        /// <summary>The ids for <c>train</c>.</summary>
+        public List<string> Envs { get; } = new();
+
+        /// <summary>A time budget per env for <c>train</c> replacing <see cref="Ars.For"/>'s, or null.</summary>
+        public double? Minutes { get; private set; }
+
         /// <summary>Parses the arguments.</summary>
         /// <param name="args">The arguments.</param>
         /// <returns>The options.</returns>
@@ -190,6 +227,8 @@ internal static class Program {
                     case "--at":
                         o.At.AddRange(Value().Split(',', StringSplitOptions.RemoveEmptyEntries).Select(s => double.Parse(s, CultureInfo.InvariantCulture)));
                         break;
+                    case "--env": o.Envs.AddRange(Value().Split(',', StringSplitOptions.RemoveEmptyEntries)); break;
+                    case "--minutes": o.Minutes = double.Parse(Value(), CultureInfo.InvariantCulture); break;
                     default:
                         if (a.StartsWith("--", StringComparison.Ordinal) || o.Command is not null)
                             throw new ArgumentException($"unknown argument '{a}'");

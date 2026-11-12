@@ -65,10 +65,10 @@ internal static class Gallery {
                 ["seed"] = recipe.Seed,
                 ["steps"] = steps,
                 ["return"] = Math.Round(ret, 1),
-                ["result"] = recipe.Hands > 1 ? $"{wins} WON, {losses} LOST" : stamp ?? "",
+                ["result"] = recipe.ScoresHands ? $"{wins} WON, {losses} LOST" : stamp ?? "",
                 ["actionSpace"] = action,
                 ["observationSpace"] = observation,
-                ["make"] = $"Gymnasium.Make(\"{recipe.Id}\")",
+                ["make"] = MakeSnippet(recipe),
                 ["loop"] = $"images/envs/{recipe.Id}.webp",
                 ["poster"] = $"images/envs/{recipe.Id}.png",
                 ["width"] = w,
@@ -78,6 +78,26 @@ internal static class Gallery {
         // Relaxed escaping keeps the quotes in the make snippets readable; the file is fetched as JSON, never inlined in HTML.
         var json = new JsonSerializerOptions { WriteIndented = true, Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
         File.WriteAllText(Path.Combine(folder, "envs.json"), JsonSerializer.Serialize(entries, json) + "\n");
+    }
+
+    /// <summary>
+    ///     The C# line that makes the env as the gallery's loop was rendered: <c>render_mode</c> and the recipe's string
+    ///     keyword arguments (the locomotion envs' <c>camera_name="track"</c>) in an anonymous object; a dictionary argument
+    ///     (InvertedDoublePendulum's camera) is named in a trailing comment instead, since spelling it out would bury the call.
+    /// </summary>
+    /// <param name="recipe">The recipe.</param>
+    /// <returns>The statement, e.g. <c>using IEnv env = Gymnasium.Make("Hopper-v5", new { render_mode = "rgb_array", camera_name = "track" });</c>.</returns>
+    private static string MakeSnippet(EpisodeRecipe recipe) {
+        var arguments = new List<string> { "render_mode = \"rgb_array\"" };
+        var omitted = new List<string>();
+        foreach (var (name, value) in recipe.Kwargs ?? new Dictionary<string, object?>()) {
+            if (value is string text)
+                arguments.Add($"{name} = \"{text}\"");
+            else
+                omitted.Add(name);
+        }
+        string comment = omitted.Count == 0 ? "" : $" // plus the showreel's {string.Join(", ", omitted)}";
+        return $"using IEnv env = Gymnasium.Make(\"{recipe.Id}\", new {{ {string.Join(", ", arguments)} }});{comment}";
     }
 
     /// <summary>

@@ -47,7 +47,7 @@ internal sealed class EpisodePlayer : IDisposable {
     /// <exception cref="Gym.Exceptions.Error">The id is not registered (the built-in ids register before Main).</exception>
     public EpisodePlayer(EpisodeRecipe recipe) {
         Recipe = recipe;
-        _env = Gymnasium.Make(recipe.Id, new { render_mode = "rgb_array" });
+        _env = Gymnasium.Make(recipe.Id, recipe.MakeArguments());
         _policy = recipe.Policy();
         _observation = _env.Reset(seed: recipe.Seed).Observation;
     }
@@ -102,10 +102,15 @@ internal sealed class EpisodePlayer : IDisposable {
         }
     }
 
-    /// <summary>A short status for the panel's label: step and return, or Blackjack's hand and score.</summary>
-    public string Status => Recipe.Hands > 1
-        ? $"HAND {Hand + 1}/{Recipe.Hands}  W{Wins} L{Losses}"
-        : $"STEP {Step}  RET {Return.ToString("0.0", CultureInfo.InvariantCulture)}";
+    /// <summary>
+    ///     A short status for the panel's corner: step and return; for multi-episode recipes the episode's number, then
+    ///     the won and lost count (Blackjack) or the episode's return (Reacher's targets).
+    /// </summary>
+    public string Status => Recipe.Hands <= 1
+        ? $"STEP {Step}  RET {Return.ToString("0.0", CultureInfo.InvariantCulture)}"
+        : Recipe.ScoresHands
+            ? $"{Recipe.HandLabel} {Hand + 1}/{Recipe.Hands}  W{Wins} L{Losses}"
+            : $"{Recipe.HandLabel} {Hand + 1}/{Recipe.Hands}  RET {Return.ToString("0.0", CultureInfo.InvariantCulture)}";
 
     /// <summary>
     ///     Steps the env (or holds between hands) until <see cref="Tick"/> reaches <paramref name="tick"/>; earlier ticks
@@ -153,9 +158,10 @@ internal sealed class EpisodePlayer : IDisposable {
         }
     }
 
-    /// <summary>Closes the env.</summary>
+    /// <summary>Closes the env, and the policy when it holds resources of its own (Pusher's scratch simulation).</summary>
     public void Dispose() {
         (_observation as IDisposable)?.Dispose();
+        (_policy as IDisposable)?.Dispose();
         _env.Dispose();
     }
 }
