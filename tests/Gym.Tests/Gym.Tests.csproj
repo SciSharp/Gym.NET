@@ -2,6 +2,9 @@
 
   <PropertyGroup>
     <TargetFrameworks>net8.0-windows;net10.0-windows</TargetFrameworks>
+    <!-- net11.0 (D24) when the SDK can build it, 11.0.100 and later: an older SDK keeps building the frameworks above
+         instead of failing with NETSDK1045, and Directory.Build.targets stops a release build on one. -->
+    <TargetFrameworks Condition="$([MSBuild]::VersionGreaterThanOrEquals('$(NETCoreSdkVersion)', '11.0'))">$(TargetFrameworks);net11.0-windows</TargetFrameworks>
     <UseWindowsForms>true</UseWindowsForms>
     <UseWpf>true</UseWpf>
     <IsPackable>false</IsPackable>

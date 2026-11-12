@@ -26,7 +26,7 @@ dotnet add package Gym.NET.Rendering.Avalonia    # optional: a window for render
 dotnet add package Gym.NET.Rendering.WinForm     # optional: the same on Windows Forms
 ```
 
-Gym.NET 1.0 targets .NET 8 and .NET 10. Coming from 0.2: move every Gym.NET package to 1.0.0 at once and remove any
+Gym.NET 1.0 targets .NET 8, .NET 10 and .NET 11. Coming from 0.2: move every Gym.NET package to 1.0.0 at once and remove any
 NumSharp.Lite reference ([migrating from 0.2](https://github.com/SciSharp/Gym.NET/blob/master/docs/guides/migrating_to_1.0.md)).
 
 ## Example

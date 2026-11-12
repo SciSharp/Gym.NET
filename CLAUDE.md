@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Gym.NET is a native C# (.NET) reinforcement learning environment toolkit and benchmark suite, API-compatible with Farama Gymnasium (the successor of OpenAI Gym) and aligned with it byte for byte. It is its own codebase: Gymnasium is the reference it measures itself against, not an identity it claims. It is part of the SciSharp STACK ecosystem and uses `NumSharp` for multidimensional tensor/array operations and `SixLabors.ImageSharp` for rendering.
 
 - **Canonical SOT Submodule:** `refs/Gymnasium` (Farama Foundation Gymnasium Git submodule for behavioral, mathematical, and algorithmic parity).
-- **Roadmap:** `docs/plans/COMPLETION_PLAN.md` orders the work to one release, 1.0.0 (planned as 2.0 until decision D23 of 2026-11-12), through phases R0, P0r, P2, P3, P7, P4, P5, P6, P8, P9 (MuJoCo, resumed by DR-61) and P10, of which P10.5, the release itself, is left; it records the decisions D2–D23; `docs/plans/GYMNASIUM_PORT_PLAN.md` holds the per-area specifications.
+- **Roadmap:** `docs/plans/COMPLETION_PLAN.md` orders the work to one release, 1.0.0 (planned as 2.0 until decision D23 of 2026-11-12), through phases R0, P0r, P2, P3, P7, P4, P5, P6, P8, P9 (MuJoCo, resumed by DR-61) and P10, of which P10.5, the release itself, is left; it records the decisions D2–D24; `docs/plans/GYMNASIUM_PORT_PLAN.md` holds the per-area specifications.
 - **User docs (P10):** `docs/README.md` indexes the guides, `docs/architecture.md` and the release notes `docs/releases/RELEASE_1.0.0.md` (not yet published); every code sample in them was compiled and run against the tree. Keep them true when the API changes.
 - **Design gate:** `docs/plans/DESIGN_REVIEW.md` holds the approved implementation designs (DR-01…DR-72). Implement only what an approved design covers; a design question no DR-xx answers goes back to the maintainer for review before the step continues.
 - **Working branch:** `journey1` until 1.0 (decision D20); it merges into `master` once, at the release.
@@ -171,6 +171,10 @@ refs/Gym.NET/
 ## 3. Build & Test Commands
 
 ### 3.1 Building the Solution & Projects
+
+The libraries and tests target `net8.0` and `net10.0`, and `net11.0` when the SDK is 11.0.100 or later (decision D24): an
+older SDK builds the first two instead of failing, and a release build (`-p:ContinuousIntegrationBuild=true`) stops on it
+with `GYMNET0011` (`Directory.Build.targets`), so no package ships without its .NET 11 build.
 
 ```powershell
 # Build entire solution (Debug / Release)

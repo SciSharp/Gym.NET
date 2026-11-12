@@ -8,8 +8,10 @@ repository's [CLAUDE.md](../../CLAUDE.md); the parity suite's own guide is
 
 ## Prerequisites
 
-- The .NET 8 and .NET 10 SDKs (the libraries target `net8.0` and `net10.0`; the unit tests and the Windows Forms viewer
-  target `net8.0-windows` and `net10.0-windows`).
+- The .NET 11 SDK (11.0.100 or later) with the .NET 8 and .NET 10 runtimes: the libraries target `net8.0`, `net10.0`
+  and `net11.0`, the unit tests and the Windows Forms viewer the three `-windows` forms. An older SDK builds and tests
+  `net8.0` and `net10.0` alone, since `net11.0` joins only on an SDK that can build it (decision D24), and a release
+  build (`-p:ContinuousIntegrationBuild=true`) refuses such an SDK (`GYMNET0011`, `Directory.Build.targets`).
 - The two reference submodules, initialized without `--recursive` (that would also clone NumSharp's own submodules,
   which the build doesn't need):
 

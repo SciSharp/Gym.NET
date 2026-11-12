@@ -3,6 +3,7 @@
 | | |
 |---|---|
 | **Status** | Draft 2, 2026-11-08: the implementation designs are reviewed and approved in [`DESIGN_REVIEW.md`](DESIGN_REVIEW.md) (DR-01…DR-36). **A step starts only when every design it depends on is approved there** |
+| **Frameworks** | net8.0, net10.0 and, since D24 (2026-11-12), net11.0 |
 | **Versions** | The release ships as **1.0.0** (D23, 2026-11-12). This plan was written for "2.0", its number until then, and its records keep that wording: read 2.0 (2.0.0) as 1.0 (1.0.0), 2.x as 1.x, and 3.0, where the `[Obsolete]` shims and `Gym.Legacy` go, as 2.0 |
 | **Progress** | Done: R0, P0r, P2, P3, P7, P4, P5 and P6 (2026-11-09 and 2026-11-10), P8 (2026-11-11) and P9, MuJoCo, resumed by DR-61 (2026-11-12); P10.1–P10.4 prepared on 2026-11-09 and moved to 1.0.0 on 2026-11-12 (D23). Left: P10.5, the release itself, on the maintainer's word, after the items the release-readiness review of 2026-11-12 lists under P10 |
 | **Scope** | Everything [`GYMNASIUM_PORT_PLAN.md`](GYMNASIUM_PORT_PLAN.md) still has open, up to one release, 1.0.0 (D23), that includes Box2D (D21) and, since DR-61, MuJoCo |
@@ -148,6 +149,7 @@ D7 (`AsyncVectorEnv`) is settled by DR-22, D14 (toy_text assets) by DR-19, and D
 | # | Decision | Taken | Consequence for this plan |
 |---|---|---|---|
 | D23 | Release version | **1.0.0** (the maintainer: "Prepare moving to new major 1.0.0"), in place of the 2.0.0 the port plan's §16 chose. The last release was 0.2.0 and there was never a 1.x, so the next major is 1.0. The one after it, 2.0, is where the `[Obsolete]` shims and `Gym.Legacy` go (DR-56, DR-58), and `Gym.Legacy` stays through 1.x (D9) | P10: the package and assembly versions, the docs, the shims' messages and the release notes (`docs/releases/RELEASE_1.0.0.md`) moved to 1.0.0 on 2026-11-12. Earlier records keep "2.0" (the Versions row above) |
+| D24 | .NET 11 | **net11.0 joins net8.0 and net10.0** (the maintainer: "Add .NET 11"; .NET 11.0.0 shipped on 2026-11-10, an STS release) in the five packages and the unit, parity and plugin test projects (`net11.0-windows` for the Windows Forms viewer and the unit tests). *Implemented conditionally*: each project's second TargetFrameworks line admits net11.0 when the SDK is 11.0.100 or later, so a machine or session still on SDK 10 keeps building the other two instead of failing with NETSDK1045; `Directory.Build.targets` stops a release build (`ContinuousIntegrationBuild=true`) on such an SDK with `GYMNET0011`. CI installs the 11.0 SDK. Once every machine that builds Gym.NET has SDK 11, the condition can go | P10: the packages carry net11.0 builds; the gates run on three frameworks |
 
 ## 4. The road to 1.0
 

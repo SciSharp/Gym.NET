@@ -1,5 +1,8 @@
 # Gym.NET's continuous integration (completion plan P0r.1, decision D20: informational on the journey1 branch until 1.0).
 #
+# Both jobs install the .NET 8, 10 and 11 SDKs: the newest, 11, builds every project for net8.0, net10.0 and net11.0
+# (net11.0 joins only on SDK 11, decision D24), and the tests run on all three runtimes.
+#
 # windows: the reference platform of tools/parity/manifest.json (win-x64). Builds Debug and Release, runs the headless
 #          unit gate, creates the pinned Python stack and runs the live parity gate with the engine required, so a
 #          missing or drifted stack fails instead of skipping. The golden replays run inside that gate as well.
@@ -48,6 +51,7 @@ jobs:
           dotnet-version: |
             8.0.x
             10.0.x
+            11.0.x
 
       - name: Build (Debug)
         run: dotnet build Gym.NET.sln -c Debug
@@ -97,6 +101,7 @@ jobs:
           dotnet-version: |
             8.0.x
             10.0.x
+            11.0.x
 
       # The parity project builds Gym, Gym.Rendering and Gym.Environments with it; the -windows projects are skipped.
       - name: Build the parity suite (Release)

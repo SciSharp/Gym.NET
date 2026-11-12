@@ -16,6 +16,7 @@ API, which followed gym before 0.26, with Gymnasium's.
 - **Gymnasium's API in C#**: `Env<TObs, TAct>`, `Reset(seed)` returning `(observation, info)`, `Step` returning
   `(observation, reward, terminated, truncated, info)`, the registry, all ten spaces, every wrapper but Atari's and the
   JAX/PyTorch conversions, and sync and async vector envs.
+- **.NET 8, .NET 10 and .NET 11**: every package carries a build for each (the Windows Forms viewer's for Windows).
 - **No native code**: Box2D 2.3.0 and a MuJoCo engine that computes what MuJoCo 4.0.0 computes are managed C#, inside
   Gym.NET.Environments; nothing to install beside the packages.
 - **Checked against Gymnasium itself**: a live parity suite runs Gymnasium inside the test process and compares every
@@ -32,7 +33,7 @@ API, which followed gym before 0.26, with Gymnasium's.
 | Gym.NET.Rendering.Avalonia | A window for `human` mode on Avalonia 12 (Windows, Linux, macOS), and `PlayPlot`'s live charts on ScottPlot (`AvaloniaPlotFigure`) |
 | Gym.NET.Rendering.WinForm | The same on Windows Forms (`WinFormPlotFigure`); its window's client area is the frame's size, where 0.2's form cropped the frame's bottom rows behind the title bar |
 
-All target .NET 8 and .NET 10, depend on NumSharp 0.80.0, and are Apache-2.0, the repository's license (decision
+All target .NET 8, .NET 10 and .NET 11, depend on NumSharp 0.80.0, and are Apache-2.0, the repository's license (decision
 DR-49). Each package carries THIRD-PARTY-NOTICES.md, which credits, with their notices, the sources Gym.NET translates
 (Box2D 2.3.0 and pybox2d, SDL_gfx, SDL_ttf, OpenCV's resize, CPython's difflib, json and math routines, pygame-ce's
 `draw.aaline`/`aalines`) and the data it carries (Gymnasium's assets, CarRacing's score glyphs, MuJoCo's font and
@@ -47,7 +48,8 @@ compiled models).
    'Gym.Environments.IEnvViewer'`). Gym.NET.Rendering, new, comes with Gym.NET.Environments.
 2. **Remove NumSharp.Lite.** 1.0 depends on NumSharp 0.80.0; with NumSharp.Lite 0.1.12 still referenced, code naming
    `NDArray` stops compiling (CS0433: the type exists in both).
-3. **Target .NET 8 or later.** The packages carry .NET 8 and .NET 10 builds; 0.2's targeted .NET Core 3.1 and .NET 6.
+3. **Target .NET 8 or later.** The packages carry .NET 8, .NET 10 and .NET 11 builds; 0.2's targeted .NET Core 3.1
+   and .NET 6.
 4. **Avalonia 12** for Gym.NET.Rendering.Avalonia; 0.2's viewer was built on Avalonia 0.10.
 5. **Builds that treat warnings as errors** need two suppressions:
    - ImageSharp 2.1.13's five advisories, which NuGet reports as NU1902/NU1903 ([below](#sixlaborsimagesharp-2113-and-its-advisories)).
@@ -260,7 +262,8 @@ A new advisory against 2.1.13 gets the same review before Gym.NET suppresses it.
 
 ## Verification
 
-On 2026-11-12, on Windows x64, in Release, on net8.0 and net10.0 alike, on the tree of this release:
+On 2026-11-12, on Windows x64, in Release, on net8.0, net10.0 and net11.0 alike (built with the .NET 11 SDK, 11.0.100),
+on the tree of this release:
 
 - **The unit suite** (Gymnasium's own tests rewritten in C#, and Gym.NET's): 3,894 of 3,894 pass (24 data rows skip
   where Gymnasium's own tests call `pytest.skip`), and the 10 open tests fail only at their documented gaps (NumSharp's
@@ -272,8 +275,10 @@ On 2026-11-12, on Windows x64, in Release, on net8.0 and net10.0 alike, on the t
   - Gymnasium's own `check_env` and `check_environments_match`, run through the reverse bridge on the 38 ids that build;
   - the 40 golden trajectories, replayed without Python;
   - the MuJoCo frame and window cells, on the reference GPU (NVIDIA GeForce RTX 4060 Ti, driver 616.56).
-- **The five packages**, packed from that tree and restored from a local feed into a project of their own:
-  - 12 ids from every family, MuJoCo's HalfCheetah, Humanoid, Pusher and Ant among them, made, stepped and rendered;
-  - installed all together, every one of their 927 types loads, both viewers implement the window and input contracts,
-    and 0.2's common lines compile and run through the shims.
+- **The five packages**, packed from that tree with a build for each framework, and restored from a local feed into
+  apps of their own on .NET 10 and on .NET 11:
+  - 12 ids from every family, MuJoCo's HalfCheetah, Humanoid, Pusher and Ant among them, made, stepped and rendered,
+    the same frames on both runtimes;
+  - installed all together, every type of the five assemblies loads, both viewers implement the window and input
+    contracts, and 0.2's common lines compile and run through the shims.
 - **The rest**: the CartPole example solves CartPole-v1 in seven generations, and the documentation site builds.

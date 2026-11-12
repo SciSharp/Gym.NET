@@ -7,6 +7,9 @@
        its license, the GNU Library GPL version 2 or later, so the package's license expression names both licenses. -->
   <PropertyGroup>
     <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <!-- net11.0 (D24) when the SDK can build it, 11.0.100 and later: an older SDK keeps building the frameworks above
+         instead of failing with NETSDK1045, and Directory.Build.targets stops a release build on one. -->
+    <TargetFrameworks Condition="$([MSBuild]::VersionGreaterThanOrEquals('$(NETCoreSdkVersion)', '11.0'))">$(TargetFrameworks);net11.0</TargetFrameworks>
     <LangVersion>latest</LangVersion>
     <RootNamespace>Gym.Rendering</RootNamespace>
     <!-- New projects follow the port plan's section 3.7. -->

@@ -14,7 +14,7 @@ will be removed in 2.0.
 
 ## Requirements
 
-- .NET 8 or .NET 10 (0.2 targeted .NET Core 3.1 and .NET 6).
+- .NET 8, .NET 10 or .NET 11 (0.2 targeted .NET Core 3.1 and .NET 6).
 - Every Gym.NET package at 1.0.0, moved together. 0.2.0 declared its dependencies as "0.2.0 or later", so NuGet
   accepts a mix of 0.2.0 and 1.0.0 packages without a warning, and the mix fails when it runs: Gym.NET.Environments
   0.2.0 over Gym.NET 1.0.0 cannot load its envs (`Could not load type 'Gym.Envs.Env'`), and a 0.2.0 viewer over

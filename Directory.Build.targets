@@ -1,0 +1,16 @@
+<!-- Gym.NET's release guard (decision D24). The libraries and tests target net11.0 only when the SDK can build it (the
+     second TargetFrameworks line of each project), so an SDK older than 11.0.100 quietly builds net8.0 and net10.0
+     alone. That is right for development and wrong for a release: packages packed on such an SDK would ship without
+     their .NET 11 assets. A release is built with -p:ContinuousIntegrationBuild=true (deterministic paths, completion
+     plan P10.5), so that build stops here, before restore, when the SDK cannot target .NET 11. Every other build, and
+     a release build on SDK 11, is untouched. -->
+<Project>
+
+  <Target Name="GymNetRequireNet11SdkForRelease"
+          BeforeTargets="Restore;Build;Pack"
+          Condition="'$(ContinuousIntegrationBuild)' == 'true' and $([MSBuild]::VersionLessThan('$(NETCoreSdkVersion)', '11.0'))">
+    <Error Code="GYMNET0011"
+           Text="A Gym.NET release build (ContinuousIntegrationBuild=true) targets .NET 11 too, which needs the .NET 11 SDK (11.0.100 or later); this is SDK $(NETCoreSdkVersion), which would build and pack without net11.0. Install the .NET 11 SDK, or build without ContinuousIntegrationBuild for development." />
+  </Target>
+
+</Project>
