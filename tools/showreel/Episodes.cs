@@ -90,7 +90,7 @@ internal sealed record EpisodeRecipe(
 ///     </para>
 ///     <para>
 ///     Eight of the eleven MuJoCo envs play linear policies committed in <c>tools/showreel/policies</c>: HalfCheetah's is
-///     the autopilot trained for <c>tools/parity/mujoco/halfcheetah_poc/play</c> on the same physics, the others were
+///     the autopilot trained for <c>examples/HalfCheetah</c> on the same physics, the others were
 ///     trained by <see cref="Ars"/> (the <c>train</c> command), and each file records its training and evaluation returns.
 ///     Three are scripted instead, each after its trained policy looked wrong on screen: InvertedPendulum
 ///     (<see cref="InvertedPendulumBalance"/>, which keeps the cart centred), Reacher (<see cref="ReacherReach"/>, whose

@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- InvertedPendulum-v5 played by linear state feedback (decision DR-74): one seeded episode headless, or in a
+       window, or played from the keyboard. It references the source projects so it always builds against the current tree (Gym.NET.sln
+       builds it, so an API change that breaks it fails the build); a copy outside this repository replaces the three
+       ProjectReferences with PackageReferences to Gym.NET.Environments and Gym.NET.Rendering.Avalonia, and drops the
+       Import below (the package brings it). -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <RootNamespace>Gym.Examples.InvertedPendulum</RootNamespace>
+    <AssemblyName>InvertedPendulum</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Gym\Gym.csproj" />
+    <ProjectReference Include="..\..\src\Gym.Environments\Gym.Environments.csproj" />
+    <ProjectReference Include="..\..\src\Gym.Rendering.Avalonia\Gym.Rendering.Avalonia.csproj" />
+  </ItemGroup>
+
+  <!-- What the Gym.NET.Environments package's buildTransitive targets do for a C# app (DR-17): compile a module
+       initializer that registers the built-in env ids before Main, so Gymnasium.Make("InvertedPendulum-v5") works with no set-up
+       call. A ProjectReference does not bring buildTransitive files, so the example imports it by path. -->
+  <Import Project="..\..\src\Gym.Environments\buildTransitive\Gym.NET.Environments.targets" />
+
+</Project>

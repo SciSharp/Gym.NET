@@ -1,7 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- Gym.NET's one example (decision D13): learns CartPole-v1 with the cross-entropy method over linear policies and
-       plays the result, on the 1.0 API only. It references the source projects so it always builds against the current
+  <!-- Gym.NET's first example (decision D13): learns CartPole-v1 with the cross-entropy method over linear policies and
+       plays the result, on the 1.0 API only; since DR-74 it also plays the showreel's hand-written controller and the
+       keyboard. It references the source projects so it always builds against the current
        tree (Gym.NET.sln builds it, so an API change that breaks it fails the build); a copy outside this repository
        replaces the three ProjectReferences with PackageReferences to Gym.NET.Environments and
        Gym.NET.Rendering.Avalonia, and drops the Import below (the package brings it). -->

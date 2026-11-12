@@ -129,15 +129,21 @@ refs/Gym.NET/
 ├── tools/parity/mujoco/           # record_models.py (the embedded MuJoCo models, --check); gpu_probe.py (re-measures the GPU behaviours
 │                                  #   the renderer reproduces, scoring its models); halfcheetah_poc/: the trace checker over the
 │                                  #   product engine (oracle.py records MuJoCo's state per mj_step; verify/: traces.txt, record_traces.py,
-│                                  #   negative_controls.py, branch_search.py, cs_coverage.py), and play/, a playable HalfCheetah
+│                                  #   negative_controls.py, branch_search.py, cs_coverage.py); its playable HalfCheetah moved to examples/ (DR-74)
 ├── tools/showreel/                # The front-page media (DR-59, DR-60, DR-72, DR-73): the synthwave video and the README's 51 s WebP cut of it (docs/media), the site's 8-bit
 │                                  #   gallery (docs/website-src/images/envs), from the envs' own frames under scripted or trained policies (the
 │                                  #   MuJoCo envs' ARS-trained linear policies in policies/, retrained by its train command); its parity
 │                                  #   segment is checked against Gymnasium in Python (gymnasium_replay.py). Not in the sln; README.md has the commands
 │
-├── examples/
-│   └── CartPole/                  # The one example (D13): the cross-entropy method over linear policies, 100 carts at once through
-│                                  #   MakeVec, then a played episode (--render: Avalonia window); in Gym.NET.sln, so API changes break its build
+├── examples/                      # One project per env the showreel plays (DR-74), all in Gym.NET.sln so API changes break their build;
+│   │                              #   README.md indexes them. Each plays a seeded episode with its agent (the showreel's: controllers,
+│   │                              #   Gymnasium's heuristics, value iteration, ARS-trained policy.json files), --render in a window,
+│   │                              #   --play from the keyboard through Play.Run where a few keys and the frame cost allow
+│   ├── CartPole/                  # The first example (D13): the cross-entropy method over linear policies, 100 carts at once through
+│   │                              #   MakeVec, then a played episode; --controller the showreel's hand-written controller
+│   ├── HalfCheetah/               # The autopilot through Gymnasium.Make, and the playable HalfCheetah (moved from tools/parity), which
+│   │                              #   compiles the engine in for its internals (CS0436 silenced)
+│   └── Acrobot/ … Walker2d/       # The other 22 envs, one folder each: Program.cs, README.md, and policy.json for the trained ones
 │
 ├── docs/                          # README.md (index), architecture.md, guides/ (getting_started, creating_custom_environments,
 │                                  #   migrating_to_1.0, development_and_testing), releases/RELEASE_1.0.0.md, plans/;
@@ -187,8 +193,10 @@ dotnet build src/Gym.Environments/Gym.Environments.csproj -c Release
 dotnet build src/Gym.Rendering.Avalonia/Gym.Rendering.Avalonia.csproj -c Release
 dotnet build src/Gym.Rendering.WinForm/Gym.Rendering.WinForm.csproj -c Release
 
-# The example: trains CartPole headless in about two seconds, exits 0 when solved (--render opens a window: desktops only)
+# The examples (examples/README.md): CartPole trains headless in about two seconds and exits 0 when solved; every example
+# plays a seeded episode headless and prints its steps and return (--render and --play open windows: desktops only)
 dotnet run --project examples/CartPole -c Release
+dotnet run --project examples/Hopper -c Release
 
 # The packages (versions 1.0.0, P10.4; each carries README.md and THIRD-PARTY-NOTICES.md) into a folder of your choice; building also packs (GeneratePackageOnBuild)
 dotnet pack Gym.NET.sln -c Release -o <folder>

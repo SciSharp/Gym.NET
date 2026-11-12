@@ -20,6 +20,7 @@ behavior bit for bit and pixel for pixel. These pages cover the 1.0 API.
 | [Release notes 1.0.0](releases/RELEASE_1.0.0.md) | What 1.0 contains and leaves out, how to upgrade from 0.2, every known difference from Gymnasium, the ImageSharp advisories |
 | [Third-party notices](../THIRD-PARTY-NOTICES.md) | Gymnasium (MIT), SDL_gfx (zlib), CPython (PSF), pygame-ce as a behavior reference |
 | [Example: CartPole](../examples/CartPole/README.md) | Learning CartPole with the cross-entropy method, 100 carts at once in a vector env |
+| [Examples](../examples/README.md) | One project per environment the showreel plays (24), each playing its env with an agent: headless, in a window, or from the keyboard |
 
 ## Plans
 

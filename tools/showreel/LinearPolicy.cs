@@ -15,7 +15,7 @@ namespace Gym.Showreel;
 /// </summary>
 /// <remarks>
 ///     <para>
-///     The JSON format is the one <c>tools/parity/mujoco/halfcheetah_poc/play/policy.json</c> uses, so that autopilot
+///     The JSON format is the one <c>examples/HalfCheetah/policy.json</c> uses, so that autopilot
 ///     (trained on the same physics) loads as it is. Scaling by the action space's bound is this class's addition: it
 ///     is 1 for HalfCheetah, which keeps that policy's actions unchanged, and lets one formula drive envs whose bounds are
 ///     ±3 (InvertedPendulum), ±2 (Pusher) or ±0.4 (the humanoids).

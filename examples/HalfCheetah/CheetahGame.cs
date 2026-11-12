@@ -13,9 +13,10 @@ namespace MujocoPoc.Play;
 /// <remarks>
 ///     An env step can also be taken in parts (<see cref="BeginStep"/>, <see cref="PhysicsStep"/> × frame_skip,
 ///     <see cref="EndStep"/>), which is the same step a renderer can draw between physics steps. Not thread-safe; give each
-///     thread its own game (the model may be shared, the core never writes it).
+///     thread its own game (the model may be shared, the core never writes it). Dispose a game when done: it owns its
+///     core's arrays (the simulation state), while the model stays the caller's.
 /// </remarks>
-public sealed class CheetahGame {
+public sealed class CheetahGame : IDisposable {
     /// <summary>The length of a Gymnasium episode (its TimeLimit).</summary>
     public const int EpisodeSteps = 1000;
 
@@ -28,7 +29,8 @@ public sealed class CheetahGame {
     /// <summary>The core being stepped; its arrays are the live simulation state.</summary>
     public readonly MjData Core;
 
-    /// <summary>The model.</summary>
+    /// <summary>The model; borrowed from the caller, who may share it between games and releases it.</summary>
+    [NDBorrowed]
     public readonly MjModel Model;
 
     /// <summary>The action of the current env step, float32 as Gymnasium's Box hands it to MuJoCo.</summary>
@@ -201,4 +203,7 @@ public sealed class CheetahGame {
         double u1 = 1.0 - random.NextDouble(), u2 = random.NextDouble();
         return Math.Sqrt(-2.0 * Math.Log(u1)) * Math.Cos(2.0 * Math.PI * u2);
     }
+
+    /// <summary>Releases the core's arrays, the simulation state this game owns; the model stays the caller's.</summary>
+    public void Dispose() => Core.Dispose();
 }

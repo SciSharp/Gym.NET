@@ -72,7 +72,7 @@ Stamps such as `LANDED!` mark how an episode ended.
 | BipedalWalker-v3 | 0 | Gymnasium's gait (`BipedalWalkerHeuristics`) | The whole course, return 314.5 |
 | BipedalWalkerHardcore-v3 | 10 | The same gait | Trips over a stump at step 157 (on purpose: GAME OVER) |
 | CarRacing-v3 | 11 | Pure pursuit on the track's centre line | Return 880.7 in 1,000 steps |
-| HalfCheetah-v5 | 0 | The ARS autopilot of `tools/parity/mujoco/halfcheetah_poc/play`, trained on the same physics | 1,000 steps, return 5,797.0; Gymnasium's is the same to the last bit (that folder's `replay_in_gymnasium.py`) |
+| HalfCheetah-v5 | 0 | The ARS autopilot of `examples/HalfCheetah`, trained on the same physics | 1,000 steps, return 5,797.0; Gymnasium's is the same to the last bit (that folder's `replay_in_gymnasium.py`) |
 | Hopper-v5 | 0 | Linear policy trained by ARS | 1,000 steps, return 3,614.8 |
 | Walker2d-v5 | 0 | Linear policy trained by ARS | 1,000 steps, return 2,446.0 |
 | Ant-v5 | 0 | Linear policy trained by ARS | 1,000 steps, return 3,131.8 |

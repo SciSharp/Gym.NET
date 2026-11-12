@@ -41,7 +41,7 @@ internal static class Gallery {
         Directory.CreateDirectory(folder);
         var entries = new List<Dictionary<string, object>>();
         foreach (EpisodeRecipe recipe in Episodes.All) {
-            var (ticks, steps, ret, stamp, wins, losses, action, observation) = Measure(recipe);
+            var (ticks, seed, steps, ret, stamp, wins, losses, action, observation) = Measure(recipe);
             int loopTicks = Math.Min(ticks, (int)(recipe.StepsPerSecond * MaxSeconds));
             int frames = (int)Math.Ceiling(loopTicks / recipe.StepsPerSecond * Fps) + (int)(HoldSeconds * Fps);
             using var player = new EpisodePlayer(recipe);
@@ -62,7 +62,8 @@ internal static class Gallery {
                 ["id"] = recipe.Id,
                 ["family"] = recipe.Family,
                 ["blurb"] = recipe.Blurb,
-                ["seed"] = recipe.Seed,
+                // The seed of the episode whose steps and return the card shows: the last hand's, for multi-hand recipes.
+                ["seed"] = seed,
                 ["steps"] = steps,
                 ["return"] = Math.Round(ret, 1),
                 ["result"] = recipe.ScoresHands ? $"{wins} WON, {losses} LOST" : stamp ?? "",
@@ -101,18 +102,23 @@ internal static class Gallery {
     }
 
     /// <summary>
-    ///     Plays a recipe to its end without rendering, for the manifest: ticks to the end, the last hand's steps and
+    ///     Plays a recipe to its end without rendering, for the manifest: ticks to the end, the last hand's seed, steps and
     ///     return, its stamp, the hands won and lost, and the spaces as Gymnasium prints them.
     /// </summary>
     /// <param name="recipe">The episode.</param>
     /// <returns>The measurements.</returns>
-    private static (int Ticks, int Steps, double Return, string? Stamp, int Wins, int Losses, string Action, string Observation) Measure(EpisodeRecipe recipe) {
+    /// <remarks>
+    ///     A multi-hand recipe (Reacher's four targets, Blackjack's five hands) resets each hand with the next seed, so the
+    ///     last hand's seed is the recipe's plus the hand's index: the card names the episode its numbers come from.
+    /// </remarks>
+    private static (int Ticks, long Seed, int Steps, double Return, string? Stamp, int Wins, int Losses, string Action, string Observation) Measure(EpisodeRecipe recipe) {
         using var player = new EpisodePlayer(recipe);
         // TimeLimit ends every id within 2,000 steps; the cap only guards against a recipe that never finishes.
         while (!player.Finished && player.Tick < 5_000)
             player.AdvanceTo(player.Tick + 1);
         using IEnv env = Gymnasium.Make(recipe.Id);
-        return (player.Tick, player.Step, player.Return, player.Stamp, player.Wins, player.Losses, env.ActionSpace.ToString()!, env.ObservationSpace.ToString()!);
+        return (player.Tick, recipe.Seed + player.Hand, player.Step, player.Return, player.Stamp, player.Wins, player.Losses,
+            env.ActionSpace.ToString()!, env.ObservationSpace.ToString()!);
     }
 
     /// <summary>Shrinks a frame by averaging each output pixel's footprint (an area filter, like ffmpeg's).</summary>

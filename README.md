@@ -62,7 +62,10 @@ Console.WriteLine($"Episode return: {episodeReturn}");
 steps). The render mode is chosen when the env is built: `Gymnasium.Make("CartPole-v1", new { render_mode = "rgb_array" })`.
 
 [examples/CartPole](https://github.com/SciSharp/Gym.NET/tree/master/examples/CartPole) trains a policy that balances
-the pole, playing 100 carts at once through `Gymnasium.MakeVec`.
+the pole, playing 100 carts at once through `Gymnasium.MakeVec`. [examples/](https://github.com/SciSharp/Gym.NET/tree/master/examples)
+has one project for each of the 24 environments in the showreel above. Each plays its env with the same agent, a
+hand-written controller, Gymnasium's heuristic, value iteration or a trained linear policy, headless, in a window
+(`--render`) or from your keyboard (`--play`).
 
 ## What is in 1.0
 

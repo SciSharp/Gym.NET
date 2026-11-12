@@ -1,11 +1,14 @@
 # CartPole: learning to balance with the cross-entropy method
 
-Gym.NET's example: it learns CartPole-v1 with no machine-learning library, using only Gym.NET's 1.0 API, and then plays
-the learned policy.
+The example that learns: it learns CartPole-v1 with no machine-learning library, using only Gym.NET's 1.0 API, and then
+plays the learned policy. The other examples in `examples/` play an agent each (DR-74); this one has one too,
+`--controller`.
 
 ```bash
-dotnet run --project examples/CartPole -c Release              # train, then play one episode headless
-dotnet run --project examples/CartPole -c Release -- --render  # play the final episode in a window (Avalonia)
+dotnet run --project examples/CartPole -c Release                  # train, then play one episode headless
+dotnet run --project examples/CartPole -c Release -- --render      # play the final episode in a window (Avalonia)
+dotnet run --project examples/CartPole -c Release -- --controller  # a hand-written controller instead (add --render to watch)
+dotnet run --project examples/CartPole -c Release -- --play        # you balance it, A and D push the cart
 ```
 
 Output of a run (the same on every run, since every draw is seeded):
@@ -40,6 +43,24 @@ At the end, `Gymnasium.Make("CartPole-v1")` builds the env through the registry,
 (`TimeLimit` of 500 steps, `OrderEnforcing`, `PassiveEnvChecker`), and the learned policy plays one more episode.
 With `--render`, that env is built with `render_mode = "human"`, and the frames go to the window that
 `Gymnasium.HumanViewerFactory = AvaloniaEnvViewer.Factory` provides.
+
+## The hand-written controller
+
+`--controller` skips the learning and plays the controller the front-page showreel plays (DR-74): linear state feedback
+around a set point that sways 1.2 either side of the centre every 250 steps, so the cart glides from side to side with
+the pole balanced. It pushes right when `0.6 (x - target) + 1.2 ẋ + 12 θ + 2 θ̇` is positive: the pole's angle
+dominates, so the cart moves under the pole, and the position term drags the balancing act toward the moving set
+point.
+
+```
+CartPole-v1, seed 3: 500 steps, return 500.0, truncated by the time limit
+```
+
+## Playing it yourself
+
+`--play` hands the cart to you through Gymnasium's `play` utility (`Play.Run`): A pushes the cart left, D right.
+CartPole has no neutral action, so with no key held the default no-op, action 0, pushes left: keep a key down,
+alternating as the pole leans. Each new game starts from the same seed; Escape or the window's close button quits.
 
 ## The API it shows
 

@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using Gym.Envs;
@@ -13,7 +14,8 @@ namespace Gym.Examples.CartPole {
     /// <summary>
     ///     Learns to balance CartPole-v1 with the cross-entropy method over linear policies, then plays the learned policy
     ///     for one episode: <c>dotnet run --project examples/CartPole -c Release</c>, with <c>-- --render</c> to watch that
-    ///     episode in a window.
+    ///     episode in a window. <c>-- --controller</c> plays a hand-written controller instead of learning one (the cart
+    ///     the front-page showreel shows), and <c>-- --play</c> hands the cart to the keyboard.
     /// </summary>
     /// <remarks>
     ///     <para>
@@ -67,15 +69,34 @@ namespace Gym.Examples.CartPole {
         /// <summary>The reset seed of the episode played at the end, again one neither training nor judging used.</summary>
         private const long PlaySeed = 2_000_000;
 
-        /// <summary>Trains a policy, then plays one episode with it.</summary>
-        /// <param name="args"><c>--render</c> plays the final episode in a window (Avalonia); other arguments are ignored.</param>
-        /// <returns>The process exit code: 0 when training solved CartPole-v1, 1 when <see cref="MaxGenerations"/> ran out first.</returns>
+        /// <summary>The reset seed of the hand-written controller's episode: the one the front-page showreel plays (DR-74).</summary>
+        private const long ControllerSeed = 3;
+
+        /// <summary>Trains a policy, then plays one episode with it; or plays the hand-written controller; or the keyboard.</summary>
+        /// <param name="args">
+        ///     <c>--render</c> plays the final episode in a window (Avalonia); <c>--controller</c> plays the hand-written
+        ///     controller instead of training; <c>--play</c> hands the cart to the keyboard (A and D) until Escape or the
+        ///     window's close button. Other arguments are ignored.
+        /// </param>
+        /// <returns>
+        ///     The process exit code: 0 when training solved CartPole-v1 (or the controller or the keyboard game ran), 1 when
+        ///     <see cref="MaxGenerations"/> ran out first.
+        /// </returns>
         /// <exception cref="Gym.Exceptions.DependencyNotInstalled">
-        ///     Not thrown in practice: <c>--render</c> sets the Avalonia viewer before the env renders, and without it the env
-        ///     never renders.
+        ///     Not thrown in practice: <c>--render</c> and <c>--play</c> set the Avalonia viewer before the env renders, and
+        ///     without them the env never renders.
         /// </exception>
         private static int Main(string[] args) {
             bool render = args.Contains("--render");
+            if (args.Contains("--play")) {
+                PlayWithKeyboard();
+                return 0;
+            }
+            if (args.Contains("--controller")) {
+                (int steps, double total, string ending) = PlayController(render);
+                Console.WriteLine(string.Create(CultureInfo.InvariantCulture, $"CartPole-v1, seed {ControllerSeed}: {steps} steps, return {total:F1}, {ending}"));
+                return 0;
+            }
             // The threshold comes from the registry, as gymnasium.spec("CartPole-v1").reward_threshold does in Python.
             double threshold = Gymnasium.Spec("CartPole-v1").RewardThreshold ?? 475.0;
 
@@ -247,6 +268,65 @@ namespace Gym.Examples.CartPole {
             } finally {
                 observation.Dispose();
             }
+        }
+
+        /// <summary>
+        ///     Plays one episode with a hand-written controller instead of a learned policy: linear state feedback around a
+        ///     set point that sways 1.2 either side of the centre every 250 steps, so the cart glides from side to side with
+        ///     the pole balanced. It is the controller the front-page showreel plays (DR-74).
+        /// </summary>
+        /// <param name="render">Whether to render the episode in human mode, in an Avalonia window at 50 frames per second.</param>
+        /// <returns>The steps taken, the return (1 per step the pole stays up), and how the episode ended.</returns>
+        /// <remarks>
+        ///     The push is right when <c>0.6 (x - target) + 1.2 x_dot + 12 theta + 2 theta_dot</c> is positive: the pole's
+        ///     angle dominates, so the cart moves under the pole to keep it up, and the position term drags the whole
+        ///     balancing act toward the moving set point. From seed 3 it lasts all 500 steps.
+        /// </remarks>
+        /// <exception cref="Gym.Exceptions.DependencyNotInstalled">
+        ///     Not thrown in practice: <paramref name="render"/> sets Avalonia's viewer first.
+        /// </exception>
+        private static (int Steps, double Return, string Ending) PlayController(bool render) {
+            if (render)
+                Gymnasium.HumanViewerFactory = AvaloniaEnvViewer.Factory;
+            using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("CartPole-v1", kwargs: render ? new { render_mode = "human" } : null);
+            NDArray observation = env.Reset(seed: ControllerSeed).Observation;
+            int steps = 0;
+            double total = 0;
+            try {
+                while (true) {
+                    float[] s = observation.ToArray<float>();
+                    // The set point's phase is the step count, which is what TimeLimit's _elapsed_steps holds at this point.
+                    double target = 1.2 * Math.Sin(steps * 2 * Math.PI / 250.0);
+                    double u = 0.6 * (s[0] - target) + 1.2 * s[1] + 12.0 * s[2] + 2.0 * s[3];
+                    using NDArray action = NDArray.Scalar(u > 0 ? 1L : 0L);
+                    StepResult<NDArray> step = env.Step(action);
+                    observation.Dispose();
+                    observation = step.Observation;
+                    steps++;
+                    total += step.Reward;
+                    if (step.Terminated || step.Truncated)
+                        return (steps, total, step.Terminated ? "the pole fell" : "truncated by the time limit");
+                }
+            } finally {
+                observation.Dispose();
+            }
+        }
+
+        /// <summary>
+        ///     Hands the cart to the keyboard, Gymnasium's play, until Escape or the window's close button: A pushes the cart
+        ///     left, D right.
+        /// </summary>
+        /// <remarks>
+        ///     CartPole has no neutral action, so with no key held play's default no-op, action 0, pushes left; keep a key
+        ///     down, alternating as the pole leans. Every reset uses <see cref="PlaySeed"/>, so each new game starts as the
+        ///     last one did, as Gymnasium's play does with a seed.
+        /// </remarks>
+        private static void PlayWithKeyboard() {
+            // play draws the env's rgb_array frames into a window of the app-wide viewer, which also reads the keys.
+            Gymnasium.HumanViewerFactory = AvaloniaEnvViewer.Factory;
+            using IEnv env = Gymnasium.Make("CartPole-v1", new { render_mode = "rgb_array" });
+            // Qualified: inside this class, Play names the method that plays the learned policy.
+            Gym.Utils.Play.Run(env, keysToAction: new Dictionary<object, object?> { ["a"] = 0L, ["d"] = 1L }, seed: PlaySeed);
         }
 
         /// <summary>Formats a policy's parameters for the console.</summary>

@@ -75,7 +75,7 @@ public static class Ars {
                 var w = new double[dim];
                 for (int i = 0; i < dim; i++)
                     w[i] = weights[i] + sign * settings.Noise * deltas[k / 2][i];
-                var game = new CheetahGame(model);
+                using var game = new CheetahGame(model);
                 var visited = new RunningStats(inputs);
                 double[] obs = game.Reset(new Random(resetSeeds[k]));
                 Span<float> action = stackalloc float[outputs];
@@ -153,7 +153,7 @@ public static class Ars {
     /// <param name="seed">The reset seed.</param>
     /// <returns>The episode return, summed as Gymnasium's caller sums it.</returns>
     public static double Play(MjModel model, LinearPolicy policy, int seed) {
-        var game = new CheetahGame(model);
+        using var game = new CheetahGame(model);
         double[] obs = game.Reset(seed);
         Span<float> action = stackalloc float[CheetahGame.ActionSize];
         for (int t = 0; t < CheetahGame.EpisodeSteps; t++) {

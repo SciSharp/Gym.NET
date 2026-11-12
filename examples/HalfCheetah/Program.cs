@@ -6,9 +6,13 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Gym;
 using Gym.Environments;
+using Gym.Envs;
+using Gym.Observations;
 using Gym.Rendering;
 using Gym.Rendering.Avalonia;
+using NumSharp;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using Gym.MuJoCo;
@@ -16,21 +20,30 @@ using Gym.MuJoCo;
 namespace MujocoPoc.Play;
 
 /// <summary>
-///     Plays HalfCheetah-v5 on the managed core in a window: the trained autopilot runs, Tab hands the six motors to the
-///     keyboard. Also trains the autopilot, records it to a video, and prints its exact episode returns for comparison with
-///     Gymnasium on MuJoCo (replay_in_gymnasium.py).
+///     HalfCheetah-v5 on its autopilot, a linear policy trained by Augmented Random Search: <c>dotnet run --project
+///     examples/HalfCheetah -c Release</c> plays one seeded episode headless through <c>Gymnasium.Make</c> and prints its steps
+///     and return; <c>-- --render</c> plays it in MuJoCo's window, and <c>-- --play</c> opens the playable HalfCheetah, where
+///     the keyboard drives the six motors and Tab hands them to the autopilot. Also trains the autopilot, records it to a
+///     video, and prints its exact episode returns for comparison with Gymnasium on MuJoCo (replay_in_gymnasium.py).
 /// </summary>
 /// <remarks>
 ///     Usage:
 ///     <code>
-///     HalfCheetahPlay [play] [--seed N] [--manual]          the window (default)
-///     HalfCheetahPlay train [--iterations N] [--threads N] [--seed N] [--out policy.json]
-///     HalfCheetahPlay video FILE.mp4 [--seconds S] [--seed N]   needs ffmpeg on PATH
-///     HalfCheetahPlay frames FOLDER [--steps N] [--every N] [--seed N]
-///     HalfCheetahPlay score [--seeds A-B]
+///     HalfCheetah [--seed N] [--episodes N] [--render]    the autopilot through Gymnasium.Make (default; DR-74)
+///     HalfCheetah --play [--seed N]                        the game, with the keyboard driving
+///     HalfCheetah play [--seed N] [--manual]               the game, with the autopilot driving until Tab
+///     HalfCheetah train [--iterations N] [--threads N] [--seed N] [--out policy.json]
+///     HalfCheetah video FILE.mp4 [--seconds S] [--seed N]   needs ffmpeg on PATH
+///     HalfCheetah frames FOLDER [--steps N] [--every N] [--seed N]
+///     HalfCheetah score [--seeds A-B]
 ///     </code>
 ///     The model (half_cheetah.json, MuJoCo's compiled HalfCheetah as Gym.Environments embeds it) and the autopilot (policy.json) are read from
 ///     the program's folder; <c>--policy FILE</c> picks another autopilot.
+///     <para>
+///     The game moved here from <c>tools/parity/mujoco/halfcheetah_poc/play</c> (DR-74): it steps its own copy of the engine
+///     and draws its own side view, cheap enough for real time. The default mode, the flags every example takes, plays the
+///     product's env instead, the one <c>Gymnasium.Make</c> builds.
+///     </para>
 /// </remarks>
 internal static class Program {
     private const string Title = "HalfCheetah-v5 - Gym.NET managed core, bit-exact with MuJoCo 4.0.0";
@@ -41,15 +54,22 @@ internal static class Program {
     private static int Main(string[] args) {
         CultureInfo.DefaultThreadCurrentCulture = CultureInfo.InvariantCulture;
         CultureInfo.CurrentCulture = CultureInfo.InvariantCulture;
-        string command = args.Length > 0 && !args[0].StartsWith("--", StringComparison.Ordinal) ? args[0] : "play";
         var options = new Options(args.SkipWhile(a => !a.StartsWith("--", StringComparison.Ordinal)).ToArray());
+        // With no command, the flags every example takes choose: --play opens the game with the keyboard driving, and
+        // otherwise the autopilot plays seeded episodes through Gymnasium.Make, headless or in MuJoCo's window.
+        bool commanded = args.Length > 0 && !args[0].StartsWith("--", StringComparison.Ordinal);
+        string command = commanded ? args[0] : options.Flag("play") ? "play" : "episode";
         string folder = AppContext.BaseDirectory;
         MjModel model = MjModel.Load(Path.Combine(folder, "half_cheetah.json"));
         string policyPath = options.Text("policy", Path.Combine(folder, "policy.json"));
         try {
             switch (command) {
+                case "episode":
+                    return Episodes(policyPath, options.Int("seed", 0), options.Int("episodes", 1), options.Flag("render"));
                 case "play":
-                    int code = Play(model, File.Exists(policyPath) ? LinearPolicy.Load(policyPath) : null, options.Int("seed", 0), options.Flag("manual"));
+                    // --play hands the motors to the keyboard from the start; the play command keeps the autopilot driving.
+                    bool manual = options.Flag("manual") || !commanded;
+                    int code = Play(model, File.Exists(policyPath) ? LinearPolicy.Load(policyPath) : null, options.Int("seed", 0), manual);
                     // the Avalonia UI thread keeps the process alive; end it explicitly
                     Environment.Exit(code);
                     return code;
@@ -62,13 +82,71 @@ internal static class Program {
                 case "score":
                     return Score(model, LinearPolicy.Load(policyPath), options.Text("seeds", "0-4"));
                 default:
-                    Console.Error.WriteLine($"unknown command '{command}': play, train, video, frames or score");
+                    Console.Error.WriteLine($"unknown command '{command}': play, train, video, frames or score (or none, for the episode flags)");
                     return 2;
             }
         } catch (ArgumentException e) {
             Console.Error.WriteLine(e.Message);
             return 2;
         }
+    }
+
+    /// <summary>
+    ///     The mode every example shares (DR-74): plays seeded episodes of HalfCheetah-v5 on the autopilot through
+    ///     <c>Gymnasium.Make</c>, the product's env rather than this program's game, headless or in MuJoCo's window, and prints
+    ///     each one's steps and return.
+    /// </summary>
+    /// <param name="policyPath">The autopilot's file.</param>
+    /// <param name="seed">The first reset seed.</param>
+    /// <param name="episodes">How many episodes, on consecutive seeds.</param>
+    /// <param name="render">Whether to show them in MuJoCo's window, human mode with Gymnasium's controls (DR-70).</param>
+    /// <returns>0.</returns>
+    /// <exception cref="IOException">The policy file cannot be read.</exception>
+    /// <remarks>
+    ///     Seed 0 returns 5,797.0, the bits <c>score</c> prints for the game's own copy of the engine, and the bits
+    ///     replay_in_gymnasium.py gets from Gymnasium on MuJoCo 4.0.0. The arrays a reset or a step returns are the caller's
+    ///     (D19): each result is released once the autopilot has read its observation.
+    /// </remarks>
+    private static int Episodes(string policyPath, int seed, int episodes, bool render) {
+        LinearPolicy policy = LinearPolicy.Load(policyPath);
+        // Human mode draws inside every reset and step into the app-wide viewer (DR-20).
+        if (render)
+            Gymnasium.HumanViewerFactory = AvaloniaEnvViewer.Factory;
+        double sum = 0;
+        var action = new float[CheetahGame.ActionSize];
+        for (int episode = 0; episode < episodes; episode++) {
+            using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("HalfCheetah-v5", render ? new { render_mode = "human" } : null);
+            ResetResult<NDArray> reset = env.Reset(seed: seed + episode);
+            // The result whose observation the autopilot reads next; a boxed copy shares its arrays, so disposing it frees them.
+            IDisposable held = reset;
+            NDArray observation = reset.Observation;
+            int steps = 0;
+            double total = 0;
+            try {
+                while (true) {
+                    // HalfCheetah's motors take [-1, 1], the autopilot's own range: its outputs are the action as they are.
+                    policy.Act(observation.ToArray<double>(), action);
+                    StepResult<NDArray> step;
+                    using (NDArray a = np.array(action))
+                        step = env.Step(a);
+                    held.Dispose();
+                    held = step;
+                    observation = step.Observation;
+                    steps++;
+                    total += step.Reward;
+                    // HalfCheetah never terminates: every episode is cut by the 1,000-step time limit.
+                    if (step.Terminated || step.Truncated)
+                        break;
+                }
+            } finally {
+                held.Dispose();
+            }
+            sum += total;
+            Console.WriteLine($"HalfCheetah-v5, seed {seed + episode}: {steps} steps, return {total:F1}, truncated by the time limit");
+        }
+        if (episodes > 1)
+            Console.WriteLine($"Mean return over {episodes} episodes: {sum / episodes:F1}");
+        return 0;
     }
 
     /// <summary>The positional argument after a command (a file or folder).</summary>
@@ -93,7 +171,7 @@ internal static class Program {
     /// <exception cref="InvalidOperationException">The viewer reports no keyboard input.</exception>
     private static int Play(MjModel model, LinearPolicy? policy, int seed, bool manual) {
         var view = new SideView();
-        var game = new CheetahGame(model);
+        using var game = new CheetahGame(model);
         game.Reset(seed);
         IEnvViewer viewer = AvaloniaEnvViewer.Factory(view.Width, view.Height, Title).GetAwaiter().GetResult();
         var input = viewer as IInteractiveEnvViewer ?? throw new InvalidOperationException("the viewer reports no keys");
@@ -233,7 +311,7 @@ internal static class Program {
     /// <exception cref="System.ComponentModel.Win32Exception">ffmpeg is not on PATH.</exception>
     private static int Video(MjModel model, LinearPolicy policy, string path, double seconds, int seed) {
         var view = new SideView();
-        var game = new CheetahGame(model);
+        using var game = new CheetahGame(model);
         game.Reset(seed);
         const int fps = 50;
         int physicsPerFrame = (int)Math.Round(1.0 / (fps * model.timestep));
@@ -285,7 +363,7 @@ internal static class Program {
     private static int Frames(MjModel model, LinearPolicy policy, string folder, int steps, int every, int seed) {
         Directory.CreateDirectory(folder);
         var view = new SideView();
-        var game = new CheetahGame(model);
+        using var game = new CheetahGame(model);
         game.Reset(seed);
         Span<float> action = stackalloc float[CheetahGame.ActionSize];
         for (int t = 0; t <= steps; t++) {

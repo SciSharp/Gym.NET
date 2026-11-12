@@ -1,13 +1,13 @@
 """Plays the autopilot in Gymnasium's own HalfCheetah-v5 on MuJoCo, to compare with the managed core.
 
-`HalfCheetahPlay score` prints the autopilot's episode returns on the managed core; this script plays the same policy from
+`HalfCheetah score` prints the autopilot's episode returns on the managed core; this script plays the same policy from
 the same seeded resets in Gymnasium (refs/Gymnasium) on the installed `mujoco`, and prints the same lines. Because the
 core steps exactly as MuJoCo 4.0.0 does, and the policy is evaluated here in the same arithmetic order as in C# (plain
 Python floats, summed in column order, clipped, then rounded to float32: NumPy's matrix product would sum differently),
 the two outputs are identical to the last bit.
 
 Usage (a Python with numpy, imageio and mujoco==4.0.0, the pin of DR-64):
-    python tools/parity/mujoco/halfcheetah_poc/play/replay_in_gymnasium.py [--policy FILE] [--seeds A-B]
+    python examples/HalfCheetah/replay_in_gymnasium.py [--policy FILE] [--seeds A-B]
 
 Args (command line):
     --policy FILE   the policy JSON (default: policy.json next to this script).
@@ -22,7 +22,8 @@ import os
 import struct
 import sys
 
-REPO = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "..", ".."))
+# The repository root, two folders up from examples/HalfCheetah (the script moved there from tools/parity/... with DR-74).
+REPO = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
 sys.path.insert(0, os.path.join(REPO, "refs", "Gymnasium"))
 import gymnasium as gym  # noqa: E402  (imported from the pinned submodule, as the parity suite does)
 import numpy as np  # noqa: E402
@@ -72,7 +73,7 @@ def episode(policy, seed):
 
 
 def main():
-    """Parses the arguments and prints one line per seed, in HalfCheetahPlay score's format."""
+    """Parses the arguments and prints one line per seed, in HalfCheetah score's format."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--policy", default=os.path.join(os.path.dirname(os.path.abspath(__file__)), "policy.json"))
     parser.add_argument("--seeds", default="0-4")
