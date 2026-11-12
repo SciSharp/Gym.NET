@@ -1,4 +1,4 @@
-﻿// Gym.Internal is 0.2's code, [Obsolete] since 2.0 and removed in 3.0 with Gym.Legacy (DR-56): it keeps no nullable
+﻿// Gym.Internal is 0.2's code, [Obsolete] since 1.0 and removed in 2.0 with Gym.Legacy (DR-56): it keeps no nullable
 // context (DR-54), rather than 89 annotations for code on its way out.
 #nullable disable
 using System;
@@ -10,11 +10,11 @@ namespace Gym.Collections {
     ///     cause. Keys merged before the failing one stay merged: the target is left half-merged.
     /// </summary>
     /// <remarks>
-    ///     Obsolete with <see cref="Dict"/> (DR-56) and removed in 3.0. <see cref="Gym.Envs.Info.Update"/>, its
+    ///     Obsolete with <see cref="Dict"/> (DR-56) and removed in 2.0. <see cref="Gym.Envs.Info.Update"/>, its
     ///     replacement, overwrites one level deep and has no failure of its own to report.
     /// </remarks>
     [Serializable]
-    [Obsolete("Thrown only by the legacy Dict's deep merge; Gym.Envs.Info.Update needs none. Removed in 3.0 with Gym.Legacy.")]
+    [Obsolete("Thrown only by the legacy Dict's deep merge; Gym.Envs.Info.Update needs none. Removed in 2.0 with Gym.Legacy.")]
     public class DictMergingException : Exception {
         /// <summary>An error without a message of its own (.NET's default text).</summary>
         public DictMergingException() { }

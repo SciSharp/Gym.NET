@@ -168,13 +168,13 @@ namespace Gym.Exceptions {
         public ResetNeeded(string message, Exception innerException) : base(message, innerException) { }
     }
 
-#pragma warning disable CS0618 // The obsolete base is on purpose: it keeps 0.2's catch blocks compiling until 3.0 (DR-58).
+#pragma warning disable CS0618 // The obsolete base is on purpose: it keeps 0.2's catch blocks compiling until 2.0 (DR-58).
     /// <summary>
     ///     An action outside the action space. The envs mostly assert instead (<see cref="NumSharp.AssertionError"/>), as Gymnasium's
     ///     do; CarRacing raises this one, as should a custom env refusing an action.
     /// </summary>
     /// <remarks>
-    ///     Its base is 0.2's obsolete <see cref="InvalidActionError"/> (itself an <see cref="Error"/>), kept until 3.0 so 0.2's
+    ///     Its base is 0.2's obsolete <see cref="InvalidActionError"/> (itself an <see cref="Error"/>), kept until 2.0 so 0.2's
     ///     <c>catch (InvalidActionError)</c> still compiles and catches it (DR-58): one level Gymnasium's hierarchy does not
     ///     have. Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/error.py#L50">gymnasium/error.py</see>.
     /// </remarks>
@@ -260,14 +260,14 @@ namespace Gym.Exceptions {
         public DeprecatedWrapper(string message, Exception innerException) : base(message, innerException) { }
     }
 
-#pragma warning disable CS0618 // The obsolete base is on purpose: it keeps 0.2's catch blocks compiling until 3.0 (DR-58).
+#pragma warning disable CS0618 // The obsolete base is on purpose: it keeps 0.2's catch blocks compiling until 2.0 (DR-58).
     /// <summary>
     ///     An asynchronous <c>reset</c> or <c>step</c> was started while the previous one of the same kind is still pending.
     ///     Not an <see cref="Error"/>, as in Gymnasium.
     /// </summary>
     /// <remarks>
     ///     Its base is 0.2's obsolete <see cref="AlreadySteppingError"/> (an <see cref="Exception"/>, not an
-    ///     <see cref="Error"/>), kept until 3.0 so 0.2's <c>catch (AlreadySteppingError)</c> still compiles and catches it
+    ///     <see cref="Error"/>), kept until 2.0 so 0.2's <c>catch (AlreadySteppingError)</c> still compiles and catches it
     ///     (DR-58). Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/error.py#L72">gymnasium/error.py</see>.
     /// </remarks>
     public class AlreadyPendingCallError : AlreadySteppingError {
@@ -283,13 +283,13 @@ namespace Gym.Exceptions {
         public string Name { get; }
     }
 
-#pragma warning disable CS0618 // The obsolete base is on purpose: it keeps 0.2's catch blocks compiling until 3.0 (DR-58).
+#pragma warning disable CS0618 // The obsolete base is on purpose: it keeps 0.2's catch blocks compiling until 2.0 (DR-58).
     /// <summary>
     ///     <c>reset_wait</c> or <c>step_wait</c> was called with no matching asynchronous call running.
     /// </summary>
     /// <remarks>
     ///     Its base is 0.2's obsolete <see cref="NotSteppingError"/> (an <see cref="Exception"/>, not an <see cref="Error"/>),
-    ///     kept until 3.0 so 0.2's <c>catch (NotSteppingError)</c> still compiles and catches it (DR-58). Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/error.py#L83">gymnasium/error.py</see>.
+    ///     kept until 2.0 so 0.2's <c>catch (NotSteppingError)</c> still compiles and catches it (DR-58). Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/error.py#L83">gymnasium/error.py</see>.
     /// </remarks>
     public class NoAsyncCallError : NotSteppingError {
 #pragma warning restore CS0618

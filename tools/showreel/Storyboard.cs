@@ -443,7 +443,7 @@ internal static class Storyboards {
         overlays.Add(new Overlay(start, end, (img, t, local) => {
             float a = (float)Math.Min(Math.Clamp(local / 0.3, 0, 1), Math.Clamp((end - t) / 0.3, 0, 1));
             Centered(img, "GYMNASIUM 1.4.0 · PYTHON", Slots.FourTL.Cx, 80, 2, Cyan, a);
-            Centered(img, "GYM.NET 2.0 · C#", Slots.FourTR.Cx, 80, 2, Pink, a);
+            Centered(img, "GYM.NET 1.0 · C#", Slots.FourTR.Cx, 80, 2, Pink, a);
         }));
 
     /// <summary>

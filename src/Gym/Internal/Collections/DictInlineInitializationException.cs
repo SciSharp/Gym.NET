@@ -1,4 +1,4 @@
-﻿// Gym.Internal is 0.2's code, [Obsolete] since 2.0 and removed in 3.0 with Gym.Legacy (DR-56): it keeps no nullable
+﻿// Gym.Internal is 0.2's code, [Obsolete] since 1.0 and removed in 2.0 with Gym.Legacy (DR-56): it keeps no nullable
 // context (DR-54), rather than 89 annotations for code on its way out.
 #nullable disable
 using System;
@@ -10,11 +10,11 @@ namespace Gym.Collections {
     ///     <see cref="string"/>. The pairs before the bad one are already in the dictionary when it is thrown.
     /// </summary>
     /// <remarks>
-    ///     Obsolete with <see cref="Dict"/> (DR-56) and removed in 3.0. <see cref="Gym.Envs.Info"/> needs no such error:
+    ///     Obsolete with <see cref="Dict"/> (DR-56) and removed in 2.0. <see cref="Gym.Envs.Info"/> needs no such error:
     ///     its collection initializer (<c>new Info { ["key"] = value }</c>) is checked when it compiles.
     /// </remarks>
     [Serializable]
-    [Obsolete("Thrown only by the legacy Dict's inline pairs; Gym.Envs.Info needs none (new Info { [\"key\"] = value } is checked when it compiles). Removed in 3.0 with Gym.Legacy.")]
+    [Obsolete("Thrown only by the legacy Dict's inline pairs; Gym.Envs.Info needs none (new Info { [\"key\"] = value } is checked when it compiles). Removed in 2.0 with Gym.Legacy.")]
     public class DictInlineInitializationException : Exception {
         /// <summary>An error without a message of its own (.NET's default text).</summary>
         public DictInlineInitializationException() { }

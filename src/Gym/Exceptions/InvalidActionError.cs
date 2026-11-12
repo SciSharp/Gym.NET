@@ -7,13 +7,13 @@ namespace Gym.Exceptions {
     ///     envs raise for an action outside their space.
     /// </summary>
     /// <remarks>
-    ///     Obsolete, and removed in 3.0 with <c>Gym.Legacy</c>. The compatibility is partial: the envs that assert their
+    ///     Obsolete, and removed in 2.0 with <c>Gym.Legacy</c>. The compatibility is partial: the envs that assert their
     ///     action, as Gymnasium's do (LunarLander, CartPole, ...), raise <see cref="NumSharp.AssertionError"/>, which a
     ///     <c>catch (InvalidActionError)</c> does not see. It is an <see cref="Error"/>, so Gymnasium's hierarchy gains this
     ///     one level between <see cref="Error"/> and <see cref="InvalidAction"/>; messages, and the Python type
     ///     <see cref="InvalidAction"/> stands for, are unchanged.
     /// </remarks>
-    [Obsolete("0.2's InvalidActionError: catch Gym.Exceptions.InvalidAction (CarRacing, custom envs) or NumSharp.AssertionError (the envs that assert their action, as Gymnasium's do). Removed in 3.0 with Gym.Legacy.")]
+    [Obsolete("0.2's InvalidActionError: catch Gym.Exceptions.InvalidAction (CarRacing, custom envs) or NumSharp.AssertionError (the envs that assert their action, as Gymnasium's do). Removed in 2.0 with Gym.Legacy.")]
     public class InvalidActionError : Error {
         /// <summary>An error with 0.2's own message, <c>Action is outside of the configured action space.</c>, for 0.2 code that throws it.</summary>
         public InvalidActionError() : base("Action is outside of the configured action space.") { }

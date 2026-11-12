@@ -1,4 +1,4 @@
-﻿// Gym.Internal is 0.2's code, [Obsolete] since 2.0 and removed in 3.0 with Gym.Legacy (DR-56): it keeps no nullable
+﻿// Gym.Internal is 0.2's code, [Obsolete] since 1.0 and removed in 2.0 with Gym.Legacy (DR-56): it keeps no nullable
 // context (DR-54), rather than 89 annotations for code on its way out.
 #nullable disable
 using System;
@@ -18,14 +18,14 @@ namespace Gym.Collections {
     ///     returns (<c>Step.Information</c>, <c>ILegacyEnv.Metadata</c>, <c>VecEnv.Metadata</c>).
     /// </summary>
     /// <remarks>
-    ///     Obsolete (DR-56) and removed in 3.0 with <c>Gym.Legacy</c>. 2.0's envs use <see cref="Gym.Envs.Info"/> for infos
+    ///     Obsolete (DR-56) and removed in 2.0 with <c>Gym.Legacy</c>. 1.0's envs use <see cref="Gym.Envs.Info"/> for infos
     ///     (Python's dict: insertion order kept, <c>Get(key, default)</c>, <c>Update</c>, <c>Copy</c>/<c>DeepCopy</c>,
     ///     <c>Pop</c>) and <see cref="Gym.Envs.Metadata"/> for metadata. Unlike <see cref="Gym.Envs.Info"/>, enumeration
     ///     order is <see cref="Dictionary{TKey, TValue}"/>'s, which removals can reorder. It shares its name with the Dict
     ///     space (<c>Gym.Spaces.Dict</c>): a file importing both namespaces must alias one (CS0104).
     /// </remarks>
     [Serializable]
-    [Obsolete("Dict is the legacy API's info and metadata type: use Gym.Envs.Info for infos and Gym.Envs.Metadata for metadata. Removed in 3.0 with Gym.Legacy.")]
+    [Obsolete("Dict is the legacy API's info and metadata type: use Gym.Envs.Info for infos and Gym.Envs.Metadata for metadata. Removed in 2.0 with Gym.Legacy.")]
     public class Dict : Dictionary<string, object>, IMergable<IDictionary>, IMergable<IList>, IMergable<IMergable> {
         /// <summary>
         ///     Returns a new empty Dict with 0 capacity (not fixed, meaning you can add items to it).

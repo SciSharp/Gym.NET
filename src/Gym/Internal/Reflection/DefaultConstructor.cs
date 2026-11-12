@@ -1,4 +1,4 @@
-﻿// Gym.Internal is 0.2's code, [Obsolete] since 2.0 and removed in 3.0 with Gym.Legacy (DR-56): it keeps no nullable
+﻿// Gym.Internal is 0.2's code, [Obsolete] since 1.0 and removed in 2.0 with Gym.Legacy (DR-56): it keeps no nullable
 // context (DR-54), rather than 89 annotations for code on its way out.
 #nullable disable
 using System;
@@ -12,11 +12,11 @@ namespace Gym.Reflection {
     /// </summary>
     /// <typeparam name="T">The type to initialize a constructor for.</typeparam>
     /// <remarks>
-    ///     Obsolete with the legacy <see cref="Gym.Collections.Dict"/> (DR-56) and removed in 3.0: use
+    ///     Obsolete with the legacy <see cref="Gym.Collections.Dict"/> (DR-56) and removed in 2.0: use
     ///     <see cref="System.Activator.CreateInstance{T}()"/> or a <c>new()</c> constraint. Each call of the delegate goes
     ///     through <see cref="System.Reflection.ConstructorInfo.Invoke(object[])"/>, so it costs a reflection call per object.
     /// </remarks>
-    [Obsolete("Part of the legacy Dict's merging: use Activator.CreateInstance<T>() or a new() constraint. Removed in 3.0 with Gym.Legacy.")]
+    [Obsolete("Part of the legacy Dict's merging: use Activator.CreateInstance<T>() or a new() constraint. Removed in 2.0 with Gym.Legacy.")]
     public static class DefaultConstructor<T> {
         /// <summary>The cached delegate, built on first use; a race may build it twice, harmlessly.</summary>
         private static Func<T> _constructor;
@@ -46,11 +46,11 @@ namespace Gym.Reflection {
     ///     <see cref="DefaultConstructor{T}"/>: one delegate per type, cached for the process's life.
     /// </summary>
     /// <remarks>
-    ///     Obsolete with the legacy <see cref="Gym.Collections.Dict"/> (DR-56) and removed in 3.0: use
+    ///     Obsolete with the legacy <see cref="Gym.Collections.Dict"/> (DR-56) and removed in 2.0: use
     ///     <see cref="System.Activator.CreateInstance(Type)"/>. The cache never forgets a type, so it keeps every type it saw
     ///     loaded.
     /// </remarks>
-    [Obsolete("Part of the legacy Dict's merging: use Activator.CreateInstance(type) or a new() constraint. Removed in 3.0 with Gym.Legacy.")]
+    [Obsolete("Part of the legacy Dict's merging: use Activator.CreateInstance(type) or a new() constraint. Removed in 2.0 with Gym.Legacy.")]
     public static class DefaultConstructor {
         /// <summary>The delegates built so far, by type.</summary>
         private static ConcurrentDictionary<Type, Func<object>> _maps = new ConcurrentDictionary<Type, Func<object>>();
@@ -91,9 +91,9 @@ namespace Gym.Reflection {
     ///     Thrown by <see cref="DefaultConstructor{T}"/> and <see cref="DefaultConstructor"/> for a type with neither a
     ///     parameterless constructor nor one whose parameters are all optional; the message names the type.
     /// </summary>
-    /// <remarks>Obsolete with the legacy <see cref="Gym.Collections.Dict"/> (DR-56) and removed in 3.0.</remarks>
+    /// <remarks>Obsolete with the legacy <see cref="Gym.Collections.Dict"/> (DR-56) and removed in 2.0.</remarks>
     [Serializable]
-    [Obsolete("Part of the legacy Dict's merging: Activator.CreateInstance throws MissingMethodException instead. Removed in 3.0 with Gym.Legacy.")]
+    [Obsolete("Part of the legacy Dict's merging: Activator.CreateInstance throws MissingMethodException instead. Removed in 2.0 with Gym.Legacy.")]
     public class DefaultConstructorNotFoundException : Exception {
         /// <summary>An error without a message of its own (.NET's default text).</summary>
         public DefaultConstructorNotFoundException() { }

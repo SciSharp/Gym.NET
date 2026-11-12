@@ -1,4 +1,4 @@
-# Gym.NET's continuous integration (completion plan P0r.1, decision D20: informational on the journey1 branch until 2.0).
+# Gym.NET's continuous integration (completion plan P0r.1, decision D20: informational on the journey1 branch until 1.0).
 #
 # windows: the reference platform of tools/parity/manifest.json (win-x64). Builds Debug and Release, runs the headless
 #          unit gate, creates the pinned Python stack and runs the live parity gate with the engine required, so a

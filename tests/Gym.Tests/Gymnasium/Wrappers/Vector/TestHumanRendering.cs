@@ -8,8 +8,8 @@ namespace Gym.Tests.Gymnasium.Wrappers.Vector {
     /// <summary>Gymnasium's vector <c>HumanRendering</c> tests (<c>test_human_rendering.py</c>), run against <see cref="HumanRenderingVector{TObs, TAct}"/>.</summary>
     /// <remarks>
     ///     The window is <see cref="NullEnvViewer"/>'s (DR-20), so the tests open nothing on screen; the frames are paced at
-    ///     CartPole's 50 frames per second, as in Gymnasium. The <c>Ant-v4</c> cases wait for the MuJoCo renderer (P9,
-    ///     DR-62: the env steps, its frames are not drawn yet) and are <c>[OpenBugs("P9")]</c>.
+    ///     CartPole's 50 frames per second, as in Gymnasium. The <c>Ant-v4</c> cases render through Gym.NET's MuJoCo renderer
+    ///     (DR-62, DR-69); they were <c>[OpenBugs("P9")]</c> until its frames landed, and gate since.
     ///     Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/tests/wrappers/vector/test_human_rendering.py">tests/wrappers/vector/test_human_rendering.py</see>.
     /// </remarks>
     [TestClass]
@@ -19,10 +19,12 @@ namespace Gym.Tests.Gymnasium.Wrappers.Vector {
         [TestMethod]
         public void TestNumEnvsScreenSize() => RunScreenSizes("CartPole-v1");
 
-        /// <summary>The <c>Ant-v4</c> cases of <see cref="TestNumEnvsScreenSize"/> (P9).</summary>
+        /// <summary>
+        ///     The <c>Ant-v4</c> cases of <see cref="TestNumEnvsScreenSize"/>: MuJoCo sub-envs, whose frames Gym.NET draws itself
+        ///     (DR-62), tiled by the wrapper as CartPole's are.
+        /// </summary>
         /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/tests/wrappers/vector/test_human_rendering.py#L11">tests/wrappers/vector/test_human_rendering.py (test_num_envs_screen_size)</see>.</remarks>
         [TestMethod]
-        [OpenBugs("P9")]
         public void TestNumEnvsScreenSize_Ant() => RunScreenSizes("Ant-v4");
 
         /// <summary>

@@ -1,4 +1,4 @@
-﻿// Gym.Internal is 0.2's code, [Obsolete] since 2.0 and removed in 3.0 with Gym.Legacy (DR-56): it keeps no nullable
+﻿// Gym.Internal is 0.2's code, [Obsolete] since 1.0 and removed in 2.0 with Gym.Legacy (DR-56): it keeps no nullable
 // context (DR-54), rather than 89 annotations for code on its way out.
 #nullable disable
 using System;
@@ -15,13 +15,13 @@ namespace Gym.Reflection {
     ///     and <see cref="CreateDefaultConstructor{T}"/>), for the legacy deep merge.
     /// </summary>
     /// <remarks>
-    ///     Obsolete with the legacy <see cref="Gym.Collections.Dict"/> (DR-56) and removed in 3.0: the BCL covers each
+    ///     Obsolete with the legacy <see cref="Gym.Collections.Dict"/> (DR-56) and removed in 2.0: the BCL covers each
     ///     method (<see cref="Type.GetConstructor(Type[])"/> with <see cref="Type.EmptyTypes"/>, <see cref="Type.IsAssignableFrom"/>,
     ///     <see cref="System.Runtime.CompilerServices.ITuple"/>, <see cref="CustomAttributeExtensions"/>). Being extension
     ///     methods, they appear on every <see cref="object"/> and <see cref="Type"/> in a file that imports
     ///     <c>Gym.Reflection</c>.
     /// </remarks>
-    [Obsolete("Part of the legacy Dict's merging: use the BCL's reflection (Type.GetConstructor(Type.EmptyTypes), Type.IsAssignableTo, System.Runtime.CompilerServices.ITuple). Removed in 3.0 with Gym.Legacy.")]
+    [Obsolete("Part of the legacy Dict's merging: use the BCL's reflection (Type.GetConstructor(Type.EmptyTypes), Type.IsAssignableTo, System.Runtime.CompilerServices.ITuple). Removed in 2.0 with Gym.Legacy.")]
     public static class ReflectionHelper {
         //private static readonly Func<T> DefaultConstructor1;
         //

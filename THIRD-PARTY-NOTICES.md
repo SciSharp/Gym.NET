@@ -11,7 +11,7 @@ third-party source code or carry third-party files and data; they are listed bel
 
 Gym.NET reproduces [Gymnasium](https://github.com/Farama-Foundation/Gymnasium)'s behavior, pinned at v1.4.0
 (`8ba8c3a63bb4e000b7f33923f43d292acac07be1`) as the `refs/Gymnasium` submodule; each member based on Gymnasium's source
-links the file it follows in its documentation. As of 2.0 that covers:
+links the file it follows in its documentation. As of 1.0 that covers:
 
 - the core API, errors, logger and seeding (`gymnasium/core.py`, `error.py`, `logger.py`, `utils/seeding.py`):
   `src/Gym/Envs`, `src/Gym/Exceptions`, `src/Gym/Logger.cs`, `src/Gym/Utils`;
@@ -19,11 +19,12 @@ links the file it follows in its documentation. As of 2.0 that covers:
 - registration and `make`/`make_vec` (`gymnasium/envs/registration.py`): `src/Gym/Envs/Registration`, `src/Gym/Gymnasium.cs`;
 - the env checkers and step-API helpers (`gymnasium/utils/env_checker.py`, `passive_env_checker.py`, `env_match.py`,
   `step_api_compatibility.py`): `src/Gym/Utils`;
-- the wrappers 2.0 includes (`gymnasium/wrappers`): `src/Gym/Wrappers`;
+- the wrappers 1.0 includes (`gymnasium/wrappers`): `src/Gym/Wrappers`;
 - the vector API (`gymnasium/vector`): `src/Gym/Vector`;
-- the classic_control and toy_text environments (`gymnasium/envs/classic_control`, `gymnasium/envs/toy_text`):
-  `src/Gym.Environments/Envs/Classic`, `src/Gym.Environments/Envs/ToyText`;
-- the images those environments draw, copied unchanged from Gymnasium v1.4.0 and embedded in Gym.NET.Environments
+- the environments (`gymnasium/envs/classic_control`, `toy_text`, `box2d`, `mujoco`): `src/Gym.Environments/Envs/Classic`,
+  `ToyText`, `Box2D` and `MuJoCo`;
+- the images those environments draw, and their 14 MuJoCo models (as MuJoCo compiles them, below), from Gymnasium
+  v1.4.0, embedded in Gym.NET.Environments
   (`src/Gym.Environments/Assets`, whose README lists every file with its source path and SHA-256). The toy_text art is
   the Farama Foundation's own, under the same license.
 
@@ -310,6 +311,45 @@ the use of this software, even if advised of the possibility of such damage.
 
 The translation is verified bit for bit against live `cv2` 4.13.0 by the parity suite
 (`tests/Gym.Tests.Parity/Tests/Utils/Cv2ResizeLiveParityTests.cs`; float32 `INTER_LINEAR` with IPP switched off).
+
+---
+
+## MuJoCo 4.0.0 (Apache-2.0)
+
+`src/Gym.Environments/MuJoCo` (the `Gym.MuJoCo` namespace) and the renderer in `src/Gym.Environments/Envs/MuJoCo/Rendering`
+are Gym.NET's own code, written to compute what [MuJoCo](https://github.com/google-deepmind/mujoco) 4.0.0 computes for
+Gymnasium's 14 bundled models, bit for bit (decisions DR-61 to DR-71); a member that follows a MuJoCo source file links
+that file at the `4.0.0` tag in its documentation. Gym.NET.Environments also carries data MuJoCo produced, unchanged:
+
+- Gymnasium's 14 MuJoCo models as MuJoCo 4.0.0's compiler compiles them (`src/Gym.Environments/Assets/mujoco/*.json`),
+  with the builtin textures it generates (`mujoco/textures/*.png`), recorded by `tools/parity/mujoco/record_models.py`;
+  the models themselves are Gymnasium's (above);
+- MuJoCo's `normal150` bitmap font, the bytes of its `src/render/classic/font/normal150.inc`
+  (`src/Gym.Environments/Assets/mujoco/fonts/normal150.json`), which the human window's menu is drawn with.
+
+The assets' README lists every file with its source and SHA-256. MuJoCo is licensed under the Apache License 2.0, the
+license of Gym.NET itself (see [LICENSE](LICENSE)); its source files carry this notice:
+
+```
+Copyright 2021 DeepMind Technologies Limited
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+```
+
+The engine is verified bit for bit against MuJoCo 4.0.0, through Gymnasium, by the parity suite
+(`tests/Gym.Tests.Parity/Tests/Envs/MujocoLiveParityTests.cs`) and the trace checker (`tools/parity/mujoco/halfcheetah_poc`);
+the frames are measured against Gymnasium's (`MujocoFrameLiveParityTests.cs`), and the window's menu font and
+decorations against MuJoCo's own (`MujocoWindowLiveParityTests.cs`).
 
 ---
 

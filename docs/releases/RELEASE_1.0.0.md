@@ -1,22 +1,26 @@
-# Gym.NET 2.0.0
+# Gym.NET 1.0.0
 
-> **Draft, not released.** Prepared on 2026-11-09 on the working branch `journey1`; nothing is merged into `master`,
-> tagged or published. Since then the Box2D environments (P8: LunarLander-v3, LunarLanderContinuous-v3,
-> BipedalWalker-v3, BipedalWalkerHardcore-v3, CarRacing-v3) landed on 2026-11-11, and the inventory's list of missing
-> names holds only MuJoCo's names and `AtariPreprocessing`, besides names that do not apply to .NET (JAX, pickling,
-> process workers) or that Gym.NET merges by design. What remains is the release itself (completion plan P10.5).
-> On 2026-11-12 MuJoCo resumed (DR-61): its 22 ids landed on Gym.NET's own engine, bit for bit with MuJoCo 4.0.0, and the
-> missing names are now MuJoCo's three renderer classes and `AtariPreprocessing`. Gym.NET draws their `rgb_array`,
-> `depth_array` and `rgbd_tuple` frames itself (DR-62, DR-69), measured against Gymnasium's, and their human window with
-> Gymnasium's controls (DR-70).
->
-> Update this page when anything changes; the numbers under "Verification" are those of 2026-11-11, after P8, and of
-> 2026-11-12, after the MuJoCo envs.
+> **Prepared, not published yet.** Verified on 2026-11-12 on the working branch `journey1`; it ships when the
+> maintainer merges it into `master`, tags it and publishes the packages (completion plan P10.5). Remove this note then.
 
-Gym.NET 2.0 gives .NET reinforcement-learning environments with Farama Gymnasium's API and behavior. For the same
-seed and actions, its environments return the same observations, rewards, flags and infos as Gymnasium v1.4.0's, bit
-for bit, and draw the same frames, pixel for pixel; a test suite that runs Gymnasium inside the test process checks it.
-It replaces 0.2's API, which followed gym before 0.26, with Gymnasium's.
+Gym.NET 1.0 gives .NET reinforcement-learning environments with Farama Gymnasium's API and behavior. For the same seed
+and actions, its environments return the same observations, rewards, flags and infos as Gymnasium v1.4.0's, bit for
+bit, and draw the same frames, pixel for pixel (MuJoCo's within a measured margin, below); a test suite that runs
+Gymnasium inside the test process checks it. It is the first release since 0.2.0 (March 2023), and it replaces 0.2's
+API, which followed gym before 0.26, with Gymnasium's.
+
+## Highlights
+
+- **39 environment ids**, with Gymnasium's names and versions: classic_control (6), box2d (5), toy_text (6) and mujoco
+  (22), registered for `Gymnasium.Make` before `Main` runs.
+- **Gymnasium's API in C#**: `Env<TObs, TAct>`, `Reset(seed)` returning `(observation, info)`, `Step` returning
+  `(observation, reward, terminated, truncated, info)`, the registry, all ten spaces, every wrapper but Atari's and the
+  JAX/PyTorch conversions, and sync and async vector envs.
+- **No native code**: Box2D 2.3.0 and a MuJoCo engine that computes what MuJoCo 4.0.0 computes are managed C#, inside
+  Gym.NET.Environments; nothing to install beside the packages.
+- **Checked against Gymnasium itself**: a live parity suite runs Gymnasium inside the test process and compares every
+  value bit for bit and every frame pixel for pixel, and Gymnasium's own tests run in C# beside Gym.NET's (Verification,
+  below).
 
 ## Packages
 
@@ -24,18 +28,44 @@ It replaces 0.2's API, which followed gym before 0.26, with Gymnasium's.
 |---|---|
 | Gym.NET | The env contract, wrappers, spaces, registry (`Gymnasium.Make`, `MakeVec`), vector envs, checkers, seeding, errors; `Gym.Legacy` |
 | Gym.NET.Rendering (new) | The rasterizer `rgb_array` frames are drawn with, equal to pygame-ce's pixels |
-| Gym.NET.Environments | classic_control, toy_text, box2d (LunarLander, BipedalWalker, CarRacing) and mujoco (Ant, HalfCheetah, Hopper, Humanoid, HumanoidStandup, the two inverted pendulums, Pusher, Reacher, Swimmer, Walker2d), CartPole's vector env, their registration; inside its assembly, the `Gym.Box2D` namespace: Box2D 2.3.0 in managed C#, bit for bit as pybox2d 2.3.10, with pybox2d's surface (zlib notices in THIRD-PARTY-NOTICES.md), and the `Gym.MuJoCo` namespace: Gym.NET's own engine, bit for bit with MuJoCo 4.0.0 on Gymnasium's 14 bundled models, embedded as MuJoCo compiled them |
+| Gym.NET.Environments | classic_control, toy_text, box2d (LunarLander, BipedalWalker, CarRacing) and mujoco (Ant, HalfCheetah, Hopper, Humanoid, HumanoidStandup, the two inverted pendulums, Pusher, Reacher, Swimmer, Walker2d), CartPole's vector env, their registration; inside its assembly, the `Gym.Box2D` namespace: Box2D 2.3.0 in managed C#, bit for bit as pybox2d 2.3.10, with pybox2d's surface, and the `Gym.MuJoCo` namespace: Gym.NET's own engine, bit for bit with MuJoCo 4.0.0 on Gymnasium's 14 bundled models, embedded as MuJoCo compiled them |
 | Gym.NET.Rendering.Avalonia | A window for `human` mode on Avalonia 12 (Windows, Linux, macOS), and `PlayPlot`'s live charts on ScottPlot (`AvaloniaPlotFigure`) |
 | Gym.NET.Rendering.WinForm | The same on Windows Forms (`WinFormPlotFigure`); its window's client area is the frame's size, where 0.2's form cropped the frame's bottom rows behind the title bar |
 
 All target .NET 8 and .NET 10, depend on NumSharp 0.80.0, and are Apache-2.0, the repository's license (decision
-DR-49). The sources Gym.NET translates (Box2D 2.3.0 and pybox2d, SDL_gfx, SDL_ttf, OpenCV's resize, pygame-ce's
-`draw.aaline`/`aalines`) and the glyphs CarRacing's score is drawn with are credited, with their notices, in
-THIRD-PARTY-NOTICES.md.
+DR-49). Each package carries THIRD-PARTY-NOTICES.md, which credits, with their notices, the sources Gym.NET translates
+(Box2D 2.3.0 and pybox2d, SDL_gfx, SDL_ttf, OpenCV's resize, CPython's difflib, json and math routines, pygame-ce's
+`draw.aaline`/`aalines`) and the data it carries (Gymnasium's assets, CarRacing's score glyphs, MuJoCo's font and
+compiled models).
+
+## Upgrading from 0.2
+
+1. **Move every Gym.NET package to 1.0.0 at once.** 0.2.0 declared its dependencies as "0.2.0 or later", so NuGet
+   accepts a mix of 0.2.0 and 1.0.0 packages without a warning, and the mix fails when it runs: Gym.NET.Environments
+   0.2.0 over Gym.NET 1.0.0 cannot load its envs (`TypeLoadException: Could not load type 'Gym.Envs.Env'`), and a
+   0.2.0 viewer over Gym.NET.Environments 1.0.0 cannot load its window (`Could not load type
+   'Gym.Environments.IEnvViewer'`). Gym.NET.Rendering, new, comes with Gym.NET.Environments.
+2. **Remove NumSharp.Lite.** 1.0 depends on NumSharp 0.80.0; with NumSharp.Lite 0.1.12 still referenced, code naming
+   `NDArray` stops compiling (CS0433: the type exists in both).
+3. **Target .NET 8 or later.** The packages carry .NET 8 and .NET 10 builds; 0.2's targeted .NET Core 3.1 and .NET 6.
+4. **Avalonia 12** for Gym.NET.Rendering.Avalonia; 0.2's viewer was built on Avalonia 0.10.
+5. **Builds that treat warnings as errors** need two suppressions:
+   - ImageSharp 2.1.13's five advisories, which NuGet reports as NU1902/NU1903 ([below](#sixlaborsimagesharp-2113-and-its-advisories)).
+   - With Gym.NET.Rendering.WinForm, NU1701: ScottPlot.WinForms, which draws `PlayPlot`'s charts, brings OpenTK 3.1.0,
+     OpenTK.GLControl 3.1.0 and SkiaSharp.Views.WindowsForms 3.119.0, which ship .NET Framework builds only. A `NoWarn`
+     on the package's own reference does not reach them; keep the warning, but not as an error:
+
+     ```xml
+     <PropertyGroup>
+       <WarningsNotAsErrors>$(WarningsNotAsErrors);NU1701</WarningsNotAsErrors>
+     </PropertyGroup>
+     ```
+6. **Then the code.** The [migration guide](../guides/migrating_to_1.0.md) maps every 0.2 call; the commonest 0.2 lines
+   still compile, with `[Obsolete]` warnings, until 2.0.
 
 ## Breaking changes
 
-2.0 is Gymnasium's API, and 0.2 code needs changes; the [migration guide](../guides/migrating_to_2.0.md) maps every call.
+1.0 is Gymnasium's API, and 0.2 code needs changes; the [migration guide](../guides/migrating_to_1.0.md) maps every call.
 In short:
 
 - `Reset(seed, options)` returns `(observation, info)`; `Seed(s)` is gone, `Reset(seed: s)` replaces it.
@@ -50,8 +80,8 @@ In short:
 - 0.2's unused public types are gone (DR-56): `CircularQueue<T>`, `CircularQueueThreadSafe<T>` and
   `GenericCallFactory`. The legacy `Dict`, which `Gym.Legacy` still returns, and its helpers in `Gym.Collections`,
   `Gym.Dynamic`, `Gym.Merging` and `Gym.Reflection` are `[Obsolete]`, each warning naming its replacement, and go in
-  3.0 with `Gym.Legacy`.
-- Common 0.2 lines still compile, each with an `[Obsolete]` warning naming the 2.0 spelling (DR-58), until 3.0:
+  2.0 with `Gym.Legacy`.
+- Common 0.2 lines still compile, each with an `[Obsolete]` warning naming the 1.0 spelling (DR-58), until 2.0:
   `var (obs, reward, done, info) = env.Step(a)` (done is terminated or truncated), `NDArray obs = env.Reset()`,
   `env.CloseEnvironment()`, `new Box(low, high, np.float32)`, `new CartPoleEnv(viewerFactory)`, LunarLander's 0.2
   names, and `catch` blocks of 0.2's three exceptions, now the bases of Gymnasium's `InvalidAction`,
@@ -61,10 +91,10 @@ In short:
   gone, with the Aether.Physics2D, ImageSharp.Drawing and SixLabors.Fonts dependencies; Gymnasium's LunarLander-v3 on
   Gym.NET's Box2D replaces it (`Gym.Environments.Envs.Box2D.LunarLanderEnv`).
 
-`Gym.Legacy.LegacyEnvAdapter` runs any 2.0 env behind the 0.2 interface for code that cannot move yet. Everything in
-`Gym.Legacy` is `[Obsolete]` and is removed in 3.0.
+`Gym.Legacy.LegacyEnvAdapter` runs any 1.0 env behind the 0.2 interface for code that cannot move yet. Everything in
+`Gym.Legacy` is `[Obsolete]` and is removed in 2.0.
 
-## What 2.0 contains
+## What 1.0 contains
 
 - **Core**: `Env<TObs, TAct>` and `IEnv`, `Wrapper` with the observation, action and reward wrapper bases,
   `StepResult`/`ResetResult` (disposable: `using var step = env.Step(action);` releases the arrays the result holds),
@@ -99,28 +129,30 @@ In short:
   benchmarks), `Video.SaveVideo`, `Cv2.Resize`, and the functional protocol `FuncEnv` (without JAX).
 - **Playing from the keyboard**: `Play.Run` (Gymnasium's `play`), `PlayableGame`, `Play.DisplayArr` and `PlayPlot`, in
   a window from the viewer factory; the Avalonia and WinForms viewers report keys, their close button, resizes and the
-  mouse (which a MuJoCo env's human window reads for Gymnasium's camera controls, DR-70), and
-  headless runs are driven by events posted to `Gym.Rendering.EventQueue`, as Gymnasium's tests post them.
-  `Play.RunAsync` awaits a game, on a thread of its own for a window and on the thread pool headless; a
-  `PygameContext` gives a game its own display and event queue, so two games can run at once. `PlayPlot`'s charts get
-  titles, ticks and labels from ScottPlot in the viewer packages (`AvaloniaPlotFigure.Subplots()`,
-  `WinFormPlotFigure.Subplots()`); the core's plain `PlotFigure` needs no chart library.
-- **Environments** (all registered for `Gymnasium.Make`, each with `rgb_array` frames equal to Gymnasium's, `ansi` text
-  for toy_text, and `human` mode):
+  mouse (which a MuJoCo env's human window reads for Gymnasium's camera controls, DR-70), and headless runs are driven
+  by events posted to `Gym.Rendering.EventQueue`, as Gymnasium's tests post them. `Play.RunAsync` awaits a game, on a
+  thread of its own for a window and on the thread pool headless; a `PygameContext` gives a game its own display and
+  event queue, so two games can run at once. `PlayPlot`'s charts get titles, ticks and labels from ScottPlot in the
+  viewer packages (`AvaloniaPlotFigure.Subplots()`, `WinFormPlotFigure.Subplots()`); the core's plain `PlotFigure` needs
+  no chart library.
+- **Environments** (all registered for `Gymnasium.Make`, each with `rgb_array` frames, `ansi` text for toy_text, and
+  `human` mode):
 
   | Family | Ids |
   |---|---|
   | classic_control | CartPole-v0, CartPole-v1 (and its vector env), MountainCar-v0, MountainCarContinuous-v0, Pendulum-v1, Acrobot-v1 |
   | box2d | LunarLander-v3, LunarLanderContinuous-v3, BipedalWalker-v3, BipedalWalkerHardcore-v3, CarRacing-v3 (on `Gym.Box2D`, Box2D 2.3.0 in managed C#) |
   | toy_text | FrozenLake-v1, FrozenLake8x8-v1, CliffWalking-v1, CliffWalkingSlippery-v1, Taxi-v4, Blackjack-v1 |
-  | mujoco | Ant, HalfCheetah, Hopper, Humanoid, HumanoidStandup, InvertedDoublePendulum, InvertedPendulum, Pusher, Reacher, Swimmer and Walker2d, each -v4 and -v5 (on `Gym.MuJoCo`, Gym.NET's engine following MuJoCo 4.0.0; Pusher-v4 refuses as Gymnasium's does on MuJoCo 3 and later). Observations, rewards, infos and their NumPy types match Gymnasium's; Gym.NET draws the frames itself, within one level of Gymnasium's on all but a few percent of the pixels (DR-62, DR-71); `human` opens a window with Gymnasium's mouse and key controls and its menu (DR-70) |
+  | mujoco | Ant, HalfCheetah, Hopper, Humanoid, HumanoidStandup, InvertedDoublePendulum, InvertedPendulum, Pusher, Reacher, Swimmer and Walker2d, each -v4 and -v5 (on `Gym.MuJoCo`, Gym.NET's engine following MuJoCo 4.0.0; Pusher-v4 refuses as Gymnasium's does on MuJoCo 3 and later). Observations, rewards, infos and their NumPy types match Gymnasium's bit for bit; Gym.NET draws the frames itself, and 0.07% (InvertedPendulum) to 16% (Humanoid's distant floor) of a frame's pixels differ from Gymnasium's, nearly all by one level (DR-62, DR-71); `human` opens a window with Gymnasium's mouse and key controls and its menu (DR-70) |
 
-  Each steps faster than Gymnasium's on the same machine (Release builds, sampled actions, the medians of interleaved
-  runs): 1.4× CartPole to 14× Acrobot, LunarLander 1.6×, BipedalWalker 3.6×, CarRacing 2.2× (the C# code review's
-  §4 has the table).
+  The classic_control, toy_text and box2d frames equal Gymnasium's pixel for pixel. The nine of those envs measured
+  (2026-11-11, before MuJoCo landed) step faster than Gymnasium's on the same machine (Release builds, sampled actions,
+  the medians of interleaved runs): 1.4× CartPole to 14× Acrobot, LunarLander 1.6×, BipedalWalker 3.6×, CarRacing 2.2×
+  (the C# code review's §4 has the table). MuJoCo's speed against native MuJoCo is not measured.
 - **Rendering**: `Gym.Rendering`, a rasterizer with pygame's semantics (SDL_gfx's `gfxdraw` primitives, `draw.line`,
-  `draw.rect`, `draw.polygon`, `draw.circle`, `draw.lines`, alpha blitting, `transform.flip`/`scale`/`smoothscale`, `image.load`), and the `human` viewers, chosen
-  once with `Gymnasium.HumanViewerFactory`.
+  `draw.rect`, `draw.polygon`, `draw.circle`, `draw.lines`, alpha blitting, `transform.flip`/`scale`/`smoothscale`,
+  `image.load`), MuJoCo's scene drawn in software as its classic renderer draws it, and the `human` viewers, chosen once
+  with `Gymnasium.HumanViewerFactory`.
 
 ## Differences from Gymnasium, by design
 
@@ -140,9 +172,10 @@ Each is documented on the member, and the parity suite pins it, so a change show
   `daemon` decides whether the worker threads are background threads. A custom `worker` is an `AsyncVectorWorker` with
   Gymnasium's eight arguments; it runs on a thread of its own and talks through a `PipeConnection`, which passes values
   by reference instead of pickling them (`AsyncVectorEnv.AsyncWorker` is the default one to wrap). `close(terminate=True)`
-  stops waiting instead of killing (each worker closes its sub-env as soon as its current call returns). A reset right after an episode end clears that sub-env's pending autoreset in
-  both copy paths (DR-42). Gymnasium's worker clears it only with shared memory, so without it Gymnasium's next step
-  resets the sub-env a second time, with a reward of 0; Gym.NET's sync and async envs agree in every sequence instead.
+  stops waiting instead of killing (each worker closes its sub-env as soon as its current call returns). A reset right
+  after an episode end clears that sub-env's pending autoreset in both copy paths (DR-42). Gymnasium's worker clears it
+  only with shared memory, so without it Gymnasium's next step resets the sub-env a second time, with a reward of 0;
+  Gym.NET's sync and async envs agree in every sequence instead.
 - **`DictInfoToList`** returns its list of infos from its own `Step` and `Reset`; through `IVectorEnv` the infos stay a
   dict.
 - **The registry's namespace scope** (`EnvRegistry.Namespace`, Gymnasium's `namespace` context manager) applies to the
@@ -152,12 +185,17 @@ Each is documented on the member, and the parity suite pins it, so a change show
 - **`Draw.Aalines` with two points**: pygame-ce reads one float past its buffer there, so for a steep segment ending off
   a whole pixel its drawing varies from run to run, by one blend of the end column. Gym.NET takes that float as 0, what a
   fresh interpreter usually holds there. No Gymnasium env draws a two-point polyline.
+- **MuJoCo's human window** follows Gymnasium's `WindowViewer` where GLFW leaves nothing to choose, and decides the rest
+  (DR-70): it draws at the viewer's client size, paces frames with a 60 Hz clock, opens at 960 × 540 when no size is
+  given, writes T's capture under `/tmp` on the current drive (creating the folder), and after Esc or the close button
+  draws nothing more.
 - **Exceptions**: Python's built-in exceptions are NumSharp's types; `OverflowError` and `ZeroDivisionError` are .NET's
   `OverflowException` and `DivideByZeroException`. `InvalidAction`, `AlreadyPendingCallError` and `NoAsyncCallError` each
   have one of 0.2's obsolete exceptions as their base (DR-58), a level Gymnasium's hierarchy does not have; their
   messages, and the Python types they stand for, are Gymnasium's.
 - **The reference platform is Windows x64.** Where Gymnasium's float64 arithmetic goes through the C runtime (CartPole's
-  `cos`/`sin`), results are verified on Windows; on Linux and macOS the C library may differ in the last bit.
+  `cos`/`sin`, Box2D's and MuJoCo's math), results are verified on Windows; on Linux and macOS the C library may differ
+  in the last bit.
 
 ## Known gaps
 
@@ -167,29 +205,28 @@ Each has a test that asserts Gymnasium's answer and fails until the gap closes (
   `cv2.ipp.setUseIPP(False)` or on a build without Intel IPP. The `cv2` wheels hand that case to IPP by default, whose
   algorithm is not published, and its results differ by a few units in the last place (DR-46). uint8 images, which
   Gymnasium's wrappers use, and float32 `INTER_AREA` are exact either way.
-
 - **A bare `assert`'s message**: where Gymnasium fails a message-less `assert` (Taxi's `decode` beyond the grid,
-  Blackjack's refused actions, `render()` without a render mode or spec), Gym.NET raises `AssertionError` too, but its
-  message is NumSharp's `"AssertionError"` instead of Python's empty one (NumSharp gap N-1).
+  Blackjack's refused actions, a Box2D env stepped before its first reset, `render()` without a render mode or spec),
+  Gym.NET raises `AssertionError` too, but its message is NumSharp's `"AssertionError"` instead of Python's empty one
+  (NumSharp gap N-1).
 - **`NotImplementedError` and `ImportError`** are `Gym.Exceptions` types until NumSharp defines them, and NumSharp's
   exceptions take no inner exception yet (N-3).
 
-## Not in 2.0 yet
+## Not in 1.0
 
-Nothing of P6 or P8 is deferred.
-
-Out of 2.0 by decision:
+Out of 1.0 by decision:
 
 - **MuJoCo's frames are measured, not equal** (DR-62, DR-67, DR-71): Gym.NET draws them on the CPU, reproducing the
   reference GPU's measured rounding and filtering, so a frame differs from Gymnasium's in 0.07% (InvertedPendulum) to
   16% (Humanoid's distant floor) of its pixels, nearly all by one level, and takes 0.05 to 0.5 s; so the `human` window
   (DR-70) shows a few to a few dozen frames a second, and its frames are single-sampled as Gymnasium's GLFW window's
-  are. A MuJoCo env's `xml_file` takes only Gymnasium's 14 bundled model names
-  (DR-63): Gym.NET has no MJCF compiler.
+  are. A MuJoCo env's `xml_file` takes only Gymnasium's 14 bundled model names (DR-63): Gym.NET has no MJCF compiler.
 - `AtariPreprocessing`, which needs the Arcade Learning Environment (DR-36).
 - **Native AOT and trimming** (DR-55): NumSharp compiles its array kernels at run time, so Gym.NET needs the JIT. A .NET
   10 file-based app (`dotnet run app.cs`), which publishes AOT by default, sets `#:property PublishAot=false`.
-- Python-only stacks: JAX and PyTorch environments and converters, pickling, Shimmy's compatibility ids.
+- Python-only stacks: JAX and PyTorch environments and converters, pickling. Gymnasium also registers ids that only
+  raise an `ImportError` pointing elsewhere (Shimmy's `GymV21Environment-v0` and `GymV26Environment-v0`, and mujoco-py's
+  `-v2`/`-v3` MuJoCo ids); Gym.NET does not register them (port plan §1.4).
 
 ## SixLabors.ImageSharp 2.1.13 and its advisories
 
@@ -223,25 +260,20 @@ A new advisory against 2.1.13 gets the same review before Gym.NET suppresses it.
 
 ## Verification
 
-On 2026-11-11, after P8, on Windows x64, in Release, on net8.0 and net10.0 alike:
+On 2026-11-12, on Windows x64, in Release, on net8.0 and net10.0 alike, on the tree of this release:
 
-- the unit suite (Gymnasium's own tests rewritten in C#, and Gym.NET's): 3,549 of 3,549 pass (19 data rows skip where
-  Gymnasium's own tests call `pytest.skip`), and the 11 open tests fail only at their documented gaps (NumSharp's N-1
-  to N-4, and MuJoCo's Ant, postponed with P9);
-- the live parity suite against Gymnasium v1.4.0 on Python 3.12, NumPy 2.4.2, pygame-ce 2.5.8, Box2D 2.3.10 and
-  OpenCV 4.13.0: 2,451 of 2,451 gated cells pass, and the 7 open cells fail only at their documented divergences
-  (six at NumSharp's N-1, the bare assertion's empty message; one at Intel IPP's float32 bilinear, DR-46);
-- Gymnasium's own `check_env` and `check_environments_match` pass through the reverse bridge on all seventeen registered
-  ids;
-- the 19 golden trajectories, at least one per registered id, replay without Python.
-
-On 2026-11-12, after the MuJoCo envs (DR-61), on Windows x64, in Debug, with MuJoCo 4.0.0 added to the parity stack:
-
-- the unit suite: 3,804 of 3,804 pass on net8.0 and net10.0 alike (24 data rows skip where Gymnasium's tests skip);
-- the live parity gate on net10.0: 2,862 of 2,862 gated cells pass, the MuJoCo ids' included (lockstep, registration,
-  `make`'s warnings, sync and async vectors, the reverse bridge). One full run passed 2,859; the three async cells it
-  failed (a Windows venv's launcher broke multiprocessing's semaphores, the first gate run in a venv) pass since the
-  harness spawns the venv's base interpreter, as CPython does;
-- Gymnasium's own `check_env` (with `skip_render_check=True`, as Gymnasium's MuJoCo tests call it) and
-  `check_environments_match` pass through the reverse bridge on the 21 MuJoCo ids that build, 38 ids in all;
-- the 40 golden trajectories, 21 of them MuJoCo's, replay without Python.
+- **The unit suite** (Gymnasium's own tests rewritten in C#, and Gym.NET's): 3,894 of 3,894 pass (24 data rows skip
+  where Gymnasium's own tests call `pytest.skip`), and the 10 open tests fail only at their documented gaps (NumSharp's
+  N-1 to N-4).
+- **The live parity suite**, against Gymnasium v1.4.0 on Python 3.12, NumPy 2.4.2, pygame-ce 2.5.8, Box2D 2.3.10,
+  OpenCV 4.13.0 and MuJoCo 4.0.0: 2,916 of 2,916 gated cells pass, every registered id at every layer. The 7 open cells
+  fail only at their documented divergences: six at NumSharp's N-1, the bare assertion's empty message, and one at Intel
+  IPP's float32 bilinear (DR-46). The gate includes:
+  - Gymnasium's own `check_env` and `check_environments_match`, run through the reverse bridge on the 38 ids that build;
+  - the 40 golden trajectories, replayed without Python;
+  - the MuJoCo frame and window cells, on the reference GPU (NVIDIA GeForce RTX 4060 Ti, driver 616.56).
+- **The five packages**, packed from that tree and restored from a local feed into a project of their own:
+  - 12 ids from every family, MuJoCo's HalfCheetah, Humanoid, Pusher and Ant among them, made, stepped and rendered;
+  - installed all together, every one of their 927 types loads, both viewers implement the window and input contracts,
+    and 0.2's common lines compile and run through the shims.
+- **The rest**: the CartPole example solves CartPole-v1 in seven generations, and the documentation site builds.

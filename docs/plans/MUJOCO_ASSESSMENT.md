@@ -3,6 +3,7 @@
 | | |
 |---|---|
 | **Date** | 2026-11-11 |
+| **Versions** | "2.0" below is the release, which ships as 1.0.0 (the completion plan's D23, 2026-11-12) |
 | **Status** | Assessment for P9, written while DR-35 had postponed it out of 2.0 and DR-30, DR-31 and DR-33 asked for a managed port of MuJoCo and its renderer. Rounds 21 and 22 of `DESIGN_REVIEW.md` (2026-11-12) replaced them: the proof of concept's core becomes the MuJoCo envs (DR-61), on MuJoCo 4.0.0 (DR-64), with frames drawn by Gym.NET and measured only (DR-62, DR-67), and Gymnasium's reach of the Python API under .NET names (DR-68). §14 verifies the core on 4.0.0; §15 is the API comparison behind DR-68; §16 records the product stage: the engine in Gym.Environments and the 22 env classes |
 | **Measured against** | Gymnasium `8ba8c3a6` (v1.4.0, committed 2026-10-05); MuJoCo 3.15.0 (released the same day) for §1–§13 and MuJoCo 4.0.0 (2026-11-06) for §14–§15: their sources, and their `win_amd64` wheels for Python 3.12 in isolated venvs |
 | **Reproduce** | §8; the probes are in `tools/parity/mujoco/`, the proof of concept for HalfCheetah (§10), Hopper and Humanoid (§11) and all 21 ids (§13) in `tools/parity/mujoco/halfcheetah_poc/`, with its verification scripts (§13) in `halfcheetah_poc/verify/`, the engine's line coverage (§10.6, §12) in `tools/parity/mujoco/coverage/` |

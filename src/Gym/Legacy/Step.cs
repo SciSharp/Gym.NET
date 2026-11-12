@@ -14,7 +14,7 @@ namespace Gym.Legacy {
     ///     <see cref="Done"/> merges termination and truncation (<c>Information["TimeLimit.truncated"]</c> tells them apart);
     ///     the reward is float64, as in <see cref="Gym.Observations.StepResult{TObs}"/>.
     /// </remarks>
-    [Obsolete("The 4-tuple step API is legacy: Env<TObs, TAct>.Step returns Gym.Observations.StepResult<TObs> (done is terminated || truncated). Gym.Legacy is removed in 3.0.")]
+    [Obsolete("The 4-tuple step API is legacy: Env<TObs, TAct>.Step returns Gym.Observations.StepResult<TObs> (done is terminated || truncated). Gym.Legacy is removed in 2.0.")]
     public class Step : IEquatable<Step>, ICloneable, IDisposable {
         /// <summary>The observation after the action; <see langword="null"/> in a step built empty (<see cref="Step()"/>) until it is set.</summary>
         public NDArray? Observation { get; set; }

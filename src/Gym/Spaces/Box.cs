@@ -64,38 +64,38 @@ namespace Gym.Spaces {
             : this(Bound.Of(low), Bound.Of(high), shape, dtype, seed) { }
 
         /// <summary>
-        ///     0.2's <c>new Box(low, high, np.float32)</c>, the dtype third, kept so 0.2 code compiles until 3.0 (DR-58): the same
+        ///     0.2's <c>new Box(low, high, np.float32)</c>, the dtype third, kept so 0.2 code compiles until 2.0 (DR-58): the same
         ///     box as <c>new Box(low, high, dtype: dtype)</c>, of shape <c>(1,)</c>, Gymnasium's for scalar bounds.
         /// </summary>
         /// <param name="low">The lower bound of every entry.</param>
         /// <param name="high">The upper bound of every entry.</param>
         /// <param name="dType">
-        ///     The dtype. Named as 0.2 named it, so 2.0's <c>dtype:</c> calls never bind here: with the same name, a named
+        ///     The dtype. Named as 0.2 named it, so 1.0's <c>dtype:</c> calls never bind here: with the same name, a named
         ///     <c>dtype:</c> argument would prefer this overload (<c>DType</c> over <c>DType?</c>) or turn ambiguous.
         /// </param>
         /// <param name="seed">An integer seed, a generator to share, or <see langword="null"/>.</param>
         /// <exception cref="NumSharp.ValueError">Thrown as the shape-taking constructor throws, with Gymnasium's messages.</exception>
         /// <exception cref="Error">Thrown when an integer <paramref name="seed"/> is negative.</exception>
         /// <remarks>Footgun: next to it, <c>new Box(low, high, null)</c> is ambiguous (a <see cref="Shape"/> or a dtype); name the argument.</remarks>
-        [Obsolete("0.2's argument order: write new Box(low, high, dtype: dtype); the third positional argument is the shape. Removed in 3.0 with Gym.Legacy.")]
+        [Obsolete("0.2's argument order: write new Box(low, high, dtype: dtype); the third positional argument is the shape. Removed in 2.0 with Gym.Legacy.")]
         public Box(double low, double high, DType dType, SpaceSeed? seed = null)
             : this(low, high, null, dType, seed) { }
 
         /// <summary>
-        ///     0.2's <c>new Box(lowArray, highArray, np.float32)</c>, the dtype third, kept so 0.2 code compiles until 3.0
+        ///     0.2's <c>new Box(lowArray, highArray, np.float32)</c>, the dtype third, kept so 0.2 code compiles until 2.0
         ///     (DR-58): the same box as <c>new Box(low, high, dtype: dtype)</c>, of the bounds' shape.
         /// </summary>
         /// <param name="low">The lower bounds; read, never kept.</param>
         /// <param name="high">The upper bounds; read, never kept.</param>
         /// <param name="dType">
-        ///     The dtype. Named as 0.2 named it, so 2.0's <c>dtype:</c> calls never bind here: with the same name, a named
+        ///     The dtype. Named as 0.2 named it, so 1.0's <c>dtype:</c> calls never bind here: with the same name, a named
         ///     <c>dtype:</c> argument would prefer this overload (<c>DType</c> over <c>DType?</c>) or turn ambiguous.
         /// </param>
         /// <param name="seed">An integer seed, a generator to share, or <see langword="null"/>.</param>
         /// <exception cref="NumSharp.ValueError">Thrown as the shape-taking constructor throws, with Gymnasium's messages.</exception>
         /// <exception cref="Error">Thrown when an integer <paramref name="seed"/> is negative.</exception>
         /// <remarks>Footgun: next to it, <c>new Box(low, high, null)</c> is ambiguous (a <see cref="Shape"/> or a dtype); name the argument.</remarks>
-        [Obsolete("0.2's argument order: write new Box(low, high, dtype: dtype); the third positional argument is the shape. Removed in 3.0 with Gym.Legacy.")]
+        [Obsolete("0.2's argument order: write new Box(low, high, dtype: dtype); the third positional argument is the shape. Removed in 2.0 with Gym.Legacy.")]
         public Box(NDArray low, NDArray high, DType dType, SpaceSeed? seed = null)
             : this(low, high, null, dType, seed) { }
 

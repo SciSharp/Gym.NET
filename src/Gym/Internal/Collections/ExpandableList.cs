@@ -1,4 +1,4 @@
-﻿// Gym.Internal is 0.2's code, [Obsolete] since 2.0 and removed in 3.0 with Gym.Legacy (DR-56): it keeps no nullable
+﻿// Gym.Internal is 0.2's code, [Obsolete] since 1.0 and removed in 2.0 with Gym.Legacy (DR-56): it keeps no nullable
 // context (DR-54), rather than 89 annotations for code on its way out.
 #nullable disable
 using System;
@@ -12,13 +12,13 @@ namespace Gym.Collections {
     /// </summary>
     /// <typeparam name="T">The type of the one value, and of the list it expands to.</typeparam>
     /// <remarks>
-    ///     Obsolete with the legacy <see cref="Dict"/> (DR-56) and removed in 3.0: use <see cref="List{T}"/>. Footgun:
+    ///     Obsolete with the legacy <see cref="Dict"/> (DR-56) and removed in 2.0: use <see cref="List{T}"/>. Footgun:
     ///     <see cref="Expand()"/> hides the base class's, so through an <see cref="ExpandableList"/> reference the base
     ///     version runs and returns a list of the value's run-time type instead.
     /// </remarks>
     [DebuggerStepThrough]
     [DebuggerDisplay("{" + nameof(obj) + "}")]
-    [Obsolete("Part of the legacy Dict's merging: use List<T>. Removed in 3.0 with Gym.Legacy.")]
+    [Obsolete("Part of the legacy Dict's merging: use List<T>. Removed in 2.0 with Gym.Legacy.")]
     public class ExpandableList<T> : ExpandableList {
         /// <summary>A new growable list holding the one value, typed <typeparamref name="T"/>.</summary>
         /// <returns>A new <see cref="List{T}"/> of one item.</returns>
@@ -35,8 +35,8 @@ namespace Gym.Collections {
     /// <summary>
     ///     A single value that a merge turns into a real list (the legacy deep merge's marker for "append to me").
     /// </summary>
-    /// <remarks>Obsolete with the legacy <see cref="Dict"/> (DR-56) and removed in 3.0.</remarks>
-    [Obsolete("Part of the legacy Dict's merging: use List<T>. Removed in 3.0 with Gym.Legacy.")]
+    /// <remarks>Obsolete with the legacy <see cref="Dict"/> (DR-56) and removed in 2.0.</remarks>
+    [Obsolete("Part of the legacy Dict's merging: use List<T>. Removed in 2.0 with Gym.Legacy.")]
     public interface IExpandableList {
         /// <summary>A new growable list holding the value.</summary>
         /// <returns>The list, of the value's run-time type when the value is not <see langword="null"/>.</returns>
@@ -48,13 +48,13 @@ namespace Gym.Collections {
     /// </summary>
     /// <remarks>
     ///     A read-only, fixed-size <see cref="IList"/> of exactly one item: every mutating member throws
-    ///     <see cref="NotSupportedException"/>. Obsolete with the legacy <see cref="Dict"/> (DR-56) and removed in 3.0: use
+    ///     <see cref="NotSupportedException"/>. Obsolete with the legacy <see cref="Dict"/> (DR-56) and removed in 2.0: use
     ///     <see cref="List{T}"/>. Footgun: <see cref="IsSynchronized"/> says <see langword="true"/> while
     ///     <see cref="SyncRoot"/> is <see langword="null"/>, so <c>lock (list.SyncRoot)</c> throws.
     /// </remarks>
     [DebuggerStepThrough]
     [DebuggerDisplay("{" + nameof(obj) + "}")]
-    [Obsolete("Part of the legacy Dict's merging: use List<T>. Removed in 3.0 with Gym.Legacy.")]
+    [Obsolete("Part of the legacy Dict's merging: use List<T>. Removed in 2.0 with Gym.Legacy.")]
     public class ExpandableList : IList, IEquatable<ExpandableList>, IExpandableList {
         /// <summary>The one value; <see langword="null"/> is allowed.</summary>
         protected readonly object obj;

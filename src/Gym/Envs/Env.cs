@@ -317,10 +317,10 @@ namespace Gym.Envs {
         public virtual void Close() { }
 
         /// <summary>
-        ///     0.2's name for <see cref="Close"/>, kept so 0.2's teardown line compiles until 3.0 (DR-58): it calls
+        ///     0.2's name for <see cref="Close"/>, kept so 0.2's teardown line compiles until 2.0 (DR-58): it calls
         ///     <see cref="Close"/>, the env's own override included.
         /// </summary>
-        [Obsolete("Close() is Gymnasium's name (or Dispose(), through using); CloseEnvironment is 0.2's. Removed in 3.0 with Gym.Legacy.")]
+        [Obsolete("Close() is Gymnasium's name (or Dispose(), through using); CloseEnvironment is 0.2's. Removed in 2.0 with Gym.Legacy.")]
         public void CloseEnvironment() => Close();
 
         /// <summary>

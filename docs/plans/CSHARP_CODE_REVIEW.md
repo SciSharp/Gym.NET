@@ -3,6 +3,7 @@
 | | |
 |---|---|
 | **Date** | 2026-11-11, at `b87d845` on `journey1` (P1–P8 done) |
+| **Versions** | The review calls the release 2.0, its number until 2026-11-12; it ships as 1.0.0 (the completion plan's D23): read 2.0 (2.0.0) as 1.0 (1.0.0), 2.x as 1.x, and 3.0, where the `[Obsolete]` shims and `Gym.Legacy` go, as 2.0 |
 | **Question** | The maintainer's: "is our design C# sound? We are a faithful port of Gymnasium, but we want to be using correct C# and utilize C# lang to the best" |
 | **Scope** | `src/`: 61k lines in 8 projects (Gym 31.4k, Gym.Box2D 12.7k, Gym.Environments 10.2k, Gym.Rendering 5.4k, the generator, the two viewers) |
 | **Method** | The public contract read in full (`IEnv`, `Env<TObs, TAct>`, wrappers, results, `Info`, spaces, registry, viewers); representative envs, the rasterizer, the Box2D facade and the generator sampled. Measured: build warnings by code, nullability coverage, exception hierarchies (by reflection), reflection and AOT exposure, step throughput and allocation against Gymnasium, CPU profiles (`dotnet-trace`). Two fixes were tried on scratch copies, outside the tree, and the parity suite checked one of them bit for bit (§4) |

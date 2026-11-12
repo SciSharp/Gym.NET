@@ -10,7 +10,7 @@ namespace Gym.Exceptions {
     ///     The error classes follow Gymnasium's hierarchy (<see cref="UnregisteredEnv"/> and its three subclasses,
     ///     <see cref="ResetNeeded"/>, <see cref="InvalidAction"/>, ...); the ones Gymnasium does not derive from <c>Error</c>
     ///     (<see cref="AlreadyPendingCallError"/>, <see cref="DeprecatedWrapper"/>, ...) do not here either. 0.2's own
-    ///     exceptions are obsolete bases of their Gymnasium counterparts until 3.0 (DR-58), so 0.2's <c>catch</c> blocks still
+    ///     exceptions are obsolete bases of their Gymnasium counterparts until 2.0 (DR-58), so 0.2's <c>catch</c> blocks still
     ///     compile: <see cref="InvalidActionError"/> under <see cref="InvalidAction"/> (the envs that assert their action raise
     ///     <see cref="NumSharp.AssertionError"/> instead), <see cref="AlreadySteppingError"/> under
     ///     <see cref="AlreadyPendingCallError"/>, <see cref="NotSteppingError"/> under <see cref="NoAsyncCallError"/>. Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/error.py#L4">gymnasium/error.py</see>.

@@ -35,7 +35,7 @@ namespace Gym.Legacy {
     ///     carries arrays. <see cref="Metadata"/> is a snapshot converted on every read.
     ///     </para>
     /// </remarks>
-    [Obsolete("LegacyEnvAdapter bridges the pre-0.26 API; call the env directly (Reset(seed), Step returning StepResult<TObs>). Gym.Legacy is removed in 3.0.")]
+    [Obsolete("LegacyEnvAdapter bridges the pre-0.26 API; call the env directly (Reset(seed), Step returning StepResult<TObs>). Gym.Legacy is removed in 2.0.")]
     public class LegacyEnvAdapter : ILegacyEnv {
         /// <summary>The seed <see cref="Seed"/> recorded for the next reset, or <see langword="null"/>.</summary>
         private BigInteger? _pendingSeed;

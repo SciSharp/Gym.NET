@@ -1,10 +1,11 @@
-# Gym.NET Completion Plan: from the core API to 2.0
+# Gym.NET Completion Plan: from the core API to 1.0
 
 | | |
 |---|---|
 | **Status** | Draft 2, 2026-11-08: the implementation designs are reviewed and approved in [`DESIGN_REVIEW.md`](DESIGN_REVIEW.md) (DR-01…DR-36). **A step starts only when every design it depends on is approved there** |
-| **Progress** | Approved to run on 2026-11-09: R0, P0r, P2, P3, P7, P4, P5, P6 (what is necessary; the rest deferred and listed), then P10 prepared without publishing or pushing. Done: R0.2 (`e4e5215`), R0.1 + R0.3 (`631e0cf`), R0.4 (`0b3dee8`), R0.5 (`c80bc2d`, `f9d4dc4`), P0r.3 (`339b3b3`), P0r.4 and P0r.1 (2026-11-09) |
-| **Scope** | Everything [`GYMNASIUM_PORT_PLAN.md`](GYMNASIUM_PORT_PLAN.md) still has open, up to one 2.0 release that includes Box2D (D21); MuJoCo is postponed out of 2.0 (DR-35) |
+| **Versions** | The release ships as **1.0.0** (D23, 2026-11-12). This plan was written for "2.0", its number until then, and its records keep that wording: read 2.0 (2.0.0) as 1.0 (1.0.0), 2.x as 1.x, and 3.0, where the `[Obsolete]` shims and `Gym.Legacy` go, as 2.0 |
+| **Progress** | Done: R0, P0r, P2, P3, P7, P4, P5 and P6 (2026-11-09 and 2026-11-10), P8 (2026-11-11) and P9, MuJoCo, resumed by DR-61 (2026-11-12); P10.1–P10.4 prepared on 2026-11-09 and moved to 1.0.0 on 2026-11-12 (D23). Left: P10.5, the release itself, on the maintainer's word, after the items the release-readiness review of 2026-11-12 lists under P10 |
+| **Scope** | Everything [`GYMNASIUM_PORT_PLAN.md`](GYMNASIUM_PORT_PLAN.md) still has open, up to one release, 1.0.0 (D23), that includes Box2D (D21) and, since DR-61, MuJoCo |
 | **Starting point** | branch `journey1` @ `7b7c919`, cut from `feat/numsharp-master-migration` (13 commits ahead of `master`, pushed 2026-09-27, no PR); all work continues on `journey1` until 2.0 (D20) |
 | **Source of truth** | `refs/Gymnasium` @ `v1.4.0` (`8ba8c3a6`) since step R0.4 (D2, 2026-11-09); `9e04324` before |
 | **Array engine** | NuGet NumSharp 0.80.0 (released 2026-11-08); `refs/NumSharp` @ `v0.80.0` (`d523eb48`) after step R0.1 (D3) |
@@ -23,7 +24,7 @@ NumPy 2.4.2, pygame-ce 2.5.8 (SDL 2.32.10) and Box2D 2.3.10, unless it says othe
 1. [Where the work stands](#1-where-the-work-stands)
 2. [What changed since 2026-09-25](#2-what-changed-since-2026-09-25)
 3. [Decisions](#3-decisions)
-4. [The road to 2.0](#4-the-road-to-20)
+4. [The road to 1.0](#4-the-road-to-10)
 5. [Phases](#5-phases)
 6. [How every step is done](#6-how-every-step-is-done)
 7. [NumSharp upstream items](#7-numsharp-upstream-items)
@@ -135,14 +136,20 @@ Gymnasium.
 | # | Decision | Default | Needed by |
 |---|---|---|---|
 | D6 | MuJoCo version | *Decided 2026-11-12 by DR-64: MuJoCo 4.0.0*, the version the engine follows and the parity stack pins | P9 |
-| D9 | Legacy shim | `Gym.Legacy` stays through 2.x, `[Obsolete]` | P10 |
+| D9 | Legacy shim | `Gym.Legacy` stays through 1.x (2.x before D23), `[Obsolete]` | P10 |
 | D13 | `examples/` | Rewrite one CartPole example on the new API, remove the rest | P10 |
 | D15 | Golden storage | In the repo as gzip JSONL (DR-04 decides how they are made) | P0r.3 |
 | — | Two of the last session's open points | (1) The two concurrency tests that start threads with `Task.Run` move to explicit `Thread`s; (2) the SDL_gfx header keeps "C# port of", which zlib's clause 2 requires of altered versions. The third (renaming `Ported`) is DR-06, approved; the README/PRD tagline "A port of openai/gym" is rewritten in P10 | R0.5, P10 |
 
 D7 (`AsyncVectorEnv`) is settled by DR-22, D14 (toy_text assets) by DR-19, and D22 (CarRacing's text) by DR-27.
 
-## 4. The road to 2.0
+### 3.3 Taken on 2026-11-12
+
+| # | Decision | Taken | Consequence for this plan |
+|---|---|---|---|
+| D23 | Release version | **1.0.0** (the maintainer: "Prepare moving to new major 1.0.0"), in place of the 2.0.0 the port plan's §16 chose. The last release was 0.2.0 and there was never a 1.x, so the next major is 1.0. The one after it, 2.0, is where the `[Obsolete]` shims and `Gym.Legacy` go (DR-56, DR-58), and `Gym.Legacy` stays through 1.x (D9) | P10: the package and assembly versions, the docs, the shims' messages and the release notes (`docs/releases/RELEASE_1.0.0.md`) moved to 1.0.0 on 2026-11-12. Earlier records keep "2.0" (the Versions row above) |
+
+## 4. The road to 1.0
 
 | Phase | Deliverables | Exit gate | Size |
 |---|---|---|---|
@@ -156,7 +163,7 @@ D7 (`AsyncVectorEnv`) is settled by DR-22, D14 (toy_text assets) by DR-19, and D
 | **P6 Vector and wrappers** | `VectorEnv` typed and untyped (DR-21), `SyncVectorEnv`, `AsyncVectorEnv` in three modes (DR-22), vector utils, 35 wrappers, vector wrappers named by DR-24, F8 (DR-23), F9 (DR-25), `play`/`PlayPlot`, `FuncEnv`, `performance` (DR-36); `AtariPreprocessing` out | `tests/vector` (76) and `tests/wrappers` (146) green; async equals sync bitwise in every mode | L |
 | **P8 Box2D** | The managed Box2D 2.3.x engine, core plus pybox2d facade (D5, DR-26, DR-29), `LunarLanderEnv`, `BipedalWalkerEnv`, `CarRacingEnv` (DR-32), CarRacing's text from recorded glyphs (DR-27); Aether removed | Engine goldens; L3 and L4 for all 5 ids; 0 `[OpenBugs]` | XL |
 | **P9 MuJoCo** | **Resumed by DR-61 (2026-11-12).** Gym.NET's own engine for Gymnasium's 14 bundled models (DR-61, DR-63) on MuJoCo 4.0.0 (DR-64), inside Gym.Environments (DR-65, DR-66); the 22 ids as env classes; Gymnasium's reach under .NET names (DR-68); frames drawn by Gym.NET and measured (DR-62, DR-67) | All 22 ids bit for bit with Gymnasium on MuJoCo 4.0.0; frames measured | XL |
-| **P10 Release 2.0.0** | Docs, migration guide, examples, packages; merge into `master` | The port plan's definition of done (§1.5) for everything but MuJoCo | M |
+| **P10 Release 1.0.0** (2.0.0 until D23) | Docs, migration guide, examples, packages; merge into `master` | The port plan's definition of done (§1.5), MuJoCo's frames measured (DR-71) | M |
 
 The order is sequential. P7 moves in front of P4 because MountainCar and Acrobot already call `pygame.draw`, and P5
 needs `draw.rect`, `image.load` and `transform.scale`.
@@ -1053,19 +1060,20 @@ The designs approved for the resumption before round 21, superseded where noted:
 - **Names** (DR-24): `AntEnvV4` / `AntEnvV5` and the other 10 pairs, each `[PyName("AntEnv")]`; models embedded
   (DR-19).
 
-### P10 Release 2.0.0
+### P10 Release 1.0.0
 
 - **P10.1 Docs.** Replace PR #24's `PRD.md` and `ROADMAP.md` (root and `docs/`), `docs/architecture`, `docs/sot` and
   `docs/plans/expressive-nibbling-goose.md` with docs derived from the plans, in Gym.NET's own voice; rewrite the
   README.
 - **P10.2** The migration guide (port plan §16); `Gym.Legacy` stays (D9).
 - **P10.3** One CartPole example on the new API; the rest removed (D13, B-36).
-- **P10.4** Packages at 2.0.0 (DR-16): Gym.NET, Gym.NET.Rendering, Gym.NET.Environments (classic_control, toy_text
+- **P10.4** Packages at 1.0.0 (2.0.0 until D23; DR-16): Gym.NET, Gym.NET.Rendering, Gym.NET.Environments (classic_control, toy_text
   and box2d with the `Gym.Box2D` engine), Gym.NET.Rendering.Avalonia, Gym.NET.Rendering.WinForm. Release notes include
   D18's advisory note and MuJoCo's postponement (DR-35). *Since DR-61 the package also carries the MuJoCo envs and their
   `Gym.MuJoCo` engine; the notes describe them instead.*
 - **P10.5** Merge `journey1` into `master` (D20), tag, publish.
-- **Exit:** the port plan's definition of done (§1.5) for everything but MuJoCo; the inventory's expected-missing list
+- **Exit:** the port plan's definition of done (§1.5), MuJoCo's frames measured rather than equal (DR-71); the
+  inventory's expected-missing list
   holds only MuJoCo's names and `AtariPreprocessing` (DR-36).
 - *Prepared 2026-11-09, P10.1–P10.4, with nothing merged, tagged, pushed or published (the run's approval: "prepare
   P10 but no publish or push"):*
@@ -1099,6 +1107,19 @@ The designs approved for the resumption before round 21, superseded where noted:
     taken and implemented on 2026-11-10 as DR-37); the
     exit's inventory check is unmet until then (69 P6 and 12 P8 names besides MuJoCo's 33, `AtariPreprocessing` and the
     n/a and by-design entries).*
+  - *2026-11-12: P8 and the deferred part of P6 are done, and MuJoCo too (P9), so the inventory's list holds only what
+    is out of scope (n/a, by design, `AtariPreprocessing`). The release moved to 1.0.0 (D23): the package and assembly
+    versions, the docs, the `[Obsolete]` messages ("removed in 2.0"), the migration guide (`migrating_to_1.0.md`) and
+    the release notes (`RELEASE_1.0.0.md`, with the upgrade rules the compatibility probes found: every Gym.NET package
+    at once, NumSharp.Lite removed, Avalonia 12, the NU1701 and ImageSharp suppressions). Every package now carries
+    THIRD-PARTY-NOTICES.md, which credits MuJoCo; `Gym.NET.Environments`' description and tags name MuJoCo;
+    `TestNumEnvsScreenSize_Ant`, passing since the MuJoCo frames, gates.*
+  - *Before P10.5 (the release-readiness review of 2026-11-12): Gymnasium's `tests/envs` modules not mirrored yet
+    (`test_make_vec.py`, `test_taxi.py`, `test_envs.py`, `test_action_dim_check.py`, `test_rendering.py`,
+    `test_frozen_lake.py`: the definition of done's item 2); CI never run (the branch is not pushed) and, as written,
+    beyond its 60-minute limit and rendering MuJoCo frames on a GPU-less runner before it checks the GPU; the
+    maintainer's decisions on DR-70's readings, review findings R12 and R13 (breaking after 1.0) and `DictInfoToList`'s
+    result shape; at P10.5, pack with `-p:ContinuousIntegrationBuild=true` so no local paths ship.*
 
 ## 6. How every step is done
 
@@ -1176,5 +1197,5 @@ one:
 | Box2D on NumSharp (DR-29) | `NDArray`s in the solver's hot loops could cost performance or code size | P8.1 measures both forms per subsystem before choosing; float32 structs where NDArrays lose. **Closed 2026-11-10:** NDArrays lost in both measured loops (6.2× and 1.6× slower), so the engine is float32 structs |
 | CarRacing's recorded glyphs (DR-27) | The font is GNU FreeFont (GPL with a font exception); its glyph data ships in Gym.NET | License check before P8.4; if the data can't ship, the text design goes back to review before P8.4 continues. *Checked 2026-11-11: plain GPL, no font exception; the maintainer decided to ship the data, licence set aside (DR-48)* |
 | The source generator (DR-13, DR-34) | One generator project feeds composite records and options records; a defect there reaches every env | Its output is covered by the same parity cells as hand-written code (`repr`, `==`, kwargs binding) |
-| MuJoCo postponed (DR-35) | 2.0 ships without Gymnasium's mujoco family | Release notes say so; DR-30, DR-31 and DR-33 keep the approved design for when it resumes (a managed port is XXL, and its bitwise parity with native MuJoCo is uncertain until measured) |
+| MuJoCo postponed (DR-35) | 2.0 ships without Gymnasium's mujoco family | Release notes say so; DR-30, DR-31 and DR-33 keep the approved design for when it resumes (a managed port is XXL, and its bitwise parity with native MuJoCo is uncertain until measured). **Closed 2026-11-12:** DR-61 resumed MuJoCo, and its 22 ids ship in 1.0, bit for bit with MuJoCo 4.0.0 |
 | Gymnasium moves past v1.4.0 | Work against a superseded pin | Re-pin only at a release tag, by the port plan's §14.10, between phases |

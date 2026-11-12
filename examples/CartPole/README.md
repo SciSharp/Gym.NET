@@ -1,6 +1,6 @@
 # CartPole: learning to balance with the cross-entropy method
 
-Gym.NET's example: it learns CartPole-v1 with no machine-learning library, using only Gym.NET's 2.0 API, and then plays
+Gym.NET's example: it learns CartPole-v1 with no machine-learning library, using only Gym.NET's 1.0 API, and then plays
 the learned policy.
 
 ```bash

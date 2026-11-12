@@ -68,23 +68,23 @@ namespace Gym.Environments.Envs.Box2D {
         /// <summary>Gymnasium's <c>INITIAL_RANDOM</c>: each component of the reset's push is uniform in ±1000 N.</summary>
         public const double InitialRandom = 1000.0;
 
-        /// <summary>0.2's name for <see cref="Scale"/>, as 0.2's <see cref="float"/> constant, kept until 3.0 (DR-58).</summary>
-        [Obsolete("0.2's constant name: use LunarLanderEnv.Scale (a double). Removed in 3.0 with Gym.Legacy.")]
+        /// <summary>0.2's name for <see cref="Scale"/>, as 0.2's <see cref="float"/> constant, kept until 2.0 (DR-58).</summary>
+        [Obsolete("0.2's constant name: use LunarLanderEnv.Scale (a double). Removed in 2.0 with Gym.Legacy.")]
         public const float SCALE = (float)Scale;
 
-        /// <summary>0.2's name for <see cref="MainEnginePower"/>, as 0.2's <see cref="float"/> constant, kept until 3.0 (DR-58).</summary>
-        [Obsolete("0.2's constant name: use LunarLanderEnv.MainEnginePower (a double). Removed in 3.0 with Gym.Legacy.")]
+        /// <summary>0.2's name for <see cref="MainEnginePower"/>, as 0.2's <see cref="float"/> constant, kept until 2.0 (DR-58).</summary>
+        [Obsolete("0.2's constant name: use LunarLanderEnv.MainEnginePower (a double). Removed in 2.0 with Gym.Legacy.")]
         public const float MAIN_ENGINE_POWER = (float)MainEnginePower;
 
         /// <summary>
         ///     0.2's name for <see cref="SideEnginePower"/>, as 0.2's <see cref="float"/> constant (0.6f, which is not exactly
-        ///     the double 0.6 the env computes with), kept until 3.0 (DR-58).
+        ///     the double 0.6 the env computes with), kept until 2.0 (DR-58).
         /// </summary>
-        [Obsolete("0.2's constant name: use LunarLanderEnv.SideEnginePower (a double). Removed in 3.0 with Gym.Legacy.")]
+        [Obsolete("0.2's constant name: use LunarLanderEnv.SideEnginePower (a double). Removed in 2.0 with Gym.Legacy.")]
         public const float SIDE_ENGINE_POWER = (float)SideEnginePower;
 
-        /// <summary>0.2's name for <see cref="InitialRandom"/>, as 0.2's <see cref="float"/> constant, kept until 3.0 (DR-58).</summary>
-        [Obsolete("0.2's constant name: use LunarLanderEnv.InitialRandom (a double). Removed in 3.0 with Gym.Legacy.")]
+        /// <summary>0.2's name for <see cref="InitialRandom"/>, as 0.2's <see cref="float"/> constant, kept until 2.0 (DR-58).</summary>
+        [Obsolete("0.2's constant name: use LunarLanderEnv.InitialRandom (a double). Removed in 2.0 with Gym.Legacy.")]
         public const float INITIAL_RANDOM = (float)InitialRandom;
 
         /// <summary>Gymnasium's <c>LEG_AWAY</c>: the legs' horizontal offset from the hull's centre, in pixels.</summary>
@@ -224,8 +224,8 @@ namespace Gym.Environments.Envs.Box2D {
         /// <summary>Gymnasium's <c>continuous</c>, fixed at construction: which action space and which action handling.</summary>
         public bool Continuous { get; }
 
-        /// <summary>0.2's name for <see cref="Continuous"/>, kept so 0.2 code compiles until 3.0 (DR-58).</summary>
-        [Obsolete("0.2's property name: use LunarLanderEnv.Continuous. Removed in 3.0 with Gym.Legacy.")]
+        /// <summary>0.2's name for <see cref="Continuous"/>, kept so 0.2 code compiles until 2.0 (DR-58).</summary>
+        [Obsolete("0.2's property name: use LunarLanderEnv.Continuous. Removed in 2.0 with Gym.Legacy.")]
         public bool ContinuousMode => Continuous;
 
         /// <summary>

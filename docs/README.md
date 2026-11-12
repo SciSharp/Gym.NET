@@ -1,7 +1,7 @@
 # Gym.NET documentation
 
 Gym.NET gives .NET reinforcement-learning environments with Farama Gymnasium's API, and holds them to Gymnasium's
-behavior bit for bit and pixel for pixel. These pages cover the 2.0 API.
+behavior bit for bit and pixel for pixel. These pages cover the 1.0 API.
 
 ## Guides
 
@@ -9,7 +9,7 @@ behavior bit for bit and pixel for pixel. These pages cover the 2.0 API.
 |---|---|
 | [Getting started](guides/getting_started.md) | Making envs, the reset/step loop, seeding, spaces, render modes, wrappers, vector envs |
 | [Creating custom environments](guides/creating_custom_environments.md) | Writing an `Env<TObs, TAct>`, registering it for `Gymnasium.Make`, checking it with `EnvChecker.CheckEnv` |
-| [Migrating from 0.2 to 2.0](guides/migrating_to_2.0.md) | What changed in each 0.2 call, and `Gym.Legacy` for code that cannot move yet |
+| [Migrating from 0.2 to 1.0](guides/migrating_to_1.0.md) | What changed in each 0.2 call, and `Gym.Legacy` for code that cannot move yet |
 | [Development and testing](guides/development_and_testing.md) | Building, the unit suite, the live parity suite against Gymnasium, goldens, `[OpenBugs]` |
 
 ## Reference
@@ -17,17 +17,18 @@ behavior bit for bit and pixel for pixel. These pages cover the 2.0 API.
 | Page | Holds |
 |---|---|
 | [Architecture](architecture.md) | The packages and projects, the env contract, typed and untyped APIs, array ownership, how parity with Gymnasium is proven |
-| [Release notes 2.0.0](releases/RELEASE_2.0.0.md) | What 2.0 contains and leaves out, every known difference from Gymnasium, the ImageSharp advisories |
+| [Release notes 1.0.0](releases/RELEASE_1.0.0.md) | What 1.0 contains and leaves out, how to upgrade from 0.2, every known difference from Gymnasium, the ImageSharp advisories |
 | [Third-party notices](../THIRD-PARTY-NOTICES.md) | Gymnasium (MIT), SDL_gfx (zlib), CPython (PSF), pygame-ce as a behavior reference |
 | [Example: CartPole](../examples/CartPole/README.md) | Learning CartPole with the cross-entropy method, 100 carts at once in a vector env |
 
 ## Plans
 
-The working documents behind 2.0. They record why the code is the way it is; the pages above describe what it does.
+The working documents behind 1.0, which they call 2.0, its planned number until 2026-11-12 (decision D23). They record
+why the code is the way it is; the pages above describe what it does.
 
 | Plan | Holds |
 |---|---|
-| [Completion plan](plans/COMPLETION_PLAN.md) | The phases to 2.0, each with its status, scope and deferrals; the decisions D2–D22 |
+| [Completion plan](plans/COMPLETION_PLAN.md) | The phases to 1.0, each with its status, scope and deferrals; the decisions D2–D23 |
 | [Design review](plans/DESIGN_REVIEW.md) | The approved implementation designs DR-01…DR-71, and the consequences found while implementing them |
 | [Gymnasium port plan](plans/GYMNASIUM_PORT_PLAN.md) | The per-area specifications, the name map, the defect register |
 | [Parity testing](plans/GYM_PARITY_INTEROP_TESTING.md) | The design of the live parity suite |

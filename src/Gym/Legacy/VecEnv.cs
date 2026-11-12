@@ -18,7 +18,7 @@ namespace Gym.Legacy {
     ///     that completes on the calling thread; the <c>DistributedScheduler</c> it ran on relied on <c>Thread.Abort</c> and
     ///     threw on .NET 5+ (B-34).
     /// </remarks>
-    [Obsolete("The baselines-style VecEnv is legacy (B-33: one action for every sub-env); gymnasium.vector replaces it (P6). Gym.Legacy is removed in 3.0.")]
+    [Obsolete("The baselines-style VecEnv is legacy (B-33: one action for every sub-env); gymnasium.vector replaces it (P6). Gym.Legacy is removed in 2.0.")]
     public abstract class VecEnv : IVecEnv {
         /// <summary>Records the number of sub-envs and the spaces they share; subclasses fill <see cref="Environments"/>.</summary>
         /// <param name="num_envs">The number of sub-envs.</param>

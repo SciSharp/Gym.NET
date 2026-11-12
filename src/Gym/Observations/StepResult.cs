@@ -53,7 +53,7 @@ namespace Gym.Observations {
 
         /// <summary>
         ///     0.2's four-element deconstruction, <c>var (obs, reward, done, info) = env.Step(action);</c>, kept so 0.2 code
-        ///     compiles until 3.0 (DR-58): <paramref name="done"/> is <c>terminated || truncated</c>, as gym 0.21 and
+        ///     compiles until 2.0 (DR-58): <paramref name="done"/> is <c>terminated || truncated</c>, as gym 0.21 and
         ///     <c>Gym.Legacy</c> report it.
         /// </summary>
         /// <param name="observation">The observation after the action.</param>
@@ -64,7 +64,7 @@ namespace Gym.Observations {
         ///     Footgun: <paramref name="done"/> loses why the episode ended, and bootstrapping from the final observation is
         ///     right after a truncation but wrong after a termination. The five-element deconstruction keeps both flags.
         /// </remarks>
-        [Obsolete("The pre-0.26 4-tuple: done is terminated || truncated, which loses why the episode ended. Deconstruct into (observation, reward, terminated, truncated, info). Removed in 3.0 with Gym.Legacy.")]
+        [Obsolete("The pre-0.26 4-tuple: done is terminated || truncated, which loses why the episode ended. Deconstruct into (observation, reward, terminated, truncated, info). Removed in 2.0 with Gym.Legacy.")]
         public void Deconstruct(out TObs observation, out double reward, out bool done, out Info info) {
             observation = Observation;
             reward = Reward;
@@ -115,7 +115,7 @@ namespace Gym.Observations {
         public void Dispose() => ResultEquality.Release(Observation, Info);
 
         /// <summary>
-        ///     The reset's observation, so 0.2's <c>NDArray obs = env.Reset();</c> compiles until 3.0 (DR-58); 2.0 code reads
+        ///     The reset's observation, so 0.2's <c>NDArray obs = env.Reset();</c> compiles until 2.0 (DR-58); 1.0 code reads
         ///     <see cref="Observation"/> or deconstructs <c>(obs, info)</c>.
         /// </summary>
         /// <param name="result">The reset's result.</param>
@@ -125,7 +125,7 @@ namespace Gym.Observations {
         ///     disposed (Taxi's reset info holds an int8 action mask). Code using <see langword="var"/> keeps the whole result
         ///     and is unaffected.
         /// </remarks>
-        [Obsolete("Reset returns (observation, info): read .Observation or deconstruct (obs, info); this conversion drops the info. Removed in 3.0 with Gym.Legacy.")]
+        [Obsolete("Reset returns (observation, info): read .Observation or deconstruct (obs, info); this conversion drops the info. Removed in 2.0 with Gym.Legacy.")]
         public static implicit operator TObs(ResetResult<TObs> result) => result.Observation;
 
         /// <summary>Exact equality of the observations and Python equality of the infos (see the remarks).</summary>

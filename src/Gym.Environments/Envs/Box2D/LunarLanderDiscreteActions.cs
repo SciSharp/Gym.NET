@@ -3,7 +3,7 @@ using System;
 
 namespace Gym.Environments.Envs.Box2D {
     /// <summary>
-    ///     0.2's names for LunarLander's four discrete actions, kept so 0.2 code compiles until 3.0 (DR-58). The values are
+    ///     0.2's names for LunarLander's four discrete actions, kept so 0.2 code compiles until 2.0 (DR-58). The values are
     ///     Gymnasium's action indices, so <c>env.Step((int)LunarLanderDiscreteActions.FireMainEngine)</c> fires the main
     ///     engine of <see cref="LunarLanderEnv"/> as 0.2's did.
     /// </summary>
@@ -14,7 +14,7 @@ namespace Gym.Environments.Envs.Box2D {
     ///     <c>Gym.Environments.Envs.Aether</c>, has a twin of this enum, so a file importing both namespaces must drop the
     ///     Aether one (CS0104 names it).
     /// </remarks>
-    [Obsolete("0.2's action names: Gymnasium's LunarLander takes the action indices 0 (nothing), 1 (left engine), 2 (main engine), 3 (right engine). Removed in 3.0 with Gym.Legacy.")]
+    [Obsolete("0.2's action names: Gymnasium's LunarLander takes the action indices 0 (nothing), 1 (left engine), 2 (main engine), 3 (right engine). Removed in 2.0 with Gym.Legacy.")]
     public enum LunarLanderDiscreteActions {
         /// <summary>0: do nothing.</summary>
         Nothing = 0,

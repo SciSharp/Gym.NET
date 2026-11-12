@@ -9,16 +9,16 @@
     href: ../../guides/getting_started.md
   - name: Creating custom environments
     href: ../../guides/creating_custom_environments.md
-  - name: Migrating from 0.2 to 2.0
-    href: ../../guides/migrating_to_2.0.md
+  - name: Migrating from 0.2 to 1.0
+    href: ../../guides/migrating_to_1.0.md
   - name: Development and testing
     href: ../../guides/development_and_testing.md
 - name: Reference
   items:
   - name: Architecture
     href: ../../architecture.md
-  - name: Release notes 2.0.0
-    href: ../../releases/RELEASE_2.0.0.md
+  - name: Release notes 1.0.0
+    href: ../../releases/RELEASE_1.0.0.md
   - name: Example - CartPole
     href: https://github.com/SciSharp/Gym.NET/blob/master/examples/CartPole/README.md
   - name: Third-party notices

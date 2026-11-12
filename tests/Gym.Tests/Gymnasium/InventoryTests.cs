@@ -16,7 +16,7 @@ namespace Gym.Tests.Gymnasium {
     ///     <c>tools/parity/inventory.py</c>, is either present in Gym.NET under the port plan's §3.8 naming or listed in
     ///     <c>inventory.expected-missing.txt</c> with the phase that ports it. The list is a ratchet: a name that appears
     ///     fails the test until it is removed from the list, and a name that disappears fails it until it is listed, so the
-    ///     list always says exactly what is left. 2.0 needs it empty but for what is out of scope.
+    ///     list always says exactly what is left. 1.0 needs it empty but for what is out of scope.
     /// </summary>
     /// <remarks>
     ///     <para>

@@ -1,4 +1,4 @@
-﻿// Gym.Internal is 0.2's code, [Obsolete] since 2.0 and removed in 3.0 with Gym.Legacy (DR-56): it keeps no nullable
+﻿// Gym.Internal is 0.2's code, [Obsolete] since 1.0 and removed in 2.0 with Gym.Legacy (DR-56): it keeps no nullable
 // context (DR-54), rather than 89 annotations for code on its way out.
 #nullable disable
 using System;
@@ -11,10 +11,10 @@ namespace Gym.Merging {
     ///     may add keys or only overwrite existing ones.
     /// </summary>
     /// <remarks>
-    ///     Obsolete with <see cref="Gym.Collections.Dict"/> (DR-56) and removed in 3.0; <see cref="Gym.Envs.Info"/> is the
+    ///     Obsolete with <see cref="Gym.Collections.Dict"/> (DR-56) and removed in 2.0; <see cref="Gym.Envs.Info"/> is the
     ///     2.0 dictionary, merged with <see cref="Gym.Envs.Info.Update"/>.
     /// </remarks>
-    [Obsolete("The legacy Dict's deep merge: use Gym.Envs.Info.Update (Python's dict.update: the new value wins, one level deep). Removed in 3.0 with Gym.Legacy.")]
+    [Obsolete("The legacy Dict's deep merge: use Gym.Envs.Info.Update (Python's dict.update: the new value wins, one level deep). Removed in 2.0 with Gym.Legacy.")]
     public interface IMergable {
         /// <summary>
         ///     Performs a merge with object of unknown type: a dictionary, another <see cref="IMergable"/>, or a sequence of
@@ -64,8 +64,8 @@ namespace Gym.Merging {
     ///     implements for dictionaries, lists and other mergeables.
     /// </summary>
     /// <typeparam name="T">The type of value the merge takes.</typeparam>
-    /// <remarks>Obsolete with <see cref="Gym.Collections.Dict"/> (DR-56) and removed in 3.0.</remarks>
-    [Obsolete("The legacy Dict's deep merge: use Gym.Envs.Info.Update (Python's dict.update: the new value wins, one level deep). Removed in 3.0 with Gym.Legacy.")]
+    /// <remarks>Obsolete with <see cref="Gym.Collections.Dict"/> (DR-56) and removed in 2.0.</remarks>
+    [Obsolete("The legacy Dict's deep merge: use Gym.Envs.Info.Update (Python's dict.update: the new value wins, one level deep). Removed in 2.0 with Gym.Legacy.")]
     public interface IMergable<in T> : IMergable {
         /// <summary>
         ///     Performs a merge with object of <typeparamref name="T"/> type.

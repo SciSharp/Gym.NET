@@ -20,7 +20,7 @@ namespace Gym.Legacy {
     ///     <c>terminated || truncated</c>, <c>Seed(s)</c> → <c>Reset(seed: s)</c>, <c>Render("rgb_array")</c> →
     ///     <c>render_mode</c> at construction.
     /// </remarks>
-    [Obsolete("The pre-0.26 env API is legacy: program against Gym.Envs.IEnv / Env<TObs, TAct> (Reset(seed) returns (obs, info), Step returns StepResult<TObs>). Gym.Legacy is removed in 3.0.")]
+    [Obsolete("The pre-0.26 env API is legacy: program against Gym.Envs.IEnv / Env<TObs, TAct> (Reset(seed) returns (obs, info), Step returns StepResult<TObs>). Gym.Legacy is removed in 2.0.")]
     public interface ILegacyEnv : IDisposable {
         /// <summary>The env's metadata as the legacy <see cref="Dict"/>.</summary>
         Dict Metadata { get; set; }

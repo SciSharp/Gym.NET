@@ -2,7 +2,8 @@
 
 | | |
 |---|---|
-| **Status** | Draft 1, 2026-09-23. The remaining work is ordered in [`COMPLETION_PLAN.md`](COMPLETION_PLAN.md) (2026-11-08), which also records decisions D18–D22 |
+| **Status** | Draft 1, 2026-09-23. The remaining work is ordered in [`COMPLETION_PLAN.md`](COMPLETION_PLAN.md) (2026-11-08), which also records decisions D18–D23 |
+| **Versions** | Written for a release numbered 2.0.0; it ships as **1.0.0** (the completion plan's D23, 2026-11-12): read 2.0 (2.0.0) as 1.0 (1.0.0), 2.x as 1.x, and 3.0, where the `[Obsolete]` shims and `Gym.Legacy` go, as 2.0 |
 | **Goal** | Gym.NET becomes a byte-perfect clone of `refs/Gymnasium`, plus its own additions |
 | **Source of truth** | `refs/Gymnasium` @ `v1.4.0` (`8ba8c3a6`), re-pinned on 2026-11-09 by the completion plan's R0.4; this plan was written against `9e04324` (v1.3.0 + 75 commits, `__version__ = "1.4.0"` dev, 2026-08-29) |
 | **Array engine** | `refs/NumSharp` master @ `93967990` (v0.70.0 + 46) |
@@ -867,10 +868,10 @@ Bump the submodule, then:
 
 ## 16. Migration for existing users
 
-- Release the port as **2.0.0**, a breaking change. Package ids and namespaces don't change (D1), so package references and `using` directives keep working; the API inside them changes.
+- Release the port as **2.0.0** (*1.0.0 since the completion plan's D23, 2026-11-12*), a breaking change. Package ids and namespaces don't change (D1), so package references and `using` directives keep working; the API inside them changes.
 - `Gym.Legacy` provides a `LegacyEnvAdapter` that exposes a new env through the old 4-tuple API, built on the ported `step_api_compatibility`. Everything in it is marked `[Obsolete]` with the replacement named.
 - A migration guide maps old calls to new ones: `Reset()` → `Reset(seed)`, `Step(a).Done` → `terminated || truncated`, `Seed(s)` → `Reset(seed: s)`, `Render("rgb_array")` → `render_mode` at construction, `new CartPoleEnv()` → `Gymnasium.Make("CartPole-v1")`, `class MyEnv : Env` → `class MyEnv : Env<TObs, TAct>`.
-- Remove `Gym.Legacy` in 3.0.
+- Remove `Gym.Legacy` in 3.0 (*2.0 since D23*).
 
 ---
 
@@ -887,7 +888,7 @@ Sizes are relative (S < M < L < XL). The phases in the second group can run in p
 | **P4 classic_control** | 5 envs and `CartPoleVectorEnv` (dynamics) | P3 | L3 goldens for all 6 ids | M |
 | **P5 toy_text** | 4 envs (dynamics and `ansi`) | P3 | L3 goldens for all 6 ids | M |
 | **P6 Vector and wrappers** | `VectorEnv`, `SyncVectorEnv`, `AsyncVectorEnv`, utils, remaining wrappers, vector wrappers | P3 | `tests/vector` and `tests/wrappers` green; async equals sync bitwise | L |
-| **P10 Release** | Docs, migration guide, `Gym.Legacy`, examples, packages 2.0.0 | P4–P6 at minimum | Definition of done (§1.5) for the released scope | M |
+| **P10 Release** | Docs, migration guide, `Gym.Legacy`, examples, packages 2.0.0 (1.0.0 since D23) | P4–P6 at minimum | Definition of done (§1.5) for the released scope | M |
 | **P7 Rasterizer** | F5; frames for classic_control and toy_text; fonts | P1 | L4 goldens for classic_control, then toy_text | L |
 | **P8 Box2D** | F6; LunarLander, BipedalWalker, CarRacing | P3 (for envs); the engine can start at P0 | Engine goldens, then env goldens | XL |
 | **P9 MuJoCo** | F7; `MujocoEnv`, `MujocoRenderer`, 22 ids | P3; bindings can start at P0 | Hopper-v5 golden, then all | XL |
@@ -983,7 +984,7 @@ release cut above: one 2.0 ships after all of them, Box2D and MuJoCo included.
 | D6 | MuJoCo version | Any 3.x | Pin the version Gymnasium's CI uses at the pinned SHA |
 | D7 | `AsyncVectorEnv` model | Threads or processes | Threads by default; processes later if isolation is needed |
 | D8 | Generic API | Generic `Env<TObs, TAct>` or object-typed only | Generic plus non-generic `IEnv` (§6) |
-| D9 | Legacy shim | Keep one major version, or hard break | Keep in 2.x (§16) |
+| D9 | Legacy shim | Keep one major version, or hard break | Keep in 2.x (§16); *1.x since the completion plan's D23* |
 | D10 | Aether-based LunarLander in 2.0 | Ship it as an extra, or drop it until P8 | Drop; it's broken (Appendix B) and not Gymnasium. **Settled 2026-11-08 by D21**: it is deleted when LunarLander-v3 lands in P8, which is before 2.0 |
 | D11 | PR #24 | Merge as is, merge trimmed, or close | Merge trimmed (§18) |
 | D12 | Fork cb9dcb6 | Merge or re-port | Re-port (§18) |

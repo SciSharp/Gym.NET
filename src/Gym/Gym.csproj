@@ -7,7 +7,7 @@
     <Nullable>enable</Nullable>
     <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
     <PackageId>Gym.NET</PackageId>
-    <Version>2.0.0</Version>
+    <Version>1.0.0</Version>
     <Authors>Eli Belash</Authors>
     <Company>SciSharp STACK</Company>
     <Product>Gym.NET</Product>
@@ -20,14 +20,14 @@
     <RepositoryUrl>https://github.com/SciSharp/Gym.NET</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageTags>gym;gymnasium;reinforcement-learning;rl;environments;numsharp;numpy;machine-learning</PackageTags>
-    <PackageReleaseNotes>https://github.com/SciSharp/Gym.NET/blob/master/docs/releases/RELEASE_2.0.0.md</PackageReleaseNotes>
+    <PackageReleaseNotes>https://github.com/SciSharp/Gym.NET/blob/master/docs/releases/RELEASE_1.0.0.md</PackageReleaseNotes>
     <AllowedOutputExtensionsInPackageBuildOutputFolder>$(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb</AllowedOutputExtensionsInPackageBuildOutputFolder>
     <!-- The XML documentation goes into the package next to the assembly, so consumers' IntelliSense shows Gym.NET's docs
-         (P10.4). Members of the pre-2.0 code without docs (Gym.Internal, the 0.2 LunarLander, the viewers' XAML classes)
+         (P10.4). Members of the pre-1.0 code without docs (Gym.Internal, the 0.2 LunarLander, the viewers' XAML classes)
          raise CS1591 warnings, which the build tolerates (DR-05). -->
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <AssemblyVersion>2.0.0.0</AssemblyVersion>
-    <FileVersion>2.0.0.0</FileVersion>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
     <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
   </PropertyGroup>
   <ItemGroup>
@@ -38,10 +38,15 @@
     <PackageReference Include="JetBrains.Annotations" Version="2026.2.0" PrivateAssets="all" />
   </ItemGroup>
   <!-- The package's icon and readme, packed at its root (NuGet's PackageIcon / PackageReadmeFile). They replace the
-       deprecated PackageIconUrl / PackageLicenseUrl, which fail packing as NU5048 / NU5125 where warnings are errors. -->
+       deprecated PackageIconUrl / PackageLicenseUrl, which fail packing as NU5048 / NU5125 where warnings are errors.
+       THIRD-PARTY-NOTICES.md goes with them: the packages carry code and data from other projects (Gymnasium's assets,
+       Box2D, SDL_gfx, SDL_ttf, CPython, OpenCV, pygame-ce, MuJoCo; each listed there with its notice), and those
+       licences ask for their notices in every copy. One file in all five packages, so none ships without a notice it
+       needs; the package's own licence stays the Apache-2.0 expression (DR-49). -->
   <ItemGroup>
     <None Include="..\..\eng\icon.png" Pack="true" PackagePath="\" Visible="false" />
     <None Include="..\..\README.md" Pack="true" PackagePath="\" Visible="false" />
+    <None Include="..\..\THIRD-PARTY-NOTICES.md" Pack="true" PackagePath="\" Visible="false" />
   </ItemGroup>
 
   <!-- Gym.NET's source generator (DR-13, DR-34): the options records of [GymOptions] wrappers and the members of

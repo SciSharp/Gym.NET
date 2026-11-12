@@ -1,4 +1,4 @@
-﻿// Gym.Internal is 0.2's code, [Obsolete] since 2.0 and removed in 3.0 with Gym.Legacy (DR-56): it keeps no nullable
+﻿// Gym.Internal is 0.2's code, [Obsolete] since 1.0 and removed in 2.0 with Gym.Legacy (DR-56): it keeps no nullable
 // context (DR-54), rather than 89 annotations for code on its way out.
 #nullable disable
 //#define SupportXmlSerialization
@@ -67,13 +67,13 @@ namespace Gym.Dynamic {
     /// Dictionary: Any of the extended properties are accessible via IDictionary interface
     /// </summary>
     /// <remarks>
-    ///     The legacy <see cref="Gym.Collections.Dict"/>'s <c>AsDynamic()</c> view is the one use in 2.0. Obsolete with it
-    ///     (DR-56) and removed in 3.0: use <see cref="ExpandoObject"/>. Every member lookup goes through reflection, and
+    ///     The legacy <see cref="Gym.Collections.Dict"/>'s <c>AsDynamic()</c> view is the one use in 1.0. Obsolete with it
+    ///     (DR-56) and removed in 2.0: use <see cref="ExpandoObject"/>. Every member lookup goes through reflection, and
     ///     reflection failures are swallowed: a dynamic read of a member that throws reads as missing.
     /// </remarks>
     [Serializable]
     [DebuggerStepThrough]
-    [Obsolete("The legacy Dict's dynamic view: use System.Dynamic.ExpandoObject. Removed in 3.0 with Gym.Legacy.")]
+    [Obsolete("The legacy Dict's dynamic view: use System.Dynamic.ExpandoObject. Removed in 2.0 with Gym.Legacy.")]
     public class Expando : DynamicObject, IDynamicMetaObjectProvider, IEnumerable<KeyValuePair<string, object>> {
         /// <summary>
         /// Instance of object passed in

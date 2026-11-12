@@ -7,10 +7,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Gym.NET is a native C# (.NET) reinforcement learning environment toolkit and benchmark suite, API-compatible with Farama Gymnasium (the successor of OpenAI Gym) and aligned with it byte for byte. It is its own codebase: Gymnasium is the reference it measures itself against, not an identity it claims. It is part of the SciSharp STACK ecosystem and uses `NumSharp` for multidimensional tensor/array operations and `SixLabors.ImageSharp` for rendering.
 
 - **Canonical SOT Submodule:** `refs/Gymnasium` (Farama Foundation Gymnasium Git submodule for behavioral, mathematical, and algorithmic parity).
-- **Roadmap:** `docs/plans/COMPLETION_PLAN.md` orders the remaining work to one 2.0 release (phases R0, P0r, P2, P3, P7, P4, P5, P6, P8, P10; MuJoCo's P9, postponed until DR-61, is under way) and records the 2026-11-08 decisions; `docs/plans/GYMNASIUM_PORT_PLAN.md` holds the per-area specifications.
-- **User docs (P10):** `docs/README.md` indexes the guides, `docs/architecture.md` and the draft release notes `docs/releases/RELEASE_2.0.0.md`; every code sample in them was compiled and run against the tree. Keep them true when the API changes.
+- **Roadmap:** `docs/plans/COMPLETION_PLAN.md` orders the work to one release, 1.0.0 (planned as 2.0 until decision D23 of 2026-11-12), through phases R0, P0r, P2, P3, P7, P4, P5, P6, P8, P9 (MuJoCo, resumed by DR-61) and P10, of which P10.5, the release itself, is left; it records the decisions D2–D23; `docs/plans/GYMNASIUM_PORT_PLAN.md` holds the per-area specifications.
+- **User docs (P10):** `docs/README.md` indexes the guides, `docs/architecture.md` and the release notes `docs/releases/RELEASE_1.0.0.md` (not yet published); every code sample in them was compiled and run against the tree. Keep them true when the API changes.
 - **Design gate:** `docs/plans/DESIGN_REVIEW.md` holds the approved implementation designs (DR-01…DR-71). Implement only what an approved design covers; a design question no DR-xx answers goes back to the maintainer for review before the step continues.
-- **Working branch:** `journey1` until 2.0 (decision D20); it merges into `master` once, at the release.
+- **Working branch:** `journey1` until 1.0 (decision D20); it merges into `master` once, at the release.
 
 ---
 
@@ -44,7 +44,7 @@ refs/Gym.NET/
 │   │   │                          #   twins), StatefulVector.cs (NormalizeObservation/NormalizeReward), CommonVector.cs (RecordEpisodeStatistics),
 │   │   │                          #   DictInfoToList.cs, RenderingVector.cs (HumanRendering, RecordVideo)
 │   │   ├── Legacy/                # [Obsolete] pre-0.26 API: Step, ILegacyEnv, LegacyEnvAdapter, VecEnv family
-│   │   ├── Internal/              # [Obsolete] until 3.0 (DR-56): Dict (Gym.Legacy's info type) and its Dynamic/Merging/Reflection helpers
+│   │   ├── Internal/              # [Obsolete] until 2.0 (DR-56): Dict (Gym.Legacy's info type) and its Dynamic/Merging/Reflection helpers
 │   │   ├── Utils/                 # Seeding (PCG64), PyBuiltins, PyMath (F3), PyAttributes, PyEquality, PyCopy, PyKwargs (Python kwargs binding), PyJson, Deque,
 │   │   │                          # PassiveChecker, EnvChecker (check_env, data_equivalence), EnvMatch, StepApiCompatibility, RecordConstructorArgs, Warnings,
 │   │   │                          # Cv2 (OpenCV's uint8 and float32 cv2.resize, INTER_AREA and INTER_LINEAR, bit for bit; DR-23, DR-46: float32 bilinear is
@@ -139,7 +139,7 @@ refs/Gym.NET/
 │                                  #   MakeVec, then a played episode (--render: Avalonia window); in Gym.NET.sln, so API changes break its build
 │
 ├── docs/                          # README.md (index), architecture.md, guides/ (getting_started, creating_custom_environments,
-│                                  #   migrating_to_2.0, development_and_testing), releases/RELEASE_2.0.0.md (draft), plans/;
+│                                  #   migrating_to_1.0, development_and_testing), releases/RELEASE_1.0.0.md, plans/;
 │                                  #   media/ (the showreel); docfx.json + website-src/ (the DocFX site: landing page, template
 │                                  #   templates/gymnet, gallery images; `docfx docs/docfx.json`, deployed by .github/workflows/docs.yml)
 │
@@ -185,7 +185,7 @@ dotnet build src/Gym.Rendering.WinForm/Gym.Rendering.WinForm.csproj -c Release
 # The example: trains CartPole headless in about two seconds, exits 0 when solved (--render opens a window: desktops only)
 dotnet run --project examples/CartPole -c Release
 
-# The packages (versions 2.0.0, P10.4) into a folder of your choice; building also packs (GeneratePackageOnBuild)
+# The packages (versions 1.0.0, P10.4; each carries README.md and THIRD-PARTY-NOTICES.md) into a folder of your choice; building also packs (GeneratePackageOnBuild)
 dotnet pack Gym.NET.sln -c Release -o <folder>
 ```
 
@@ -249,7 +249,7 @@ dotnet test tests/Gym.Tests.Parity/Gym.Tests.Parity.csproj --filter "TestCategor
 GYMNET_PARITY_RECORD_BASELINE=1 dotnet test tests/Gym.Tests.Parity/Gym.Tests.Parity.csproj -f net10.0 --filter "FullyQualifiedName~MujocoFrameLiveParityTests"
 ```
 
-CI (`.github/workflows/ci.yml`, informational on `journey1` until 2.0, decision D20): a Windows job builds Debug and
+CI (`.github/workflows/ci.yml`, informational on `journey1` until 1.0, decision D20): a Windows job builds Debug and
 Release, runs the headless unit gate and the live parity gate on the pinned stack; an Ubuntu job replays the goldens
 without Python.
 

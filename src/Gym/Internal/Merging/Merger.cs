@@ -1,4 +1,4 @@
-﻿// Gym.Internal is 0.2's code, [Obsolete] since 2.0 and removed in 3.0 with Gym.Legacy (DR-56): it keeps no nullable
+﻿// Gym.Internal is 0.2's code, [Obsolete] since 1.0 and removed in 2.0 with Gym.Legacy (DR-56): it keeps no nullable
 // context (DR-54), rather than 89 annotations for code on its way out.
 #nullable disable
 using System;
@@ -15,13 +15,13 @@ namespace Gym.Merging {
     ///     values on the same key are settled by <see cref="MergePrefer"/>. The left side is changed in place.
     /// </summary>
     /// <remarks>
-    ///     Obsolete with <see cref="Dict"/> (DR-56) and removed in 3.0; <see cref="Gym.Envs.Info.Update"/> replaces it, one
+    ///     Obsolete with <see cref="Dict"/> (DR-56) and removed in 2.0; <see cref="Gym.Envs.Info.Update"/> replaces it, one
     ///     level deep with the new value winning, as Python's <c>dict.update</c>. Footguns: lists are concatenated whatever
     ///     the preference; a fixed-size or read-only left dictionary is returned unmerged, silently; merging a dictionary
     ///     into a non-expandable <see cref="IMergable"/> overwrites its existing keys whatever the preference; a right side
     ///     of any other type merges nothing; and a failing key leaves the keys before it merged.
     /// </remarks>
-    [Obsolete("The legacy Dict's deep merge: use Gym.Envs.Info.Update (Python's dict.update: the new value wins, one level deep). Removed in 3.0 with Gym.Legacy.")]
+    [Obsolete("The legacy Dict's deep merge: use Gym.Envs.Info.Update (Python's dict.update: the new value wins, one level deep). Removed in 2.0 with Gym.Legacy.")]
     public static class Merger {
         /// <summary>
         ///     Merges <paramref name="right"/> with <paramref name="left"/> object, appending all lists and merging dictionaries.

@@ -15,7 +15,7 @@ namespace Gym.Legacy {
     ///     Moved from <c>Gym.Envs</c> by the core-API work (P1). Its sub-envs are <see cref="ILegacyEnv"/>s: wrap current envs
     ///     in <see cref="LegacyEnvAdapter"/>.
     /// </remarks>
-    [Obsolete("The baselines-style VecEnv is legacy (B-33: one action for every sub-env); gymnasium.vector replaces it (P6). Gym.Legacy is removed in 3.0.")]
+    [Obsolete("The baselines-style VecEnv is legacy (B-33: one action for every sub-env); gymnasium.vector replaces it (P6). Gym.Legacy is removed in 2.0.")]
     public interface IVecEnv {
         /// <summary>The sub-envs, stepped in this order.</summary>
         IList<ILegacyEnv> Environments { get; }

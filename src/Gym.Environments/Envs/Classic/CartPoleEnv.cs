@@ -113,7 +113,7 @@ namespace Gym.Environments.Envs.Classic {
         }
 
         /// <summary>
-        ///     0.2's <c>new CartPoleEnv(viewerFactory)</c>, kept so 0.2 code compiles until 3.0 (DR-58). 0.2 drew only when
+        ///     0.2's <c>new CartPoleEnv(viewerFactory)</c>, kept so 0.2 code compiles until 2.0 (DR-58). 0.2 drew only when
         ///     <c>Render()</c> was called, and its headless runs passed <see cref="NullEnvViewer.Factory"/>: that factory, or
         ///     <see langword="null"/>, builds the env without a render mode (headless and unpaced), and any other factory builds
         ///     a <c>human</c>-mode env drawing into the window it creates.
@@ -125,7 +125,7 @@ namespace Gym.Environments.Envs.Classic {
         ///     once, as Gymnasium's does without a render mode, and returns nothing. <c>new CartPoleEnv(null)</c> is ambiguous
         ///     next to the <see cref="IEnvViewer"/> constructor; cast the <see langword="null"/>.
         /// </remarks>
-        [Obsolete("0.2's constructor: write new CartPoleEnv(renderMode: \"human\", viewerFactory: factory), or new CartPoleEnv() headless. Removed in 3.0 with Gym.Legacy.")]
+        [Obsolete("0.2's constructor: write new CartPoleEnv(renderMode: \"human\", viewerFactory: factory), or new CartPoleEnv() headless. Removed in 2.0 with Gym.Legacy.")]
         public CartPoleEnv(IEnvironmentViewerFactoryDelegate? viewerFactory)
             : this(false, IsHeadless(viewerFactory) ? null : "human", IsHeadless(viewerFactory) ? null : viewerFactory) { }
 

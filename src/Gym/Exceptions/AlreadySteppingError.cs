@@ -7,11 +7,11 @@ namespace Gym.Exceptions {
     ///     <c>AsyncVectorEnv</c>'s error for a call started while another is pending, the same situation.
     /// </summary>
     /// <remarks>
-    ///     Obsolete, and removed in 3.0 with <c>Gym.Legacy</c>. 0.2 never threw it, so a <c>catch</c> of it that never ran
+    ///     Obsolete, and removed in 2.0 with <c>Gym.Legacy</c>. 0.2 never threw it, so a <c>catch</c> of it that never ran
     ///     in 0.2 can now run. Like Gymnasium's <c>AlreadyPendingCallError</c>, it is not an <see cref="Error"/>; the extra
     ///     level changes no message and not the Python type the subclass stands for.
     /// </remarks>
-    [Obsolete("0.2's AlreadySteppingError: catch Gym.Exceptions.AlreadyPendingCallError, which AsyncVectorEnv raises. Removed in 3.0 with Gym.Legacy.")]
+    [Obsolete("0.2's AlreadySteppingError: catch Gym.Exceptions.AlreadyPendingCallError, which AsyncVectorEnv raises. Removed in 2.0 with Gym.Legacy.")]
     public class AlreadySteppingError : Exception {
         /// <summary>An error with 0.2's own message, <c>already running an async step</c>.</summary>
         public AlreadySteppingError() : base("already running an async step") { }

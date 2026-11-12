@@ -17,8 +17,8 @@ using NumSharp;
 
 namespace Gym.Tests.Legacy {
     /// <summary>
-    ///     Pins DR-58: the <c>[Obsolete]</c> shims that keep 0.2 code compiling until 3.0, each found by compiling 0.2.0's own
-    ///     tests against 2.0. Every shim must mean what the 0.2 line meant and spell out 2.0's equivalent; the limits the docs
+    ///     Pins DR-58: the <c>[Obsolete]</c> shims that keep 0.2 code compiling until 2.0, each found by compiling 0.2.0's own
+    ///     tests against 1.0. Every shim must mean what the 0.2 line meant and spell out 1.0's equivalent; the limits the docs
     ///     state (what a shim does not catch or keep) are pinned too.
     /// </summary>
     [TestClass]
@@ -199,7 +199,7 @@ namespace Gym.Tests.Legacy {
             Assert.AreEqual(2, wrapper.Closes);
         }
 
-        /// <summary>0.2's <c>new Box(low, high, dtype)</c>, positional and with 0.2's <c>dType:</c> name, builds the box <c>dtype:</c> builds in 2.0.</summary>
+        /// <summary>0.2's <c>new Box(low, high, dtype)</c>, positional and with 0.2's <c>dType:</c> name, builds the box <c>dtype:</c> builds in 1.0.</summary>
         [TestMethod]
         public void Box_ZeroPointTwosDtypeThird_BuildsTheSameBox() {
             using var expected = new Box(-5.0, 5.0, dtype: np.float32);

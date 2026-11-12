@@ -109,5 +109,5 @@ so the list only shrinks.
 ## CI
 
 `.github/workflows/ci.yml` builds the solution in Debug and Release on Windows, runs the unit gate, sets up the parity
-stack and runs the parity gate; a Linux job builds the parity suite and replays the goldens. Until 2.0 it runs on the
+stack and runs the parity gate; a Linux job builds the parity suite and replays the goldens. Until 1.0 it runs on the
 working branch and is informational.

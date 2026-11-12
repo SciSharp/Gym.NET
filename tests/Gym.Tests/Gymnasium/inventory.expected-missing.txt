@@ -3,7 +3,7 @@
 # The names come from tools/parity/gymnasium_inventory.json (python tools/parity/inventory.py --write).
 #
 # A ratchet: a name Gym.NET gains must be removed from this list (the test fails until it is), and a name Gymnasium
-# gains must be listed or ported. 2.0 needs every line here to be out of scope (n/a, by design, out of scope, P9).
+# gains must be listed or ported. 1.0 needs every line here to be out of scope (n/a, by design, out of scope, P9).
 # Phases are docs/plans/COMPLETION_PLAN.md's; the DR ids are docs/plans/DESIGN_REVIEW.md's.
 
 gymnasium.envs.box2d.bipedal_walker.ContactDetector                                      by design: a private nested class of BipedalWalkerEnv (DR-28)

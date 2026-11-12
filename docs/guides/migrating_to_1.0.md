@@ -1,26 +1,36 @@
-# Migrating from Gym.NET 0.2 to 2.0
+# Migrating from Gym.NET 0.2 to 1.0
 
 [Documentation index](../README.md) · [Getting started](getting_started.md)
 
-Gym.NET 2.0 takes Gymnasium's API, the contract gym adopted in 0.26 and Gymnasium kept: `Reset(seed)` returns
+Gym.NET 1.0 takes Gymnasium's API, the contract gym adopted in 0.26 and Gymnasium kept: `Reset(seed)` returns
 `(observation, info)`, `Step` returns `(observation, reward, terminated, truncated, info)`, the render mode is fixed at
 construction, and envs are made through a registry. It is a breaking release: the package ids
 (`Gym.NET`, `Gym.NET.Environments`, `Gym.NET.Rendering.Avalonia`, `Gym.NET.Rendering.WinForm`) and the namespaces stay,
-so package references and most `using` directives keep working, but the members inside them change.
+so most `using` directives keep working, but the members inside them change, and every package moves to 1.0.0 at once
+(see Requirements). `Gym.NET.Rendering`, new, comes with `Gym.NET.Environments`.
 
 Code that cannot move at once can keep the 0.2 API through `Gym.Legacy.LegacyEnvAdapter` (below), which is obsolete and
-will be removed in 3.0.
+will be removed in 2.0.
 
 ## Requirements
 
 - .NET 8 or .NET 10 (0.2 targeted .NET Core 3.1 and .NET 6).
-- NumSharp 0.80.0, which the packages bring, in place of 0.2's NumSharp.Lite 0.1.12. NumSharp's own API differs from
-  NumSharp.Lite's: dtypes are `DType`s (`np.float32` still reads the same), indices are `long`, and random generators
-  are NumPy's `Generator`.
+- Every Gym.NET package at 1.0.0, moved together. 0.2.0 declared its dependencies as "0.2.0 or later", so NuGet
+  accepts a mix of 0.2.0 and 1.0.0 packages without a warning, and the mix fails when it runs: Gym.NET.Environments
+  0.2.0 over Gym.NET 1.0.0 cannot load its envs (`Could not load type 'Gym.Envs.Env'`), and a 0.2.0 viewer over
+  Gym.NET.Environments 1.0.0 cannot load its window (`Could not load type 'Gym.Environments.IEnvViewer'`).
+- NumSharp 0.80.0, which the packages bring, in place of 0.2's NumSharp.Lite 0.1.12. Remove any NumSharp.Lite
+  reference: with both, code naming `NDArray` stops compiling (CS0433, the type is in both). NumSharp's own API differs
+  from NumSharp.Lite's: dtypes are `DType`s (`np.float32` still reads the same), indices are `long`, and random
+  generators are NumPy's `Generator`.
+- Avalonia 12 for Gym.NET.Rendering.Avalonia (0.2's was built on Avalonia 0.10).
+- In a build that treats warnings as errors, two suppressions, both explained in the
+  [release notes](../releases/RELEASE_1.0.0.md#upgrading-from-02): ImageSharp 2.1.13's five advisories, and, with
+  Gym.NET.Rendering.WinForm, NU1701 for the .NET Framework packages ScottPlot.WinForms brings.
 
 ## The calls, old and new
 
-| 0.2 | 2.0 |
+| 0.2 | 1.0 |
 |---|---|
 | `new CartPoleEnv()` | `Gymnasium.Make("CartPole-v1")`, which adds Gymnasium's wrappers (`TimeLimit` of 500 steps, `OrderEnforcing`, `PassiveEnvChecker`); `new CartPoleEnv()` still builds the bare env |
 | `new CartPoleEnv(WinFormEnvViewer.Factory)` | `Gymnasium.HumanViewerFactory = WinFormEnvViewer.Factory;` then `Gymnasium.Make("CartPole-v1", new { render_mode = "human" })`, or `new CartPoleEnv(renderMode: "human", viewerFactory: WinFormEnvViewer.Factory)` |
@@ -66,7 +76,7 @@ while (true) {
 env.CloseEnvironment();
 ```
 
-2.0:
+1.0:
 
 ```csharp
 Gymnasium.HumanViewerFactory = WinFormEnvViewer.Factory;    // once, at start-up
@@ -102,7 +112,7 @@ What behaves differently, beyond the spelling:
 
 ## Rendering to an image
 
-0.2 returned an ImageSharp `Image`; 2.0 returns the frame as an array, the way Gymnasium does. To get an image:
+0.2 returned an ImageSharp `Image`; 1.0 returns the frame as an array, the way Gymnasium does. To get an image:
 
 ```csharp
 using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("CartPole-v1", new { render_mode = "rgb_array" });
@@ -114,7 +124,7 @@ using Image<Rgb24> image = Image.LoadPixelData<Rgb24>(frame.ToArray<byte>(), (in
 
 ## Keeping 0.2 code running: Gym.Legacy
 
-`LegacyEnvAdapter` exposes any 2.0 env through the 0.2 interface (`ILegacyEnv`):
+`LegacyEnvAdapter` exposes any 1.0 env through the 0.2 interface (`ILegacyEnv`):
 
 ```csharp
 #pragma warning disable CS0618 // Gym.Legacy is obsolete on purpose: it keeps 0.2 code running while it moves
@@ -134,15 +144,15 @@ while (!step.Done)                            // Done = terminated || truncated
 - The 0.2 vector types, `IVecEnv`, `VecEnv`, `DummyVecEnv` and `VecEnvWrapper`, are in `Gym.Legacy` too, over
   `ILegacyEnv`.
 
-Everything in `Gym.Legacy` is `[Obsolete]`, with the replacement named in the warning, and is removed in 3.0.
+Everything in `Gym.Legacy` is `[Obsolete]`, with the replacement named in the warning, and is removed in 2.0.
 
 ### The legacy `Dict` and its helpers
 
 `Gym.Legacy` still hands out 0.2's `Gym.Collections.Dict` (`Step.Information`, `ILegacyEnv.Metadata`,
-`VecEnv.Metadata`), so `Dict` and the fifteen types behind it stay in 2.0, `[Obsolete]` (DR-56), and go in 3.0 with
+`VecEnv.Metadata`), so `Dict` and the fifteen types behind it stay in 1.0, `[Obsolete]` (DR-56), and go in 2.0 with
 `Gym.Legacy`. Each warning names the replacement:
 
-| 0.2 type | 2.0 replacement |
+| 0.2 type | 1.0 replacement |
 |---|---|
 | `Gym.Collections.Dict` | `Gym.Envs.Info` for infos, `Gym.Envs.Metadata` for metadata |
 | `Gym.Dynamic.Expando` | `System.Dynamic.ExpandoObject` |
@@ -174,10 +184,10 @@ must keep returning Python's `object`.
 
 ### 0.2 lines that still compile
 
-Compiling 0.2's own tests against 2.0 found the lines below broken; each now compiles with an `[Obsolete]` warning that
-names the 2.0 spelling (DR-58), and goes in 3.0 with `Gym.Legacy`:
+Compiling 0.2's own tests against 1.0 found the lines below broken; each now compiles with an `[Obsolete]` warning that
+names the 1.0 spelling (DR-58), and goes in 2.0 with `Gym.Legacy`:
 
-| 0.2 line | What it does in 2.0 | 2.0 spelling |
+| 0.2 line | What it does in 1.0 | 1.0 spelling |
 |---|---|---|
 | `var (obs, reward, done, info) = env.Step(a);` | `done` is `terminated \|\| truncated`, as gym 0.21 reported it | `var (obs, reward, terminated, truncated, info) = env.Step(a);` |
 | `NDArray obs = env.Reset();` | the observation; the info is dropped, and arrays in it are never disposed (Taxi's action mask) | `env.Reset().Observation`, or `var (obs, info) = env.Reset();` |
@@ -199,7 +209,7 @@ The `LunarLanderEnv` of 0.2 (`Gym.Environments.Envs.Aether`, Aether physics) is 
 replacement is Gymnasium's LunarLander on Gym.NET's Box2D engine: `Gymnasium.Make("LunarLander-v3")` or
 `Gymnasium.Make("LunarLanderContinuous-v3")`, or `Gym.Environments.Envs.Box2D.LunarLanderEnv` built directly.
 
-| 0.2 | 2.0 |
+| 0.2 | 1.0 |
 |---|---|
 | `new LunarLanderEnv(viewerFactory, random_state: rng, continuous: c, render_mode: m)` | `new LunarLanderEnv(renderMode: m, continuous: c, viewerFactory: f)`; seed through `Reset(seed)`, or assign `env.NpRandom` |
 | `(int)LunarLanderDiscreteActions.FireMainEngine` | the action `2` (0 nothing, 1 left engine, 2 main engine, 3 right engine), as Gymnasium's |

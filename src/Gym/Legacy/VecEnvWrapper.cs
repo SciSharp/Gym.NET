@@ -8,7 +8,7 @@ using NumSharp;
 namespace Gym.Legacy {
     /// <summary>A <see cref="VecEnv"/> over a fixed set of legacy envs, stepped one after another on the calling thread.</summary>
     /// <remarks>Moved from <c>Gym.Envs</c> by the core-API work (P1); the sub-envs are <see cref="ILegacyEnv"/>s.</remarks>
-    [Obsolete("The baselines-style VecEnv is legacy (B-33: one action for every sub-env); gymnasium.vector replaces it (P6). Gym.Legacy is removed in 3.0.")]
+    [Obsolete("The baselines-style VecEnv is legacy (B-33: one action for every sub-env); gymnasium.vector replaces it (P6). Gym.Legacy is removed in 2.0.")]
     public class VecEnvWrapper : VecEnv {
         /// <summary>Wraps the given envs, which share the spaces given.</summary>
         /// <param name="observationSpace">The observation space of one sub-env.</param>

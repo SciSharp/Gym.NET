@@ -51,9 +51,9 @@ var (next, reward, terminated, truncated, info) = env.Step(action);</code></pre>
 <section class="gn-docmap" aria-label="Documentation">
 <a class="gn-card" href="../guides/getting_started.md"><span>Start here</span><strong>Getting started</strong><p>Making envs, the reset/step loop, seeding, spaces, render modes, wrappers, vector envs.</p></a>
 <a class="gn-card" href="../guides/creating_custom_environments.md"><span>Build</span><strong>Custom environments</strong><p>Writing an <code>Env&lt;TObs, TAct&gt;</code>, registering it for <code>Gymnasium.Make</code>, checking it.</p></a>
-<a class="gn-card" href="../guides/migrating_to_2.0.md"><span>Upgrade</span><strong>Migrating from 0.2</strong><p>What changed in each 0.2 call, and <code>Gym.Legacy</code> for code that cannot move yet.</p></a>
+<a class="gn-card" href="../guides/migrating_to_1.0.md"><span>Upgrade</span><strong>Migrating from 0.2</strong><p>What changed in each 0.2 call, and <code>Gym.Legacy</code> for code that cannot move yet.</p></a>
 <a class="gn-card" href="../architecture.md"><span>Design</span><strong>Architecture</strong><p>The packages, the env contract, array ownership, and how parity with Gymnasium is proven.</p></a>
-<a class="gn-card" href="../releases/RELEASE_2.0.0.md"><span>Release</span><strong>2.0.0 notes</strong><p>What 2.0 contains and leaves out, and every known difference from Gymnasium.</p></a>
+<a class="gn-card" href="../releases/RELEASE_1.0.0.md"><span>Release</span><strong>1.0.0 notes</strong><p>What 1.0 contains and leaves out, and every known difference from Gymnasium.</p></a>
 <a class="gn-card" href="../guides/development_and_testing.md"><span>Contribute</span><strong>Development and testing</strong><p>Building, the unit suite, and the live parity suite against Gymnasium.</p></a>
 </section>
 </div>

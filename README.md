@@ -26,7 +26,8 @@ dotnet add package Gym.NET.Rendering.Avalonia    # optional: a window for render
 dotnet add package Gym.NET.Rendering.WinForm     # optional: the same on Windows Forms
 ```
 
-Gym.NET 2.0 targets .NET 8 and .NET 10.
+Gym.NET 1.0 targets .NET 8 and .NET 10. Coming from 0.2: move every Gym.NET package to 1.0.0 at once and remove any
+NumSharp.Lite reference ([migrating from 0.2](https://github.com/SciSharp/Gym.NET/blob/master/docs/guides/migrating_to_1.0.md)).
 
 ## Example
 
@@ -62,7 +63,7 @@ steps). The render mode is chosen when the env is built: `Gymnasium.Make("CartPo
 [examples/CartPole](https://github.com/SciSharp/Gym.NET/tree/master/examples/CartPole) trains a policy that balances
 the pole, playing 100 carts at once through `Gymnasium.MakeVec`.
 
-## What is in 2.0
+## What is in 1.0
 
 | Area | Contents |
 |---|---|
@@ -75,9 +76,10 @@ the pole, playing 100 carts at once through `Gymnasium.MakeVec`.
 | Environments | classic_control: CartPole-v0/v1, MountainCar-v0, MountainCarContinuous-v0, Pendulum-v1, Acrobot-v1. box2d: LunarLander-v3, LunarLanderContinuous-v3, BipedalWalker-v3, BipedalWalkerHardcore-v3, CarRacing-v3 (on Box2D 2.3.0 in managed C#). toy_text: FrozenLake-v1, FrozenLake8x8-v1, CliffWalking-v1, CliffWalkingSlippery-v1, Taxi-v4, Blackjack-v1. mujoco: Ant, HalfCheetah, Hopper, Humanoid, HumanoidStandup, InvertedPendulum, InvertedDoublePendulum, Pusher, Reacher, Swimmer, Walker2d, each -v4 and -v5 (on Gym.NET's own engine, bit for bit with MuJoCo 4.0.0) |
 | Rendering | `rgb_array` and `ansi` frames equal to Gymnasium's; `human` mode in an Avalonia or Windows Forms window |
 
-MuJoCo's environments step bit for bit but do not draw frames yet. The release notes list what 2.0 leaves out and
-every known difference from Gymnasium:
-[docs/releases/RELEASE_2.0.0.md](https://github.com/SciSharp/Gym.NET/blob/master/docs/releases/RELEASE_2.0.0.md).
+MuJoCo's environments step bit for bit with MuJoCo 4.0.0. Gym.NET draws their frames itself: against Gymnasium's GPU
+frames, 0.07% (InvertedPendulum) to 16% (Humanoid) of the pixels differ, nearly all by one level. The release notes
+list what 1.0 leaves out and every known difference from Gymnasium:
+[docs/releases/RELEASE_1.0.0.md](https://github.com/SciSharp/Gym.NET/blob/master/docs/releases/RELEASE_1.0.0.md).
 
 ## Documentation
 
@@ -87,7 +89,7 @@ every known difference from Gymnasium:
   seeding, spaces, rendering, wrappers, vector envs.
 - [Creating custom environments](https://github.com/SciSharp/Gym.NET/blob/master/docs/guides/creating_custom_environments.md):
   an `Env<TObs, TAct>`, its registration, and checking it.
-- [Migrating from 0.2 to 2.0](https://github.com/SciSharp/Gym.NET/blob/master/docs/guides/migrating_to_2.0.md): the old
+- [Migrating from 0.2 to 1.0](https://github.com/SciSharp/Gym.NET/blob/master/docs/guides/migrating_to_1.0.md): the old
   calls and their replacements, and `Gym.Legacy` for code that cannot move yet.
 - [Architecture](https://github.com/SciSharp/Gym.NET/blob/master/docs/architecture.md): the packages, and how Gym.NET
   is held to Gymnasium's behavior.
@@ -105,5 +107,7 @@ input, you can suppress them; the release notes list the five advisories and the
 ## License
 
 Apache-2.0, every package. Gymnasium's environment assets are used under Gymnasium's MIT license; the sources Gym.NET
-translates (Box2D, SDL_gfx, SDL_ttf, pygame-ce's anti-aliased lines) and the score glyphs CarRacing records from pygame
-are credited in [THIRD-PARTY-NOTICES.md](https://github.com/SciSharp/Gym.NET/blob/master/THIRD-PARTY-NOTICES.md).
+translates (Box2D, SDL_gfx, SDL_ttf, OpenCV's resize, CPython's difflib, json and math routines, pygame-ce's
+anti-aliased lines), the score glyphs CarRacing records from pygame, and MuJoCo's font and compiled models are credited
+in [THIRD-PARTY-NOTICES.md](https://github.com/SciSharp/Gym.NET/blob/master/THIRD-PARTY-NOTICES.md), which every
+package carries.

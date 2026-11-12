@@ -202,7 +202,7 @@ few to a few dozen a second.
 ## Wrappers
 
 A wrapper is an env around an env: `Wrapper<TObs, TAct>` and the `ObservationWrapper`, `ActionWrapper` and
-`RewardWrapper` bases, as in Gymnasium. 2.0 has `TimeLimit`, `OrderEnforcing`, `PassiveEnvChecker`, `Autoreset`,
+`RewardWrapper` bases, as in Gymnasium. 1.0 has `TimeLimit`, `OrderEnforcing`, `PassiveEnvChecker`, `Autoreset`,
 `RecordEpisodeStatistics`, `RenderCollection`, `NormalizeObservation`, `NormalizeReward`, `TimeAwareObservation` and
 `FlattenObservation` (`Gym.Wrappers`):
 
@@ -272,5 +272,5 @@ packages, warns about them (`NDW012`). The samples above dispose everything and 
 ## The pre-0.26 API
 
 Code written for Gym.NET 0.2 (`Reset()` returning only the observation, the 4-tuple `Step` with `Done`, `Seed(s)`,
-`Render("rgb_array")`) can run against 2.0 through `Gym.Legacy.LegacyEnvAdapter`, obsolete and removed in 3.0. The
-[migration guide](migrating_to_2.0.md) maps every 0.2 call to its replacement.
+`Render("rgb_array")`) can run against 1.0 through `Gym.Legacy.LegacyEnvAdapter`, obsolete and removed in 2.0. The
+[migration guide](migrating_to_1.0.md) maps every 0.2 call to its replacement.
