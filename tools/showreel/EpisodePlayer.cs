@@ -17,7 +17,10 @@ namespace Gym.Showreel;
 ///     </para>
 ///     <para>
 ///     Rendering is the costly part (CarRacing draws hundreds of polygons a frame), so stepping several ticks in one
-///     <see cref="AdvanceTo"/> renders once, at the end, and only when <see cref="Frame"/> is read.
+///     <see cref="AdvanceTo"/> renders once, at the end, and only when <see cref="Frame"/> is read. The exception is a
+///     recipe whose env changes state inside <c>render()</c> (<see cref="EpisodeRecipe.RenderEveryStep"/>: LunarLander's
+///     particles, BipedalWalker's lidar sweep): it renders after the reset and every step, as human mode would, and
+///     <see cref="Frame"/> returns the last of those frames rather than rendering once more.
 ///     </para>
 /// </remarks>
 internal sealed class EpisodePlayer : IDisposable {
@@ -50,6 +53,9 @@ internal sealed class EpisodePlayer : IDisposable {
         _env = Gymnasium.Make(recipe.Id, recipe.MakeArguments());
         _policy = recipe.Policy();
         _observation = _env.Reset(seed: recipe.Seed).Observation;
+        // Human mode renders inside reset too; a render-stateful env must see that render as well.
+        if (recipe.RenderEveryStep)
+            Capture();
     }
 
     /// <summary>The recipe this player plays.</summary>
@@ -86,20 +92,28 @@ internal sealed class EpisodePlayer : IDisposable {
     /// <exception cref="InvalidOperationException">The env did not return an RGB frame.</exception>
     public RgbImage Frame {
         get {
-            if (_stale || _frame is null) {
-                using RenderResult r = _env.Render();
-                if (r is not RenderResult.Rgb rgb)
-                    throw new InvalidOperationException($"{Recipe.Id} rendered {r.GetType().Name}, not an RGB frame");
-                int h = (int)rgb.Frame.shape[0], w = (int)rgb.Frame.shape[1];
-                byte[] bytes = rgb.Frame.ToArray<byte>();
-                if (_frame is null || _frame.Width != w || _frame.Height != h)
-                    _frame = new RgbImage(w, h, bytes);
-                else
-                    Buffer.BlockCopy(bytes, 0, _frame.Pixels, 0, bytes.Length);
-                _stale = false;
-            }
-            return _frame;
+            if (_stale || _frame is null)
+                Capture();
+            return _frame!;
         }
+    }
+
+    /// <summary>
+    ///     Renders the env's current frame into <see cref="_frame"/> (reusing its buffer while the size holds) and marks it
+    ///     fresh. Every call is a real <c>render()</c>, with whatever state the env advances there.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">The env did not return an RGB frame.</exception>
+    private void Capture() {
+        using RenderResult r = _env.Render();
+        if (r is not RenderResult.Rgb rgb)
+            throw new InvalidOperationException($"{Recipe.Id} rendered {r.GetType().Name}, not an RGB frame");
+        int h = (int)rgb.Frame.shape[0], w = (int)rgb.Frame.shape[1];
+        byte[] bytes = rgb.Frame.ToArray<byte>();
+        if (_frame is null || _frame.Width != w || _frame.Height != h)
+            _frame = new RgbImage(w, h, bytes);
+        else
+            Buffer.BlockCopy(bytes, 0, _frame.Pixels, 0, bytes.Length);
+        _stale = false;
     }
 
     /// <summary>
@@ -128,7 +142,11 @@ internal sealed class EpisodePlayer : IDisposable {
                 _observation = next;
                 Return += reward;
                 Step++;
-                _stale = true;
+                // A render-stateful env renders at every step, as in human mode; the others render lazily, when shown.
+                if (Recipe.RenderEveryStep)
+                    Capture();
+                else
+                    _stale = true;
                 if (terminated || truncated) {
                     _handDone = true;
                     _pauseLeft = Recipe.HandPauseTicks;
@@ -151,7 +169,10 @@ internal sealed class EpisodePlayer : IDisposable {
                     Step = 0;
                     Stamp = null;
                     _handDone = false;
-                    _stale = true;
+                    if (Recipe.RenderEveryStep)
+                        Capture();
+                    else
+                        _stale = true;
                 }
             }
             Tick++;

@@ -394,14 +394,15 @@ internal static class Storyboards {
     ///     <para>
     ///     The maintainer, 2026-11-12: "the gif is not great, redo the showreel but -2/5 of the time of the mp4" (DR-73).
     ///     The cut keeps every env and shortens how long each stays: a solo of 6 s in the video holds about 3.5 s here, and
-    ///     the finale flips every 0.45 s instead of 0.6 s. The episodes still play at their own speed.
+    ///     the finale flips every 0.45 s instead of 0.6 s. The episodes play at their own speed, but for LunarLander.
     ///     </para>
     ///     <para>
     ///     Where a panel is now too short to reach the moment its episode is known for, it joins mid-episode
-    ///     (<see cref="Mid"/>), timed so the moment lands on screen: MountainCar's summit, Acrobot crossing the line,
-    ///     LunarLander's landing, the toy-text goals. Each such tick is the episode's length minus what the panel can show,
-    ///     from the recipe's steps per second (the toy texts' lengths are the README table's: goal in 63 and 41 steps, the
-    ///     edge path in 13, the delivery in 16).
+    ///     (<see cref="Mid"/>), timed so the moment lands on screen: MountainCar's summit, Acrobot crossing the line, the
+    ///     toy-text goals. Each such tick is the episode's length minus what the panel can show, from the recipe's steps
+    ///     per second (the toy texts' lengths are the README table's: goal in 63 and 41 steps, the edge path in 13, the
+    ///     delivery in 16). A join only works where the story is in the episode's end: LunarLander's is its descent, which
+    ///     ends at step 117 of 299, so it plays from its start at twice its speed instead.
     ///     </para>
     ///     <para>
     ///     The title runs 0.3–3.75 s, as long as its two lines need to type on at 32 letters a second and be read before it
@@ -449,8 +450,10 @@ internal static class Storyboards {
 
         // Box2D, 14.8-25.0 s: the lander alone, the two walkers side by side, then the race car, which stays for the hand-over.
         Caption(overlays, 14.8, 24.9, "BOX2D", Pink);
-        // It lands at step 299 (50 a second): joined at step 125, it touches down at 18.3 s, half a second before it leaves.
-        tracks.Add(Panel(Cyan, new[] { new Content(14.8, Mid("LunarLander-v3", 14.8, 125)) },
+        // The lander touches down at step 117 and comes to rest, LANDED!, at step 299: from its start at twice its speed,
+        // the descent plays out, it touches down at 16.0 s and the stamp holds the last second before the panel leaves.
+        // Joining mid-episode instead (step 125, as the first cut did) skipped the whole descent.
+        tracks.Add(Panel(Cyan, Play("LunarLander-v3", 14.8, speed: 2.0),
             K(14.8, Slots.Point(Slots.One)), K(15.3, Slots.One, Ease.OutBack), K(18.8, Slots.One), K(19.3, Slots.OffTop(Slots.One), Ease.InBack)));
         tracks.Add(Panel(Yellow, Play("BipedalWalker-v3", 19.0),
             K(19.0, Slots.OffLeft(Slots.TwoLeft)), K(19.6, Slots.TwoLeft, Ease.OutBack), K(22.3, Slots.TwoLeft), K(22.8, Slots.OffLeft(Slots.TwoLeft), Ease.InBack)));

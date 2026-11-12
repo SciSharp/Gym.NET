@@ -53,10 +53,15 @@ MuJoCo's locomotion (CarRacing stays on beside HalfCheetah), toy text, the parit
 The README shows the same tour cut to 51 s (DR-73, 2026-11-12: "the gif is not great, redo the showreel but -2/5 of the
 time of the mp4"): every section and env, each on screen about 60% as long, in place of DR-59's 12 s loop of seven
 envs. Where a panel became too short for the moment its episode is known for, it joins mid-episode so that moment still
-lands on screen: MountainCar's summit, Acrobot's crossing, LunarLander's landing, the toy-text goals
-(`Storyboards.Hero`).
+lands on screen: MountainCar's summit, Acrobot's crossing, the toy-text goals (`Storyboards.Hero`). LunarLander's story
+is its descent, which ends at step 117 of 299, so it plays from its start at twice its speed instead.
 
 Stamps such as `LANDED!` mark how an episode ended.
+
+LunarLander and the BipedalWalkers render after every step, even the steps no frame shows
+(`EpisodeRecipe.RenderEveryStep`). Their `render()` changes what the next frame shows, as in Gymnasium: LunarLander ages
+and removes its exhaust particles there, and BipedalWalker sweeps its lidar one ray a frame. Rendering only the shown
+frames left the particles of the unshown steps unaged, so a mid-episode join started on a cloud of stale particles.
 
 | Id | Seed | Policy | The episode |
 |---|---|---|---|

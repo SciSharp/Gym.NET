@@ -49,6 +49,13 @@ internal sealed record DelegatePolicy(Func<IEnv, object?, object> Rule) : IPolic
 ///     Constructor arguments added to <c>render_mode="rgb_array"</c> when the env is made, by Python name, or null. Only
 ///     presentation is set this way (InvertedDoublePendulum's camera); never anything that changes the dynamics.
 /// </param>
+/// <param name="RenderEveryStep">
+///     Whether the env's <c>render()</c> changes what its next frame shows, so the player must render after every step, as
+///     human mode does, and not only the frames it displays: LunarLander ages and removes its exhaust particles there,
+///     BipedalWalker sweeps its lidar one ray a frame. Rendering only the shown frames left LunarLander's particles
+///     unaged, a cloud of them after a mid-episode join. Costs a render per step, cheap for these 2-D envs; the MuJoCo
+///     envs, whose frames are costly, have no such state.
+/// </param>
 internal sealed record EpisodeRecipe(
     string Id,
     string Family,
@@ -60,7 +67,8 @@ internal sealed record EpisodeRecipe(
     int Hands = 1,
     string HandLabel = "HAND",
     bool ScoresHands = false,
-    IReadOnlyDictionary<string, object?>? Kwargs = null) {
+    IReadOnlyDictionary<string, object?>? Kwargs = null,
+    bool RenderEveryStep = false) {
     /// <summary>Ticks a finished episode is held on screen before the next one starts (multi-episode recipes only).</summary>
     public int HandPauseTicks => 2;
 
@@ -141,11 +149,14 @@ internal static class Episodes {
         new EpisodeRecipe("Pusher-v5", "mujoco", 73, 20, () => new PusherScript(),
             (_, _, ret) => ret > -35 ? "PUSHED!" : null, "A seven-joint arm, steered by its fingertip's Jacobian, sweeps to the puck and nudges it goalward."),
         new EpisodeRecipe("LunarLander-v3", "box2d", 7, 50, () => new DelegatePolicy((env, o) => LunarLanderEnv.Heuristic(env, (NDArray)o!)),
-            (term, _, ret) => term && ret > 100 ? "LANDED!" : term ? "CRASH" : null, "Gymnasium's own heuristic lands between the flags."),
+            (term, _, ret) => term && ret > 100 ? "LANDED!" : term ? "CRASH" : null, "Gymnasium's own heuristic lands between the flags.",
+            RenderEveryStep: true),
         new EpisodeRecipe("BipedalWalker-v3", "box2d", 0, 50, () => new BipedalPolicy(),
-            (term, _, ret) => term && ret > 0 ? "FINISH!" : term ? "GAME OVER" : null, "Gymnasium's gait state machine walks the whole course."),
+            (term, _, ret) => term && ret > 0 ? "FINISH!" : term ? "GAME OVER" : null, "Gymnasium's gait state machine walks the whole course.",
+            RenderEveryStep: true),
         new EpisodeRecipe("BipedalWalkerHardcore-v3", "box2d", 10, 50, () => new BipedalPolicy(),
-            (term, _, _) => term ? "GAME OVER" : null, "The same gait meets stumps, pits and stairs. It does not go well."),
+            (term, _, _) => term ? "GAME OVER" : null, "The same gait meets stumps, pits and stairs. It does not go well.",
+            RenderEveryStep: true),
         // CarRacing terminates when the lap closes; seed 11 visits 98% of the tiles but meets the 1,000-step limit first,
         // so it truncates and earns no stamp (the score in its own frame tells the story).
         new EpisodeRecipe("CarRacing-v3", "box2d", 11, 50, () => new DelegatePolicy(CarRacingPursuit),
