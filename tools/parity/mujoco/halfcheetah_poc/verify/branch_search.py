@@ -38,10 +38,13 @@ FILES = ["CheetahCore.cs", "Kernels.cs"]
 
 # executed paths worth locating too: (file, anchor that ends a line, label); the probe goes on the line after the anchor
 MARKERS = [
-    ("Kernels.cs", "private static int Polytope3(CcdPolytope pt, CcdStatus status, CcdObject obj1, CcdObject obj2) {", "marker Polytope3"),
+    ("Kernels.cs", "private static int Polytope3(CcdPolytope pt, CcdStatus status, CcdObject obj1, CcdObject obj2, bool allowP2) {", "marker Polytope3"),
     ("Kernels.cs", "private static int Polytope4(CcdPolytope pt, CcdStatus status, CcdObject obj1, CcdObject obj2) {", "marker Polytope4"),
     ("Kernels.cs", "private static int Epa(CcdStatus status, CcdPolytope pt, CcdObject obj1, CcdObject obj2) {", "marker Epa"),
-    ("Kernels.cs", "private static int GjkIntersect(CcdStatus status, CcdObject obj1, CcdObject obj2) {", "marker GjkIntersect"),
+    # MuJoCo 4's multi-contact pass and its polygon clipping (the capsule's edge against the cylinder's disk)
+    ("Kernels.cs", "private static int Multicontact(CcdObject obj1, CcdObject obj2, double[] x1, double[] x2, double[] dist, int nconmax) {", "marker Multicontact"),
+    ("Kernels.cs", "int nface2, ReadOnlySpan<double> n, ReadOnlySpan<double> dir, double margin) {", "marker PolygonClip"),
+    ("Kernels.cs", "} else if (maxContacts > 1 && status.Dist[0] < 0 && obj1.NSupp > 0) {", "marker shallow contact to the multi-contact pass"),
 ]
 
 # conditions no single line shows: (file, anchor, code inserted after the anchor, labels the code uses); the code only
@@ -63,7 +66,7 @@ CUSTOM = [
       "custom: warm start kept and a free dof's warm start differs from qacc_smooth"]),
     # two runs the insertion rules cannot probe (statements under an unbraced header), probed by their conditions
     ("Kernels.cs",
-     "            outward[k] = verts[v1 * VertexSize + k] - pt.Center[k];\n",
+     "            outward[k] = V(pt, v1)[k] - pt.Center[k];\n",
      "        if (Dot3(projection, outward) < 0)\n"
      "            Probe.Hit(\"custom: AttachFace turns a face's projection outward\");\n",
      ["custom: AttachFace turns a face's projection outward"]),
@@ -72,6 +75,25 @@ CUSTOM = [
      "        if (root2 < root1)\n"
      "            Probe.Hit(\"custom: the union-find links the first root under the second\");\n",
      ["custom: the union-find links the first root under the second"]),
+    # MuJoCo 4's multi-contact pass: EPA's contact handed to it (an unbraced if, so probed by its condition), and the
+    # pass clipping the capsule's edge into contacts
+    ("Kernels.cs",
+     "                int face = Epa(status, poly, obj1, obj2);\n",
+     "                if (maxContacts > 1 && face >= 0)\n"
+     "                    Probe.Hit(\"custom: EPA's contact to the multi-contact pass\");\n",
+     ["custom: EPA's contact to the multi-contact pass"]),
+    ("Kernels.cs",
+     "            Inflate(nx, x1, x2, dist, margin1, margin2, normal);\n",
+     "            Probe.Hit(\"custom: the multi-contact pass clipped the capsule's edge\");\n",
+     ["custom: the multi-contact pass clipped the capsule's edge"]),
+    # mjc_segWeights' parallel test (MuJoCo 4): exact parallels, and the band its 1e-8 threshold decides
+    ("CheetahCore.cs",
+     "        double det = Spatial.Dot3(cross, cross);\n",
+     "        if (det == 0)\n"
+     "            Probe.Hit(\"custom: two capsules exactly parallel\");\n"
+     "        else if (det <= sin2 * dot1 * dot2)\n"
+     "            Probe.Hit(\"custom: two capsules parallel within 1e-8, not exactly\");\n",
+     ["custom: two capsules exactly parallel", "custom: two capsules parallel within 1e-8, not exactly"]),
 ]
 
 PROBE = '''using System;

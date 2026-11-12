@@ -235,6 +235,17 @@ with what each costs from `MUJOCO_ASSESSMENT.md`. The maintainer's answers and c
 | DR-64 | The MuJoCo pin (D6) | **MuJoCo 4.0.0** (2026-11-06). Gymnasium v1.4.0 runs all 21 ids on it, measured on 2026-11-12. The parity stack pins `mujoco==4.0.0`, and the core follows 4.0.0's engine | 3.15.0, the version every proof-of-concept trace verified | P9 |
 | DR-65 | Where the engines live (DR-16) | **Inside Gym.Environments, without projects of their own.** MuJoCo's core is part of Gym.Environments. The maintainer added "Also, Box2D should just be in Gym.Environments", so Gym.Box2D's sources move there too, keeping their `Gym.Box2D` namespace | A Gym.MuJoCo project packed like Gym.Box2D; a separate Gym.NET.MuJoCo package | P8, P9 |
 
+### Round 22: the MuJoCo product's names, frames and surface (2026-11-12)
+
+Three questions the Round 21 rows left open, asked before the env classes are written: how users reach MuJoCo's model
+and data, the names, and what MuJoCo's frames are measured against.
+
+| ID | Design | Approved | Options not taken | Applies to |
+|---|---|---|---|---|
+| DR-66 | MuJoCo's names | **MuJoCo's own capitalization for the namespaces, Gymnasium's for the classes.** The engine is namespace `Gym.MuJoCo` in `src/Gym.Environments/MuJoCo`, the envs `Gym.Environments.Envs.MuJoCo` in `Envs/MuJoCo`: `MujocoEnv`, and per DR-24 `AntEnvV4`/`AntEnvV5` and their siblings, each `[PyName]` with Gymnasium's class name | `Gym.Mujoco`, the Python module's spelling | P9 |
+| DR-67 | What MuJoCo's frames are measured against (amends DR-62) | **Measure only** ("Because at the bottom line they all draw simple drawings"). Gym.NET draws its own frames (DR-62) and compares them with the frames Gymnasium draws in its default setup; the differences (pixels, largest channel delta) are measured and documented, and no cell requires equal frames. DR-62's byte-exact aim stays a direction, not a gate | Mesa's llvmpipe pinned in the parity stack as a byte-exact reference; the parity machine's GPU as the reference, its cells pinned to that machine | P9 |
+| DR-68 | How users reach MuJoCo's model and data | **Gymnasium's reach under .NET names.** First deferred ("Defer, compare to python apis and suggest these again"); `MUJOCO_ASSESSMENT.md` §15 then compared the Python APIs: Gymnasium's envs, `utils` and tests read about 45 members of `MjModel`/`MjData` and call 9 `mj_*` functions, of MuJoCo's 625 + 238 attributes and 485 callables. `Gym.MuJoCo` exposes exactly that reach in PascalCase, each member `[PyName]`d to Python's name: `MjModel` (`Nq`, `Nv`, `Opt.Timestep`, `Stat.Extent`, `ActuatorCtrlrange`, `BodyMass`, `GeomRgba`, ...), `MjData` (`Qpos`, `Qvel`, `Ctrl`, `CfrcExt`, `Cinert`, `Body(name).Xpos`, ...), the static `Mujoco` (`MjStep(model, data, nstep)`, `MjForward`, `MjResetData`, `MjRnePostConstraint`, `MjKinematics`, `MjName2Id`, `MjStateSize`, `MjGetState`, `MjSetState`), the enums `MjtState` and `MjtObj`, and `utils`' three functions. Arrays are writable views of the core's own arrays, as Python's are. More members can be added later without a breaking change | A: the same reach with MuJoCo's own names (`data.qpos`); B: everything the core holds (about 110 model fields and 85 data arrays); D: the env's own methods only | P9 |
+
 ---
 
 ## Coverage by phase

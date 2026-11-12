@@ -1,8 +1,8 @@
-# The trace set of MUJOCO_ASSESSMENT.md §13: one oracle.py run per line, recorded by record_traces.py.
+# The trace set of MUJOCO_ASSESSMENT.md §13 and §14: one oracle.py run per line, recorded by record_traces.py.
 # Columns: folder name, Gymnasium id, first seed, episodes, debug episodes (efc_AR and the stage arrays), then oracle.py flags.
 # The first 37 lines are the broad set: every id, as Gymnasium plays it, plus long episodes without termination and the
-# planar walkers upside down. The last eight are targeted: seeds the branch search (branch_search.py) found reaching a
-# branch the broad set does not, recorded on their own.
+# planar walkers upside down. The last twelve are targeted: seeds the branch search (branch_search.py) found reaching a
+# branch the broad set does not, recorded on their own (eight from MuJoCo 3.15.0's search, four from 4.0.0's).
 hc5 HalfCheetah-v5 0 5 1
 hc4 HalfCheetah-v4 0 3 1
 hc5_flip HalfCheetah-v5 0 2 0 --flip
@@ -40,13 +40,22 @@ pus5_d Pusher-v5 200 50 0
 pus5_e Pusher-v5 250 50 0
 pus5_f Pusher-v5 300 50 0
 pus5_g Pusher-v5 350 50 0
-# targeted: two capsules with parallel axes (Hopper lying down)
+# targeted: two capsules with parallel axes (Hopper lying down), found by MuJoCo 3.15.0's search; on 4.0.0 the broad
+# set's hop5_nt (seeds 0 and 1) already falls within mjc_segWeights' parallel band
 hop5_nt_s109 Hopper-v5 109 1 1 --no-terminate
 hop5_nt_s280 Hopper-v5 280 1 1 --no-terminate
-# targeted: EPA from GJK's triangle (polytope3), whose arithmetic reaches the contact in seeds 654 and 1559
+# targeted: EPA from GJK's triangle (polytope3), whose arithmetic reached the contact in seeds 654 and 1559 on MuJoCo
+# 3.15.0; on 4.0.0 seeds 1559 and 2455 still reach polytope3, and seed 654 the multi-contact pass's clipped edge
 pus5_s654 Pusher-v5 654 1 1
 pus5_s1559 Pusher-v5 1559 1 1
 pus5_s2455 Pusher-v5 2455 1 1
 pus5_s20432 Pusher-v5 20432 1 1
 pus5_s40228 Pusher-v5 40228 1 1
 pus5_s60390 Pusher-v5 60390 1 1
+# targeted (MuJoCo 4.0.0): the multi-contact pass clipping the capsule's edge against the cylinder's disk (seeds 94 and
+# 418), and the clip's two rarer exits: a clipped point beyond the margin, pruned, and two points or fewer, kept as they
+# are (seeds 94, 2851 and 3016)
+pus5_s94 Pusher-v5 94 1 1
+pus5_s418 Pusher-v5 418 1 1
+pus5_s2851 Pusher-v5 2851 1 1
+pus5_s3016 Pusher-v5 3016 1 1

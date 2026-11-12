@@ -1,7 +1,8 @@
-"""The negative controls of MUJOCO_ASSESSMENT.md §13.5: each copies the POC project, applies one plausible "almost right"
-change to the pieces §13 added, builds it in Release and runs the checker on the traces that should tell. A control
-passes when its verdict matches the expected one: "detected" (the checker exits 1) or "same bits" (exit 0), the latter
-for changes that provably cannot move a recorded bit on these models (the reason is in the list).
+"""The negative controls of MUJOCO_ASSESSMENT.md §13.5 and §14: each copies the POC project, applies one plausible
+"almost right" change to the pieces §13 added or MuJoCo 4.0.0 changed (many of the latter put back what 3.15.0 did),
+builds it in Release and runs the checker on the traces that should tell, recorded with mujoco 4.0.0. A control passes
+when its verdict matches the expected one: "detected" (the checker exits 1) or "same bits" (exit 0), the latter for
+changes that provably cannot move a recorded bit on these models (the reason is in the list).
 
 Usage:
     python negative_controls.py <poc folder> <scratch folder> <trace set folder> [control names...]
@@ -23,6 +24,14 @@ PUS = ["pus5_a", "pus5_b", "pus5_c", "pus5_d", "pus5_e", "pus5_f", "pus5_g"]
 PUS_P3 = ["pus5_c", "pus5_e", "pus5_s654", "pus5_s1559", "pus5_s2455", "pus5_s20432", "pus5_s40228", "pus5_s60390"]
 REA = ["rea5", "rea4"]
 SWI = ["swi5", "swi4"]
+# the RK4 envs, those with a free joint, and Hopper's episodes with two parallel capsules (§13.4's targeted seeds)
+RK4 = ["hop5", "wal5", "ant5", "hum5", "idp5", "rea5", "swi5"]
+FREE = ["ant5", "ant4", "hum5", "hst5"]
+# Hopper lying down: on MuJoCo 4.0.0 its capsules fall within mjc_segWeights' 1e-8 parallel band in seeds 0 and 1 of the
+# broad set (§14's search: 909 of 1,600 no-terminate episodes, never exactly parallel); 109 and 280 are 3.15.0's seeds
+PARALLEL = ["hop5_nt", "hop5_nt_s109", "hop5_nt_s280"]
+# the Pusher seeds whose multi-contact pass clips the capsule's edge (§14's search; the broad set has none)
+PUS_MC = ["pus5_s94", "pus5_s418", "pus5_s654", "pus5_s2851", "pus5_s3016"]
 
 # (name, file, exact old text, new text, traces, expected verdict, what it shows)
 CONTROLS = [
@@ -40,22 +49,30 @@ CONTROLS = [
      "            AddPlaneCylinderContact(d, pos2, vec1, 1, axis, 1, vec, -0.5, normal);\n"
      "            AddPlaneCylinderContact(d, pos2, vec1, -1, axis, 1, vec, -0.5, normal);\n",
      "", PUS, "detected", "the upright cylinder's three-point base"),
-    ("convex-without-multiccd", "CheetahCore.cs",
-     "        int n = Penetration(first, margin);\n        if (n == 1) {",
-     "        int n = Penetration(first, margin);\n        if (n == -1) {", PUS, "detected", "MultiCCD's perturbed contacts"),
-    ("gjk-s2d-m14-summed-in-another-order", "Kernels.cs",
-     "        double m14 = s2[1] * s3[2] - s2[2] * s3[1] - s1[1] * s3[2] + s1[2] * s3[1] + s1[1] * s2[2] - s1[2] * s2[1];",
-     "        double m14 = s1[1] * s2[2] - s1[2] * s2[1] + s2[1] * s3[2] - s2[2] * s3[1] - s1[1] * s3[2] + s1[2] * s3[1];",
-     PUS, "detected", "the signed-volume subalgorithm's cofactors, term by term"),
+    ("convex-one-contact-and-multiccd-as-in-3.15", "CheetahCore.cs",
+     "        int maxContacts = MaxContacts(m.geom_type[g1], m.geom_type[g2]);",
+     "        int maxContacts = 1;", PUS, "detected",
+     "4.0's single pass asks a capsule's edge against a face for two contacts and runs no MultiCCD"),
+    ("convex-shallow-multicontact-skipped", "Kernels.cs",
+     "                } else if (maxContacts > 1 && status.Dist[0] < 0 && obj1.NSupp > 0) {",
+     "                } else if (false) {", PUS + PUS_MC, "detected", "the multi-contact pass after a shallow contact"),
+    ("convex-deep-multicontact-skipped", "Kernels.cs",
+     "                if (maxContacts > 1 && face >= 0)\n                    status.Nx = Multicontact(",
+     "                if (false)\n                    status.Nx = Multicontact(", PUS + PUS_MC, "detected",
+     "the multi-contact pass after EPA's contact"),
+    ("gjk-s2d-weights-over-the-minor-as-in-3.15", "Kernels.cs",
+     "                double mDet = c31 + c32 + c33;\n                lambda[0] = c31 / mDet;",
+     "                double mDet = mMax;\n                lambda[0] = c31 / mDet;",
+     PUS, "detected", "4.0's S2D divides by the sum of the cofactors, not by the largest minor"),
     ("gjk-s2d-tie-taken", "Kernels.cs",
      "            double d = Dot3(p, p);\n            if (d < dmin) {\n                lambda[0] = l1[0];\n                lambda[1] = 0;",
      "            double d = Dot3(p, p);\n            if (d <= dmin) {\n                lambda[0] = l1[0];\n                lambda[1] = 0;",
      PUS, "same bits", "exact ties are common (59,516 of 425,129 edge comparisons in 20,000 Pusher episodes), but every "
      "one is at the two edges' shared vertex, where both edges give the same weights, so the rule cannot change a result"),
     ("epa-polytope3-normal-from-the-other-edge", "Kernels.cs",
-     "            diff1[k] = sx[VertexSize + k] - sx[k];\n            diff2[k] = sx[2 * VertexSize + k] - sx[k];",
-     "            diff1[k] = sx[VertexSize + k] - sx[k];\n            diff2[k] = sx[2 * VertexSize + k] - sx[VertexSize + k];",
-     PUS_P3, "detected", "polytope3's normal reaches the contact, in seeds 654 and 1559 (the targeted traces)"),
+     "            diff2[k] = V(pt, v3i)[k] - V(pt, v1i)[k];",
+     "            diff2[k] = V(pt, v3i)[k] - V(pt, v2i)[k];",
+     PUS_P3, "detected", "polytope3's normal reaches the contact (the targeted traces)"),
     ("epa-polytope3-supports-swapped", "Kernels.cs",
      "        int v5i = EpaSupport(pt, obj1, obj2, nNeg, nNorm);\n        int v4i = EpaSupport(pt, obj1, obj2, n, nNorm);",
      "        int v4i = EpaSupport(pt, obj1, obj2, n, nNorm);\n        int v5i = EpaSupport(pt, obj1, obj2, nNeg, nNorm);",
@@ -99,6 +116,59 @@ CONTROLS = [
     ("pusher-reward-summed-in-another-order", "EnvRules.cs",
      "        double reward = rewardDist + rewardCtrl + rewardNear;",
      "        double reward = rewardDist + rewardNear + rewardCtrl;", PUS, "detected", "the reward's summation order"),
+    # MuJoCo 4.0.0's changes, most of them put back as 3.15.0 had them
+    ("rk4-free-joints-uncorrected-as-in-3.15", "CheetahCore.cs",
+     "            RkCorrectVel(xi.Slice(nq, nv), dX.Slice(0, nv), h);\n", "", FREE, "detected",
+     "4.0's RKMK correction of a free joint's angular velocity at each stage"),
+    ("rk4-qacc-of-the-last-stage-as-in-3.15", "CheetahCore.cs",
+     "        Array.Copy(rkdX, nv, qacc, 0, nv);\n", "", RK4, "detected",
+     "4.0 publishes the step's weighted acceleration as qacc"),
+    ("rk4-warmstart-from-the-first-stage", "CheetahCore.cs",
+     "        Array.Copy(rkF, 3 * nv, qacc_warmstart, 0, nv);",
+     "        Array.Copy(rkF, 0, qacc_warmstart, 0, nv);", RK4, "detected",
+     "4.0 warm-starts the next step from the last stage's solve"),
+    ("quat2mat-diagonal-left-to-right-as-in-3.15", "Kernels.cs",
+     "        res[0] = (q00 - q22) + (q11 - q33);",
+     "        res[0] = q00 + q11 - q22 - q33;", ["ant5", "hc5"], "detected",
+     "4.0's AVX mju_quat2Mat groups the diagonal's squares"),
+    ("mulquat-left-to-right-as-in-3.15", "Kernels.cs",
+     "        double r0 = (qa[0] * qb[0] - qa[1] * qb[1]) + (-qa[2] * qb[2] - qa[3] * qb[3]);",
+     "        double r0 = qa[0] * qb[0] - qa[1] * qb[1] - qa[2] * qb[2] - qa[3] * qb[3];", ["ant5", "hc5"], "detected",
+     "4.0's AVX mju_mulQuat sums its products in pairs"),
+    ("normalize4-left-to-right-as-in-3.15", "Kernels.cs",
+     "Math.Sqrt((q[0] * q[0] + q[1] * q[1]) + (q[2] * q[2] + q[3] * q[3]))",
+     "Math.Sqrt(q[0] * q[0] + q[1] * q[1] + q[2] * q[2] + q[3] * q[3])", FREE, "detected",
+     "4.0's mju_normalize4 adds its squares in pairs"),
+    ("cholsolve-backward-by-rows-as-in-3.15", "Kernels.cs",
+     "        for (int i = n - 1; i >= 0; i--) {\n            res[i] /= mat[i * (n + 1)];\n            if (i != 0 && res[i] != 0) {\n"
+     "                double scl = -res[i];\n                for (int k = 0; k < i; k++)\n                    res[k] += mat[i * n + k] * scl;\n"
+     "            }\n        }",
+     "        for (int i = n - 1; i >= 0; i--) {\n            for (int k = i + 1; k < n; k++)\n                res[i] -= mat[k * n + i] * res[k];\n"
+     "            res[i] /= mat[i * (n + 1)];\n        }",
+     ["hop5", "wal5", "ant5", "pus5_a"], "detected", "4.0's dense mju_cholSolve substitutes backward by columns"),
+    ("pgs-scale-from-the-mean-inertia-as-in-3.15", "CheetahCore.cs",
+     "        double pgsScale = 1 / MaxFirst(Kernels.MinVal, trace);",
+     "        double pgsScale = 1 / MaxFirst(Kernels.MinVal, m.meaninertia * nv);", ["hum5", "hst5"], "detected",
+     "4.0's PGS scales its improvement by the island's inertia trace"),
+    ("capsules-parallel-one-pair", "CheetahCore.cs",
+     "        ClampSeg(w, 2, 1, (dot5 + dot3) / dot2, s0, s1);\n        return 2;",
+     "        ClampSeg(w, 2, 1, (dot5 + dot3) / dot2, s0, s1);\n        return 1;", PARALLEL, "detected",
+     "mjc_segWeights' second pair for parallel capsules"),
+    ("capsules-parallel-only-when-exact", "CheetahCore.cs",
+     "        if (det > sin2 * dot1 * dot2) {",
+     "        if (det > 0) {", PARALLEL, "detected",
+     "mjc_segWeights' 1e-8 band: Hopper's capsules fall inside it without being exactly parallel"),
+    ("multicontact-cylinder-margin-not-inflated", "Kernels.cs",
+     "            Inflate(nx, x1, x2, dist, margin1, margin2, normal);\n", "", PUS_MC, "detected",
+     "the clipped contacts are inflated by the cylinder's half margin"),
+    ("polygon-clip-edge-keeps-its-first-two-points", "Kernels.cs",
+     "            double dd = 0;",
+     "            double dd = double.MaxValue;", PUS_MC, "detected",
+     "a clipped edge keeps the two points farthest apart"),
+    ("polygon-clip-margin-not-pruned", "Kernels.cs",
+     "            if (d <= margin) {",
+     "            if (true) {", PUS_MC, "detected",
+     "a clipped point farther from the disk than the margin is dropped"),
 ]
 
 

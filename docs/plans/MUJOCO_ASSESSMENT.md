@@ -3,8 +3,8 @@
 | | |
 |---|---|
 | **Date** | 2026-11-11 |
-| **Status** | Assessment for P9, which DR-35 postponed out of 2.0. The approved designs stand: DR-30 (a 100% managed port inside Gym.NET.Environments), DR-31 (MuJoCo's own renderer, ported, drawing through a managed OpenGL binding), DR-33 (scope: what Gymnasium's envs reach, proven bitwise) |
-| **Measured against** | Gymnasium `8ba8c3a6` (v1.4.0, committed 2026-10-05); MuJoCo 3.15.0 (released the same day): its source, and its `win_amd64` wheel for Python 3.12 in an isolated venv |
+| **Status** | Assessment for P9, written while DR-35 had postponed it out of 2.0 and DR-30, DR-31 and DR-33 asked for a managed port of MuJoCo and its renderer. Rounds 21 and 22 of `DESIGN_REVIEW.md` (2026-11-12) replaced them: the proof of concept's core becomes the MuJoCo envs (DR-61), on MuJoCo 4.0.0 (DR-64), with frames drawn by Gym.NET and measured only (DR-62, DR-67), and Gymnasium's reach of the Python API under .NET names (DR-68). §14 verifies the core on 4.0.0; §15 is the API comparison behind DR-68 |
+| **Measured against** | Gymnasium `8ba8c3a6` (v1.4.0, committed 2026-10-05); MuJoCo 3.15.0 (released the same day) for §1–§13 and MuJoCo 4.0.0 (2026-11-06) for §14–§15: their sources, and their `win_amd64` wheels for Python 3.12 in isolated venvs |
 | **Reproduce** | §8; the probes are in `tools/parity/mujoco/`, the proof of concept for HalfCheetah (§10), Hopper and Humanoid (§11) and all 21 ids (§13) in `tools/parity/mujoco/halfcheetah_poc/`, with its verification scripts (§13) in `halfcheetah_poc/verify/`, the engine's line coverage (§10.6, §12) in `tools/parity/mujoco/coverage/` |
 
 ---
@@ -1150,3 +1150,238 @@ times too high. Its line count was 33% too low.
   without a margin (MuJoCo's multi-contact polygon clipping); ball joints; equality constraints; active tendons;
   elliptic cones; the ellipsoid fluid model; PGS over several trees; and stateful actuators. Gymnasium's eleven models
   need none of them. Their own `xml_file` variants might.
+
+## 14. The core on MuJoCo 4.0.0 (2026-11-12)
+
+Round 21 of `DESIGN_REVIEW.md` made the proof of concept's core the MuJoCo envs (DR-61) and pinned MuJoCo 4.0.0
+(DR-64), released 2026-11-06. Gymnasium v1.4.0 runs all 21 ids on it. The core had been written against 3.15.0, so it
+was verified again. Traces were recorded with mujoco 4.0.0 in an isolated venv, 4.0.0's sources were compared with
+3.15.0's function by function, and the core was changed wherever 4.0.0 rounds differently.
+
+### 14.1 What changed
+
+A first set of 18 traces, one or two per id, showed five changes outside the collider:
+- **RK4** publishes the step's weighted acceleration as `qacc` and warm-starts the next step from the last stage's
+  solve. A free joint's angular velocity gets the RKMK correction at each stage (`mju_derivExpmap`, with the Bortz
+  coefficient series).
+- **The AVX quaternion kernels:** `mju_mulQuat` sums its products in pairs, `mju_quat2Mat` groups the diagonal's
+  squares, and `mju_normalize4` adds its squares in pairs. They move every model's kinematics in the last bit.
+- **The dense `mju_cholSolve`** substitutes backward by columns: each solved entry is scattered into the rows above.
+- **PGS** (Humanoid, HumanoidStandup) scales its improvement test by the island's inertia trace, where 3.15 used the
+  model's mean inertia.
+- **Capsule pairs** go through `mjc_segWeights`: Ericson's Voronoi regions, Lagrange's determinant and the
+  Binet-Cauchy weight, with two pairs within sin² = 1e-8 of parallel. 3.15 solved the axes' 2×2 system.
+
+After them, 15 of the 18 were exact. The three Pusher traces needed **4.0.0's convex collider**, rewritten as a whole:
+- GJK with discrete geoms, the Frank-Wolfe gap, exact plane and line projections and a final separation check;
+- the signed-volume subalgorithms in their new form;
+- the initial polytopes, with three new helpers (`replaceSimplex2`, `recoverHexa`, `originOnEdge`), and EPA's
+  recursive horizon;
+- `inflate` with an explicit normal.
+
+`maxContacts` now asks a capsule's edge against a face for two contacts in one pass, even with a margin.
+`mjc_multicontact` then clips the capsule's edge against the cylinder's disk, a 16-gon, and MultiCCD's perturbations
+no longer run for that pair. The new collider replaced the old one's 1,520 lines. The loader no longer refuses a
+capsule-cylinder pair without a margin, which 4.0.0 treats the same way.
+
+### 14.2 Results
+
+The 45 folders of `verify/traces.txt`, recorded again with mujoco 4.0.0, and four new targeted ones (§14.3). Episodes
+are the same seeds as §13.2, but their lengths follow 4.0.0's physics: Ant's falls come sooner.
+
+| Id | Folders | Episodes | Env steps | Physics steps | Steps with constraint rows | Solver iterations |
+|---|---:|---:|---:|---:|---:|---:|
+| HalfCheetah-v5 | 2 | 7 | 7,000 | 35,000 | 21,146 | 28,566 |
+| HalfCheetah-v4 | 2 | 4 | 4,000 | 20,000 | 12,347 | 16,842 |
+| Hopper-v5 | 4 | 105 | 7,267 | 29,068 | 25,012 | 30,007 |
+| Hopper-v4 | 2 | 102 | 4,267 | 17,068 | 14,294 | 16,675 |
+| Walker2d-v5 | 2 | 103 | 5,147 | 20,588 | 18,445 | 29,428 |
+| Walker2d-v4 | 2 | 102 | 4,164 | 16,656 | 14,922 | 24,034 |
+| Ant-v5 | 2 | 32 | 5,470 | 27,350 | 26,754 | 52,154 |
+| Ant-v4 | 2 | 31 | 4,470 | 22,350 | 21,825 | 42,400 |
+| Humanoid-v5 | 2 | 103 | 5,347 | 26,735 | 22,982 | 377,329 (PGS) |
+| Humanoid-v4 | 2 | 102 | 4,347 | 21,735 | 18,089 | 282,063 (PGS) |
+| HumanoidStandup-v5 | 1 | 3 | 3,000 | 15,000 | 14,722 | 273,808 (PGS) |
+| HumanoidStandup-v4 | 1 | 2 | 2,000 | 10,000 | 9,797 | 183,857 (PGS) |
+| InvertedPendulum-v5 | 1 | 300 | 1,911 | 3,822 | 0 | 0 |
+| InvertedPendulum-v4 | 1 | 300 | 1,911 | 3,822 | 0 | 0 |
+| InvertedDoublePendulum-v5 | 1 | 300 | 1,944 | 9,720 | 0 | 0 |
+| InvertedDoublePendulum-v4 | 1 | 300 | 1,944 | 9,720 | 0 | 0 |
+| Reacher-v5 | 1 | 100 | 5,000 | 10,000 | 581 | 585 |
+| Reacher-v4 | 1 | 100 | 5,000 | 10,000 | 581 | 585 |
+| Swimmer-v5 | 1 | 5 | 5,000 | 20,000 | 1,591 | 1,556 |
+| Swimmer-v4 | 1 | 3 | 3,000 | 12,000 | 956 | 940 |
+| Pusher-v5 | 17 | 360 | 36,000 | 180,000 | 180,000 | 51,769 |
+| **Total** | **49** | **2,464** | **118,189** | **520,634** | **404,044** | **1,412,598** |
+
+| Check | Result |
+|---|---|
+| Reset noise and the 118,189 sampled actions, through NumSharp's `Generator` | bit-exact |
+| Closed loop: 17,228,202 array comparisons per pass | bit-exact |
+| Resync, each physics step from MuJoCo's recorded state | bit-exact |
+| Env layer of all 21 ids: observation, reward, terminated, truncated, every info entry | bit-exact |
+
+### 14.3 What the traces execute
+
+Line coverage over the 49 folders (Debug build): `CheetahCore.cs` 1,761 of 1,906 lines, `Kernels.cs` 1,554 of 2,014,
+`CheetahModel.cs` 240 of 241, `EnvRules.cs` 369 of 377.
+
+The branch search of §13.4 was aimed at 4.0.0's code: new anchors, probes on the multi-contact pass, and probes on
+`mjc_segWeights`' parallel test. The probed copy, built as the checker, gave 45 of 45 bit-exact first.
+
+| Env | Episodes searched | Physics steps | Found |
+|---|---:|---:|---|
+| Pusher-v5 | 80,000 | 40 million | EPA in 1,232 episodes: from GJK's tetrahedron (`polytope4`) 32,418 times, from its triangle (`polytope3`) 141 times in 104 episodes. The multi-contact pass after 51,681 shallow contacts and after 32,559 of EPA's; it clipped the capsule's edge 3,778 times in 576 episodes, pruned a clipped point beyond the margin in 88, and kept two points or fewer as they were in 119 |
+| Hopper-v5, no termination | 1,600 | 6.4 million | Two capsules within the 1e-8 parallel band, never exactly parallel: 2,630 times in 909 episodes |
+| Hopper-v5, as played | 30,000 | 2.7 million | none |
+| Walker2d-v5, no termination | 800 | 3.2 million | none |
+
+No episode of the broad set clips an edge: the first seeds that do are 94, 418, 512 and 654. Four seeds were recorded
+on their own and are bit-exact: 94 (all three clip paths, at physics step 384), 418, 2851 and 3016. Seed 654, a
+targeted line of §13.4, clips its edge on 4.0.0. The broad set's `hop5_nt` (seeds 0 and 1) already lies in the
+parallel band, so 3.15.0's targeted Hopper seeds are kept only as a record.
+
+The lines no trace executes and no search reached, new with 4.0.0:
+- EPA from a segment (`polytope2`, `replaceSimplex2`, `originOnEdge`);
+- the branches of `recoverHexa`, and the failure exits and fallbacks of `polytope3` and `polytope4`;
+- `hull4`, more than four clipped points;
+- the degenerate segment weights, a capsule of zero length;
+- the large angles of `DerivExpmap` and `BortzCoef`: a rotation beyond π, or beyond 1.75 rad, in one step.
+
+Two parts are unreachable by construction:
+- MultiCCD's perturbation code, since no pair of these models asks the collider for a single contact on 4.0.0;
+- the multi-contact pass's face cases, since a capsule has no face.
+
+§13.4's other unexecuted lines are unchanged.
+
+### 14.4 Negative controls
+
+`verify/negative_controls.py` now holds 32 controls, run on the 4.0.0 traces. All 32 gave their expected verdict.
+§13.5's controls on code that 4.0.0 replaced were re-aimed, and 15 are new. Most of the new ones put back what 3.15.0
+did:
+
+| Change | Traces | Verdict |
+|---|---|---|
+| MuJoCo 3's one contact and MultiCCD for the capsule-cylinder pair | Pusher | Detected: `pus5_c`, step 426, `qpos[0]` |
+| The multi-contact pass skipped after a shallow contact | Pusher, with the targeted seeds | Detected: seed 94, step 384 |
+| The multi-contact pass skipped after EPA's contact | Pusher, with the targeted seeds | Detected: seed 654, step 270 |
+| S2D's weights divided by the largest minor, as in 3.15 | Pusher | Detected: step 343, 1 ulp in `qvel[2]` |
+| `polytope3`'s normal from the triangle's other edge | Pusher, targeted | Detected: `pus5_c`, step 386, 180 ulp |
+| RK4 without the free joints' correction | Ant, Humanoid, HumanoidStandup | Detected at step 0 |
+| RK4 publishing the last stage's `qacc`, as in 3.15 | The RK4 envs | Detected at step 0 |
+| RK4 warm-starting from the first stage | The RK4 envs | Detected at step 0 |
+| `mju_quat2Mat`'s diagonal left to right, as in 3.15 | Ant, HalfCheetah | Detected: step 0, 5 ulp |
+| `mju_mulQuat` left to right, as in 3.15 | Ant, HalfCheetah | Detected: step 0, 1 ulp |
+| `mju_normalize4` left to right, as in 3.15 | Ant, Humanoid, HumanoidStandup | Detected: step 387, 1 ulp |
+| The dense `mju_cholSolve` substituting backward by rows, as in 3.15 | Hopper, Walker2d, Ant, Pusher | Detected: step 9, 3 ulp |
+| PGS scaled by the mean inertia, as in 3.15 | Humanoid, HumanoidStandup | Detected: step 93 |
+| One pair for parallel capsules | Hopper lying down | Detected: `hop5_nt`, step 3828 |
+| The parallel band reduced to exact parallels | Hopper lying down | Detected: `hop5_nt`, step 3828 |
+| The clipped contacts not inflated by the cylinder's half margin | the clipping seeds | Detected: seed 94, step 384 |
+| A clipped edge keeping its first two points, not the two farthest apart | the clipping seeds | Detected: seed 654, step 267, 1 ulp |
+| Clipped points beyond the margin kept | the clipping seeds | Detected: seed 94, step 384, 6 contacts where MuJoCo has 5 |
+
+§13.5's other controls give the same verdicts on 4.0.0's traces. Their "same bits" reasons were measured on 3.15.0
+and still hold, for two reasons:
+- Two are structural: an exact S2D tie falls at the shared vertex, and swapping `polytope3`'s supports only renumbers
+  two vertices.
+- The search re-measured a third: the warm start was kept while a tree was in no island 7.3 million times in 80,000
+  Pusher episodes, and a free dof's warm start never differed from `qacc_smooth`.
+
+### 14.5 Speed
+
+§13.6's method: the minimum of five interleaved rounds, each the best of five runs of the same episode on both sides,
+against mujoco 4.0.0 from Python.
+
+| Episode | Managed core | MuJoCo 4.0.0, `mj_step(nstep=frame_skip)` from Python | Ratio |
+|---|---:|---:|---:|
+| HalfCheetah-v5, seed 0 | 7.54 µs | 9.98 µs | 0.76 |
+| Hopper-v5, seed 0, no termination | 21.76 µs | 30.43 µs | 0.72 |
+| Walker2d-v5, seed 0, no termination | 34.64 µs | 40.93 µs | 0.85 |
+| Ant-v5, seed 0, no termination | 59.46 µs | 60.59 µs | 0.98 |
+| Humanoid-v5, seed 0, no termination | 121.29 µs | 115.07 µs | 1.05 |
+| HumanoidStandup-v5, seed 0 | 131.79 µs | 114.96 µs | 1.15 |
+| InvertedPendulum-v5, seed 0 | 5.41 µs | 12.67 µs | 0.43 |
+| InvertedDoublePendulum-v5, seed 0 | 7.04 µs | 13.94 µs | 0.51 |
+| Reacher-v5, seed 0 | 8.34 µs | 15.55 µs | 0.54 |
+| Swimmer-v5, seed 0 | 12.09 µs | 16.46 µs | 0.73 |
+| Pusher-v5, seed 0 | 7.76 µs | 10.10 µs | 0.77 |
+
+Both sides ran 30 to 45% slower than in §13.6's rounds on the same machine, which was busier this time, so the ratios
+are what compares. They moved little, except for the two Humanoids, whose PGS sweeps now take 4% and 15% longer than
+MuJoCo's. The episodes also differ, because 4.0.0's physics changes where the falls happen.
+
+### 14.6 Still open
+
+- **The branches of §14.3** that no trace and no search reached.
+- **Productizing**, in Round 21 and 22's terms: the env classes, the registration, the embedded models (DR-63), the
+  `Gym.MuJoCo` surface (DR-68), the parity stack on mujoco 4.0.0 with its live cells, and the frames (DR-62, DR-67).
+- **§10.3 still holds** for exactness: proven on win-x64, and to be verified again at each MuJoCo pin.
+
+## 15. The Python API Gymnasium reaches, compared (2026-11-12)
+
+Round 22 of `DESIGN_REVIEW.md` deferred how users reach MuJoCo's model and data: "Defer, compare to python apis and
+suggest these again". This section is that comparison. It counts what Gymnasium v1.4.0 calls in MuJoCo's Python
+bindings, what the bindings offer, and what the core holds. It ends with the options, revised.
+
+### 15.1 What Gymnasium calls
+
+Counted in `refs/Gymnasium`: the 22 env modules, `mujoco_env.py`, `utils.py`, the renderer `mujoco_rendering.py`, and
+the three MuJoCo test modules.
+
+| Where | `MjModel` | `MjData` | Functions and types |
+|---|---|---|---|
+| The envs and `MujocoEnv` | `nq`, `nv`, `nu`, `na`, `opt.timestep`, `actuator_ctrlrange`, `body_mass` (Humanoid's `mass_center`), `vis.global_.offwidth` and `offheight` (grown to the render size) | `qpos` (61 uses), `qvel`, `ctrl`, `act` (cleared when `na` is 0), `cfrc_ext`, `cvel`, `cinert`, `qfrc_actuator`, `qfrc_constraint` (InvertedDoublePendulum), `ten_length` and `ten_velocity` (Humanoid's and HumanoidStandup's info), `site_xpos`, `xipos`, `body(name).xpos` | `MjModel.from_xml_path`, `MjData`, `mj_step(model, data, nstep)`, `mj_forward`, `mj_resetData`, `mj_rnePostConstraint` |
+| `utils.py` | | | `mj_stateSize`, `mj_getState`, `mj_setState`, `mjtState` (`mjSTATE_FULLPHYSICS`, `mjSTATE_INTEGRATION`) |
+| The renderer | `ncam`, `stat.extent`, `geom_rgba` (written: made translucent and back), `opt.timestep` | `geom_xpos`, `time`, `solver_niter` | `MjvScene`, `MjvOption`, `MjvCamera`, `MjvPerturb`, `MjrContext`, `MjrRect`, `mjv_updateScene`, `mjv_moveCamera`, `mjv_initGeom`, `mjr_render`, `mjr_readPixels`, `mjr_setBuffer`, `mjr_overlay`, `mj_name2id`, 12 enum types, the OpenGL contexts (`glfw`, `egl`, `osmesa`) |
+| The tests | `nbody`, `njnt`, `ngeom`, `ntendon`, `nbvh`, `nq`, `nv`, `nu`, `body_mass`, `opt.timestep`, `vis.global_` | `qpos`, `qvel`, `xipos`, `site_xpos`, `body(name).xpos`, and the shapes of `cfrc_ext`, `qfrc_actuator`, `cvel`, `cinert` | `mj_kinematics`, `mj_step`, `mj_forward`, `MjModel.from_xml_path` (custom models among them), `mujoco.Renderer` |
+
+Gymnasium writes as well as reads. `set_state` assigns `data.qpos[:]` and `data.qvel[:]`, `do_simulation` assigns
+`data.ctrl[:]`, and `MujocoEnv` grows `model.vis.global_.offwidth`. The renderer divides `model.geom_rgba[:, 3]` by 5
+and back. Python's arrays are views of MuJoCo's own memory, so every such write reaches the simulation.
+
+### 15.2 What the bindings offer, and what the core holds
+
+MuJoCo 4.0.0's Python bindings, counted by introspection, are far larger:
+- `MjModel` has 625 public attributes and `MjData` 238.
+- The module has 485 callables: 133 `mj_*`, 110 `mju_*` utilities, 29 `mjv_*` and 25 `mjr_*` rendering functions,
+  67 classes and 78 enum types.
+- Both objects have named accessors per element kind: `model.body("torso")`, `data.joint("hip")`, `data.site("tip")`.
+
+The core loads about 110 model fields and computes about 85 data arrays:
+- the state: `qpos`, `qvel`, `ctrl`, `time`, `qacc`, `qacc_warmstart`;
+- positions and frames: `xpos`, `xquat`, `xmat`, `xipos`, `ximat`, `xanchor`, `xaxis`, `geom_xpos`, `geom_xmat`,
+  `site_xpos`, `site_xmat`, `subtree_com`;
+- composite inertias and velocities: `cinert`, `cdof`, `crb`, `cvel`, `cdof_dot`, `cfrc_ext`;
+- the mass matrix and its factor, the forces (`qfrc_*`, `actuator_force`), the tendons;
+- the contacts, the constraint rows (`efc_*`), and the solver's statistics.
+
+Of what Gymnasium reads, the core lacks a few model fields and two small items. The model fields are the renderer's
+`ncam`, `stat.extent`, `vis.global_` and `geom_rgba`, and `nbvh`, which the tests compare to tell the `xml_file`
+variants apart; the embedded models will carry them all (DR-63). The two small items are `na` and `act` (always 0 and
+empty, since no model has a stateful actuator) and `body(name)`, a name lookup over arrays the core already holds.
+
+### 15.3 The options, revised
+
+| Option | What a user writes | Public surface | Gymnasium's code and tests |
+|---|---|---|---|
+| **A. Gymnasium's reach, MuJoCo's names** | `env.Unwrapped.data.qpos`, `model.opt.timestep`, `data.body("torso").xpos`, `Mujoco.mj_forward(model, data)` | `MjModel` and `MjData` with the members of §15.1 (about 25 and 20), the 9 functions the envs, `utils` and tests call, `mjtState` and `mjtObj`, `utils`' 3 functions | carried over with the same names; the tests mirror, except custom XML models (refused, DR-63) |
+| **B. Everything the core holds** | as A, plus `data.efc_force`, `data.contact`, `model.dof_damping` | about 110 model fields and 85 data arrays | as A |
+| **C. Gymnasium's reach, .NET names** | `env.Unwrapped.Data.Qpos`, `Model.Opt.Timestep`, `Mujoco.MjForward(model, data)` | as A, PascalCase, each `[PyName]`d | renamed member by member |
+| **D. The env only** | `env.SetState(qpos, qvel)`, `env.StateVector()`, `env.GetBodyCom("torso")` | `MujocoEnv`'s own members | the tests that read `data` or call `mj_*` are not mirrored |
+
+In all four, the arrays are writable views of the core's own arrays, as Python's are. NumSharp can wrap a managed
+array without copying it (`ArraySlice.FromArray(array, copy: false)`), so `data.qpos[...] = ...` reaches the
+simulation. The renderer's types (`Mjv*`, `Mjr*`, `mjv_*`, `mjr_*`, the OpenGL contexts) stay out of every option,
+because DR-62 draws with Gym.NET's own rasterizer. Gymnasium's `MujocoRenderer` can keep its name and its `render`
+and `close` methods over that rasterizer whichever option is chosen.
+
+**Recommended: A.** Gymnasium's own envs, `utils` and tests read about 45 members and call 9 functions; A gives exactly
+those, so they and users' Gymnasium code carry over unchanged in names (DR-06's mirrored tests included). MuJoCo's
+names are its documentation's, and option C would give names MuJoCo never uses (`Xipos`, `CfrcExt`). B's other 150
+members are inspection aids no env reads. Each would become a public contract to document and keep exact, and A
+leaves room to add them later without a breaking change. D cannot run Gymnasium's `utils` or the tests that read
+`data`.
+
+**Decided: C** (DR-68). The maintainer chose Gymnasium's reach under .NET names, each member `[PyName]`d to Python's,
+in line with how Gym.NET names its own members.
