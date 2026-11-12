@@ -1424,8 +1424,29 @@ number below is the product's.
   later, the envs without `observation_structure`). The whole unit gate: 3,804 pass and 24 skip on net8.0 and net10.0.
 - **The trace checker** over the 50 traces (point.xml's added): bit-exact with the product files.
 
-### 16.3 Still open
+### 16.3 The live parity cells (2026-11-12)
+
+`mujoco==4.0.0` joined the parity stack's pins (`tools/parity/manifest.json`, `requirements.txt`, both setup scripts),
+and the MuJoCo ids joined every layer the other families have, except frames (`tests/Gym.Tests.Parity/CLAUDE.md` §5.1):
+
+- **Lockstep** (`MujocoLiveParityTests`, 178 cells): every id's sampled episodes, 39 keyword variants, 11 action forms on
+  11 ids, `make`'s stacks to their ends, the state vectors, spaces, metadata, Pusher-v4's refusal; and the warnings
+  `make` issues (22 cells: the v4 ids' out-of-date notice, none for v5).
+- **Registration** (22 cells): `spec(id)` printed and its kwargs for all 22, `str(make(id))` and both printed specs for
+  the 21 that build.
+- **Vector** (`EnvCoverageLiveParityTests`): sync in both autoreset modes and Gymnasium's own `AsyncVectorEnv` with and
+  without shared memory, 84 cells over the 21 ids.
+- **Reverse bridge** (42 cells): Gymnasium's `check_env` (with `skip_render_check=True`, as its MuJoCo tests call it)
+  and `check_environments_match` pass Gym.NET's envs with Gymnasium's own verdicts and warnings. The bridge now crosses
+  an info's 0-d arrays as the NumPy scalars they stand for (DR-08), since `data_equivalence` compares types; a planted
+  `float` in place of `np.float64` fails the tool at the reset and at step 0 (the negative control).
+- **Goldens** (21, `tests/Golden/mujoco`, about 700 KB): one per id that builds, replayed without Python, strict on
+  win-x64 only (MuJoCo's `sin`/`cos`/`tan`/`pow` come from the C runtime).
+
+### 16.4 Still open
 
 - Frames: `MujocoRenderer` raises `NotImplementedError` until Gym.NET's drawing of the scene lands (DR-62, DR-67).
-- The live parity cells: `mujoco==4.0.0` joins the parity stack's pins, and the MuJoCo ids join the lockstep,
-  registration, vector and bridge cells the other families have.
+  Gymnasium's own frames are not a fixed reference: rendered five times from the same state, Humanoid-v5's frames
+  differ from one render to the next in 15 to 21 pixels and Hopper-v5's in 1 to 19, while HalfCheetah-v5's and
+  Walker2d-v5's repeat exactly (measured 2026-11-12 on this machine's GPU, through MuJoCo's free camera; the cause is not
+  established). DR-67's measuring, rather than gating, already allows for that.

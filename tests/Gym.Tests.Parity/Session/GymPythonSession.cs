@@ -268,6 +268,13 @@ namespace Gym.Tests.Parity.Session {
                 live["opencv.version"] = Missing(error);
             }
 
+            // MuJoCo is the oracle of the MuJoCo envs (DR-64): Gymnasium's MuJoCo ids import it; also a reported drift.
+            try {
+                live["mujoco.version"] = Python.mujoco.__version__;
+            } catch (PythonException error) {
+                live["mujoco.version"] = Missing(error);
+            }
+
             return live;
         }
 

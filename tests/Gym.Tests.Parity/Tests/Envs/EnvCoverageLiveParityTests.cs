@@ -49,6 +49,13 @@ namespace Gym.Tests.Parity.Tests.Envs {
         };
 
         /// <summary>
+        ///     The MuJoCo ids that run on MuJoCo 3 and later (DR-61), in Gymnasium's registration order
+        ///     (<see cref="MujocoLiveParityTests.Ids"/>): they join the vector cells, not the frame cells, whose frames Gym.NET
+        ///     does not draw yet (DR-62) and measures rather than gates (DR-67).
+        /// </summary>
+        private static string[] MujocoIds => MujocoLiveParityTests.Ids;
+
+        /// <summary>
         ///     Gymnasium's side of <see cref="AssertHumanFrames"/>: the calls made, the display flips and updates counted
         ///     after each (pygame's two functions are wrapped for the run and restored after it), and the display surface
         ///     after each as an <c>(H, W, 3)</c> uint8 array. The cell binds <c>env_id</c>, <c>seed</c> and <c>steps</c>.
@@ -108,11 +115,13 @@ namespace Gym.Tests.Parity.Tests.Envs {
             result = tuple(lists)
             """;
 
-        /// <summary>Every id with each autoreset mode the sync cells run.</summary>
-        public static IEnumerable<object[]> IdsAndAutoresetModes => from id in Ids from mode in new[] { "NextStep", "SameStep" } select new object[] { id, mode };
+        /// <summary>Every id, the MuJoCo ones included, with each autoreset mode the sync cells run.</summary>
+        public static IEnumerable<object[]> IdsAndAutoresetModes =>
+            from id in Ids.Concat(MujocoIds) from mode in new[] { "NextStep", "SameStep" } select new object[] { id, mode };
 
-        /// <summary>Every id with shared memory on and off.</summary>
-        public static IEnumerable<object[]> IdsAndSharedMemory => from id in Ids from sharedMemory in new[] { true, false } select new object[] { id, sharedMemory };
+        /// <summary>Every id, the MuJoCo ones included, with shared memory on and off.</summary>
+        public static IEnumerable<object[]> IdsAndSharedMemory =>
+            from id in Ids.Concat(MujocoIds) from sharedMemory in new[] { true, false } select new object[] { id, sharedMemory };
 
         /// <summary>Every id, one per row, for the cells that take the id alone; all render pixel for pixel.</summary>
         public static IEnumerable<object[]> EveryId => Ids.Select(id => new object[] { id });
@@ -322,12 +331,17 @@ namespace Gym.Tests.Parity.Tests.Envs {
             Outcome.Release(reset.Info);
         }
 
-        /// <summary>Pins a classic-control or box2d id's cells to the reference platform (their cos/sin, and Box2D's sinf/cosf, come from the C runtime).</summary>
+        /// <summary>
+        ///     Pins a classic-control, box2d or mujoco id's cells to the reference platform (their cos/sin, Box2D's sinf/cosf
+        ///     and MuJoCo's libm calls come from the C runtime, MuJoCo's kernels from its AVX build).
+        /// </summary>
         /// <param name="id">The env.</param>
         private void SkipClassicOffReferencePlatform(string id) {
             if (IsToyText(id))
                 return;
-            SkipOffReferencePlatform(IsBox2D(id) ? "Box2D's sinf/cosf" : "the classic envs' cos/sin");
+            SkipOffReferencePlatform(IsBox2D(id) ? "Box2D's sinf/cosf"
+                                     : Array.IndexOf(MujocoIds, id) >= 0 ? "MuJoCo 4.0.0's win-x64 arithmetic"
+                                     : "the classic envs' cos/sin");
         }
 
         /// <summary>Whether an id is one of box2d's, which run on Gym.NET's Box2D and its C runtime's sinf/cosf.</summary>

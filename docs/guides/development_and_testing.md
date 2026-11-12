@@ -20,9 +20,10 @@ repository's [CLAUDE.md](../../CLAUDE.md); the parity suite's own guide is
   `refs/Gymnasium` is Gymnasium v1.4.0 (`8ba8c3a6`), the behavior Gym.NET is held to. `refs/NumSharp` is NumSharp
   v0.80.0's source, used only by the opt-in `-p:NumSharpSource=Submodule` build; the default build uses the NumSharp
   0.80.0 package.
-- For the parity suite only: Python 3.12 with NumPy 2.4.2, pygame-ce 2.5.8 and Box2D 2.3.10, the stack pinned in
-  `tools/parity/manifest.json`. `pwsh tools/parity/setup_venv.ps1` (or `bash tools/parity/setup_venv.sh`) creates it in
-  `tools/parity/.venv`, where the suite finds it.
+- For the parity suite only: Python 3.12 with NumPy 2.4.2, pygame-ce 2.5.8, Box2D 2.3.10, OpenCV 4.13.0 and MuJoCo
+  4.0.0, the stack pinned in `tools/parity/manifest.json`. `pwsh tools/parity/setup_venv.ps1` (or
+  `bash tools/parity/setup_venv.sh`) creates it in `tools/parity/.venv`, where the suite finds it. A venv made before
+  the MuJoCo envs (2026-11-12) lacks `mujoco`, and the stack check then fails every cell: run the script again.
 - Set `AVALONIA_TELEMETRY_OPTOUT=1`: building the Avalonia projects otherwise sends Avalonia's build telemetry.
 
 ## Build

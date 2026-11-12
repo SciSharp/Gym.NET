@@ -106,7 +106,7 @@ namespace Gym.Tests.Parity.Bridge {
                 try {
                     return PythonRuntime.Run(() => {
                         using PyObject observation = CrossObservation(result.Observation);
-                        using PyObject info = PyConvert.ToPythonShared(result.Info);
+                        using PyObject info = CrossInfo(result.Info);
                         return HandOff(new PyTuple(new[] { observation, info }));
                     });
                 } finally {
@@ -163,7 +163,7 @@ namespace Gym.Tests.Parity.Bridge {
                         };
                         using PyObject terminated = result.Terminated.ToPython();
                         using PyObject truncated = result.Truncated.ToPython();
-                        using PyObject info = PyConvert.ToPythonShared(result.Info);
+                        using PyObject info = CrossInfo(result.Info);
                         return HandOff(new PyTuple(new[] { observation, reward, terminated, truncated, info }));
                     });
                 } finally {
@@ -175,6 +175,51 @@ namespace Gym.Tests.Parity.Bridge {
                 Outcome.Release(clrAction);
             }
         });
+
+        /// <summary>
+        ///     The info as Gymnasium's env returns it: a <c>dict</c> in the info's order whose 0-d arrays, at any depth of nested
+        ///     dictionaries, cross as the NumPy scalars of their dtypes (<c>np.float64(0.5)</c>, not <c>array(0.5)</c>), and
+        ///     everything else as <see cref="PyConvert.ToPythonShared"/> crosses it. Must run under the GIL.
+        /// </summary>
+        /// <remarks>
+        ///     Gym.NET holds a NumPy scalar info value as a 0-d array, NumSharp having no scalar types (DR-08: the MuJoCo envs'
+        ///     <c>np.float64</c> reward terms and positions, their <c>np.float32</c> control costs), and
+        ///     <c>check_environments_match</c>'s <c>data_equivalence</c> tells <c>np.float64</c> from a 0-d <c>ndarray</c> by
+        ///     type, so a view would fail the comparison on a value with the same bits. No built-in env returns a genuine 0-d
+        ///     array in an info (the toy_text envs' <c>prob</c> is a Python <c>int</c> or <c>float</c>, Taxi's
+        ///     <c>action_mask</c> a 1-d array), so the rule holds for every bridged env, not only the MuJoCo ones.
+        /// </remarks>
+        /// <param name="info">The .NET info, or a value inside it; stays owned by the caller.</param>
+        /// <returns>A new owned reference.</returns>
+        /// <exception cref="ArgumentException">Thrown for a value with no defined conversion (<see cref="PyConvert.ToPython"/>'s refusal).</exception>
+        /// <exception cref="PythonException">Thrown when NumPy refuses the scalar read.</exception>
+        private static PyObject CrossInfo(object? info) {
+            switch (info) {
+                case NDArray { ndim: 0 } scalar: {
+                    // a[()] of a zero-copy view: the scalar copies the value out, so nothing keeps the .NET memory alive.
+                    using PyObject view = scalar.ToNumpy();
+                    return Python.numpy.ndarray.item_scalar(view);
+                }
+                case IEnumerable<KeyValuePair<string, object?>> entries: {
+                    var dictionary = new PyDict();
+                    try {
+                        foreach ((string key, object? value) in entries) {
+                            using PyObject converted = CrossInfo(value);
+                            // The dict takes its own reference to the value.
+                            dictionary[key] = converted;
+                        }
+                    } catch {
+                        dictionary.Dispose();
+                        throw;
+                    }
+
+                    return dictionary;
+                }
+                default:
+                    // Arrays of any other rank stay zero-copy views, so Gymnasium's data-reuse checks still see shared memory.
+                    return PyConvert.ToPythonShared(info);
+            }
+        }
 
         /// <summary>
         ///     The observation as Gymnasium's env of this class returns it: a zero-copy view (<see cref="BridgeObservation.Shared"/>),

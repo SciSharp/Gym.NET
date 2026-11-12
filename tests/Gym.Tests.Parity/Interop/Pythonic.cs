@@ -2927,6 +2927,26 @@ namespace Gym.Tests.Parity {
                     }
                 }
 
+                /// <summary><c>gymnasium.envs.mujoco</c>.</summary>
+                internal static class mujoco {
+                    /// <summary><c>gymnasium.envs.mujoco.utils</c>: the state vectors Gymnasium's MuJoCo tests compare.</summary>
+                    internal static class utils {
+                        /// <summary>
+                        ///     <c>get_state(env, state_type)</c>: the elements of <c>mjtState</c> value <paramref name="state_type"/>
+                        ///     (<c>mjSTATE_FULLPHYSICS</c> is 24607 on MuJoCo 4.0.0) as one new float64 array.
+                        /// </summary>
+                        /// <param name="env">A MuJoCo env, wrapped or not; stays owned by the caller.</param>
+                        /// <param name="state_type">The state signature's bits, as <c>mj_stateSize</c> takes them.</param>
+                        /// <returns>A new owned reference to the array.</returns>
+                        /// <exception cref="PythonException">Thrown when the env has no MuJoCo model or the signature is invalid.</exception>
+                        internal static PyObject get_state(PyObject env, int state_type) {
+                            using PyObject function = PythonRuntime.Import("gymnasium.envs.mujoco.utils").GetAttr("get_state");
+                            using var type = new PyInt(state_type);
+                            return function.Invoke(env, type);
+                        }
+                    }
+                }
+
                 /// <summary><c>gymnasium.envs.box2d</c>.</summary>
                 internal static class box2d {
                     /// <summary><c>gymnasium.envs.box2d.lunar_lander</c>.</summary>
@@ -3454,6 +3474,18 @@ namespace Gym.Tests.Parity {
             internal static string __version__ {
                 get {
                     using PyObject value = PythonRuntime.Import("Box2D").GetAttr("__version__");
+                    return value.As<string>();
+                }
+            }
+        }
+
+        /// <summary>The <c>mujoco</c> bindings, the oracle of Gym.NET's MuJoCo engine (DR-64).</summary>
+        internal static class mujoco {
+            /// <summary><c>mujoco.__version__</c>.</summary>
+            /// <exception cref="PythonException">Thrown when the import or lookup fails.</exception>
+            internal static string __version__ {
+                get {
+                    using PyObject value = PythonRuntime.Import("mujoco").GetAttr("__version__");
                     return value.As<string>();
                 }
             }

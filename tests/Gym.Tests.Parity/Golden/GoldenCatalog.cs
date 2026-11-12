@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Gym.Environments.Envs.Box2D;
 using Gym.Environments.Envs.Classic;
+using Gym.Environments.Envs.MuJoCo;
 using Gym.Environments.Envs.ToyText;
 using Gym.Tests.Parity.Pair;
 
@@ -276,7 +277,260 @@ namespace Gym.Tests.Parity.Golden {
                 PlatformDependence = "Box2D's sinf/cosf and the track's atan2/sin/cos",
                 CreateDotNet = renderMode => new GymNetEnv(new CarRacingEnv(renderMode: renderMode, continuous: false)),
             },
+            // The mujoco envs run on Gym.NET's managed MuJoCo 4.0.0 (DR-61, DR-64), whose joint rotations, gains and camera
+            // math call the C runtime's sin/cos/tan/pow, so their goldens are strict on the reference platform only. Every
+            // id that runs on MuJoCo 3 and later (Pusher-v4 refuses, as Gymnasium's does) under seeded float32 actions,
+            // without frames (DR-62, DR-67): the reset's noise draws, the observation layout, the reward and every info
+            // term with its NumPy type, and the termination of the ids that fall. The v5 ids use seed 0, the v4 ids seed 1;
+            // the ids that never terminate stop at a step count that keeps each golden small (Humanoid's 348 and 376
+            // float64 observation entries are about 3 KB a step).
+            // Reacher-v4 for its whole 50-step limit: the goal drawn at the reset, and the reward priced before the step.
+            new GoldenCase {
+                Suite = "mujoco",
+                Name = "Reacher-v4.sampled.seed1",
+                EnvId = "Reacher-v4",
+                Seed = 1,
+                Actions = new GoldenActions.Sampled(1),
+                MaxSteps = 50,
+                PlatformDependence = MujocoPlatformDependence,
+                CreateDotNet = renderMode => new GymNetEnv(new ReacherEnvV4(renderMode: renderMode)),
+            },
+            // Reacher-v5 for its whole 50-step limit: the reward priced after the step, its int control weight.
+            new GoldenCase {
+                Suite = "mujoco",
+                Name = "Reacher-v5.sampled.seed0",
+                EnvId = "Reacher-v5",
+                Seed = 0,
+                Actions = new GoldenActions.Sampled(0),
+                MaxSteps = 50,
+                PlatformDependence = MujocoPlatformDependence,
+                CreateDotNet = renderMode => new GymNetEnv(new ReacherEnvV5(renderMode: renderMode)),
+            },
+            // Pusher-v5 for its whole 100-step limit: the cylinder redrawn at the reset until it lies 0.17 from the fixed goal
+            // (and written into init_qpos itself, as Gymnasium's reset does), the arm's distances to it and to the goal.
+            new GoldenCase {
+                Suite = "mujoco",
+                Name = "Pusher-v5.sampled.seed0",
+                EnvId = "Pusher-v5",
+                Seed = 0,
+                Actions = new GoldenActions.Sampled(0),
+                MaxSteps = 100,
+                PlatformDependence = MujocoPlatformDependence,
+                CreateDotNet = renderMode => new GymNetEnv(new PusherEnvV5(renderMode: renderMode)),
+            },
+            // InvertedPendulum-v4 until the pole falls.
+            new GoldenCase {
+                Suite = "mujoco",
+                Name = "InvertedPendulum-v4.sampled.seed1",
+                EnvId = "InvertedPendulum-v4",
+                Seed = 1,
+                Actions = new GoldenActions.Sampled(1),
+                MaxSteps = 1000,
+                PlatformDependence = MujocoPlatformDependence,
+                CreateDotNet = renderMode => new GymNetEnv(new InvertedPendulumEnvV4(renderMode: renderMode)),
+            },
+            // InvertedPendulum-v5 until the pole falls: v5's reward of 0 at the terminating step.
+            new GoldenCase {
+                Suite = "mujoco",
+                Name = "InvertedPendulum-v5.sampled.seed0",
+                EnvId = "InvertedPendulum-v5",
+                Seed = 0,
+                Actions = new GoldenActions.Sampled(0),
+                MaxSteps = 1000,
+                PlatformDependence = MujocoPlatformDependence,
+                CreateDotNet = renderMode => new GymNetEnv(new InvertedPendulumEnvV5(renderMode: renderMode)),
+            },
+            // InvertedDoublePendulum-v4 until the tip drops: the reward's distance and velocity penalties, and the three
+            // constraint forces in its 11-entry observation.
+            new GoldenCase {
+                Suite = "mujoco",
+                Name = "InvertedDoublePendulum-v4.sampled.seed1",
+                EnvId = "InvertedDoublePendulum-v4",
+                Seed = 1,
+                Actions = new GoldenActions.Sampled(1),
+                MaxSteps = 1000,
+                PlatformDependence = MujocoPlatformDependence,
+                CreateDotNet = renderMode => new GymNetEnv(new InvertedDoublePendulumEnvV4(renderMode: renderMode)),
+            },
+            // InvertedDoublePendulum-v5 until the tip drops: v5's info terms (survival, distance and velocity penalties) and
+            // its 9-entry observation.
+            new GoldenCase {
+                Suite = "mujoco",
+                Name = "InvertedDoublePendulum-v5.sampled.seed0",
+                EnvId = "InvertedDoublePendulum-v5",
+                Seed = 0,
+                Actions = new GoldenActions.Sampled(0),
+                MaxSteps = 1000,
+                PlatformDependence = MujocoPlatformDependence,
+                CreateDotNet = renderMode => new GymNetEnv(new InvertedDoublePendulumEnvV5(renderMode: renderMode)),
+            },
+            // HalfCheetah-v4 for 150 steps (it never terminates): the forward reward and the control cost.
+            new GoldenCase {
+                Suite = "mujoco",
+                Name = "HalfCheetah-v4.sampled.seed1",
+                EnvId = "HalfCheetah-v4",
+                Seed = 1,
+                Actions = new GoldenActions.Sampled(1),
+                MaxSteps = 150,
+                PlatformDependence = MujocoPlatformDependence,
+                CreateDotNet = renderMode => new GymNetEnv(new HalfCheetahEnvV4(renderMode: renderMode)),
+            },
+            // HalfCheetah-v5 for 150 steps: the uniform and standard-normal reset noise, the ground contacts.
+            new GoldenCase {
+                Suite = "mujoco",
+                Name = "HalfCheetah-v5.sampled.seed0",
+                EnvId = "HalfCheetah-v5",
+                Seed = 0,
+                Actions = new GoldenActions.Sampled(0),
+                MaxSteps = 150,
+                PlatformDependence = MujocoPlatformDependence,
+                CreateDotNet = renderMode => new GymNetEnv(new HalfCheetahEnvV5(renderMode: renderMode)),
+            },
+            // Hopper-v4 until it falls: the health ranges that end the episode.
+            new GoldenCase {
+                Suite = "mujoco",
+                Name = "Hopper-v4.sampled.seed1",
+                EnvId = "Hopper-v4",
+                Seed = 1,
+                Actions = new GoldenActions.Sampled(1),
+                MaxSteps = 1000,
+                PlatformDependence = MujocoPlatformDependence,
+                CreateDotNet = renderMode => new GymNetEnv(new HopperEnvV4(renderMode: renderMode)),
+            },
+            // Hopper-v5 until it falls: the survival reward as a Python float, the info's positions and velocity.
+            new GoldenCase {
+                Suite = "mujoco",
+                Name = "Hopper-v5.sampled.seed0",
+                EnvId = "Hopper-v5",
+                Seed = 0,
+                Actions = new GoldenActions.Sampled(0),
+                MaxSteps = 1000,
+                PlatformDependence = MujocoPlatformDependence,
+                CreateDotNet = renderMode => new GymNetEnv(new HopperEnvV5(renderMode: renderMode)),
+            },
+            // Swimmer-v4 for 150 steps (it never terminates): the viscous fluid's drag.
+            new GoldenCase {
+                Suite = "mujoco",
+                Name = "Swimmer-v4.sampled.seed1",
+                EnvId = "Swimmer-v4",
+                Seed = 1,
+                Actions = new GoldenActions.Sampled(1),
+                MaxSteps = 150,
+                PlatformDependence = MujocoPlatformDependence,
+                CreateDotNet = renderMode => new GymNetEnv(new SwimmerEnvV4(renderMode: renderMode)),
+            },
+            // Swimmer-v5 for 150 steps.
+            new GoldenCase {
+                Suite = "mujoco",
+                Name = "Swimmer-v5.sampled.seed0",
+                EnvId = "Swimmer-v5",
+                Seed = 0,
+                Actions = new GoldenActions.Sampled(0),
+                MaxSteps = 150,
+                PlatformDependence = MujocoPlatformDependence,
+                CreateDotNet = renderMode => new GymNetEnv(new SwimmerEnvV5(renderMode: renderMode)),
+            },
+            // Walker2d-v4 until it falls.
+            new GoldenCase {
+                Suite = "mujoco",
+                Name = "Walker2d-v4.sampled.seed1",
+                EnvId = "Walker2d-v4",
+                Seed = 1,
+                Actions = new GoldenActions.Sampled(1),
+                MaxSteps = 1000,
+                PlatformDependence = MujocoPlatformDependence,
+                CreateDotNet = renderMode => new GymNetEnv(new Walker2dEnvV4(renderMode: renderMode)),
+            },
+            // Walker2d-v5 until it falls: v5's own model (walker2d_v5.xml: both feet at friction 1.9, where v4's right foot
+            // has 0.9) and the survival reward as np.float64.
+            new GoldenCase {
+                Suite = "mujoco",
+                Name = "Walker2d-v5.sampled.seed0",
+                EnvId = "Walker2d-v5",
+                Seed = 0,
+                Actions = new GoldenActions.Sampled(0),
+                MaxSteps = 1000,
+                PlatformDependence = MujocoPlatformDependence,
+                CreateDotNet = renderMode => new GymNetEnv(new Walker2dEnvV5(renderMode: renderMode)),
+            },
+            // Ant-v4 for 100 steps: the 27-entry observation without contact forces, the health check.
+            new GoldenCase {
+                Suite = "mujoco",
+                Name = "Ant-v4.sampled.seed1",
+                EnvId = "Ant-v4",
+                Seed = 1,
+                Actions = new GoldenActions.Sampled(1),
+                MaxSteps = 100,
+                PlatformDependence = MujocoPlatformDependence,
+                CreateDotNet = renderMode => new GymNetEnv(new AntEnvV4(renderMode: renderMode)),
+            },
+            // Ant-v5 for at most 60 steps (seed 0's torso leaves the healthy height at step 46): the clipped contact forces
+            // in its 105-entry observation, the contact cost and the termination.
+            new GoldenCase {
+                Suite = "mujoco",
+                Name = "Ant-v5.sampled.seed0",
+                EnvId = "Ant-v5",
+                Seed = 0,
+                Actions = new GoldenActions.Sampled(0),
+                MaxSteps = 60,
+                PlatformDependence = MujocoPlatformDependence,
+                CreateDotNet = renderMode => new GymNetEnv(new AntEnvV5(renderMode: renderMode)),
+            },
+            // Humanoid-v4 until it falls: the 376-entry observation (inertias, velocities, actuator and external forces)
+            // and the mass centre's velocity.
+            new GoldenCase {
+                Suite = "mujoco",
+                Name = "Humanoid-v4.sampled.seed1",
+                EnvId = "Humanoid-v4",
+                Seed = 1,
+                Actions = new GoldenActions.Sampled(1),
+                MaxSteps = 1000,
+                PlatformDependence = MujocoPlatformDependence,
+                CreateDotNet = renderMode => new GymNetEnv(new HumanoidEnvV4(renderMode: renderMode)),
+            },
+            // Humanoid-v5 until it falls: the 348-entry observation (the world body's rows and the free joint's actuator
+            // forces left out) and the contact cost.
+            new GoldenCase {
+                Suite = "mujoco",
+                Name = "Humanoid-v5.sampled.seed0",
+                EnvId = "Humanoid-v5",
+                Seed = 0,
+                Actions = new GoldenActions.Sampled(0),
+                MaxSteps = 1000,
+                PlatformDependence = MujocoPlatformDependence,
+                CreateDotNet = renderMode => new GymNetEnv(new HumanoidEnvV5(renderMode: renderMode)),
+            },
+            // HumanoidStandup-v4 for 40 steps (it never terminates): the height reward and the quadratic costs.
+            new GoldenCase {
+                Suite = "mujoco",
+                Name = "HumanoidStandup-v4.sampled.seed1",
+                EnvId = "HumanoidStandup-v4",
+                Seed = 1,
+                Actions = new GoldenActions.Sampled(1),
+                MaxSteps = 40,
+                PlatformDependence = MujocoPlatformDependence,
+                CreateDotNet = renderMode => new GymNetEnv(new HumanoidStandupEnvV4(renderMode: renderMode)),
+            },
+            // HumanoidStandup-v5 for 40 steps: the impact cost clipped to its range.
+            new GoldenCase {
+                Suite = "mujoco",
+                Name = "HumanoidStandup-v5.sampled.seed0",
+                EnvId = "HumanoidStandup-v5",
+                Seed = 0,
+                Actions = new GoldenActions.Sampled(0),
+                MaxSteps = 40,
+                PlatformDependence = MujocoPlatformDependence,
+                CreateDotNet = renderMode => new GymNetEnv(new HumanoidStandupEnvV5(renderMode: renderMode)),
+            },
         }.ToDictionary(c => c.Key, StringComparer.Ordinal);
+
+        /// <summary>
+        ///     What makes every mujoco golden depend on the platform: Gym.NET's engine computes MuJoCo 4.0.0's win-x64 bits,
+        ///     whose <c>sin</c>/<c>cos</c>/<c>tan</c>/<c>pow</c> are the C runtime's, so another libm can round a step one ulp
+        ///     apart and the trajectory drifts from there. Its AVX kernels' summation order is reproduced in scalar code and
+        ///     does not depend on the machine.
+        /// </summary>
+        private const string MujocoPlatformDependence = "MuJoCo's sin/cos/tan/pow through the C runtime";
 
         /// <summary>Every case's key, as MSTest data rows: one row per case, named by its key in test results.</summary>
         public static IEnumerable<object[]> Keys => Cases.Keys.Order(StringComparer.Ordinal).Select(key => new object[] { key });

@@ -18,7 +18,8 @@
     "pygame.version": "2.5.8",
     "pygame.sdl": "2.32.10",
     "box2d.version": "2.3.10",
-    "opencv.version": "4.13.0"
+    "opencv.version": "4.13.0",
+    "mujoco.version": "4.0.0"
   },
   "referencePlatform": "win-x64"
 }

@@ -990,9 +990,11 @@ Specs: the port plan's §5.7 and §11.4; sources 6,153 lines. Postponed by DR-35
   (`Assets/mujoco`, DR-63). The 22 ids register as `<Name>EnvV4`/`<Name>EnvV5` classes on `MujocoEnv` (Pusher-v4
   refusing as Gymnasium does on MuJoCo 3 and later), and match Gymnasium on MuJoCo 4.0.0 value, bit and NumPy type
   for 143 compared runs (every id, two seeds, 36 keyword variants, actions of six dtypes; 421,367 dumped values).
-  Gymnasium's `test_mujoco_v5.py` and `test_mujoco_custom_env.py` run in the unit suite.
-- **Left:** the frames (DR-62, measured against Gymnasium's by DR-67; `MujocoRenderer` raises until then), and the
-  live parity cells with `mujoco==4.0.0` pinned in the parity stack.
+  Gymnasium's `test_mujoco_v5.py` and `test_mujoco_custom_env.py` run in the unit suite. The parity stack pins
+  `mujoco==4.0.0`, and the 22 ids have every live parity layer the other families have except frames: lockstep cells
+  (`MujocoLiveParityTests`), registration, `make`'s warnings, sync and async vectors, Gymnasium's `check_env` and
+  `check_environments_match` through the reverse bridge, and 21 goldens (`tests/Gym.Tests.Parity/CLAUDE.md` §5.1).
+- **Left:** the frames (DR-62, measured against Gymnasium's by DR-67; `MujocoRenderer` raises until then).
 
 [`MUJOCO_ASSESSMENT.md`](MUJOCO_ASSESSMENT.md) (2026-11-11) measures what completing it takes, against Gymnasium
 `8ba8c3a6` and MuJoCo 3.15.0:

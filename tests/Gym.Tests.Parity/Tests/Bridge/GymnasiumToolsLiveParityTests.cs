@@ -4,6 +4,7 @@ using System.Linq;
 using System.Numerics;
 using Gym.Environments;
 using Gym.Environments.Envs.Classic;
+using Gym.Environments.Envs.MuJoCo;
 using Gym.Envs;
 using Gym.Observations;
 using Gym.Spaces;
@@ -11,6 +12,7 @@ using Gym.Tests.Parity.Bridge;
 using Gym.Tests.Parity.Interop;
 using Gym.Tests.Parity.Oracle;
 using Gym.Tests.Parity.Session;
+using Gym.Tests.Parity.Tests.Envs;
 using Gym.Utils;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using NumSharp;
@@ -53,6 +55,29 @@ namespace Gym.Tests.Parity.Tests.Bridge {
             "    except AssertionError as e:\n" +
             "        error = str(e)\n" +
             "result = (error, [str(w.message) for w in caught])\n";
+
+        /// <summary>
+        ///     <see cref="CheckEnvStatements"/> with <c>skip_render_check=True</c>, as Gymnasium's own MuJoCo tests call
+        ///     <c>check_env</c> (<c>test_mujoco_v5.py</c>, <c>test_mujoco_custom_env.py</c>): the MuJoCo envs' frames are
+        ///     measured, not gated (DR-67), and Gym.NET does not draw them yet (DR-62).
+        /// </summary>
+        private const string CheckEnvSkippingRenderStatements =
+            "import warnings\n" +
+            "from gymnasium.utils.env_checker import check_env\n" +
+            "with warnings.catch_warnings(record=True) as caught:\n" +
+            "    warnings.simplefilter('always')\n" +
+            "    try:\n" +
+            "        check_env(env, skip_render_check=True)\n" +
+            "        error = None\n" +
+            "    except AssertionError as e:\n" +
+            "        error = str(e)\n" +
+            "result = (error, [str(w.message) for w in caught])\n";
+
+        /// <summary>
+        ///     The MuJoCo ids that run on MuJoCo 3 and later (DR-61), in Gymnasium's registration order
+        ///     (<see cref="MujocoLiveParityTests.Ids"/>); Pusher-v4 refuses on both sides.
+        /// </summary>
+        public static IEnumerable<object[]> MujocoIds => MujocoLiveParityTests.Ids.Select(id => new object[] { id });
 
         /// <summary>
         ///     Steps <c>env</c> with action 1 from <c>reset(seed=0)</c> until the pole falls, then twice more, recording the
@@ -458,6 +483,78 @@ namespace Gym.Tests.Parity.Tests.Bridge {
         }
 
         /// <summary>
+        ///     Gymnasium's <c>check_env</c> on <c>make(id).unwrapped</c> for the MuJoCo envs (DR-61), with
+        ///     <c>skip_render_check=True</c> as Gymnasium's own MuJoCo tests call it: Gym.NET's env built through the bridge
+        ///     passes exactly as Gymnasium's own (no error, the same warnings: every id's infinite observation bounds, and the
+        ///     advice on the unnormalised action spaces of both InvertedPendulums and Pusher-v5), and Gym.NET's own
+        ///     <c>EnvChecker.CheckEnv</c> gives the same verdict. The infos' NumPy scalars cross as NumPy scalars (the bridge's
+        ///     info rule, DR-08).
+        /// </summary>
+        /// <param name="id">The id.</param>
+        /// <exception cref="AssertFailedException">Thrown when Gymnasium's own env fails the check, or a verdict differs from it.</exception>
+        [TestMethod]
+        [DynamicData(nameof(MujocoIds))]
+        public void CheckEnv_PassesGymNetsMujocoEnvs_AsGymnasiumsOwn(string id) {
+            SkipOffReferencePlatform("MuJoCo 4.0.0's win-x64 arithmetic");
+            using var bridge = new ReverseBridge();
+            using PyRef python = PyRef.Of(() => MadeUnwrapped(Python.gymnasium.make(id)));
+            using PyRef shim = PyRef.Of(() => {
+                using PyObject spec = bridge.Spec(Gymnasium.Spec(id), reward: MujocoReward(id));
+                return MadeUnwrapped(Python.gymnasium.make(spec));
+            });
+            using IEnv dotnet = Gymnasium.Make(id);
+            string label = $"check_env(make({PyBuiltins.Repr(id)}).unwrapped, skip_render_check=True)";
+            Outcome expected = ExpectPassed(label, GymnasiumCheckEnv(python.Object, skipRenderCheck: true));
+            ByteContract.AssertSame($"{label}: Gymnasium's tool on Gym.NET's env", expected, ReverseBridge.AsBridgedSide(GymnasiumCheckEnv(shim.Object, skipRenderCheck: true)));
+            ByteContract.AssertSame($"{label}: Gym.NET's tool", expected, GymNetCheckEnv(dotnet.Unwrapped, skipRenderCheck: true));
+        }
+
+        /// <summary>
+        ///     Gymnasium's <c>check_environments_match</c> finds Gym.NET's MuJoCo envs equal to its own over two seeds of 200
+        ///     sampled steps, in both orders, through <c>make</c>'s stacks: observations, rewards with their Python types
+        ///     (<see cref="MujocoReward"/>), the flags, resets after episode ends, and every info entry with its NumPy type. No
+        ///     render mode is set, so the tool compares no frames (DR-62, DR-67).
+        /// </summary>
+        /// <param name="id">The id.</param>
+        /// <exception cref="AssertFailedException">Thrown when Gymnasium's reference pair fails, or the tool's verdict on Gym.NET's env differs from it.</exception>
+        [TestMethod]
+        [DynamicData(nameof(MujocoIds))]
+        public void CheckEnvironmentsMatch_GymNetsMujocoEnvs_AsGymnasiumsOwn(string id) {
+            SkipOffReferencePlatform("MuJoCo 4.0.0's win-x64 arithmetic");
+            using var bridge = new ReverseBridge();
+            foreach (long seed in new long[] { 0, 123 }) {
+                using PyRef python = PyRef.Of(() => Python.gymnasium.make(id));
+                using PyRef twin = PyRef.Of(() => Python.gymnasium.make(id));
+                using PyRef shim = PyRef.Of(() => {
+                    using PyObject spec = bridge.Spec(Gymnasium.Spec(id), reward: MujocoReward(id));
+                    return Python.gymnasium.make(spec);
+                });
+                Outcome expected = Outcome.CapturePython(() => Python.gymnasium.utils.env_match.check_environments_match(python.Object, twin.Object, 200, seed));
+                // The reference must pass, or two equal failures would pass the comparison.
+                expected.Expect($"check_environments_match({id}: gymnasium, gymnasium, 200, seed={seed})");
+                ByteContract.AssertSame($"check_environments_match({id}: gymnasium, gym.net, 200, seed={seed})", expected,
+                    ReverseBridge.AsBridgedSide(Outcome.CapturePython(() => Python.gymnasium.utils.env_match.check_environments_match(python.Object, shim.Object, 200, seed))));
+                // Gymnasium samples from env_a's action space, so the other order samples from the bridge's mirror.
+                ByteContract.AssertSame($"check_environments_match({id}: gym.net, gymnasium, 200, seed={seed})", expected,
+                    ReverseBridge.AsBridgedSide(Outcome.CapturePython(() => Python.gymnasium.utils.env_match.check_environments_match(shim.Object, python.Object, 200, seed))));
+            }
+        }
+
+        /// <summary>
+        ///     The Python type of a MuJoCo env's reward in Gymnasium under the tools' float32 sampled actions: an
+        ///     <c>np.float64</c> (the positions' and velocities' float64 terms less a float32 control cost), except
+        ///     InvertedPendulum-v4's constant <c>1.0</c>, a Python <c>float</c>, and InvertedPendulum-v5's
+        ///     <c>int(not terminated)</c>, a Python <c>int</c>.
+        /// </summary>
+        /// <param name="id">The id.</param>
+        /// <returns>The bridge's reward type for it.</returns>
+        private static BridgeReward MujocoReward(string id) => id switch {
+            "InvertedPendulum-v4" => BridgeReward.Float,
+            "InvertedPendulum-v5" => BridgeReward.Int,
+            _ => BridgeReward.NumpyFloat64,
+        };
+
+        /// <summary>
         ///     The Python type of a toy_text env's reward in Gymnasium: Blackjack's <c>float</c> (<c>-1.0</c>, <c>cmp</c>'s
         ///     result), the tables' <c>int</c> (FrozenLake's default schedule <c>(1, 0, 0)</c>, CliffWalking's and Taxi's).
         /// </summary>
@@ -535,6 +632,36 @@ namespace Gym.Tests.Parity.Tests.Bridge {
         }
 
         /// <summary>
+        ///     Negative control (plan §11) for the MuJoCo cells' infos: a HalfCheetah-v5 whose <c>x_position</c> info entry
+        ///     reaches Python as a <c>float</c> instead of Gymnasium's <c>np.float64</c> (the same bits, another type), at the
+        ///     reset or at the steps only, fails Gymnasium's <c>check_environments_match</c> at that call. So the bridge's info
+        ///     rule (a 0-d array crosses as the NumPy scalar it stands for, DR-08) is what the passing cells rest on, and the
+        ///     tool compares every info entry's type, not only its value.
+        /// </summary>
+        /// <exception cref="AssertFailedException">Thrown when a planted defect goes unnoticed or is reported at another call.</exception>
+        [TestMethod]
+        public void PlantedInfoTypeDefect_FailsGymnasiumsEnvMatch() {
+            SkipOffReferencePlatform("MuJoCo 4.0.0's win-x64 arithmetic");
+            foreach ((bool onReset, string expectedStart) in new[] {
+                         (true, "resetting info is not equivalent"),
+                         (false, "stepping info is not equivalent in step = 0"),
+                     }) {
+                using var bridge = new ReverseBridge();
+                using PyRef python = PyRef.Of(() => Python.gymnasium.make("HalfCheetah-v5"));
+                using PyRef shim = PyRef.Of(() => {
+                    // HalfCheetah-v5 registers no kwargs, so the planted env takes the class's defaults, as make's would.
+                    using PyObject spec = bridge.Spec(Gymnasium.Spec("HalfCheetah-v5"), _ => new PositionAsDouble(onReset), reward: BridgeReward.NumpyFloat64);
+                    return Python.gymnasium.make(spec);
+                });
+
+                Outcome outcome = Outcome.CapturePython(() => Python.gymnasium.utils.env_match.check_environments_match(python.Object, shim.Object, 20, 0));
+                Assert.IsNotNull(outcome.Raised, $"The planted info defect (at the {(onReset ? "reset" : "steps")}) went unnoticed.");
+                Assert.AreEqual("AssertionError", outcome.Raised.Type);
+                StringAssert.StartsWith(outcome.Raised.Message, expectedStart);
+            }
+        }
+
+        /// <summary>
         ///     Negative controls (plan §11) for <c>check_env</c>: an env whose observations are views of one reused buffer, and
         ///     an env whose reset ignores its seed, fail Gymnasium's checks through the bridge with Gymnasium's messages (the
         ///     zero-copy crossing keeps the shared memory visible, the generator mirror keeps the missing generator visible), and
@@ -575,17 +702,23 @@ namespace Gym.Tests.Parity.Tests.Bridge {
 
         /// <summary>Gymnasium's <c>check_env</c> on a Python env, described: <c>(error or None, [warning texts])</c>.</summary>
         /// <param name="env">The env; borrowed.</param>
+        /// <param name="skipRenderCheck">
+        ///     Whether to pass <c>skip_render_check=True</c> (<see cref="CheckEnvSkippingRenderStatements"/>): no render mode is
+        ///     made or rendered, for the envs whose frames are not compared (the MuJoCo ones).
+        /// </param>
         /// <returns>The outcome; an exception other than <c>AssertionError</c> is the outcome's raised error.</returns>
-        private static Outcome GymnasiumCheckEnv(PyObject env) => Outcome.CapturePython(() => Python.evalStmts(CheckEnvStatements, "result", ("env", env)));
+        private static Outcome GymnasiumCheckEnv(PyObject env, bool skipRenderCheck = false) =>
+            Outcome.CapturePython(() => Python.evalStmts(skipRenderCheck ? CheckEnvSkippingRenderStatements : CheckEnvStatements, "result", ("env", env)));
 
         /// <summary>Gym.NET's <c>EnvChecker.CheckEnv</c> on a Gym.NET env, described as <see cref="GymnasiumCheckEnv"/> describes Gymnasium's.</summary>
         /// <param name="env">The env; stays owned by the caller.</param>
+        /// <param name="skipRenderCheck">Passed to <see cref="EnvChecker.CheckEnv"/>, as <see cref="GymnasiumCheckEnv"/> passes it to Gymnasium's.</param>
         /// <returns>The outcome; an exception other than <see cref="AssertionError"/> is the outcome's raised error.</returns>
-        private static Outcome GymNetCheckEnv(IEnv env) => Outcome.Capture(() => {
+        private static Outcome GymNetCheckEnv(IEnv env, bool skipRenderCheck = false) => Outcome.Capture(() => {
             using WarningCatcher caught = Warnings.Catch();
             string? error = null;
             try {
-                EnvChecker.CheckEnv(env);
+                EnvChecker.CheckEnv(env, skipRenderCheck: skipRenderCheck);
             } catch (AssertionError e) {
                 error = e.Message;
             }
@@ -610,6 +743,58 @@ namespace Gym.Tests.Parity.Tests.Bridge {
             using PyObject unwrapped = Python.gymnasium.Env.unwrapped(env);
             using PyObject spec = Python.gymnasium.Env.spec(unwrapped);
             return Python.gymnasium.envs.registration.EnvSpec.pprint(spec);
+        }
+
+        /// <summary>
+        ///     The planted info defect of <see cref="PlantedInfoTypeDefect_FailsGymnasiumsEnvMatch"/>: a HalfCheetah-v5 whose
+        ///     <c>x_position</c> info entry is handed over as a <see langword="double"/>, which the bridge returns as a Python
+        ///     <c>float</c>, instead of the 0-d array that stands for Gymnasium's <c>np.float64</c>. The value keeps its bits;
+        ///     only its Python type changes.
+        /// </summary>
+        /// <remarks>
+        ///     A subclass rather than a <see cref="Wrapper{TObs, TAct}"/>: <c>make(spec)</c> assigns the spec to the env the
+        ///     shim stands for, Gymnasium's unwrapped env, and a wrapper's <c>spec</c> is read-only, in Gym.NET as in Gymnasium.
+        /// </remarks>
+        private sealed class PositionAsDouble : HalfCheetahEnvV5 {
+            /// <summary>Whether the reset's info is altered; otherwise only the steps' infos are.</summary>
+            private readonly bool _onReset;
+
+            /// <summary>A HalfCheetah-v5 with the class's defaults (the id's registration passes none).</summary>
+            /// <param name="onReset">Alter the reset's info (<see langword="true"/>) or the steps' infos (<see langword="false"/>).</param>
+            public PositionAsDouble(bool onReset) => _onReset = onReset;
+
+            /// <summary>Resets the env, altering the info when the defect is planted at the reset.</summary>
+            /// <param name="seed">The seed, passed through.</param>
+            /// <param name="options">The options, passed through.</param>
+            /// <returns>HalfCheetah-v5's result, its info altered or not.</returns>
+            /// <exception cref="Exception">Whatever HalfCheetah-v5's reset throws.</exception>
+            public override ResetResult<NDArray> Reset(BigInteger? seed = null, IReadOnlyDictionary<string, object?>? options = null) {
+                ResetResult<NDArray> result = base.Reset(seed, options);
+                if (_onReset)
+                    Demote(result.Info);
+                return result;
+            }
+
+            /// <summary>Steps the env, altering the info when the defect is planted at the steps.</summary>
+            /// <param name="action">The action, passed through.</param>
+            /// <returns>HalfCheetah-v5's result, its info altered or not.</returns>
+            /// <exception cref="Exception">Whatever HalfCheetah-v5's step throws.</exception>
+            public override StepResult<NDArray> Step(NDArray action) {
+                StepResult<NDArray> result = base.Step(action);
+                if (!_onReset)
+                    Demote(result.Info);
+                return result;
+            }
+
+            /// <summary>Replaces the 0-d <c>x_position</c> with its value as a <see langword="double"/>.</summary>
+            /// <param name="info">The info, altered in place.</param>
+            private static void Demote(Info info) {
+                if (info.TryGetValue("x_position", out object? value) && value is NDArray { ndim: 0 } scalar) {
+                    info["x_position"] = scalar.GetAtIndex<double>(0);
+                    // The info owned the array, and nothing else refers to it once it is replaced.
+                    scalar.Dispose();
+                }
+            }
         }
 
         /// <summary>

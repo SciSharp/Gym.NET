@@ -8,7 +8,8 @@
 > On 2026-11-12 MuJoCo resumed (DR-61): its 22 ids landed on Gym.NET's own engine, bit for bit with MuJoCo 4.0.0, and the
 > missing names are now MuJoCo's three renderer classes and `AtariPreprocessing`. Their frames are not drawn yet (DR-62).
 >
-> Update this page when anything changes; the numbers under "Verification" are those of 2026-11-11, after P8.
+> Update this page when anything changes; the numbers under "Verification" are those of 2026-11-11, after P8, and of
+> 2026-11-12, after the MuJoCo envs.
 
 Gym.NET 2.0 gives .NET reinforcement-learning environments with Farama Gymnasium's API and behavior. For the same
 seed and actions, its environments return the same observations, rewards, flags and infos as Gymnasium v1.4.0's, bit
@@ -227,3 +228,14 @@ On 2026-11-11, after P8, on Windows x64, in Release, on net8.0 and net10.0 alike
 - Gymnasium's own `check_env` and `check_environments_match` pass through the reverse bridge on all seventeen registered
   ids;
 - the 19 golden trajectories, at least one per registered id, replay without Python.
+
+On 2026-11-12, after the MuJoCo envs (DR-61), on Windows x64, in Debug, with MuJoCo 4.0.0 added to the parity stack:
+
+- the unit suite: 3,804 of 3,804 pass on net8.0 and net10.0 alike (24 data rows skip where Gymnasium's tests skip);
+- the live parity gate on net10.0: 2,862 of 2,862 gated cells pass, the MuJoCo ids' included (lockstep, registration,
+  `make`'s warnings, sync and async vectors, the reverse bridge). One full run passed 2,859; the three async cells it
+  failed (a Windows venv's launcher broke multiprocessing's semaphores, the first gate run in a venv) pass since the
+  harness spawns the venv's base interpreter, as CPython does;
+- Gymnasium's own `check_env` (with `skip_render_check=True`, as Gymnasium's MuJoCo tests call it) and
+  `check_environments_match` pass through the reverse bridge on the 21 MuJoCo ids that build, 38 ids in all;
+- the 40 golden trajectories, 21 of them MuJoCo's, replay without Python.

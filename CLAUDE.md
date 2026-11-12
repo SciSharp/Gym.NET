@@ -216,8 +216,9 @@ dotnet test tests/Gym.Tests/Gym.Tests.csproj --filter "FullyQualifiedName~LunarL
 
 `tests/Gym.Tests.Parity` embeds CPython (pythonnet) and compares Gym.NET with `refs/Gymnasium` byte for byte and pixel for
 pixel, on the reference stack pinned in `tools/parity/manifest.json` (Python 3.12, NumPy 2.4.2, pygame-ce 2.5.8, Box2D
-2.3.10, OpenCV 4.13.0). Cells Gym.NET does not pass yet are `[OpenBugs("B-xx")]` (NumSharp's convention): gated runs exclude them. Full
-guide: `tests/Gym.Tests.Parity/CLAUDE.md`; design: `docs/plans/GYM_PARITY_INTEROP_TESTING.md`.
+2.3.10, OpenCV 4.13.0, MuJoCo 4.0.0). Cells Gym.NET does not pass yet are `[OpenBugs("B-xx")]` (NumSharp's convention): gated runs exclude them. Full
+guide: `tests/Gym.Tests.Parity/CLAUDE.md`; design: `docs/plans/GYM_PARITY_INTEROP_TESTING.md`. An interpreter without the
+`mujoco` package fails the stack check: create the venv with `tools/parity/setup_venv.ps1`, which installs it.
 
 ```powershell
 # Once per machine without the stack: creates tools/parity/.venv, which the suite finds on its own

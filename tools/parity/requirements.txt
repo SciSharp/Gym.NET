@@ -21,6 +21,10 @@ box2d==2.3.10
 # nor do its float32 INTER_AREA results; float32 INTER_LINEAR goes to Intel IPP when IPP is on, the default, and differs
 # from OpenCV's own kernel in 255 of 400 cases (DR-46, measured 2026-11-10), so those cells switch IPP off.
 opencv-python-headless==4.13.0.92
+# The oracle of the MuJoCo envs (DR-64): Gymnasium's MuJoCo ids run on these bindings, and Gym.NET's engine
+# (src/Gym.Environments/MuJoCo) follows this version bit for bit on win-x64. It brings absl-py, etils, glfw and
+# PyOpenGL; rendering is not compared (DR-67), so no GL context is needed.
+mujoco==4.0.0
 # Gymnasium's own runtime dependencies (pyproject.toml, "dependencies"). cloudpickle and typing-extensions are the
 # versions on the reference machine. farama-notifications is not installed there (gymnasium/__init__.py imports it
 # inside try/except, and it only prints release notices), so it is pinned to its latest release, 0.0.6; it never

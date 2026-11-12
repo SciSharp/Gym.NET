@@ -23,8 +23,9 @@ namespace Gym.Tests.Parity.Tests.Vector {
     /// <remarks>
     ///     <para>
     ///     Gymnasium spawns its workers with <c>multiprocessing</c>; embedded, <c>sys.executable</c> is the test host, so the
-    ///     cells name the session's interpreter with <c>multiprocessing.set_executable</c> first, and are Inconclusive when the
-    ///     session found only a library (<c>PYTHONNET_PYDLL</c>). Each cell closes Gymnasium's env, which joins its processes.
+    ///     cells name the session's interpreter with <c>multiprocessing.set_executable</c> first (a Windows venv's base
+    ///     interpreter, run as the venv's: <see cref="RequireSpawn"/>), and are Inconclusive when the session found only a
+    ///     library (<c>PYTHONNET_PYDLL</c>). Each cell closes Gymnasium's env, which joins its processes.
     ///     </para>
     ///     <para>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/vector/async_vector_env.py">gymnasium/vector/async_vector_env.py</see>.</para>
     /// </remarks>
@@ -409,6 +410,17 @@ namespace Gym.Tests.Parity.Tests.Vector {
         ///     Names the session's interpreter as the one <c>multiprocessing</c> spawns, once per process; Inconclusive when the
         ///     session has only a library.
         /// </summary>
+        /// <remarks>
+        ///     A Windows venv's <c>Scripts\python.exe</c> is a launcher that starts the base interpreter as a child of its own.
+        ///     <c>multiprocessing</c> hands a spawned worker a semaphore (Gymnasium's <c>max_concurrency</c>) by duplicating
+        ///     its handle into the process <c>CreateProcess</c> made, the launcher, so the worker, one process further down,
+        ///     waits on a handle it does not own, forever (measured: <c>MaxConcurrency_Lockstep_MatchesGymnasium</c> hung in
+        ///     Gymnasium's <c>reset</c>; pipes survive the launcher because the worker takes them from the parent by pid).
+        ///     CPython bypasses the launcher only when the executable is <c>sys.executable</c> (bpo-35797), which, embedded, it
+        ///     never is; so this does what CPython does there: it spawns the base interpreter and names the venv in
+        ///     <c>__PYVENV_LAUNCHER__</c>, which the base interpreter reads to run as the venv's.
+        /// </remarks>
+        /// <exception cref="AssertInconclusiveException">Thrown when the session has no interpreter to spawn.</exception>
         internal static void RequireSpawn() {
             string? interpreter = GymPythonSession.Installation?.Interpreter;
             if (interpreter is null)
@@ -417,8 +429,46 @@ namespace Gym.Tests.Parity.Tests.Vector {
                 return;
             // The session may know the interpreter by a bare name found on PATH ("python"); CreateProcess needs its file.
             string executable = ResolveOnPath(interpreter);
+            string? baseInterpreter = VenvBaseInterpreter(executable);
+            if (baseInterpreter != null) {
+                // The Win32 environment block, which CreateProcess hands children when multiprocessing passes no
+                // environment of its own; set for the test host's lifetime, as the venv is the session's for that long.
+                Environment.SetEnvironmentVariable("__PYVENV_LAUNCHER__", executable);
+                executable = baseInterpreter;
+            }
+
             PythonRuntime.Run(() => Python.multiprocessing.set_executable(executable));
             _spawnConfigured = true;
+        }
+
+        /// <summary>
+        ///     The base interpreter behind a Windows venv's launcher: <c>python.exe</c> in the <c>home</c> its
+        ///     <c>pyvenv.cfg</c> names, the file beside the launcher's <c>Scripts</c> directory.
+        /// </summary>
+        /// <param name="interpreter">The interpreter's full path.</param>
+        /// <returns>
+        ///     The base interpreter's path, or <see langword="null"/> off Windows (a POSIX venv's <c>bin/python</c> is a link
+        ///     to the base, not a launcher), outside a venv, or when the configuration names no existing interpreter.
+        /// </returns>
+        /// <exception cref="System.IO.IOException">Thrown when <c>pyvenv.cfg</c> exists but cannot be read.</exception>
+        private static string? VenvBaseInterpreter(string interpreter) {
+            if (!OperatingSystem.IsWindows())
+                return null;
+            string? scripts = System.IO.Path.GetDirectoryName(interpreter);
+            string? venv = scripts is null ? null : System.IO.Path.GetDirectoryName(scripts);
+            string? config = venv is null ? null : System.IO.Path.Combine(venv, "pyvenv.cfg");
+            if (config is null || !System.IO.File.Exists(config))
+                return null;
+            foreach (string line in System.IO.File.ReadAllLines(config)) {
+                // "home = C:\...\Python312": the base installation's directory, written by venv since Python 3.3.
+                int equals = line.IndexOf('=');
+                if (equals < 0 || !line[..equals].Trim().Equals("home", StringComparison.OrdinalIgnoreCase))
+                    continue;
+                string candidate = System.IO.Path.Combine(line[(equals + 1)..].Trim(), "python.exe");
+                return System.IO.File.Exists(candidate) ? candidate : null;
+            }
+
+            return null;
         }
 
         /// <summary>An executable's full path: as given when rooted, else the first <c>PATH</c> directory holding it (with <c>.exe</c> on Windows).</summary>

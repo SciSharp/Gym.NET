@@ -7,6 +7,7 @@ using Gym.Spaces;
 using Gym.Tests.Parity.Interop;
 using Gym.Tests.Parity.Oracle;
 using Gym.Tests.Parity.Session;
+using Gym.Tests.Parity.Tests.Envs;
 using Gym.Utils;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using NumSharp;
@@ -175,6 +176,47 @@ namespace Gym.Tests.Parity.Tests.Registration {
                 return Python.gymnasium.envs.registration.EnvSpec.kwargs(spec);
             }), Outcome.Returned(ValueFacts.Of(Gymnasium.Spec(id).Kwargs)));
         }
+
+        /// <summary>
+        ///     The MuJoCo ids (DR-61): <c>spec(id)</c>'s printed text and kwargs for all 22, Pusher-v4 included (it registers,
+        ///     and refuses only when built); and for the 21 that build, <c>str(make(id))</c> (each class's Python name, the same
+        ///     for v4 and v5, DR-66) and the printed specs of the stack and of the unwrapped env. Gymnasium registers their
+        ///     thresholds as floats (<c>-3.75</c>, <c>950.0</c>, ...) or none, so, unlike the box2d ids', nothing prints
+        ///     differently by type.
+        /// </summary>
+        /// <param name="id">The id.</param>
+        /// <exception cref="AssertFailedException">Thrown when a printed text or the kwargs differ from Gymnasium's.</exception>
+        [TestMethod]
+        [DynamicData(nameof(MujocoIds))]
+        public void Make_Mujoco_StackAndSpecs_MatchGymnasium(string id) {
+            ByteContract.AssertSame($"spec('{id}').pprint()", Outcome.CapturePython(() => {
+                using PyObject spec = Python.gymnasium.spec(id);
+                return Python.gymnasium.envs.registration.EnvSpec.pprint(spec);
+            }), Outcome.Returned(ValueFacts.FromText(Gymnasium.Spec(id).Pprint(disablePrint: true)!)));
+            ByteContract.AssertSame($"spec('{id}').kwargs", Outcome.CapturePython(() => {
+                using PyObject spec = Python.gymnasium.spec(id);
+                return Python.gymnasium.envs.registration.EnvSpec.kwargs(spec);
+            }), Outcome.Returned(ValueFacts.Of(Gymnasium.Spec(id).Kwargs)));
+            // Pusher-v4 builds on neither side (MujocoLiveParityTests compares the refusal), so its registration is all there is.
+            if (id == "Pusher-v4")
+                return;
+
+            using PyRef python = PyRef.Of(() => Python.gymnasium.make(id));
+            using IEnv dotnet = Gymnasium.Make(id);
+            ByteContract.AssertSame($"str(make('{id}'))", Outcome.CapturePython(() => Python.builtins.str(python.Object)), Outcome.Returned(ValueFacts.FromText(dotnet.ToString()!)));
+            ByteContract.AssertSame($"{id}: env.spec.pprint()", Outcome.CapturePython(() => {
+                using PyObject spec = Python.gymnasium.Env.spec(python.Object);
+                return Python.gymnasium.envs.registration.EnvSpec.pprint(spec);
+            }), Outcome.Returned(ValueFacts.FromText(dotnet.Spec!.Pprint(disablePrint: true)!)));
+            ByteContract.AssertSame($"{id}: env.unwrapped.spec.pprint()", Outcome.CapturePython(() => {
+                using PyObject unwrapped = Python.gymnasium.Env.unwrapped(python.Object);
+                using PyObject spec = Python.gymnasium.Env.spec(unwrapped);
+                return Python.gymnasium.envs.registration.EnvSpec.pprint(spec);
+            }), Outcome.Returned(ValueFacts.FromText(dotnet.Unwrapped.Spec!.Pprint(disablePrint: true)!)));
+        }
+
+        /// <summary>All 22 MuJoCo ids, Pusher-v4 in its registration place (<see cref="MujocoLiveParityTests.MakeIds"/>).</summary>
+        public static IEnumerable<object[]> MujocoIds => MujocoLiveParityTests.MakeIds;
 
         /// <summary>
         ///     DR-32's accepted deviation, pinned so it cannot drift: <c>MountainCarContinuous-v0</c>'s <c>EnvSpec.kwargs</c> is

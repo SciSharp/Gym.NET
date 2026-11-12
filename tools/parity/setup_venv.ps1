@@ -90,5 +90,5 @@ Invoke-Checked -Command @($venvPython) -Arguments @('-m', 'pip', 'install', '--d
 Invoke-Checked -Command @($venvPython) -Arguments @('-m', 'pip', 'install', '--disable-pip-version-check', '-r', $requirements)
 
 # Import what the manifest pins, so a broken wheel fails here rather than in the first test.
-Invoke-Checked -Command @($venvPython) -Arguments @('-c', 'import numpy, pygame, Box2D; print("numpy", numpy.__version__, "| pygame-ce", pygame.version.ver, "(SDL", str(pygame.version.SDL) + ") | Box2D", Box2D.__version__)')
+Invoke-Checked -Command @($venvPython) -Arguments @('-c', 'import numpy, pygame, Box2D, mujoco; print("numpy", numpy.__version__, "| pygame-ce", pygame.version.ver, "(SDL", str(pygame.version.SDL) + ") | Box2D", Box2D.__version__, "| mujoco", mujoco.__version__)')
 Write-Host "Created $venv. The parity suite uses it automatically; see tests/Gym.Tests.Parity/CLAUDE.md."

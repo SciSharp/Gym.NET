@@ -53,5 +53,5 @@ fi
 "$venv_python" -m pip install --disable-pip-version-check -r "$here/requirements.txt"
 
 # Import what the manifest pins, so a broken wheel fails here rather than in the first test.
-"$venv_python" -c 'import numpy, pygame, Box2D; print("numpy", numpy.__version__, "| pygame-ce", pygame.version.ver, "(SDL", str(pygame.version.SDL) + ") | Box2D", Box2D.__version__)'
+"$venv_python" -c 'import numpy, pygame, Box2D, mujoco; print("numpy", numpy.__version__, "| pygame-ce", pygame.version.ver, "(SDL", str(pygame.version.SDL) + ") | Box2D", Box2D.__version__, "| mujoco", mujoco.__version__)'
 echo "Created $venv. The parity suite uses it automatically; see tests/Gym.Tests.Parity/CLAUDE.md."
