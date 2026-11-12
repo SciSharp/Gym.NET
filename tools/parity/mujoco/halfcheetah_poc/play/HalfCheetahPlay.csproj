@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- HalfCheetah-v5 to play: the proof of concept's managed core (compiled in from the folder above) in a Gym.NET viewer
-       window, keyboard-driven or on an autopilot trained by Augmented Random Search on the same core. Not part of
+  <!-- HalfCheetah-v5 to play: Gym.NET's MuJoCo engine (compiled in from src/Gym.Environments/MuJoCo) in a Gym.NET viewer
+       window, keyboard-driven or on an autopilot trained by Augmented Random Search on the same engine. Not part of
        Gym.NET.sln; nothing ships from here. -->
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -11,18 +11,20 @@
     <LangVersion>latest</LangVersion>
     <RootNamespace>MujocoPoc.Play</RootNamespace>
     <ServerGarbageCollection>false</ServerGarbageCollection>
+    <!-- The Avalonia viewer brings Gym.Environments, whose assembly holds the same Gym.MuJoCo types this project compiles
+         from source (below) to reach the engine's internals; the compiled-in copy wins, as intended (CS0436). -->
+    <NoWarn>$(NoWarn);CS0436</NoWarn>
   </PropertyGroup>
 
-  <!-- The core is the proof of concept's own source, the one the checker proves bit-exact; it is compiled in, not copied. -->
+  <!-- The engine is the product's own source, the one the trace checker proves bit-exact; it is compiled in, not copied. -->
   <ItemGroup>
-    <Compile Include="..\Kernels.cs" Link="Core\Kernels.cs" />
-    <Compile Include="..\CheetahModel.cs" Link="Core\CheetahModel.cs" />
-    <Compile Include="..\CheetahCore.cs" Link="Core\CheetahCore.cs" />
+    <Compile Include="..\..\..\..\..\src\Gym.Environments\MuJoCo\*.cs" Link="Engine\%(Filename)%(Extension)" />
+    <ProjectReference Include="..\..\..\..\..\src\Gym\Gym.csproj" />
   </ItemGroup>
 
-  <!-- MuJoCo's compiled HalfCheetah (oracle.py's model dump) and the trained autopilot, next to the program. -->
+  <!-- MuJoCo's compiled HalfCheetah (the embedded model of DR-63) and the trained autopilot, next to the program. -->
   <ItemGroup>
-    <None Include="half_cheetah.mjmodel.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\..\..\..\src\Gym.Environments\Assets\mujoco\half_cheetah.json" Link="half_cheetah.json" CopyToOutputDirectory="PreserveNewest" />
     <None Include="policy.json" CopyToOutputDirectory="PreserveNewest" Condition="Exists('policy.json')" />
   </ItemGroup>
 

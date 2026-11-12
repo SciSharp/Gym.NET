@@ -34,23 +34,26 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import cs_coverage  # noqa: E402  (the same reading of the report)
 
-FILES = ["CheetahCore.cs", "Kernels.cs"]
+FILES = ["MjData.cs", "Ccd.cs", "Kernels.cs"]
+# the engine's sources (src/Gym.Environments/MuJoCo), probed in the out folder's Engine copy
+REPO = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "..", ".."))
+ENGINE = os.path.join(REPO, "src", "Gym.Environments", "MuJoCo")
 
 # executed paths worth locating too: (file, anchor that ends a line, label); the probe goes on the line after the anchor
 MARKERS = [
-    ("Kernels.cs", "private static int Polytope3(CcdPolytope pt, CcdStatus status, CcdObject obj1, CcdObject obj2, bool allowP2) {", "marker Polytope3"),
-    ("Kernels.cs", "private static int Polytope4(CcdPolytope pt, CcdStatus status, CcdObject obj1, CcdObject obj2) {", "marker Polytope4"),
-    ("Kernels.cs", "private static int Epa(CcdStatus status, CcdPolytope pt, CcdObject obj1, CcdObject obj2) {", "marker Epa"),
+    ("Ccd.cs", "private static int Polytope3(CcdPolytope pt, CcdStatus status, CcdObject obj1, CcdObject obj2, bool allowP2) {", "marker Polytope3"),
+    ("Ccd.cs", "private static int Polytope4(CcdPolytope pt, CcdStatus status, CcdObject obj1, CcdObject obj2) {", "marker Polytope4"),
+    ("Ccd.cs", "private static int Epa(CcdStatus status, CcdPolytope pt, CcdObject obj1, CcdObject obj2) {", "marker Epa"),
     # MuJoCo 4's multi-contact pass and its polygon clipping (the capsule's edge against the cylinder's disk)
-    ("Kernels.cs", "private static int Multicontact(CcdObject obj1, CcdObject obj2, double[] x1, double[] x2, double[] dist, int nconmax) {", "marker Multicontact"),
-    ("Kernels.cs", "int nface2, ReadOnlySpan<double> n, ReadOnlySpan<double> dir, double margin) {", "marker PolygonClip"),
-    ("Kernels.cs", "} else if (maxContacts > 1 && status.Dist[0] < 0 && obj1.NSupp > 0) {", "marker shallow contact to the multi-contact pass"),
+    ("Ccd.cs", "private static int Multicontact(CcdObject obj1, CcdObject obj2, double[] x1, double[] x2, double[] dist, int nconmax) {", "marker Multicontact"),
+    ("Ccd.cs", "int nface2, ReadOnlySpan<double> n, ReadOnlySpan<double> dir, double margin) {", "marker PolygonClip"),
+    ("Ccd.cs", "} else if (maxContacts > 1 && status.Dist[0] < 0 && obj1.NSupp > 0) {", "marker shallow contact to the multi-contact pass"),
 ]
 
 # conditions no single line shows: (file, anchor, code inserted after the anchor, labels the code uses); the code only
 # reads state
 CUSTOM = [
-    ("CheetahCore.cs",
+    ("MjData.cs",
      "        if (costWarm > costSmooth)\n            Array.Copy(qacc_smooth, qacc, nv);\n",
      "        if (costWarm <= costSmooth && nidof < nv) {\n"
      "            Probe.Hit(\"custom: warm start kept while some dofs are in no island\");\n"
@@ -65,29 +68,29 @@ CUSTOM = [
      ["custom: warm start kept while some dofs are in no island",
       "custom: warm start kept and a free dof's warm start differs from qacc_smooth"]),
     # two runs the insertion rules cannot probe (statements under an unbraced header), probed by their conditions
-    ("Kernels.cs",
+    ("Ccd.cs",
      "            outward[k] = V(pt, v1)[k] - pt.Center[k];\n",
      "        if (Dot3(projection, outward) < 0)\n"
      "            Probe.Hit(\"custom: AttachFace turns a face's projection outward\");\n",
      ["custom: AttachFace turns a face's projection outward"]),
-    ("CheetahCore.cs",
+    ("MjData.cs",
      "        else if (root2 < root1)\n            treeParent[root1] = root2;\n",
      "        if (root2 < root1)\n"
      "            Probe.Hit(\"custom: the union-find links the first root under the second\");\n",
      ["custom: the union-find links the first root under the second"]),
     # MuJoCo 4's multi-contact pass: EPA's contact handed to it (an unbraced if, so probed by its condition), and the
     # pass clipping the capsule's edge into contacts
-    ("Kernels.cs",
+    ("Ccd.cs",
      "                int face = Epa(status, poly, obj1, obj2);\n",
      "                if (maxContacts > 1 && face >= 0)\n"
      "                    Probe.Hit(\"custom: EPA's contact to the multi-contact pass\");\n",
      ["custom: EPA's contact to the multi-contact pass"]),
-    ("Kernels.cs",
+    ("Ccd.cs",
      "            Inflate(nx, x1, x2, dist, margin1, margin2, normal);\n",
      "            Probe.Hit(\"custom: the multi-contact pass clipped the capsule's edge\");\n",
      ["custom: the multi-contact pass clipped the capsule's edge"]),
     # mjc_segWeights' parallel test (MuJoCo 4): exact parallels, and the band its 1e-8 threshold decides
-    ("CheetahCore.cs",
+    ("MjData.cs",
      "        double det = Spatial.Dot3(cross, cross);\n",
      "        if (det == 0)\n"
      "            Probe.Hit(\"custom: two capsules exactly parallel\");\n"
@@ -100,7 +103,7 @@ PROBE = '''using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace MujocoPoc;
+namespace Gym.MuJoCo;
 
 /// <summary>The search's probes: per label, the hit count, the episodes and the first (seed, physics step) pairs.</summary>
 internal static class Probe {
@@ -141,6 +144,7 @@ SEARCH = '''using System;
 using System.IO;
 using System.Linq;
 using System.Numerics;
+using Gym.MuJoCo;
 using NumSharp;
 
 namespace MujocoPoc;
@@ -154,13 +158,14 @@ internal static class Search {
     private static int Main(string[] args) {
         string dir = args[0];
         int from = int.Parse(args[1]), to = int.Parse(args[2]);
-        var model = CheetahModel.Load(Path.Combine(dir, "model.json"));
+        var model = MjModel.Load(Path.Combine(dir, "model.json"));
         var run = RunInfo.Load(Path.Combine(dir, "run.json"));
         EnvRules rules = EnvRules.TryFor(model, run) ?? throw new InvalidOperationException("no rules for " + run.Env);
         long physics = 0;
         for (int seed = from; seed < to; seed++) {
             Probe.Seed = seed;
-            var core = new CheetahCore(model);
+            // a new data per episode: the search plays seeds independently (the checker proves the reset path)
+            using var core = new MjData(model);
             rules.Reset(core, seed, run.Flip);
             // the action space's own stream, as Program.SampleActions draws it, one action per env step
             var rng = new Generator(new PCG64(new SeedSequence(new BigInteger(seed))));
@@ -171,8 +176,8 @@ internal static class Search {
                 double[] action = drawn.ToArray<double>().Select(v => (double)(float)v).ToArray();
                 rules.Before(core, action);
                 Array.Copy(action, core.ctrl, model.nu);
-                for (int k = 0; k < model.frame_skip; k++) {
-                    Probe.Step = t * model.frame_skip + k;
+                for (int k = 0; k < run.FrameSkip; k++) {
+                    Probe.Step = t * run.FrameSkip + k;
                     core.Step();
                     physics++;
                 }
@@ -243,6 +248,22 @@ def insert_probes(path, runs, name):
     return labels
 
 
+def shift(text):
+    """Moves an anchor or inserted code into the engine's namespace block, four spaces deeper than first written.
+
+    Args:
+        text: lines written for the file-scoped namespace; a first line that begins mid-line (no leading space) stays.
+    Returns:
+        The shifted text.
+    """
+    lines = text.split("\n")
+    out = []
+    for i, line in enumerate(lines):
+        starts_line = i > 0 or line.startswith(" ")
+        out.append(("    " + line) if starts_line and line else line)
+    return "\n".join(out)
+
+
 def insert_after(path, anchor, code):
     """Inserts code after a unique anchor.
 
@@ -268,16 +289,21 @@ def main():
     for f in os.listdir(poc):
         if f.endswith(".cs") or f.endswith(".csproj"):
             shutil.copy(os.path.join(poc, f), out)
+    # the engine is compiled from the copy, where the probes go
+    os.makedirs(os.path.join(out, "Engine"))
+    for f in os.listdir(ENGINE):
+        if f.endswith(".cs"):
+            shutil.copy(os.path.join(ENGINE, f), os.path.join(out, "Engine"))
     hits, method_of = cs_coverage.load(report)
     labels = []
     for name in FILES:
         runs = [(a, b, method_of[name].get(a, "?")) for a, b in cs_coverage.unexecuted_runs(hits[name])]
-        labels += insert_probes(os.path.join(out, name), runs, name)
+        labels += insert_probes(os.path.join(out, "Engine", name), runs, name)
     for name, anchor, label in MARKERS:
-        insert_after(os.path.join(out, name), anchor, f'\n        Probe.Hit("{label}");')
+        insert_after(os.path.join(out, "Engine", name), shift(anchor), f'\n            Probe.Hit("{label}");')
         labels.append(label)
     for name, anchor, code, custom_labels in CUSTOM:
-        insert_after(os.path.join(out, name), anchor, code)
+        insert_after(os.path.join(out, "Engine", name), shift(anchor), shift(code))
         labels += custom_labels
     with open(os.path.join(out, "Probe.cs"), "w", encoding="utf-8") as fh:
         fh.write(PROBE)
@@ -293,7 +319,8 @@ def main():
     proj = os.path.join(out, "HalfCheetahPoc.csproj")
     src = open(proj, encoding="utf-8").read()
     src = src.replace("<RootNamespace>MujocoPoc</RootNamespace>",
-                      f"<RootNamespace>MujocoPoc</RootNamespace>\n    <StartupObject>{startup}</StartupObject>\n    <NoWarn>CS7022</NoWarn>")
+                      f"<RootNamespace>MujocoPoc</RootNamespace>\n    <StartupObject>{startup}</StartupObject>\n    <NoWarn>CS7022</NoWarn>"
+                      f"\n    <GymRoot>{REPO}{os.sep}</GymRoot>\n    <MuJoCoSource>{os.path.join(os.path.abspath(out), 'Engine')}</MuJoCoSource>")
     open(proj, "w", encoding="utf-8").write(src)
     print(f"{len(labels)} probes; entry point {startup}")
 

@@ -1,7 +1,7 @@
 # HalfCheetah-v5, playable
 
-The proof of concept's managed core (`../CheetahCore.cs`, bit-exact with MuJoCo 3.15.0, see
-[`MUJOCO_ASSESSMENT.md` §10](../../../../../docs/plans/MUJOCO_ASSESSMENT.md)) running in a Gym.NET viewer window. An
+Gym.NET's MuJoCo engine (`src/Gym.Environments/MuJoCo`, bit-exact with MuJoCo 4.0.0, see
+[`MUJOCO_ASSESSMENT.md` §10 and §14](../../../../../docs/plans/MUJOCO_ASSESSMENT.md)) running in a Gym.NET viewer window. An
 autopilot drives it; Tab hands the six motors to you.
 
 ```bash
@@ -40,7 +40,9 @@ dotnet run --project tools/parity/mujoco/halfcheetah_poc/play -c Release -- scor
 python tools/parity/mujoco/halfcheetah_poc/play/replay_in_gymnasium.py --seeds 0-9
 ```
 
-All ten returns were identical when measured on 2026-11-11 (seed 0: 5832.688804393127 on both). The replay evaluates the
+All ten returns were identical when measured on 2026-11-11 against MuJoCo 3.15.0 (seed 0: 5832.688804393127 on both),
+and again on 2026-11-12 against MuJoCo 4.0.0, the engine having followed the pin (seed 0: 5796.983819567387 on both; the
+policy is the same, the physics rounds differently). The replay evaluates the
 policy in the C# arithmetic order (`LinearPolicy.Act`). NumPy's matrix product sums in another order and would make the
 episodes drift apart.
 
@@ -53,5 +55,5 @@ episodes drift apart.
 | `frames FOLDER [--steps 200] [--every 20]` | Writes PNG stills |
 | `score [--seeds 0-4]` | Prints exact episode returns |
 
-Pass the command after `--` in `dotnet run`. `half_cheetah.mjmodel.json` is MuJoCo's compiled model, dumped by
-`../oracle.py`.
+Pass the command after `--` in `dotnet run`. `half_cheetah.json` is MuJoCo's compiled model as Gym.Environments embeds
+it (`src/Gym.Environments/Assets/mujoco`, recorded by `tools/parity/mujoco/record_models.py`).

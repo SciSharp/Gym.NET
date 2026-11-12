@@ -7,6 +7,7 @@ using System.Linq;
 using System.Numerics;
 using System.Text.Json;
 using NumSharp;
+using Gym.MuJoCo;
 
 namespace MujocoPoc;
 
@@ -22,7 +23,7 @@ namespace MujocoPoc;
 ///     difference shows in the step that makes it. Exit code 0 when every episode is exact in both passes and the env layer.
 ///     An id without rules (a MuJoCo env outside Gymnasium's eleven) is checked physics only: the closed loop starts from
 ///     Gymnasium's recorded reset and replays its actions, and its env layer is not checked (its report says so). A model
-///     outside the core's scope is reported by the feature <see cref="CheetahModel.Load"/> names, and counts as failed.
+///     outside the core's scope is reported by the feature <see cref="MjModel.Load"/> names, and counts as failed.
 /// </remarks>
 internal static class Program {
     /// <summary>The names of the per-step records, in oracle.py's order after the state block.</summary>
@@ -56,11 +57,11 @@ internal static class Program {
         int failed = 0;
         long physicsSteps = 0, envSteps = 0, comparisons = 0;
         // the first trace of each env is the one its speed is measured on, in the order the envs first appear
-        var benchmarks = new List<(CheetahModel Model, RunInfo Run, string Dir)>();
+        var benchmarks = new List<(MjModel Model, RunInfo Run, string Dir)>();
         foreach (string dir in dirs) {
-            CheetahModel model;
+            MjModel model;
             try {
-                model = CheetahModel.Load(Path.Combine(dir, "model.json"));
+                model = MjModel.Load(Path.Combine(dir, "model.json"));
             } catch (NotSupportedException e) {
                 // a model beyond the core's scope is a finding, not a crash: report it and go on with the other folders
                 Console.WriteLine($"{Path.GetFileName(dir.TrimEnd('/', '\\'))}: refused by the core: {e.Message}");
@@ -79,7 +80,7 @@ internal static class Program {
         }
         Console.WriteLine($"total: {dirs.Length - failed}/{dirs.Length} traces bit-exact; {envSteps} env steps, {physicsSteps} physics steps, "
                           + $"{comparisons} array comparisons per pass");
-        foreach ((CheetahModel model, RunInfo run, string dir) in benchmarks)
+        foreach ((MjModel model, RunInfo run, string dir) in benchmarks)
             Benchmark(model, run, dir);
         return failed == 0 ? 0 : 1;
     }
@@ -109,7 +110,7 @@ internal static class Program {
     ///     A physics-only pass proves the core's arithmetic for the model, not the env: the reset noise, the action
     ///     sampling and the env's observation, reward and info stay unverified until the env has rules here.
     /// </remarks>
-    private static TraceResult CheckTrace(string dir, CheetahModel model, RunInfo run, bool verbose) {
+    private static TraceResult CheckTrace(string dir, MjModel model, RunInfo run, bool verbose) {
         List<double[]> trace = Records.ReadAll(Path.Combine(dir, "trace.bin"));
         List<double[]> envRecords = Records.ReadAll(Path.Combine(dir, "env.bin"));
         if (trace[0].Length != 2 || trace[0][0] != 3)
@@ -122,6 +123,9 @@ internal static class Program {
         long constraintSteps = 0, iterations = 0;
         var touched = new SortedSet<int>();
         int rec = 1, envRec = 0;
+        // one data for the whole run, reset per episode by mj_resetData, as Gymnasium's env resets its one mjData: the
+        // closed loop then proves that a reset leaves nothing of the previous episode behind
+        using var core = new MjData(model);
         for (int e = 0; e < run.Seeds.Length; e++) {
             int seed = run.Seeds[e];
             int steps = (int)trace[rec][0];
@@ -130,7 +134,7 @@ internal static class Program {
             int start = rec;
             rec += 4;
             // ---- closed loop with the env layer, from the core's own reset and actions
-            var core = new CheetahCore(model);
+            core.ResetData();
             double[][]? actions = null;
             if (rules != null) {
                 rules.Reset(core, seed, run.Flip);
@@ -155,9 +159,9 @@ internal static class Program {
                 recClosed++;
                 rules?.Before(core, action);
                 Array.Copy(action, core.ctrl, model.nu);
-                for (int k = 0; k < model.frame_skip; k++) {
+                for (int k = 0; k < run.FrameSkip; k++) {
                     core.Step();
-                    CompareStep(closed, core, trace, ref recClosed, debug, t * model.frame_skip + k);
+                    CompareStep(closed, core, trace, ref recClosed, debug, t * run.FrameSkip + k);
                     constraintSteps += core.nefc > 0 ? 1 : 0;
                     iterations += core.solver_niter;
                     for (int c = 0; c < core.ncon; c++) {
@@ -174,12 +178,12 @@ internal static class Program {
                 }
             }
             // ---- resync: every physics step from MuJoCo's recorded pre-step state
-            var fresh = new CheetahCore(model);
+            using var fresh = new MjData(model);
             double[] prevQpos = trace[start], prevQvel = trace[start + 1], prevWarm = trace[start + 2];
             double prevTime = trace[start + 3][0];
             for (int t = 0; t < steps; t++) {
                 double[] action = trace[rec++];
-                for (int k = 0; k < model.frame_skip; k++) {
+                for (int k = 0; k < run.FrameSkip; k++) {
                     int stepStart = rec;
                     Array.Copy(prevQpos, fresh.qpos, model.nq);
                     Array.Copy(prevQvel, fresh.qvel, model.nv);
@@ -187,7 +191,7 @@ internal static class Program {
                     Array.Copy(action, fresh.ctrl, model.nu);
                     fresh.time = prevTime;
                     fresh.Step();
-                    CompareStep(resync, fresh, trace, ref rec, debug, t * model.frame_skip + k);
+                    CompareStep(resync, fresh, trace, ref rec, debug, t * run.FrameSkip + k);
                     prevQpos = trace[stepStart];
                     prevQvel = trace[stepStart + 1];
                     prevWarm = trace[stepStart + 3];
@@ -243,7 +247,7 @@ internal static class Program {
     /// <param name="rec">The cursor, advanced past the step's records.</param>
     /// <param name="debug">Whether the episode recorded the dual matrix and the position/velocity-stage arrays.</param>
     /// <param name="step">The physics step index, for the report.</param>
-    private static void CompareStep(Checker c, CheetahCore core, List<double[]> trace, ref int rec, bool debug, int step) {
+    private static void CompareStep(Checker c, MjData core, List<double[]> trace, ref int rec, bool debug, int step) {
         int nv = core.qvel.Length, nefc = core.nefc, ncon = core.ncon;
         double[][] state = [core.qpos, core.qvel, core.qacc, core.qacc_warmstart, core.qacc_smooth, core.qfrc_constraint,
                             core.qfrc_passive, core.qfrc_bias, core.qfrc_actuator, core.actuator_force];
@@ -276,11 +280,11 @@ internal static class Program {
 
     /// <summary>Compares the arrays recorded after an env step's <c>mj_rnePostConstraint</c>.</summary>
     /// <param name="c">The checker.</param>
-    /// <param name="core">The core after <see cref="CheetahCore.RnePostConstraint"/>.</param>
+    /// <param name="core">The core after <see cref="MjData.RnePostConstraint"/>.</param>
     /// <param name="trace">The trace.</param>
     /// <param name="rec">The cursor, advanced past the records.</param>
     /// <param name="t">The env step index.</param>
-    private static void ComparePost(Checker c, CheetahCore core, List<double[]> trace, ref int rec, int t) {
+    private static void ComparePost(Checker c, MjData core, List<double[]> trace, ref int rec, int t) {
         double[][] post = [core.cfrc_ext, core.ten_length, core.ten_velocity, core.site_xpos, core.site_xmat, core.xpos];
         for (int i = 0; i < PostNames.Length; i++)
             c.Check(PostNames[i], post[i], trace[rec++], t);
@@ -304,14 +308,14 @@ internal static class Program {
     ///     their own NumSharp reset and actions.
     /// </param>
     /// <exception cref="IOException">The trace of an env without rules cannot be read.</exception>
-    private static void Benchmark(CheetahModel model, RunInfo run, string dir) {
+    private static void Benchmark(MjModel model, RunInfo run, string dir) {
         EnvRules? rules = EnvRules.TryFor(model, run);
         (double[] Qpos, double[] Qvel, double[] Warm, double Time, double[][] Actions)? recorded =
-            rules == null ? FirstEpisode(Records.ReadAll(Path.Combine(dir, "trace.bin")), model) : null;
+            rules == null ? FirstEpisode(Records.ReadAll(Path.Combine(dir, "trace.bin")), run.FrameSkip) : null;
         double[][] actions = recorded?.Actions ?? SampleActions(rules!, run.Seeds[0], run.Steps[0]);
         double best = double.MaxValue;
         for (int r = 0; r < 5; r++) {
-            var core = new CheetahCore(model);
+            using var core = new MjData(model);
             if (rules != null) {
                 rules.Reset(core, run.Seeds[0], run.Flip);
             } else {
@@ -323,11 +327,11 @@ internal static class Program {
             var sw = Stopwatch.StartNew();
             foreach (double[] a in actions) {
                 Array.Copy(a, core.ctrl, model.nu);
-                for (int k = 0; k < model.frame_skip; k++)
+                for (int k = 0; k < run.FrameSkip; k++)
                     core.Step();
             }
             sw.Stop();
-            best = Math.Min(best, sw.Elapsed.TotalMicroseconds / (actions.Length * model.frame_skip));
+            best = Math.Min(best, sw.Elapsed.TotalMicroseconds / (actions.Length * run.FrameSkip));
         }
         Console.WriteLine($"speed ({run.Env}): {best:F2} us per physics step (managed core, best of 5 runs of one episode)");
     }
@@ -337,7 +341,7 @@ internal static class Program {
     ///     checker has no rules for.
     /// </summary>
     /// <param name="trace">The trace's records.</param>
-    /// <param name="model">The model, for the frame skip.</param>
+    /// <param name="frameSkip">The env's physics steps per env step (run.json's <c>frame_skip</c>).</param>
     /// <returns>The reset's qpos, qvel, qacc_warmstart and time, and the episode's actions.</returns>
     /// <remarks>
     ///     The records of an env step are its action, then per physics step 30 records (47 in a debug episode), then the
@@ -345,12 +349,12 @@ internal static class Program {
     ///     change the stride here.
     /// </remarks>
     private static (double[] Qpos, double[] Qvel, double[] Warm, double Time, double[][] Actions) FirstEpisode(
-        List<double[]> trace, CheetahModel model) {
+        List<double[]> trace, int frameSkip) {
         int steps = (int)trace[1][0];
         bool debug = trace[1][1] != 0;
         // the state block, the meta record, 4 contact records, efc_J and the efc arrays; then efc_AR and DEBUG
         int perStep = StateNames.Length + 6 + EfcNames.Length + (debug ? 1 + DebugNames.Length : 0);
-        int stride = 1 + model.frame_skip * perStep + PostNames.Length;
+        int stride = 1 + frameSkip * perStep + PostNames.Length;
         var actions = new double[steps][];
         for (int t = 0; t < steps; t++)
             actions[t] = trace[6 + t * stride];
@@ -366,8 +370,9 @@ internal static class Program {
 /// <param name="Terminate">Whether the env terminates when unhealthy.</param>
 /// <param name="InfoKeys">The info entries and their sizes, in env.bin's order.</param>
 /// <param name="MaxEpisodeSteps">The env's TimeLimit (<c>max_episode_steps</c>), the step that truncates.</param>
+/// <param name="FrameSkip">The env's physics steps per env step (<c>frame_skip</c>), an env setting rather than the model's.</param>
 internal sealed record RunInfo(string Env, int[] Seeds, int[] Steps, bool Flip, bool Terminate, (string Key, int Size)[] InfoKeys,
-                                 int MaxEpisodeSteps) {
+                                 int MaxEpisodeSteps, int FrameSkip) {
     /// <summary>Reads run.json.</summary>
     /// <param name="path">The file.</param>
     /// <returns>The run.</returns>
@@ -383,7 +388,8 @@ internal sealed record RunInfo(string Env, int[] Seeds, int[] Steps, bool Flip, 
             r.GetProperty("flip").GetBoolean(),
             r.GetProperty("terminate").GetBoolean(),
             r.GetProperty("info_keys").EnumerateArray().Select(e => (e[0].GetString() ?? "", e[1].GetInt32())).ToArray(),
-            r.GetProperty("max_episode_steps").GetInt32());
+            r.GetProperty("max_episode_steps").GetInt32(),
+            r.GetProperty("frame_skip").GetInt32());
     }
 }
 

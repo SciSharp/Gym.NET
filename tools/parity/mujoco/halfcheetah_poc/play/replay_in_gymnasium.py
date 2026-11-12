@@ -2,11 +2,11 @@
 
 `HalfCheetahPlay score` prints the autopilot's episode returns on the managed core; this script plays the same policy from
 the same seeded resets in Gymnasium (refs/Gymnasium) on the installed `mujoco`, and prints the same lines. Because the
-core steps exactly as MuJoCo 3.15.0 does, and the policy is evaluated here in the same arithmetic order as in C# (plain
+core steps exactly as MuJoCo 4.0.0 does, and the policy is evaluated here in the same arithmetic order as in C# (plain
 Python floats, summed in column order, clipped, then rounded to float32: NumPy's matrix product would sum differently),
 the two outputs are identical to the last bit.
 
-Usage (a Python with numpy, imageio and mujoco==3.15.0):
+Usage (a Python with numpy, imageio and mujoco==4.0.0, the pin of DR-64):
     python tools/parity/mujoco/halfcheetah_poc/play/replay_in_gymnasium.py [--policy FILE] [--seeds A-B]
 
 Args (command line):

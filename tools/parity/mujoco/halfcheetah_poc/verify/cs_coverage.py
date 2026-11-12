@@ -23,6 +23,10 @@ import os
 import sys
 import xml.etree.ElementTree as ET
 
+# the engine's sources, which the checker compiles in (src/Gym.Environments/MuJoCo)
+ENGINE = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "..", "..", "src",
+                                       "Gym.Environments", "MuJoCo"))
+
 
 def load(report):
     """Reads the line hits of a cobertura report.
@@ -84,6 +88,9 @@ def main():
         if not runs:
             continue
         path = os.path.join(folder, name)
+        if not os.path.exists(path):
+            # the engine's files are compiled in from src/Gym.Environments/MuJoCo
+            path = os.path.join(ENGINE, name)
         source = open(path, encoding="utf-8").read().splitlines() if os.path.exists(path) else []
         print(f"\n== {name}: {sum(1 for h in hits[name].values() if h == 0)} lines never executed")
         for a, b in runs:

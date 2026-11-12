@@ -17,14 +17,16 @@ namespace Gym.Utils {
     ///     is the name Python prints for it (DR-24): the vector wrappers renamed for unique class names
     ///     (<c>NormalizeObservationVector</c>) keep Gymnasium's (<c>NormalizeObservation</c>) in <c>repr</c> and messages. On
     ///     a static method it is the Python function the method stands for where C# cannot use that name
-    ///     (<c>StepApiCompatibility.Dispatch</c> is <c>step_api_compatibility</c>, the class's own name).
+    ///     (<c>StepApiCompatibility.Dispatch</c> is <c>step_api_compatibility</c>, the class's own name). On an enum and its
+    ///     members it is the Python enum and constant each stands for (DR-68: <c>MjtState.FullPhysics</c> is
+    ///     <c>mjtState.mjSTATE_FULLPHYSICS</c>).
     /// </summary>
     /// <remarks>
     ///     An overriding property inherits its base's name (<c>Inherited</c>), but a class's name is read from the class
     ///     itself only (<see cref="PyAttributes.PyTypeName"/>): a subclass prints its own name, as a Python subclass does.
     /// </remarks>
-    [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field | AttributeTargets.Parameter | AttributeTargets.Class | AttributeTargets.Method, AllowMultiple = false,
-        Inherited = true)]
+    [AttributeUsage(AttributeTargets.Property | AttributeTargets.Field | AttributeTargets.Parameter | AttributeTargets.Class | AttributeTargets.Method
+                    | AttributeTargets.Enum, AllowMultiple = false, Inherited = true)]
     public sealed class PyNameAttribute : Attribute {
         /// <summary>Maps the member to <paramref name="name"/>.</summary>
         /// <param name="name">The Python attribute name, spelled exactly as in the Gymnasium source.</param>

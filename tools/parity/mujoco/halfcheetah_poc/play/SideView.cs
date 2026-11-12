@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using Gym.Rendering;
+using Gym.MuJoCo;
 
 namespace MujocoPoc.Play;
 
@@ -66,7 +67,7 @@ public sealed class SideView {
     /// <param name="hud">The display's contents.</param>
     /// <returns>The frame, reused by the next call (copy it, e.g. with <see cref="Surface.ToRgbBytes"/>, to keep it).</returns>
     public Surface Render(CheetahGame game, Hud hud) {
-        CheetahCore core = game.Core;
+        MjData core = game.Core;
         // the camera tracks the center of mass of the whole cheetah (body 1's subtree), as Gymnasium's "trackcom" camera does
         double cameraX = core.subtree_com[3];
         DrawSky(cameraX);
@@ -150,8 +151,8 @@ public sealed class SideView {
     /// <param name="game">The game.</param>
     /// <param name="cameraX">The tracked x.</param>
     private void DrawCheetah(CheetahGame game, double cameraX) {
-        CheetahCore core = game.Core;
-        CheetahModel m = game.Model;
+        MjData core = game.Core;
+        MjModel m = game.Model;
         // geoms 3-8 are the leg segments, each moved by actuator g - 3 (back thigh, shin, foot, then the front three)
         foreach (int g in new[] { 3, 4, 5, 6, 7, 8, 1, 2 }) {
             if (g >= m.ngeom)
@@ -217,14 +218,14 @@ public sealed class SideView {
         Draw.Rect(surface, Panel, 0, 0, Width, HudHeight);
         Draw.Rect(surface, PanelEdge, 0, HudHeight, Width, 2);
         PixelFont.Draw(surface, "HALFCHEETAH-V5", 14, 10, 2, Accent);
-        PixelFont.Draw(surface, "GYM.NET C# CORE, BIT-EXACT WITH MUJOCO 3.15.0", 14 + PixelFont.Measure("HALFCHEETAH-V5 ", 2), 10, 2, Text);
+        PixelFont.Draw(surface, "GYM.NET C# CORE, BIT-EXACT WITH MUJOCO 4.0.0", 14 + PixelFont.Measure("HALFCHEETAH-V5 ", 2), 10, 2, Text);
         // row 2: who drives and the last score; row 3: the episode's numbers. Both stay left of the torque bars.
         bool auto = hud.Driver == "AUTOPILOT";
         string driver = auto ? "AUTOPILOT (ARS LINEAR POLICY)" : "YOU ARE DRIVING";
         PixelFont.Draw(surface, driver, 14, 36, 2, auto ? Good : Warn);
         string last = double.IsNaN(hud.LastScore) ? "" : "  LAST " + hud.LastScore.ToString("F0", CultureInfo.InvariantCulture);
         PixelFont.Draw(surface, (auto ? "  TAB: TAKE OVER" : "  TAB: AUTOPILOT") + last, 14 + PixelFont.Measure(driver, 2), 36, 2, Dim);
-        CheetahCore core = game.Core;
+        MjData core = game.Core;
         string speed = Math.Abs(hud.SpeedFactor - 1) < 1e-9 ? "" : $"   X{hud.SpeedFactor.ToString("0.###", CultureInfo.InvariantCulture)}";
         string stats = string.Create(CultureInfo.InvariantCulture,
             $"STEP {game.StepIndex}/1000   X {core.qpos[0]:F1}M   SPEED {game.LastVelocity:F1}M/S   RETURN {game.EpisodeReturn:F0}{speed}");

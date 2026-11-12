@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using NumSharp;
+using Gym.MuJoCo;
 
 namespace MujocoPoc;
 
@@ -36,14 +37,14 @@ namespace MujocoPoc;
 ///         </list>
 ///     </para>
 ///     <para>
-///         Body positions are read from <see cref="CheetahCore.xpos"/> as MuJoCo publishes them, so after an RK4 step they
+///         Body positions are read from <see cref="MjData.xpos"/> as MuJoCo publishes them, so after an RK4 step they
 ///         are its last stage's, as Gymnasium's env code sees them. An env keeps per-episode state between
 ///         <see cref="Before"/> and <see cref="After"/>, so one rules object serves one episode at a time.
 ///     </para>
 /// </remarks>
 internal abstract class EnvRules {
     /// <summary>The model the rules read.</summary>
-    protected readonly CheetahModel M;
+    protected readonly MjModel M;
 
     /// <summary>The control step, <c>timestep * frame_skip</c> (Gymnasium's <c>dt</c>).</summary>
     protected readonly double Dt;
@@ -63,11 +64,11 @@ internal abstract class EnvRules {
     /// <summary>Sets up the rules for a model and a recorded run.</summary>
     /// <param name="model">The model.</param>
     /// <param name="run">The run, for the termination flag and the episode limit.</param>
-    protected EnvRules(CheetahModel model, RunInfo run) {
+    protected EnvRules(MjModel model, RunInfo run) {
         M = model;
         Terminate = run.Terminate;
         maxEpisodeSteps = run.MaxEpisodeSteps;
-        Dt = model.timestep * model.frame_skip;
+        Dt = model.timestep * run.FrameSkip;
         ActionLow = Enumerable.Range(0, model.nu).Select(i => (double)(float)model.actuator_ctrlrange[2 * i]).ToArray();
         ActionHigh = Enumerable.Range(0, model.nu).Select(i => (double)(float)model.actuator_ctrlrange[2 * i + 1]).ToArray();
     }
@@ -80,7 +81,7 @@ internal abstract class EnvRules {
     /// <param name="run">The run: its env id, termination flag and episode limit.</param>
     /// <returns>The rules, or <see langword="null"/>.</returns>
     /// <exception cref="KeyNotFoundException">A body the env reads by name is missing from the model's names.</exception>
-    public static EnvRules? TryFor(CheetahModel model, RunInfo run) => run.Env switch {
+    public static EnvRules? TryFor(MjModel model, RunInfo run) => run.Env switch {
         "HalfCheetah-v5" or "HalfCheetah-v4" => new HalfCheetahRules(model, run),
         "Hopper-v5" => HopperWalkerRules.Hopper(model, run, v4: false),
         "Hopper-v4" => HopperWalkerRules.Hopper(model, run, v4: true),
@@ -107,10 +108,10 @@ internal abstract class EnvRules {
     ///     Gymnasium's reset after <c>mj_resetData</c>: the env's <c>reset_model</c> state from a generator seeded with
     ///     <paramref name="seed"/>, the optional flip, then <c>mj_forward</c> (<c>set_state</c>).
     /// </summary>
-    /// <param name="core">A new core, whose state is set.</param>
+    /// <param name="core">A new data, or one just reset by <c>mj_resetData</c>, whose state is set.</param>
     /// <param name="seed">The reset seed.</param>
     /// <param name="flip">Whether to turn the model upside down (<c>qpos[2] += pi</c>, hinge-rooted models only).</param>
-    public void Reset(CheetahCore core, int seed, bool flip) {
+    public void Reset(MjData core, int seed, bool flip) {
         var rng = new Generator(new PCG64(new SeedSequence(new BigInteger(seed))));
         (double[] qpos, double[] qvel) = ResetState(rng);
         Array.Copy(qpos, core.qpos, M.nq);
@@ -164,12 +165,12 @@ internal abstract class EnvRules {
     /// <summary>The observation.</summary>
     /// <param name="core">The core.</param>
     /// <returns>The observation.</returns>
-    public abstract double[] Obs(CheetahCore core);
+    public abstract double[] Obs(MjData core);
 
     /// <summary>Records what the step's reward needs from before the physics steps (the default needs nothing).</summary>
     /// <param name="core">The core before the step.</param>
     /// <param name="action">The step's action (float32 values), which Reacher-v4 prices before stepping.</param>
-    public virtual void Before(CheetahCore core, double[] action) { }
+    public virtual void Before(MjData core, double[] action) { }
 
     /// <summary>The step's results after the physics steps and <c>mj_rnePostConstraint</c>.</summary>
     /// <param name="core">The core after the step.</param>
@@ -178,7 +179,7 @@ internal abstract class EnvRules {
     /// <param name="infoKeys">The info entries in env.bin's order.</param>
     /// <returns>The observation, and [reward, terminated, truncated, the info values].</returns>
     /// <exception cref="KeyNotFoundException">An info key the rules do not produce.</exception>
-    public (double[] Obs, double[] Row) After(CheetahCore core, double[] action, int t, (string Key, int Size)[] infoKeys) {
+    public (double[] Obs, double[] Row) After(MjData core, double[] action, int t, (string Key, int Size)[] infoKeys) {
         (double reward, bool terminated, Dictionary<string, double[]> info) = Results(core, action);
         var row = new List<double> { reward, terminated ? 1 : 0, t + 1 >= maxEpisodeSteps ? 1 : 0 };
         foreach ((string key, _) in infoKeys)
@@ -193,7 +194,7 @@ internal abstract class EnvRules {
     /// <param name="core">The core after the step.</param>
     /// <param name="action">The action.</param>
     /// <returns>The results.</returns>
-    protected abstract (double Reward, bool Terminated, Dictionary<string, double[]> Info) Results(CheetahCore core, double[] action);
+    protected abstract (double Reward, bool Terminated, Dictionary<string, double[]> Info) Results(MjData core, double[] action);
 
     /// <summary>The index of a body by its name.</summary>
     /// <param name="name">The body name.</param>
@@ -298,7 +299,7 @@ internal abstract class EnvRules {
     /// <param name="core">The core.</param>
     /// <param name="v4">Whether the full v4 arrays are observed.</param>
     /// <returns>The observation's tail after the positions and velocities.</returns>
-    protected static IEnumerable<double> HumanoidTail(CheetahCore core, bool v4) => v4
+    protected static IEnumerable<double> HumanoidTail(MjData core, bool v4) => v4
         ? core.cinert.Concat(core.cvel).Concat(core.qfrc_actuator).Concat(core.cfrc_ext)
         : core.cinert.Skip(10).Concat(core.cvel.Skip(6)).Concat(core.qfrc_actuator.Skip(6)).Concat(core.cfrc_ext.Skip(6));
 }
@@ -310,19 +311,19 @@ internal sealed class HalfCheetahRules : EnvRules {
     /// <summary>Sets up the rules (v4 and v5 differ only in an info name).</summary>
     /// <param name="model">The model.</param>
     /// <param name="run">The run.</param>
-    public HalfCheetahRules(CheetahModel model, RunInfo run) : base(model, run) { }
+    public HalfCheetahRules(MjModel model, RunInfo run) : base(model, run) { }
 
     /// <inheritdoc/>
     protected override (double[] Qpos, double[] Qvel) ResetState(Generator rng) => NormalReset(rng, 0.1);
 
     /// <inheritdoc/>
-    public override double[] Obs(CheetahCore core) => core.qpos.Skip(1).Concat(core.qvel).ToArray();
+    public override double[] Obs(MjData core) => core.qpos.Skip(1).Concat(core.qvel).ToArray();
 
     /// <inheritdoc/>
-    public override void Before(CheetahCore core, double[] action) => xBefore = core.qpos[0];
+    public override void Before(MjData core, double[] action) => xBefore = core.qpos[0];
 
     /// <inheritdoc/>
-    protected override (double, bool, Dictionary<string, double[]>) Results(CheetahCore core, double[] action) {
+    protected override (double, bool, Dictionary<string, double[]>) Results(MjData core, double[] action) {
         double xAfter = core.qpos[0];
         double xVelocity = (xAfter - xBefore) / Dt;
         double forward = 1.0 * xVelocity;
@@ -356,7 +357,7 @@ internal sealed class HopperWalkerRules : EnvRules {
     /// <param name="zHigh">The exclusive upper bound of a healthy height.</param>
     /// <param name="angleLow">The exclusive lower bound of a healthy torso angle.</param>
     /// <param name="angleHigh">The exclusive upper bound of a healthy torso angle.</param>
-    private HopperWalkerRules(CheetahModel model, RunInfo run, bool v4, bool checkState, double zLow, double zHigh, double angleLow,
+    private HopperWalkerRules(MjModel model, RunInfo run, bool v4, bool checkState, double zLow, double zHigh, double angleLow,
                               double angleHigh) : base(model, run) {
         this.v4 = v4;
         this.checkState = checkState;
@@ -371,7 +372,7 @@ internal sealed class HopperWalkerRules : EnvRules {
     /// <param name="run">The run.</param>
     /// <param name="v4">Whether the env is Hopper-v4.</param>
     /// <returns>The rules.</returns>
-    public static HopperWalkerRules Hopper(CheetahModel model, RunInfo run, bool v4) =>
+    public static HopperWalkerRules Hopper(MjModel model, RunInfo run, bool v4) =>
         new(model, run, v4, true, 0.7, double.PositiveInfinity, -0.2, 0.2);
 
     /// <summary>Walker2d's rules: height in (0.8, 2.0), angle in (-1, 1).</summary>
@@ -379,30 +380,30 @@ internal sealed class HopperWalkerRules : EnvRules {
     /// <param name="run">The run.</param>
     /// <param name="v4">Whether the env is Walker2d-v4.</param>
     /// <returns>The rules.</returns>
-    public static HopperWalkerRules Walker2d(CheetahModel model, RunInfo run, bool v4) =>
+    public static HopperWalkerRules Walker2d(MjModel model, RunInfo run, bool v4) =>
         new(model, run, v4, false, 0.8, 2.0, -1.0, 1.0);
 
     /// <inheritdoc/>
     protected override (double[] Qpos, double[] Qvel) ResetState(Generator rng) => UniformReset(rng, 5e-3);
 
     /// <inheritdoc/>
-    public override double[] Obs(CheetahCore core) =>
+    public override double[] Obs(MjData core) =>
         core.qpos.Skip(1).Concat(core.qvel.Select(v => Clip(v, -10, 10))).ToArray();
 
     /// <inheritdoc/>
-    public override void Before(CheetahCore core, double[] action) => xBefore = core.qpos[0];
+    public override void Before(MjData core, double[] action) => xBefore = core.qpos[0];
 
     /// <summary>Whether the body is healthy.</summary>
     /// <param name="core">The core.</param>
     /// <returns>The health.</returns>
-    private bool Healthy(CheetahCore core) {
+    private bool Healthy(MjData core) {
         bool state = !checkState || core.qpos.Skip(2).Concat(core.qvel).All(s => -100.0 < s && s < 100.0);
         double z = core.qpos[1], angle = core.qpos[2];
         return state && zLow < z && z < zHigh && angleLow < angle && angle < angleHigh;
     }
 
     /// <inheritdoc/>
-    protected override (double, bool, Dictionary<string, double[]>) Results(CheetahCore core, double[] action) {
+    protected override (double, bool, Dictionary<string, double[]>) Results(MjData core, double[] action) {
         double xAfter = core.qpos[0];
         double xVelocity = (xAfter - xBefore) / Dt;
         double forward = 1.0 * xVelocity;
@@ -429,13 +430,13 @@ internal sealed class HumanoidRules : EnvRules {
     /// <param name="model">The model.</param>
     /// <param name="run">The run.</param>
     /// <param name="v4">Whether the env is Humanoid-v4 (full arrays observed, no contact cost, mass-centre info).</param>
-    public HumanoidRules(CheetahModel model, RunInfo run, bool v4) : base(model, run) => this.v4 = v4;
+    public HumanoidRules(MjModel model, RunInfo run, bool v4) : base(model, run) => this.v4 = v4;
 
     /// <inheritdoc/>
     protected override (double[] Qpos, double[] Qvel) ResetState(Generator rng) => UniformReset(rng, 1e-2);
 
     /// <inheritdoc/>
-    public override double[] Obs(CheetahCore core) =>
+    public override double[] Obs(MjData core) =>
         core.qpos.Skip(2).Concat(core.qvel).Concat(HumanoidTail(core, v4)).ToArray();
 
     /// <summary>
@@ -444,7 +445,7 @@ internal sealed class HumanoidRules : EnvRules {
     /// </summary>
     /// <param name="core">The core, whose last forward pass set xipos.</param>
     /// <returns>The mass centre's x and y.</returns>
-    private double[] MassCenter(CheetahCore core) {
+    private double[] MassCenter(MjData core) {
         double denom = SumF64(M.body_mass);
         var res = new double[2];
         for (int j = 0; j < 2; j++) {
@@ -457,10 +458,10 @@ internal sealed class HumanoidRules : EnvRules {
     }
 
     /// <inheritdoc/>
-    public override void Before(CheetahCore core, double[] action) => xyBefore = MassCenter(core);
+    public override void Before(MjData core, double[] action) => xyBefore = MassCenter(core);
 
     /// <inheritdoc/>
-    protected override (double, bool, Dictionary<string, double[]>) Results(CheetahCore core, double[] action) {
+    protected override (double, bool, Dictionary<string, double[]>) Results(MjData core, double[] action) {
         double[] xyAfter = MassCenter(core);
         double xVelocity = (xyAfter[0] - xyBefore[0]) / Dt, yVelocity = (xyAfter[1] - xyBefore[1]) / Dt;
         double forward = 1.25 * xVelocity;
@@ -505,17 +506,17 @@ internal sealed class HumanoidStandupRules : EnvRules {
     /// <param name="model">The model.</param>
     /// <param name="run">The run.</param>
     /// <param name="v4">Whether the env is HumanoidStandup-v4 (full arrays observed, three info entries).</param>
-    public HumanoidStandupRules(CheetahModel model, RunInfo run, bool v4) : base(model, run) => this.v4 = v4;
+    public HumanoidStandupRules(MjModel model, RunInfo run, bool v4) : base(model, run) => this.v4 = v4;
 
     /// <inheritdoc/>
     protected override (double[] Qpos, double[] Qvel) ResetState(Generator rng) => UniformReset(rng, 1e-2);
 
     /// <inheritdoc/>
-    public override double[] Obs(CheetahCore core) =>
+    public override double[] Obs(MjData core) =>
         core.qpos.Skip(2).Concat(core.qvel).Concat(HumanoidTail(core, v4)).ToArray();
 
     /// <inheritdoc/>
-    protected override (double, bool, Dictionary<string, double[]>) Results(CheetahCore core, double[] action) {
+    protected override (double, bool, Dictionary<string, double[]>) Results(MjData core, double[] action) {
         double posAfter = core.qpos[2];
         double uphCost = (posAfter - 0) / M.timestep;
         double quadCtrlCost = 0.1 * SumSquaresF64(core.ctrl);
@@ -545,7 +546,7 @@ internal sealed class AntRules : EnvRules {
     /// <param name="model">The model.</param>
     /// <param name="run">The run.</param>
     /// <param name="v4">Whether the env is Ant-v4 (no contact forces observed or priced, torso-position info).</param>
-    public AntRules(CheetahModel model, RunInfo run, bool v4) : base(model, run) {
+    public AntRules(MjModel model, RunInfo run, bool v4) : base(model, run) {
         this.v4 = v4;
         torso = BodyId("torso");
     }
@@ -554,19 +555,19 @@ internal sealed class AntRules : EnvRules {
     protected override (double[] Qpos, double[] Qvel) ResetState(Generator rng) => NormalReset(rng, 0.1);
 
     /// <inheritdoc/>
-    public override double[] Obs(CheetahCore core) {
+    public override double[] Obs(MjData core) {
         IEnumerable<double> obs = core.qpos.Skip(2).Concat(core.qvel);
         return (v4 ? obs : obs.Concat(core.cfrc_ext.Skip(6).Select(f => Clip(f, -1.0, 1.0)))).ToArray();
     }
 
     /// <inheritdoc/>
-    public override void Before(CheetahCore core, double[] action) {
+    public override void Before(MjData core, double[] action) {
         xBefore = core.xpos[3 * torso];
         yBefore = core.xpos[3 * torso + 1];
     }
 
     /// <inheritdoc/>
-    protected override (double, bool, Dictionary<string, double[]>) Results(CheetahCore core, double[] action) {
+    protected override (double, bool, Dictionary<string, double[]>) Results(MjData core, double[] action) {
         double xAfter = core.xpos[3 * torso], yAfter = core.xpos[3 * torso + 1];
         double xVelocity = (xAfter - xBefore) / Dt, yVelocity = (yAfter - yBefore) / Dt;
         double z = core.qpos[2];
@@ -605,16 +606,16 @@ internal sealed class InvertedPendulumRules : EnvRules {
     /// <param name="model">The model.</param>
     /// <param name="run">The run.</param>
     /// <param name="v4">Whether the env is InvertedPendulum-v4.</param>
-    public InvertedPendulumRules(CheetahModel model, RunInfo run, bool v4) : base(model, run) => this.v4 = v4;
+    public InvertedPendulumRules(MjModel model, RunInfo run, bool v4) : base(model, run) => this.v4 = v4;
 
     /// <inheritdoc/>
     protected override (double[] Qpos, double[] Qvel) ResetState(Generator rng) => UniformReset(rng, 0.01);
 
     /// <inheritdoc/>
-    public override double[] Obs(CheetahCore core) => core.qpos.Concat(core.qvel).ToArray();
+    public override double[] Obs(MjData core) => core.qpos.Concat(core.qvel).ToArray();
 
     /// <inheritdoc/>
-    protected override (double, bool, Dictionary<string, double[]>) Results(CheetahCore core, double[] action) {
+    protected override (double, bool, Dictionary<string, double[]>) Results(MjData core, double[] action) {
         double[] obs = Obs(core);
         bool terminated = !obs.All(double.IsFinite) || Math.Abs(obs[1]) > 0.2;
         double reward = v4 ? 1.0 : terminated ? 0 : 1;
@@ -633,19 +634,19 @@ internal sealed class InvertedDoublePendulumRules : EnvRules {
     /// <param name="model">The model.</param>
     /// <param name="run">The run.</param>
     /// <param name="v4">Whether the env is InvertedDoublePendulum-v4 (all constraint forces observed, no info).</param>
-    public InvertedDoublePendulumRules(CheetahModel model, RunInfo run, bool v4) : base(model, run) => this.v4 = v4;
+    public InvertedDoublePendulumRules(MjModel model, RunInfo run, bool v4) : base(model, run) => this.v4 = v4;
 
     /// <inheritdoc/>
     protected override (double[] Qpos, double[] Qvel) ResetState(Generator rng) => NormalReset(rng, 0.1);
 
     /// <inheritdoc/>
-    public override double[] Obs(CheetahCore core) =>
+    public override double[] Obs(MjData core) =>
         new[] { core.qpos[0] }.Concat(core.qpos.Skip(1).Select(Math.Sin)).Concat(core.qpos.Skip(1).Select(Math.Cos))
             .Concat(core.qvel.Select(v => Clip(v, -10, 10)))
             .Concat(core.qfrc_constraint.Take(v4 ? M.nv : 1).Select(f => Clip(f, -10, 10))).ToArray();
 
     /// <inheritdoc/>
-    protected override (double, bool, Dictionary<string, double[]>) Results(CheetahCore core, double[] action) {
+    protected override (double, bool, Dictionary<string, double[]>) Results(MjData core, double[] action) {
         double x = core.site_xpos[0], y = core.site_xpos[2];
         bool terminated = y <= 1;
         double v1 = core.qvel[1], v2 = core.qvel[2];
@@ -674,7 +675,7 @@ internal sealed class ReacherRules : EnvRules {
     /// <param name="model">The model.</param>
     /// <param name="run">The run.</param>
     /// <param name="v4">Whether the env is Reacher-v4.</param>
-    public ReacherRules(CheetahModel model, RunInfo run, bool v4) : base(model, run) {
+    public ReacherRules(MjModel model, RunInfo run, bool v4) : base(model, run) {
         this.v4 = v4;
         fingertip = BodyId("fingertip");
         target = BodyId("target");
@@ -704,16 +705,16 @@ internal sealed class ReacherRules : EnvRules {
     /// <summary>The fingertip's position minus the target's, from the published body frames.</summary>
     /// <param name="core">The core.</param>
     /// <returns>The 3 components.</returns>
-    private double[] Vec(CheetahCore core) =>
+    private double[] Vec(MjData core) =>
         Enumerable.Range(0, 3).Select(k => core.xpos[3 * fingertip + k] - core.xpos[3 * target + k]).ToArray();
 
     /// <inheritdoc/>
-    public override double[] Obs(CheetahCore core) =>
+    public override double[] Obs(MjData core) =>
         core.qpos.Take(2).Select(Math.Cos).Concat(core.qpos.Take(2).Select(Math.Sin)).Concat(core.qpos.Skip(2))
             .Concat(core.qvel.Take(2)).Concat(Vec(core).Take(v4 ? 3 : 2)).ToArray();
 
     /// <inheritdoc/>
-    public override void Before(CheetahCore core, double[] action) {
+    public override void Before(MjData core, double[] action) {
         if (!v4)
             return;
         double[] vec = Vec(core);
@@ -722,7 +723,7 @@ internal sealed class ReacherRules : EnvRules {
     }
 
     /// <inheritdoc/>
-    protected override (double, bool, Dictionary<string, double[]>) Results(CheetahCore core, double[] action) {
+    protected override (double, bool, Dictionary<string, double[]>) Results(MjData core, double[] action) {
         double rewardDist;
         float rewardCtrl;
         if (v4) {
@@ -746,22 +747,22 @@ internal sealed class SwimmerRules : EnvRules {
     /// <summary>Sets up the rules (v4 and v5 differ only in info names).</summary>
     /// <param name="model">The model.</param>
     /// <param name="run">The run.</param>
-    public SwimmerRules(CheetahModel model, RunInfo run) : base(model, run) { }
+    public SwimmerRules(MjModel model, RunInfo run) : base(model, run) { }
 
     /// <inheritdoc/>
     protected override (double[] Qpos, double[] Qvel) ResetState(Generator rng) => UniformReset(rng, 0.1);
 
     /// <inheritdoc/>
-    public override double[] Obs(CheetahCore core) => core.qpos.Skip(2).Concat(core.qvel).ToArray();
+    public override double[] Obs(MjData core) => core.qpos.Skip(2).Concat(core.qvel).ToArray();
 
     /// <inheritdoc/>
-    public override void Before(CheetahCore core, double[] action) {
+    public override void Before(MjData core, double[] action) {
         xBefore = core.qpos[0];
         yBefore = core.qpos[1];
     }
 
     /// <inheritdoc/>
-    protected override (double, bool, Dictionary<string, double[]>) Results(CheetahCore core, double[] action) {
+    protected override (double, bool, Dictionary<string, double[]>) Results(MjData core, double[] action) {
         double xAfter = core.qpos[0], yAfter = core.qpos[1];
         double xVelocity = (xAfter - xBefore) / Dt, yVelocity = (yAfter - yBefore) / Dt;
         double forward = 1.0 * xVelocity;
@@ -784,7 +785,7 @@ internal sealed class PusherRules : EnvRules {
     /// <summary>Sets up the rules.</summary>
     /// <param name="model">The model.</param>
     /// <param name="run">The run.</param>
-    public PusherRules(CheetahModel model, RunInfo run) : base(model, run) {
+    public PusherRules(MjModel model, RunInfo run) : base(model, run) {
         tipsArm = BodyId("tips_arm");
         obj = BodyId("object");
         goal = BodyId("goal");
@@ -815,12 +816,12 @@ internal sealed class PusherRules : EnvRules {
     }
 
     /// <inheritdoc/>
-    public override double[] Obs(CheetahCore core) =>
+    public override double[] Obs(MjData core) =>
         core.qpos.Take(7).Concat(core.qvel.Take(7)).Concat(core.xpos.Skip(3 * tipsArm).Take(3))
             .Concat(core.xpos.Skip(3 * obj).Take(3)).Concat(core.xpos.Skip(3 * goal).Take(3)).ToArray();
 
     /// <inheritdoc/>
-    protected override (double, bool, Dictionary<string, double[]>) Results(CheetahCore core, double[] action) {
+    protected override (double, bool, Dictionary<string, double[]>) Results(MjData core, double[] action) {
         double[] Diff(int a, int b) => Enumerable.Range(0, 3).Select(k => core.xpos[3 * a + k] - core.xpos[3 * b + k]).ToArray();
         double[] vec1 = Diff(obj, tipsArm), vec2 = Diff(obj, goal);
         double rewardNear = -Norm3(vec1[0], vec1[1], vec1[2]) * 0.5;

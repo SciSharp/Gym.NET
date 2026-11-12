@@ -20,6 +20,28 @@ import shutil
 import subprocess
 import sys
 
+REPO = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "..", ".."))
+# the engine's sources, which the checker compiles (src/Gym.Environments/MuJoCo, namespace Gym.MuJoCo)
+ENGINE = os.path.join(REPO, "src", "Gym.Environments", "MuJoCo")
+ENGINE_FILES = {"MjData.cs", "Kernels.cs", "Ccd.cs", "MjModel.cs"}
+
+
+def shift(text):
+    """Moves a control's text into the engine's namespace block, four spaces deeper than the proof of concept had it.
+
+    Args:
+        text: the text as written for the file-scoped namespace: each line that starts a line gets four more spaces; a
+            first line that begins mid-line (no leading space) stays as it is.
+    Returns:
+        The shifted text.
+    """
+    lines = text.split("\n")
+    out = []
+    for i, line in enumerate(lines):
+        starts_line = i > 0 or line.startswith(" ")
+        out.append(("    " + line) if starts_line and line else line)
+    return "\n".join(out)
+
 PUS = ["pus5_a", "pus5_b", "pus5_c", "pus5_d", "pus5_e", "pus5_f", "pus5_g"]
 PUS_P3 = ["pus5_c", "pus5_e", "pus5_s654", "pus5_s1559", "pus5_s2455", "pus5_s20432", "pus5_s40228", "pus5_s60390"]
 REA = ["rea5", "rea4"]
@@ -35,65 +57,65 @@ PUS_MC = ["pus5_s94", "pus5_s418", "pus5_s654", "pus5_s2851", "pus5_s3016"]
 
 # (name, file, exact old text, new text, traces, expected verdict, what it shows)
 CONTROLS = [
-    ("island-scale-over-all-dofs", "CheetahCore.cs",
+    ("island-scale-over-all-dofs", "MjData.cs",
      "        for (int i = 0; i < snv; i++)\n            inertia += iM[iMrowadr[i] + iMrownnz[i] - 1];",
      "        for (int i = 0; i < nv; i++)\n            inertia += M[m.M_rowadr[i] + m.M_rownnz[i] - 1];",
      PUS + REA, "detected", "Newton's scale is the island's own inertia, not the model's"),
-    ("unconstrained-dofs-keep-warmstart", "CheetahCore.cs",
+    ("unconstrained-dofs-keep-warmstart", "MjData.cs",
      "        for (int i = nidof; i < nv; i++) {\n            int dof = mapIdof2dof[i];\n            qacc[dof] = qacc_smooth[dof];\n        }\n",
      "", PUS + REA, "same bits",
      "the branch search: in the 7.3 million Pusher steps (80,000 episodes) and 0.64 million Reacher steps (40,000) that keep "
      "the warm start while a tree is in no island, every free dof's warm start already equals qacc_smooth (the goal and the "
      "target never move); when Pusher's arm is free with a different warm start, the smooth start wins and resets it anyway"),
-    ("plane-cylinder-without-side-points", "CheetahCore.cs",
+    ("plane-cylinder-without-side-points", "MjData.cs",
      "            AddPlaneCylinderContact(d, pos2, vec1, 1, axis, 1, vec, -0.5, normal);\n"
      "            AddPlaneCylinderContact(d, pos2, vec1, -1, axis, 1, vec, -0.5, normal);\n",
      "", PUS, "detected", "the upright cylinder's three-point base"),
-    ("convex-one-contact-and-multiccd-as-in-3.15", "CheetahCore.cs",
+    ("convex-one-contact-and-multiccd-as-in-3.15", "MjData.cs",
      "        int maxContacts = MaxContacts(m.geom_type[g1], m.geom_type[g2]);",
      "        int maxContacts = 1;", PUS, "detected",
      "4.0's single pass asks a capsule's edge against a face for two contacts and runs no MultiCCD"),
-    ("convex-shallow-multicontact-skipped", "Kernels.cs",
+    ("convex-shallow-multicontact-skipped", "Ccd.cs",
      "                } else if (maxContacts > 1 && status.Dist[0] < 0 && obj1.NSupp > 0) {",
      "                } else if (false) {", PUS + PUS_MC, "detected", "the multi-contact pass after a shallow contact"),
-    ("convex-deep-multicontact-skipped", "Kernels.cs",
+    ("convex-deep-multicontact-skipped", "Ccd.cs",
      "                if (maxContacts > 1 && face >= 0)\n                    status.Nx = Multicontact(",
      "                if (false)\n                    status.Nx = Multicontact(", PUS + PUS_MC, "detected",
      "the multi-contact pass after EPA's contact"),
-    ("gjk-s2d-weights-over-the-minor-as-in-3.15", "Kernels.cs",
+    ("gjk-s2d-weights-over-the-minor-as-in-3.15", "Ccd.cs",
      "                double mDet = c31 + c32 + c33;\n                lambda[0] = c31 / mDet;",
      "                double mDet = mMax;\n                lambda[0] = c31 / mDet;",
      PUS, "detected", "4.0's S2D divides by the sum of the cofactors, not by the largest minor"),
-    ("gjk-s2d-tie-taken", "Kernels.cs",
+    ("gjk-s2d-tie-taken", "Ccd.cs",
      "            double d = Dot3(p, p);\n            if (d < dmin) {\n                lambda[0] = l1[0];\n                lambda[1] = 0;",
      "            double d = Dot3(p, p);\n            if (d <= dmin) {\n                lambda[0] = l1[0];\n                lambda[1] = 0;",
      PUS, "same bits", "exact ties are common (59,516 of 425,129 edge comparisons in 20,000 Pusher episodes), but every "
      "one is at the two edges' shared vertex, where both edges give the same weights, so the rule cannot change a result"),
-    ("epa-polytope3-normal-from-the-other-edge", "Kernels.cs",
+    ("epa-polytope3-normal-from-the-other-edge", "Ccd.cs",
      "            diff2[k] = V(pt, v3i)[k] - V(pt, v1i)[k];",
      "            diff2[k] = V(pt, v3i)[k] - V(pt, v2i)[k];",
      PUS_P3, "detected", "polytope3's normal reaches the contact (the targeted traces)"),
-    ("epa-polytope3-supports-swapped", "Kernels.cs",
+    ("epa-polytope3-supports-swapped", "Ccd.cs",
      "        int v5i = EpaSupport(pt, obj1, obj2, nNeg, nNorm);\n        int v4i = EpaSupport(pt, obj1, obj2, n, nNorm);",
      "        int v4i = EpaSupport(pt, obj1, obj2, n, nNorm);\n        int v5i = EpaSupport(pt, obj1, obj2, nNeg, nNorm);",
      PUS_P3, "same bits", "the order only renumbers two vertices; the support points and EPA's faces are the same"),
-    ("fluid-torque-added-before-force", "CheetahCore.cs",
+    ("fluid-torque-added-before-force", "MjData.cs",
      "        Kernels.MulMatTVec(fluidQforce, fluidJacp, force, 3, nv);\n        Kernels.AddTo(target, fluidQforce, nv);\n"
      "        Kernels.MulMatTVec(fluidQforce, fluidJacr, torque, 3, nv);\n        Kernels.AddTo(target, fluidQforce, nv);",
      "        Kernels.MulMatTVec(fluidQforce, fluidJacr, torque, 3, nv);\n        Kernels.AddTo(target, fluidQforce, nv);\n"
      "        Kernels.MulMatTVec(fluidQforce, fluidJacp, force, 3, nv);\n        Kernels.AddTo(target, fluidQforce, nv);",
      SWI, "detected", "mj_applyFT's order: the force's term, then the torque's"),
-    ("fluid-face-drag-regrouped", "CheetahCore.cs",
+    ("fluid-face-drag-regrouped", "MjData.cs",
      "                lfrc[3] -= 0.5 * rho * box[1] * box[2] * Math.Abs(lvel[3]) * lvel[3];",
      "                lfrc[3] -= 0.5 * rho * box[1] * box[2] * (Math.Abs(lvel[3]) * lvel[3]);",
      SWI, "same bits", "the regrouped drag differs in its last bit in 32% of evaluations (Swimmer-v5's first 5 episodes), "
      "but it is small against the viscous force it is subtracted from, and lfrc[3] never changes"),
-    ("fluid-wind-not-transformed", "CheetahCore.cs",
+    ("fluid-wind-not-transformed", "MjData.cs",
      "            TransformSpatialMotion(lwind, wind, xipos.AsSpan(3 * i, 3), subtree_com.AsSpan(3 * m.body_rootid[i], 3), ximat.AsSpan(9 * i, 9));",
      "            lwind.Clear();", SWI, "same bits",
      "the zero wind's transform only signs zeros; Swimmer's local velocities are exactly zero in 3% of components (it is "
      "planar), but subtracting the transformed wind never changes a bit in 28.8 million components (200 episodes)"),
-    ("simple-dofs-diagonal-computed", "CheetahCore.cs",
+    ("simple-dofs-diagonal-computed", "MjData.cs",
      "            if (m.dof_simplenum[i] != 0) {",
      "            if (m.dof_simplenum[i] != 0 && false) {", PUS + REA, "same bits",
      "an axis-aligned slide on a leaf body: the composite inertia gives armature + mass exactly, the bits dof_M0 holds "
@@ -117,13 +139,13 @@ CONTROLS = [
      "        double reward = rewardDist + rewardCtrl + rewardNear;",
      "        double reward = rewardDist + rewardNear + rewardCtrl;", PUS, "detected", "the reward's summation order"),
     # MuJoCo 4.0.0's changes, most of them put back as 3.15.0 had them
-    ("rk4-free-joints-uncorrected-as-in-3.15", "CheetahCore.cs",
+    ("rk4-free-joints-uncorrected-as-in-3.15", "MjData.cs",
      "            RkCorrectVel(xi.Slice(nq, nv), dX.Slice(0, nv), h);\n", "", FREE, "detected",
      "4.0's RKMK correction of a free joint's angular velocity at each stage"),
-    ("rk4-qacc-of-the-last-stage-as-in-3.15", "CheetahCore.cs",
+    ("rk4-qacc-of-the-last-stage-as-in-3.15", "MjData.cs",
      "        Array.Copy(rkdX, nv, qacc, 0, nv);\n", "", RK4, "detected",
      "4.0 publishes the step's weighted acceleration as qacc"),
-    ("rk4-warmstart-from-the-first-stage", "CheetahCore.cs",
+    ("rk4-warmstart-from-the-first-stage", "MjData.cs",
      "        Array.Copy(rkF, 3 * nv, qacc_warmstart, 0, nv);",
      "        Array.Copy(rkF, 0, qacc_warmstart, 0, nv);", RK4, "detected",
      "4.0 warm-starts the next step from the last stage's solve"),
@@ -146,26 +168,26 @@ CONTROLS = [
      "        for (int i = n - 1; i >= 0; i--) {\n            for (int k = i + 1; k < n; k++)\n                res[i] -= mat[k * n + i] * res[k];\n"
      "            res[i] /= mat[i * (n + 1)];\n        }",
      ["hop5", "wal5", "ant5", "pus5_a"], "detected", "4.0's dense mju_cholSolve substitutes backward by columns"),
-    ("pgs-scale-from-the-mean-inertia-as-in-3.15", "CheetahCore.cs",
+    ("pgs-scale-from-the-mean-inertia-as-in-3.15", "MjData.cs",
      "        double pgsScale = 1 / MaxFirst(Kernels.MinVal, trace);",
      "        double pgsScale = 1 / MaxFirst(Kernels.MinVal, m.meaninertia * nv);", ["hum5", "hst5"], "detected",
      "4.0's PGS scales its improvement by the island's inertia trace"),
-    ("capsules-parallel-one-pair", "CheetahCore.cs",
+    ("capsules-parallel-one-pair", "MjData.cs",
      "        ClampSeg(w, 2, 1, (dot5 + dot3) / dot2, s0, s1);\n        return 2;",
      "        ClampSeg(w, 2, 1, (dot5 + dot3) / dot2, s0, s1);\n        return 1;", PARALLEL, "detected",
      "mjc_segWeights' second pair for parallel capsules"),
-    ("capsules-parallel-only-when-exact", "CheetahCore.cs",
+    ("capsules-parallel-only-when-exact", "MjData.cs",
      "        if (det > sin2 * dot1 * dot2) {",
      "        if (det > 0) {", PARALLEL, "detected",
      "mjc_segWeights' 1e-8 band: Hopper's capsules fall inside it without being exactly parallel"),
-    ("multicontact-cylinder-margin-not-inflated", "Kernels.cs",
+    ("multicontact-cylinder-margin-not-inflated", "Ccd.cs",
      "            Inflate(nx, x1, x2, dist, margin1, margin2, normal);\n", "", PUS_MC, "detected",
      "the clipped contacts are inflated by the cylinder's half margin"),
-    ("polygon-clip-edge-keeps-its-first-two-points", "Kernels.cs",
+    ("polygon-clip-edge-keeps-its-first-two-points", "Ccd.cs",
      "            double dd = 0;",
      "            double dd = double.MaxValue;", PUS_MC, "detected",
      "a clipped edge keeps the two points farthest apart"),
-    ("polygon-clip-margin-not-pruned", "Kernels.cs",
+    ("polygon-clip-margin-not-pruned", "Ccd.cs",
      "            if (d <= margin) {",
      "            if (true) {", PUS_MC, "detected",
      "a clipped point farther from the disk than the margin is dropped"),
@@ -188,18 +210,26 @@ def run_control(poc, work, traces, control):
     dst = os.path.join(work, name)
     if os.path.isdir(dst):
         shutil.rmtree(dst)
-    os.makedirs(dst)
+    os.makedirs(os.path.join(dst, "Engine"))
     for f in os.listdir(poc):
         if f.endswith(".cs") or f.endswith(".csproj"):
             shutil.copy(os.path.join(poc, f), dst)
-    path = os.path.join(dst, file)
+    # the engine is the product's source; the copy patches its own copy of it
+    for f in os.listdir(ENGINE):
+        if f.endswith(".cs"):
+            shutil.copy(os.path.join(ENGINE, f), os.path.join(dst, "Engine"))
+    engine_file = file in ENGINE_FILES
+    path = os.path.join(dst, "Engine", file) if engine_file else os.path.join(dst, file)
+    if engine_file:
+        old, new = shift(old), shift(new)
     with open(path, encoding="utf-8", newline="") as fh:
-        src = fh.read()
+        src = fh.read().replace("\r\n", "\n")
     if src.count(old) != 1:
         return "not applied", f"the old text occurs {src.count(old)} times"
     with open(path, "w", encoding="utf-8", newline="") as fh:
         fh.write(src.replace(old, new))
-    b = subprocess.run(["dotnet", "build", "-c", "Release", "-nologo", "-v", "q"], cwd=dst, capture_output=True, text=True)
+    b = subprocess.run(["dotnet", "build", "-c", "Release", "-nologo", "-v", "q", f"-p:GymRoot={REPO}{os.sep}",
+                        f"-p:MuJoCoSource={os.path.join(dst, 'Engine')}"], cwd=dst, capture_output=True, text=True)
     if b.returncode != 0:
         return "build failed", b.stdout[-800:]
     exe = os.path.join(dst, "bin", "Release", "net10.0", "HalfCheetahPoc.exe")

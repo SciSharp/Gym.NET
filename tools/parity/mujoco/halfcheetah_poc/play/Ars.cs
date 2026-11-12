@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text.Json.Nodes;
 using System.Threading.Tasks;
+using Gym.MuJoCo;
 
 namespace MujocoPoc.Play;
 
@@ -43,7 +44,7 @@ public static class Ars {
     /// <param name="log">Receives one progress line per evaluation.</param>
     /// <returns>The best policy, with its score and the settings in <see cref="LinearPolicy.Info"/>.</returns>
     /// <exception cref="ArgumentException">A setting is out of range (Top above Directions, a non-positive count).</exception>
-    public static LinearPolicy Train(CheetahModel model, Settings settings, TextWriter log) {
+    public static LinearPolicy Train(MjModel model, Settings settings, TextWriter log) {
         if (settings.Top < 1 || settings.Top > settings.Directions || settings.Iterations < 1 || settings.Horizon < 1 || settings.Threads < 1)
             throw new ArgumentException("ARS needs 1 <= Top <= Directions and positive Iterations, Horizon and Threads", nameof(settings));
         int inputs = CheetahGame.ObservationSize, outputs = CheetahGame.ActionSize, dim = inputs * outputs;
@@ -140,7 +141,7 @@ public static class Ars {
     /// <param name="count">How many seeds.</param>
     /// <param name="options">The parallelism.</param>
     /// <returns>The return per seed.</returns>
-    public static double[] Evaluate(CheetahModel model, LinearPolicy policy, int count, ParallelOptions options) {
+    public static double[] Evaluate(MjModel model, LinearPolicy policy, int count, ParallelOptions options) {
         var scores = new double[count];
         Parallel.For(0, count, options, seed => scores[seed] = Play(model, policy, seed));
         return scores;
@@ -151,7 +152,7 @@ public static class Ars {
     /// <param name="policy">The policy.</param>
     /// <param name="seed">The reset seed.</param>
     /// <returns>The episode return, summed as Gymnasium's caller sums it.</returns>
-    public static double Play(CheetahModel model, LinearPolicy policy, int seed) {
+    public static double Play(MjModel model, LinearPolicy policy, int seed) {
         var game = new CheetahGame(model);
         double[] obs = game.Reset(seed);
         Span<float> action = stackalloc float[CheetahGame.ActionSize];

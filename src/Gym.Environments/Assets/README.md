@@ -14,8 +14,9 @@ hashes in step when a re-pin re-copies the files.
 Each file is embedded under the resource name `assets/<path>` (forward slashes on every OS), read through
 `EnvAssets.Load` and decoded with `ImageIO.Load(Stream)`.
 
-One file is not an image and not a copy: `fonts/freesansbold-42.json`, CarRacing's score glyphs, recorded from pygame-ce
-(see [fonts](#fonts) below).
+Two kinds of file are not copies but recordings: `fonts/freesansbold-42.json`, CarRacing's score glyphs, recorded from
+pygame-ce (see [fonts](#fonts) below), and `mujoco/*.json` with `mujoco/textures/*.png`, Gymnasium's MuJoCo models as
+the pinned MuJoCo compiles them (see [mujoco](#mujoco) below). Their tables record the source each was made from.
 
 ## classic_control
 
@@ -143,3 +144,49 @@ hinted 26.6 advance and 8-bit coverage; the kerning of their 109 kerned pairs; t
 The parity cell `CarRacingLiveParityTests.GymNet_ScoreFont_EmbeddedDataIsTheLiveRecording` compares the file with a live
 recording, so a pygame-ce re-pin that changes the font fails there. Re-record with the parity stack's pygame-ce:
 `python tools/parity/record_score_font.py src/Gym.Environments/Assets/fonts/freesansbold-42.json`.
+
+## mujoco
+
+Gymnasium's 14 bundled MuJoCo models as MuJoCo 4.0.0 compiles them (DR-63, DR-64), embedded on the maintainer's
+decision of 2026-11-12. Gym.NET never compiles MJCF: `MjModel.FromXmlPath("ant.xml")` reads `mujoco/ant.json`, so
+every number the engine and the renderer read is MuJoCo's own, bit for bit, as CarRacing's glyphs are pygame's own. A
+model file (format 1) holds the compiler's sizes, `opt`, `stat` and `vis`, the element names per kind, the textures,
+and the arrays by MuJoCo's names: the physics fields the engine reads or validates and every `geom_*`, `site_*`,
+`mat_*`, `tex_*` (but `tex_data`), `light_*` and `cam_*` array. Doubles are written by Python's `repr`, which .NET's
+parser reads back to the same bits. `tools/parity/mujoco/record_models.py` documents every field.
+
+| File | Source | Source SHA-256 | SHA-256 | Used by |
+|---|---|---|---|---|
+| `mujoco/ant.json` | `refs/Gymnasium/gymnasium/envs/mujoco/assets/ant.xml` | `30cf9aa568dd66ce11a8f07191f656ddec47c6b405e86dd5fa73a8f02c47ceae` | `b6f27587d53d474146789bcb583912aa7211b8b1455dcd7729665ad3e204a374` | Ant-v4, Ant-v5 |
+| `mujoco/half_cheetah.json` | `refs/Gymnasium/gymnasium/envs/mujoco/assets/half_cheetah.xml` | `e39468f09810d648e1ae55d09677d02696087e7de5c32bdc3d31fffa69a6d0ff` | `3519aa3fe2f51fe5e8b32f090efe8ecbfa4ef34e234722d1d03f14e3f3a8515d` | HalfCheetah-v4, HalfCheetah-v5 |
+| `mujoco/hopper.json` | `refs/Gymnasium/gymnasium/envs/mujoco/assets/hopper.xml` | `53a729aa38026cf543c13f60934606ccd222c6d5b0a3b99172cfa2a8668fe294` | `cbb37a35b4ce2f5f985f044eefdc54cd08b16f1885e210e26ab2c14523020b4d` | Hopper-v4, Hopper-v5 |
+| `mujoco/humanoid.json` | `refs/Gymnasium/gymnasium/envs/mujoco/assets/humanoid.xml` | `28ddce0cefce55d9d7f1a54eb4a1f229fda1d4630828a95871e8ae620e367e7f` | `b18f6387562958cdf917a76d03947475c0f63f2503f2ceb900e2e9eb43074c1b` | Humanoid-v4, Humanoid-v5 |
+| `mujoco/humanoidstandup.json` | `refs/Gymnasium/gymnasium/envs/mujoco/assets/humanoidstandup.xml` | `c135edbf02a7b59a8371ba244e8c27a720aa4d8cf502f68157598e0b1106cb33` | `ee484fcb0e2138cdd91e7e7b03e2e817430b0dd6d86ce44281b1ef3bc7ae3a3b` | HumanoidStandup-v4, HumanoidStandup-v5 |
+| `mujoco/inverted_double_pendulum.json` | `refs/Gymnasium/gymnasium/envs/mujoco/assets/inverted_double_pendulum.xml` | `66fd208bbeb5b7a912d7bf2636398a6aeb9fce577c484e7565ca4f7a4c5fb250` | `d94aaaef1c687f779432fa3f090ce812e4a95f94224d5cbfee2d48b9bd1909f3` | InvertedDoublePendulum-v4, InvertedDoublePendulum-v5 |
+| `mujoco/inverted_pendulum.json` | `refs/Gymnasium/gymnasium/envs/mujoco/assets/inverted_pendulum.xml` | `4456cc21fff17f87bf7760eee8753a454fdc272a50f46e5c7e4669e4e240d07c` | `101104dc9f2ccbb1da8afa389b14a3f9afb46b5b2101289eb3cdfa5adbd8d566` | InvertedPendulum-v4, InvertedPendulum-v5 |
+| `mujoco/point.json` | `refs/Gymnasium/gymnasium/envs/mujoco/assets/point.xml` | `9ff7bb872106c2db7925ae918476a5d1a388e39412aee1c554becfbe49eed846` | `2ad3a58f3986f9c31643414b8c5bd4a8abeda31822410880338508b1dd4b2b2a` | no registered id: Gymnasium's custom-env tests |
+| `mujoco/pusher.json` | `refs/Gymnasium/gymnasium/envs/mujoco/assets/pusher.xml` | `91b2983c6ad315636af04a167f458a87e05b97da82a0c050eaf95871b664ac4a` | `3f1ebc90693dead8349b4bb003956ff0dede5c064104f859e1a79f5158d0de18` | Pusher-v5 with `xml_file="pusher.xml"` (Pusher-v4 is refused, as Gymnasium refuses it on MuJoCo 3 and later) |
+| `mujoco/pusher_v5.json` | `refs/Gymnasium/gymnasium/envs/mujoco/assets/pusher_v5.xml` | `937f3487d73e16b22256d4d3ac3ed03db59cc17e631f4633c29fdac8833a0b50` | `c900ab72f8640d25c2a281d71e8287733e0c0c1340dbbb88c82c6700f7dab3b3` | Pusher-v5 |
+| `mujoco/reacher.json` | `refs/Gymnasium/gymnasium/envs/mujoco/assets/reacher.xml` | `8d3cd344fd96db12f939716e47a84bb67102a349f6e3c0db519c1125bf76fdbc` | `30b17d01a1bc788008a78b6460813bc8f5f913d663174dde626b7131897229da` | Reacher-v4, Reacher-v5 |
+| `mujoco/swimmer.json` | `refs/Gymnasium/gymnasium/envs/mujoco/assets/swimmer.xml` | `ef9a07a5967b1affdc0ccca423dfa4e26227f72287d081af013fb2ecdc145249` | `35e042bf432a2f44093a18776b92bf50e2eff685ce48ecf353f40d037ba142ca` | Swimmer-v4, Swimmer-v5 |
+| `mujoco/walker2d.json` | `refs/Gymnasium/gymnasium/envs/mujoco/assets/walker2d.xml` | `dde87cd83e4e69e139aa7d1782321e7f62c846eebabfb41c9300fbf96eeaaf85` | `5450228f749e3ee93298910ca085e1666ff5ab8f242fb2297f2366771b3631e7` | Walker2d-v4 |
+| `mujoco/walker2d_v5.json` | `refs/Gymnasium/gymnasium/envs/mujoco/assets/walker2d_v5.xml` | `bdc043313cae4b718c97f929175e27213666af5b997eedc953479fdb6c9daeb7` | `cd2d8601a387e63960e1c45551b87eab01ceb4f8ebadb9c8f8b931de35cb8eea` | Walker2d-v5 |
+
+The textures are MuJoCo's builtin textures (`builtin="gradient"`, `"flat"` with its marks and noise, and `"checker"`
+in the XMLs), generated by the compiler, not image files of Gymnasium's: each is stored once as a lossless 8-bit RGB
+PNG named by the first 16 hex digits of the SHA-256 of its raw pixels (MuJoCo's `tex_data` slice), which the model
+file records in full beside the PNG's path. The inverted pendulums, Pusher and Reacher have none.
+
+| File | Texture | Size | Pixels' SHA-256 (in the model files) | SHA-256 | Used by |
+|---|---|---|---|---|---|
+| `mujoco/textures/ce75c84c42cbeced.png` | skybox (gradient) | 100 × 600 | `ce75c84c42cbecedd913a5a95b7b57561944563ccb91ecb32ef56b1bb46fb343` | `8616f21254a81531e2ee71b89f536fed2a112e7a85fbdebeed3efce6972e9929` | ant, half_cheetah, point, swimmer |
+| `mujoco/textures/4148cd0be74ddcde.png` | skybox (gradient) | 100 × 600 | `4148cd0be74ddcdec7e4f62298778b284763ea3c7e8cbf15989034c26521fb98` | `679786935bb2d95362fc2902d6f12c56c5f4ccda5fc30183a9015059e3bce673` | hopper, humanoid, humanoidstandup, walker2d, walker2d_v5 |
+| `mujoco/textures/639956a14614a17d.png` | `texgeom` (cube) | 127 × 762 | `639956a14614a17deea04796f5191be9227b1eeebe793f39cf30a440ad3048a8` | `b845f69a95d6c643b440c3f358106bb9b2835710c775a6f8fb0052e1afac3d82` | the nine models with a skybox |
+| `mujoco/textures/6baa02e8cd04a4ae.png` | `texplane` (2D checker) | 100 × 100 | `6baa02e8cd04a4aeccb0dbd48bbfc4e851e1ece471bfb516e1a68e9289f537fb` | `bfd5afd735b25c1ed33c6074fafcd4a49a79dc7970a128addd0d3865000dda41` | the nine models with a skybox |
+
+Re-record after a re-pin of MuJoCo or Gymnasium, with a Python holding the pinned `mujoco` and NumPy:
+`python -I tools/parity/mujoco/record_models.py`; the files change only where the compiler's output changed, and
+`--check` compares the committed files with a fresh recording instead (exit 1 on any difference). When they were
+embedded, the files were compared with the models the trace checker's 49 MuJoCo 4.0.0 traces
+(`tools/parity/mujoco/halfcheetah_poc`) ran on, field by field: 9,261 fields of the 12 models the traces use (all but
+`point` and `pusher`), all equal.

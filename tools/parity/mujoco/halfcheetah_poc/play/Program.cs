@@ -11,6 +11,7 @@ using Gym.Rendering;
 using Gym.Rendering.Avalonia;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
+using Gym.MuJoCo;
 
 namespace MujocoPoc.Play;
 
@@ -28,11 +29,11 @@ namespace MujocoPoc.Play;
 ///     HalfCheetahPlay frames FOLDER [--steps N] [--every N] [--seed N]
 ///     HalfCheetahPlay score [--seeds A-B]
 ///     </code>
-///     The model (half_cheetah.mjmodel.json, MuJoCo's compiled HalfCheetah) and the autopilot (policy.json) are read from
+///     The model (half_cheetah.json, MuJoCo's compiled HalfCheetah as Gym.Environments embeds it) and the autopilot (policy.json) are read from
 ///     the program's folder; <c>--policy FILE</c> picks another autopilot.
 /// </remarks>
 internal static class Program {
-    private const string Title = "HalfCheetah-v5 - Gym.NET managed core, bit-exact with MuJoCo 3.15.0";
+    private const string Title = "HalfCheetah-v5 - Gym.NET managed core, bit-exact with MuJoCo 4.0.0";
 
     /// <summary>Dispatches the command.</summary>
     /// <param name="args">The command and its options (see the class remarks).</param>
@@ -43,7 +44,7 @@ internal static class Program {
         string command = args.Length > 0 && !args[0].StartsWith("--", StringComparison.Ordinal) ? args[0] : "play";
         var options = new Options(args.SkipWhile(a => !a.StartsWith("--", StringComparison.Ordinal)).ToArray());
         string folder = AppContext.BaseDirectory;
-        CheetahModel model = CheetahModel.Load(Path.Combine(folder, "half_cheetah.mjmodel.json"));
+        MjModel model = MjModel.Load(Path.Combine(folder, "half_cheetah.json"));
         string policyPath = options.Text("policy", Path.Combine(folder, "policy.json"));
         try {
             switch (command) {
@@ -90,7 +91,7 @@ internal static class Program {
     /// <param name="manual">Start with the keyboard driving.</param>
     /// <returns>0.</returns>
     /// <exception cref="InvalidOperationException">The viewer reports no keyboard input.</exception>
-    private static int Play(CheetahModel model, LinearPolicy? policy, int seed, bool manual) {
+    private static int Play(MjModel model, LinearPolicy? policy, int seed, bool manual) {
         var view = new SideView();
         var game = new CheetahGame(model);
         game.Reset(seed);
@@ -164,7 +165,7 @@ internal static class Program {
             else
                 KeysToAction(held, action);
             game.BeginStep(action);
-            for (int k = 0; k < model.frame_skip; k++) {
+            for (int k = 0; k < CheetahGame.FrameSkip; k++) {
                 game.PhysicsStep();
                 due += model.timestep / speed;
                 double now = clock.Elapsed.TotalSeconds;
@@ -208,7 +209,7 @@ internal static class Program {
     /// <param name="model">The model.</param>
     /// <param name="options">--iterations, --threads, --seed, --out.</param>
     /// <returns>0.</returns>
-    private static int Train(CheetahModel model, Options options) {
+    private static int Train(MjModel model, Options options) {
         var settings = new Ars.Settings(Iterations: options.Int("iterations", 600), Threads: options.Int("threads", Math.Max(1, Environment.ProcessorCount / 2)),
                                         Seed: options.Int("seed", 1));
         string output = options.Text("out", "policy.json");
@@ -230,7 +231,7 @@ internal static class Program {
     /// <param name="seed">The first episode's seed.</param>
     /// <returns>0, or ffmpeg's exit code when it failed.</returns>
     /// <exception cref="System.ComponentModel.Win32Exception">ffmpeg is not on PATH.</exception>
-    private static int Video(CheetahModel model, LinearPolicy policy, string path, double seconds, int seed) {
+    private static int Video(MjModel model, LinearPolicy policy, string path, double seconds, int seed) {
         var view = new SideView();
         var game = new CheetahGame(model);
         game.Reset(seed);
@@ -251,7 +252,7 @@ internal static class Program {
         while (physics < total) {
             policy.Act(game.Observation(), action);
             game.BeginStep(action);
-            for (int k = 0; k < model.frame_skip; k++) {
+            for (int k = 0; k < CheetahGame.FrameSkip; k++) {
                 game.PhysicsStep();
                 if (++physics % physicsPerFrame == 0) {
                     double t = physics * model.timestep;
@@ -281,7 +282,7 @@ internal static class Program {
     /// <param name="every">Env steps between frames.</param>
     /// <param name="seed">The episode's seed.</param>
     /// <returns>0.</returns>
-    private static int Frames(CheetahModel model, LinearPolicy policy, string folder, int steps, int every, int seed) {
+    private static int Frames(MjModel model, LinearPolicy policy, string folder, int steps, int every, int seed) {
         Directory.CreateDirectory(folder);
         var view = new SideView();
         var game = new CheetahGame(model);
@@ -309,7 +310,7 @@ internal static class Program {
     /// <param name="seeds">A range "A-B" or a single seed.</param>
     /// <returns>0.</returns>
     /// <exception cref="ArgumentException">The range is malformed.</exception>
-    private static int Score(CheetahModel model, LinearPolicy policy, string seeds) {
+    private static int Score(MjModel model, LinearPolicy policy, string seeds) {
         string[] parts = seeds.Split('-');
         if (!int.TryParse(parts[0], out int first) || !int.TryParse(parts[^1], out int last) || last < first)
             throw new ArgumentException($"--seeds wants A-B or A, got '{seeds}'");

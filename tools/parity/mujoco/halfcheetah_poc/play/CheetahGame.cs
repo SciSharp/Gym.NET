@@ -1,6 +1,7 @@
 using System;
 using System.Numerics;
 using NumSharp;
+using Gym.MuJoCo;
 
 namespace MujocoPoc.Play;
 
@@ -25,10 +26,10 @@ public sealed class CheetahGame {
     public const int ObservationSize = 17;
 
     /// <summary>The core being stepped; its arrays are the live simulation state.</summary>
-    public readonly CheetahCore Core;
+    public readonly MjData Core;
 
     /// <summary>The model.</summary>
-    public readonly CheetahModel Model;
+    public readonly MjModel Model;
 
     /// <summary>The action of the current env step, float32 as Gymnasium's Box hands it to MuJoCo.</summary>
     public readonly float[] Action = new float[ActionSize];
@@ -52,18 +53,21 @@ public sealed class CheetahGame {
     /// <summary>The seed of the current episode, or -1 when it was reset from a <see cref="Random"/>.</summary>
     public int Seed { get; private set; } = -1;
 
+    /// <summary>HalfCheetah-v5's physics steps per env step (Gymnasium's <c>frame_skip</c> default), an env setting.</summary>
+    public const int FrameSkip = 5;
+
     /// <summary>The env time step: the physics time step times frame_skip (0.05 s).</summary>
-    public double Dt => Model.timestep * Model.frame_skip;
+    public double Dt => Model.timestep * FrameSkip;
 
     /// <summary>Creates a game at the model's reference configuration (call a <c>Reset</c> before stepping).</summary>
     /// <param name="model">The compiled HalfCheetah model.</param>
     /// <exception cref="ArgumentNullException"><paramref name="model"/> is null.</exception>
     /// <exception cref="ArgumentException">The model's sizes are not HalfCheetah's.</exception>
-    public CheetahGame(CheetahModel model) {
+    public CheetahGame(MjModel model) {
         Model = model ?? throw new ArgumentNullException(nameof(model));
         if (model.nu != ActionSize || model.nq + model.nv - 1 != ObservationSize)
             throw new ArgumentException($"expected HalfCheetah's sizes (nu {ActionSize}, nq + nv - 1 = {ObservationSize})", nameof(model));
-        Core = new CheetahCore(model);
+        Core = new MjData(model);
     }
 
     /// <summary>
@@ -142,7 +146,7 @@ public sealed class CheetahGame {
     /// <exception cref="ArgumentException"><paramref name="action"/> does not have six values.</exception>
     public double Step(ReadOnlySpan<float> action) {
         BeginStep(action);
-        for (int k = 0; k < Model.frame_skip; k++)
+        for (int k = 0; k < FrameSkip; k++)
             PhysicsStep();
         return EndStep();
     }
@@ -163,7 +167,7 @@ public sealed class CheetahGame {
     /// <summary>One <c>mj_step</c> of the env step in progress.</summary>
     /// <exception cref="InvalidOperationException">All frame_skip physics steps of this env step were already taken.</exception>
     public void PhysicsStep() {
-        if (substep >= Model.frame_skip)
+        if (substep >= FrameSkip)
             throw new InvalidOperationException("this env step already took its frame_skip physics steps; call EndStep");
         Core.Step();
         substep++;
@@ -176,8 +180,8 @@ public sealed class CheetahGame {
     /// <returns>The reward.</returns>
     /// <exception cref="InvalidOperationException">The env step has not taken its frame_skip physics steps.</exception>
     public double EndStep() {
-        if (substep != Model.frame_skip)
-            throw new InvalidOperationException($"an env step takes {Model.frame_skip} physics steps, {substep} were taken");
+        if (substep != FrameSkip)
+            throw new InvalidOperationException($"an env step takes {FrameSkip} physics steps, {substep} were taken");
         double xVelocity = (Core.qpos[0] - xBefore) / Dt;
         float squares = 0;
         foreach (float a in Action)
