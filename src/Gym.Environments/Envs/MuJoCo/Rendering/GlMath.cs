@@ -130,6 +130,29 @@ namespace Gym.Environments.Envs.MuJoCo.Rendering {
         /// <returns>A new matrix.</returns>
         internal static float[] Scale(float x, float y, float z) => [x, 0, 0, 0, 0, y, 0, 0, 0, 0, z, 0, 0, 0, 0, 1];
 
+        /// <summary>
+        ///     A rotation by <paramref name="degrees"/> about an axis (<c>glRotatef</c>, OpenGL 2.1 §2.11.2), built in double
+        ///     from the normalized axis; a zero axis gives the identity.
+        /// </summary>
+        /// <param name="degrees">The angle, counter-clockwise looking down the axis.</param>
+        /// <param name="x">The axis's x.</param>
+        /// <param name="y">The axis's y.</param>
+        /// <param name="z">The axis's z.</param>
+        /// <returns>A new matrix.</returns>
+        internal static float[] Rotate(float degrees, float x, float y, float z) {
+            double len = Math.Sqrt((double)x * x + (double)y * y + (double)z * z);
+            if (len == 0)
+                return Identity();
+            double ax = x / len, ay = y / len, az = z / len;
+            double rad = degrees * Math.PI / 180.0, c = Math.Cos(rad), s = Math.Sin(rad), t = 1 - c;
+            return [
+                (float)(ax * ax * t + c), (float)(ay * ax * t + az * s), (float)(az * ax * t - ay * s), 0,
+                (float)(ax * ay * t - az * s), (float)(ay * ay * t + c), (float)(az * ay * t + ax * s), 0,
+                (float)(ax * az * t + ay * s), (float)(ay * az * t - ax * s), (float)(az * az * t + c), 0,
+                0, 0, 0, 1,
+            ];
+        }
+
         /// <summary>A perspective frustum (<c>glFrustum</c>), built in double.</summary>
         /// <param name="l">Left.</param>
         /// <param name="r">Right.</param>

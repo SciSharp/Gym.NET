@@ -16,6 +16,7 @@ using SixLabors.ImageSharp.PixelFormats;
 using Image = SixLabors.ImageSharp.Image;
 using AVImage = Avalonia.Controls.Image;
 using Size = Avalonia.Size;
+using Point = Avalonia.Point;
 
 namespace Gym.Rendering.Avalonia {
     /// <summary>
@@ -33,7 +34,8 @@ namespace Gym.Rendering.Avalonia {
     ///     character and this viewer the virtual key (<c>K_1</c>), and the keypad's Enter is the main Enter (Avalonia's key
     ///     does not tell them apart). A held key reports one press, not the system's auto-repeat, as pygame's default (no
     ///     <c>key.set_repeat</c>). Keys without an SDL keycode in <see cref="KeyCode"/> are not reported. Resizes are
-    ///     reported in device-independent pixels, the unit the window was opened in.
+    ///     reported in device-independent pixels, the unit the window was opened in, and so is the mouse (DR-70: its
+    ///     buttons, moves and wheel, for a MuJoCo env's camera controls).
     ///     </para>
     ///     <para>
     ///     Before <see cref="BeginInput"/> nothing changes: the close button closes the window, as it always has for the
@@ -152,8 +154,8 @@ namespace Gym.Rendering.Avalonia {
         }
 
         /// <summary>
-        ///     Starts reporting input: keys, the close button (which from now on only reports and no longer closes) and the
-        ///     user's resizes. Safe from any thread; calling it again does nothing more.
+        ///     Starts reporting input: keys, the close button (which from now on only reports and no longer closes), the
+        ///     user's resizes and the mouse. Safe from any thread; calling it again does nothing more.
         /// </summary>
         public void BeginInput() => _inputEnabled = true;
 
@@ -215,6 +217,66 @@ namespace Gym.Rendering.Avalonia {
             int width = (int)Math.Round(e.ClientSize.Width), height = (int)Math.Round(e.ClientSize.Height);
             if (width > 0 && height > 0)
                 _input.Enqueue(ViewerInput.Resized(width, height));
+        }
+
+        /// <summary>
+        ///     Reports a mouse button press at the pointer, in device-independent pixels from the client area's top-left (DR-70,
+        ///     GLFW's numbering of the buttons), when input is on; buttons beyond the three are not reported.
+        /// </summary>
+        /// <param name="e">The pointer event; marked handled when reported.</param>
+        protected override void OnPointerPressed(PointerPressedEventArgs e) {
+            base.OnPointerPressed(e);
+            if (!_inputEnabled || !MouseButton(e.GetCurrentPoint(this).Properties.PointerUpdateKind, out int button))
+                return;
+            Point at = e.GetPosition(this);
+            _input.Enqueue(ViewerInput.MouseDown(button, at.X, at.Y));
+            e.Handled = true;
+        }
+
+        /// <summary>Reports a mouse button release at the pointer, when input is on.</summary>
+        /// <param name="e">The pointer event; marked handled when reported.</param>
+        protected override void OnPointerReleased(PointerReleasedEventArgs e) {
+            base.OnPointerReleased(e);
+            if (!_inputEnabled || !MouseButton(e.GetCurrentPoint(this).Properties.PointerUpdateKind, out int button))
+                return;
+            Point at = e.GetPosition(this);
+            _input.Enqueue(ViewerInput.MouseUp(button, at.X, at.Y));
+            e.Handled = true;
+        }
+
+        /// <summary>Reports the pointer's new position, when input is on (Avalonia captures it to the window while a button is held).</summary>
+        /// <param name="e">The pointer event.</param>
+        protected override void OnPointerMoved(PointerEventArgs e) {
+            base.OnPointerMoved(e);
+            if (!_inputEnabled)
+                return;
+            Point at = e.GetPosition(this);
+            _input.Enqueue(ViewerInput.MouseMove(at.X, at.Y));
+        }
+
+        /// <summary>Reports a turn of the wheel in notches, positive away from the user, when input is on.</summary>
+        /// <param name="e">The wheel event; marked handled when reported.</param>
+        protected override void OnPointerWheelChanged(PointerWheelEventArgs e) {
+            base.OnPointerWheelChanged(e);
+            if (!_inputEnabled)
+                return;
+            Point at = e.GetPosition(this);
+            _input.Enqueue(ViewerInput.Scroll(e.Delta.X, e.Delta.Y, at.X, at.Y));
+            e.Handled = true;
+        }
+
+        /// <summary>GLFW's number of the button an Avalonia pointer update pressed or released.</summary>
+        /// <param name="kind">The update.</param>
+        /// <param name="button">The button, when it is the left, right or middle one.</param>
+        /// <returns>Whether the update pressed or released one of the three.</returns>
+        private static bool MouseButton(PointerUpdateKind kind, out int button) {
+            button = kind switch {
+                PointerUpdateKind.LeftButtonPressed or PointerUpdateKind.LeftButtonReleased => ViewerInput.LeftButton,
+                PointerUpdateKind.RightButtonPressed or PointerUpdateKind.RightButtonReleased => ViewerInput.RightButton,
+                PointerUpdateKind.MiddleButtonPressed or PointerUpdateKind.MiddleButtonReleased => ViewerInput.MiddleButton,
+                _ => -1,
+            };
+            return button >= 0;
         }
 
         /// <summary>

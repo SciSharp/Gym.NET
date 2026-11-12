@@ -191,6 +191,14 @@ them as constants (`RenderModes.RgbArray` is `"rgb_array"`), so either form work
 
 An env class also takes its own viewer: `new CartPoleEnv(renderMode: "human", viewerFactory: WinFormEnvViewer.Factory)`.
 
+A MuJoCo env's `human` window is Gymnasium's MuJoCo viewer, with its controls (DR-70): drag with the left button to orbit
+the camera and with the right one to pan it (Shift: horizontally), scroll to zoom; Space pauses (each `Step` then waits
+in the window until Space or → is pressed), → advances one step, Tab cycles the model's cameras, C shows contact
+forces, E the bodies' frames, R makes the bodies transparent, 0 to 4 switch geom groups, T saves the frame as a PNG
+(`/tmp/frame_0000000.png` and on, on the current drive), H hides the menu, S and F slow down and speed up, D switches
+between drawing every step and real time, Esc closes the window. Its frames come from Gym.NET's software renderer, a
+few to a few dozen a second.
+
 ## Wrappers
 
 A wrapper is an env around an env: `Wrapper<TObs, TAct>` and the `ObservationWrapper`, `ActionWrapper` and

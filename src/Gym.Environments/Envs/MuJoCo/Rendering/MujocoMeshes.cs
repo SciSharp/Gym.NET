@@ -196,6 +196,12 @@ namespace Gym.Environments.Envs.MuJoCo.Rendering {
         /// <summary>The unit box, each face split into <c>numquads</c>² quads.</summary>
         internal readonly GlMesh Box;
 
+        /// <summary>
+        ///     The unit cone (<c>mjrCONE</c>): apex at z = 1, base of radius 1 at z = 0 closed by a disk facing down; the head
+        ///     of the decorations' arrows (contact forces, DR-70).
+        /// </summary>
+        internal readonly GlMesh Cone;
+
         /// <summary>The haze's truncated cone.</summary>
         internal readonly GlMesh Haze;
 
@@ -224,6 +230,9 @@ namespace Gym.Environments.Envs.MuJoCo.Rendering {
             Haze = new GlMesh();
             MakeHaze(Haze, numslices, m.vis_haze, m.vis_rgba_haze);
             Box = MakeBox(numquads);
+            Cone = new GlMesh();
+            MakeCone(Cone, numslices, numstacks);
+            Disk(Cone, 0, numslices, numstacks);
             Plane = MakeDefaultPlane(numquads);
             MakePlanes(m);
         }
@@ -400,6 +409,107 @@ namespace Gym.Environments.Envs.MuJoCo.Rendering {
             }
 
             mesh.End();
+        }
+
+        /// <summary>One cone vertex and its normal (<c>setVertexCone</c>): radius <paramref name="r"/> at height 1 - r.</summary>
+        /// <param name="v">The position, written.</param>
+        /// <param name="n">The normal, written (the side's, at 45°).</param>
+        /// <param name="az">The azimuth.</param>
+        /// <param name="r">The radius, 0 at the apex.</param>
+        private static void SetVertexCone(Span<float> v, Span<float> n, float az, float r) {
+            float scale = 1.0f / MathF.Sqrt(2.0f);
+            v[0] = MathF.Cos(az) * r;
+            v[1] = MathF.Sin(az) * r;
+            v[2] = 1 - r;
+            n[0] = MathF.Cos(az) * scale;
+            n[1] = MathF.Sin(az) * scale;
+            n[2] = scale;
+        }
+
+        /// <summary>
+        ///     The open cone's side (<c>cone</c>): triangles at the apex, each with the mean of its base normals, then quads
+        ///     down to the base.
+        /// </summary>
+        /// <param name="mesh">The list to record into.</param>
+        /// <param name="nSlice">Slices around.</param>
+        /// <param name="nStack">Rings from the apex down.</param>
+        private static void MakeCone(GlMesh mesh, int nSlice, int nStack) {
+            Span<float> v1 = stackalloc float[3], v2 = stackalloc float[3], v3 = stackalloc float[3], v4 = stackalloc float[3];
+            Span<float> n1 = stackalloc float[3], n2 = stackalloc float[3], n3 = stackalloc float[3], n4 = stackalloc float[3];
+
+            // pole: triangles
+            mesh.Begin(3);
+            float r1 = 1.0f / nStack;
+            for (int j = 0; j < nSlice; j++) {
+                float az1 = (float)(2.0f * Pi * (j + 0) / nSlice);
+                float az2 = (float)(2.0f * Pi * (j + 1) / nSlice);
+                SetVertexCone(v1, n1, az1, r1);
+                SetVertexCone(v2, n2, az2, r1);
+                v3[0] = v3[1] = 0;
+                v3[2] = 1;
+                n3[0] = n1[0] + n2[0];
+                n3[1] = n1[1] + n2[1];
+                n3[2] = n1[2] + n2[2];
+                NormalizeVec(n3);
+                float u1 = (float)j / nSlice, u2 = (float)(j + 1) / nSlice, u3 = (u1 + u2) / 2.0f;
+                mesh.TexCoord(u1, r1);
+                mesh.Normal(n1[0], n1[1], n1[2]);
+                mesh.Vertex(v1[0], v1[1], v1[2]);
+                mesh.TexCoord(u2, r1);
+                mesh.Normal(n2[0], n2[1], n2[2]);
+                mesh.Vertex(v2[0], v2[1], v2[2]);
+                mesh.TexCoord(u3, 0.0f);
+                mesh.Normal(n3[0], n3[1], n3[2]);
+                mesh.Vertex(v3[0], v3[1], v3[2]);
+            }
+
+            mesh.End();
+
+            // the rest: quads
+            mesh.Begin(4);
+            for (int i = 0; i < nStack - 1; i++) {
+                float ra = (i + 1) / (float)nStack, rb = (i + 2) / (float)nStack;
+                for (int j = 0; j < nSlice; j++) {
+                    float az1 = (float)(2.0f * Pi * (j + 0) / nSlice);
+                    float az2 = (float)(2.0f * Pi * (j + 1) / nSlice);
+                    SetVertexCone(v1, n1, az1, rb);
+                    SetVertexCone(v2, n2, az2, rb);
+                    SetVertexCone(v3, n3, az2, ra);
+                    SetVertexCone(v4, n4, az1, ra);
+                    float u1 = (float)j / nSlice, u2 = (float)(j + 1) / nSlice;
+                    mesh.TexCoord(u1, rb);
+                    mesh.Normal(n1[0], n1[1], n1[2]);
+                    mesh.Vertex(v1[0], v1[1], v1[2]);
+                    mesh.TexCoord(u2, rb);
+                    mesh.Normal(n2[0], n2[1], n2[2]);
+                    mesh.Vertex(v2[0], v2[1], v2[2]);
+                    mesh.TexCoord(u2, ra);
+                    mesh.Normal(n3[0], n3[1], n3[2]);
+                    mesh.Vertex(v3[0], v3[1], v3[2]);
+                    mesh.TexCoord(u1, ra);
+                    mesh.Normal(n4[0], n4[1], n4[2]);
+                    mesh.Vertex(v4[0], v4[1], v4[2]);
+                }
+            }
+
+            mesh.End();
+        }
+
+        /// <summary>Normalizes a float vector in place (<c>mjr_normalizeVec</c>): +z when it is shorter than 1e-10.</summary>
+        /// <param name="v">The vector.</param>
+        private static void NormalizeVec(Span<float> v) {
+            float len = MathF.Sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
+            if (len < 1e-10f) {
+                v[0] = 0;
+                v[1] = 0;
+                v[2] = 1;
+                return;
+            }
+
+            float scl = 1.0f / len;
+            v[0] *= scl;
+            v[1] *= scl;
+            v[2] *= scl;
         }
 
         /// <summary>A disk at z = sign (<c>disk</c>): +1 the top, -1 the bottom, 0 a disk at z = 0 facing down.</summary>

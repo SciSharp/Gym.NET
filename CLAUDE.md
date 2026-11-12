@@ -25,7 +25,8 @@ refs/Gym.NET/
 │   │   ├── Envs/                  # IEnv, Env<TObs, TAct> (Step, ValueTask StepAsync), Wrapper family (+ IWrapper), Info, Metadata, RenderResult
 │   │   │   ├── Registration/      # EnvSpec (Make, ToJson/FromJson), WrapperSpec, EnvCreator, EnvSpecRegistry, EnvRegistry (register, spec, make, pprint_registry),
 │   │   │   │                      #   EnvRegistry.MakeVec.cs (make_vec: sync, async and vector entry point), VectorizeMode
-│   │   │   └── Viewers/           # IEnvViewer, IEnvironmentViewerFactoryDelegate, NullEnvViewer (namespace Gym.Environments; DR-20); Clock (Gym.Rendering)
+│   │   │   └── Viewers/           # IEnvViewer, IEnvironmentViewerFactoryDelegate, IInteractiveEnvViewer + ViewerInput (keys, close, resizes, mouse: DR-70),
+│   │   │                          #   NullEnvViewer (namespace Gym.Environments; DR-20); Clock (Gym.Rendering)
 │   │   ├── Spaces/                # Space (base), Box (bounded/continuous), Discrete
 │   │   ├── Observations/          # StepResult<TObs> (5-tuple), ResetResult<TObs>, DoneStepResult<TObs> (pre-0.26 4-tuple)
 │   │   ├── Vector/                # IVectorEnv, VectorEnv<TObs, TAct> (batched types, DR-21; _add_info), VectorStepResult/VectorResetResult, AutoresetMode,
@@ -86,13 +87,16 @@ refs/Gym.NET/
 │   │   │                          #   Hopper, Humanoid (+ MassCenter), HumanoidStandup, InvertedDoublePendulum, InvertedPendulum, Pusher
 │   │   │                          #   (PusherEnvV4 refuses, as Gymnasium's on MuJoCo 3+), Reacher, Swimmer, Walker2d; MujocoMath (internal:
 │   │   │                          #   NumPy's pairwise sums, norms and the control cost in the action's dtype; DR-08 info scalars);
-│   │   │                          #   MujocoRenderer (Gymnasium's camera rules, rgb_array/depth_array/rgbd_tuple; human's window to come,
-│   │   │                          #   DR-70); MujocoUtils (utils' 3 functions)
-│   │   ├── Envs/MuJoCo/Rendering/ # internal (DR-69): MuJoCo's classic renderer drawn in software (DR-62): MujocoScene (mjv_updateScene),
-│   │   │                          #   MujocoMeshes (the builtin meshes), MujocoFrame (mjr_render's passes: reflection, shadow maps, skybox,
+│   │   │                          #   MujocoRenderer (Gymnasium's camera rules, rgb_array/depth_array/rgbd_tuple, and human: the window
+│   │   │                          #   with Gymnasium's full WindowViewer controls, DR-70); MujocoUtils (utils' 3 functions)
+│   │   ├── Envs/MuJoCo/Rendering/ # internal (DR-69): MuJoCo's classic renderer drawn in software (DR-62): MujocoScene (mjv_updateScene,
+│   │   │                          #   the C/E keys' contact and frame decorations; MjvCamera.Move = mjv_moveCamera), MujocoMeshes (the
+│   │   │                          #   builtin meshes, the arrows' cone), MujocoFrame (mjr_render's passes: reflection, shadow maps, skybox,
 │   │   │                          #   haze, transparency; mjr_readPixels), GlContext (the fixed-function OpenGL MuJoCo uses: lighting,
 │   │   │                          #   texgen, clipping, 4x MSAA, stencil, blending), GlTexture (mipmaps, filtering), GlMath. Where the GPU
-│   │   │                          #   decides (rounding, LOD, centroid, resolve), the reference GPU's measured behaviour: gpu_probe.py
+│   │   │                          #   decides (rounding, LOD, centroid, resolve), the reference GPU's measured behaviour: gpu_probe.py.
+│   │   │                          #   MujocoOverlay (mjr_overlay with MuJoCo's normal150 font, Assets/mujoco/fonts) and MujocoWindow
+│   │   │                          #   (Gymnasium's WindowViewer: render loop, pause, keys, mouse through IInteractiveEnvViewer, menu; DR-70)
 │   │   ├── Envs/                  # NpScalar (NEP 50 scalars), HumanWindow (DR-20), EnvAssets (DR-19), RenderMath
 │   │   ├── Assets/                # Embedded env images copied from Gymnasium (classic_control, toy_text), CarRacing's recorded score glyphs
 │   │   │                          #   (fonts/freesansbold-42.json, DR-48) and Gymnasium's 14 MuJoCo models as MuJoCo 4.0.0 compiles them
@@ -109,9 +113,9 @@ refs/Gym.NET/
 │   │   ├── GymEnvironments.cs     # Register(): the built-in ids, from a module initializer (DR-12; GYMNET_DISABLE_ENV_REGISTRATION disarms it, DR-14)
 │   │   └── buildTransitive/       # Gym.NET.Environments.targets: the app-side registration initializer (DR-17)
 │   │
-│   ├── Gym.Rendering.Avalonia/    # Cross-platform GUI rendering (AvaloniaEnvViewer, StaticAvaloniaApp); keyboard input for play (IInteractiveEnvViewer);
+│   ├── Gym.Rendering.Avalonia/    # Cross-platform GUI rendering (AvaloniaEnvViewer, StaticAvaloniaApp); keyboard and mouse input (IInteractiveEnvViewer: play; MuJoCo's window, DR-70);
 │   │                              #   AvaloniaPlotFigure, PlayPlot's ScottPlot figure (DR-39)
-│   ├── Gym.Rendering.WinForm/     # Windows Forms GUI rendering (WinFormEnvViewer); keyboard input for play (IInteractiveEnvViewer);
+│   ├── Gym.Rendering.WinForm/     # Windows Forms GUI rendering (WinFormEnvViewer); keyboard and mouse input (IInteractiveEnvViewer: play; MuJoCo's window, DR-70);
 │   │                              #   WinFormPlotFigure, PlayPlot's ScottPlot figure (DR-39)
 │   └── Shared/                    # ScottPlotAxes.cs: the IPlotAxes adapter both viewer packages compile (DR-39)
 │

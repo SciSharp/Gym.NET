@@ -26,7 +26,9 @@ namespace Gym.Rendering.WinForm {
     ///     layout. Where a layout types another character unshifted than its virtual key names (AZERTY's digit row types
     ///     <c>&amp;</c>, <c>é</c>, ...), SDL reports that character and this viewer the virtual key (<c>K_1</c>). A held key
     ///     reports one press, not the system's auto-repeat, as pygame's default. WinForms reports Shift, Ctrl and Alt without
-    ///     their side, so they are reported as the left ones. Before <see cref="BeginInput"/> nothing changes.
+    ///     their side, so they are reported as the left ones. The mouse is reported too (DR-70: buttons, moves and the
+    ///     wheel, in the client area's pixels, for a MuJoCo env's camera controls). Before <see cref="BeginInput"/> nothing
+    ///     changes.
     ///     </para>
     /// </remarks>
     public partial class WinFormEnvViewer : Form, IInteractiveEnvViewer {
@@ -57,15 +59,25 @@ namespace Gym.Rendering.WinForm {
         public static IEnvironmentViewerFactoryDelegate Factory => Run;
 
         /// <summary>
-        ///     Starts a <see cref="WinFormEnvViewer"/> in seperate thread.
+        ///     Starts a <see cref="WinFormEnvViewer"/> in seperate thread, its client area the frame's size, so a frame of that
+        ///     size shows whole at one screen pixel per pixel.
         /// </summary>
-        /// <param name="height">The height of the form</param>
-        /// <param name="width">The width of the form</param>
+        /// <param name="height">The height of the frames, the form's client height</param>
+        /// <param name="width">The width of the frames, the form's client width</param>
         /// <param name="title">The title of the form, also mentioned in the thread name.</param>
+        /// <returns>
+        ///     A task of the viewer, completed once the form exists on its own STA thread (which then runs its message loop
+        ///     until the form closes); the env blocks on it, so it must not need the calling thread.
+        /// </returns>
+        /// <exception cref="Exception">Thrown (through the task) when the form did not come up within 10 seconds.</exception>
         public static async Task<IEnvViewer> Run(int width, int height, string title = null) {
             var taskResult = new TaskCompletionSource<IEnvViewer>();
             var thread = new Thread(() => {
                 var v = new WinFormEnvViewer(width + 12, height + 12, title);
+                // The picture shows a frame at its own size from the top-left corner (it does not scale), so the client
+                // area takes the frame's size; the outer size above only seeds the form. A title bar and borders take more
+                // than 12 pixels on Windows 10 and 11, which cropped about 27 rows off every frame's bottom before.
+                v.ClientSize = new System.Drawing.Size(width, height);
                 taskResult.SetResult(v);
                 if (SystemInformation.UserInteractive) {
                     Application.Run(v);
@@ -99,6 +111,14 @@ namespace Gym.Rendering.WinForm {
             Width = width;
             if (title != null)
                 Text = title;
+            // the picture fills the form, so it is the picture that receives the mouse (DR-70); its coordinates are the
+            // client area's. The wheel goes to the focused control, the form, through OnMouseWheel.
+            PictureFrame.MouseDown += (_, e) => ReportButton(e, down: true);
+            PictureFrame.MouseUp += (_, e) => ReportButton(e, down: false);
+            PictureFrame.MouseMove += (_, e) => {
+                if (_inputEnabled)
+                    _input.Enqueue(ViewerInput.MouseMove(e.X, e.Y));
+            };
         }
 
         /// <summary>
@@ -172,8 +192,8 @@ namespace Gym.Rendering.WinForm {
 
         /// <summary>
         ///     Starts reporting input: keys (arrows and Tab included, which a form otherwise keeps for focus), the close
-        ///     button (which from now on only reports and no longer closes) and the user's resizes. Safe from any thread;
-        ///     calling it again does nothing more.
+        ///     button (which from now on only reports and no longer closes), the user's resizes and the mouse. Safe from any
+        ///     thread; calling it again does nothing more.
         /// </summary>
         public void BeginInput() => _inputEnabled = true;
 
@@ -212,6 +232,38 @@ namespace Gym.Rendering.WinForm {
             _held.Remove(e.KeyCode);
             _input.Enqueue(ViewerInput.KeyUp(code));
             e.Handled = true;
+        }
+
+        /// <summary>
+        ///     Reports a mouse button press or release at the pointer (GLFW's numbering of the buttons, DR-70), when input is
+        ///     on; other buttons are not reported. WinForms captures the mouse to the picture while a button is held, so the
+        ///     release and the moves of a drag arrive even outside it.
+        /// </summary>
+        /// <param name="e">The mouse event.</param>
+        /// <param name="down">Whether the button went down.</param>
+        private void ReportButton(MouseEventArgs e, bool down) {
+            if (!_inputEnabled)
+                return;
+            int button = e.Button switch {
+                MouseButtons.Left => ViewerInput.LeftButton,
+                MouseButtons.Right => ViewerInput.RightButton,
+                MouseButtons.Middle => ViewerInput.MiddleButton,
+                _ => -1,
+            };
+            if (button < 0)
+                return;
+            _input.Enqueue(down ? ViewerInput.MouseDown(button, e.X, e.Y) : ViewerInput.MouseUp(button, e.X, e.Y));
+        }
+
+        /// <summary>
+        ///     Reports a turn of the wheel in notches (Windows' 120 a notch), positive away from the user, at the pointer in
+        ///     the client area, when input is on.
+        /// </summary>
+        /// <param name="e">The wheel event, passed on.</param>
+        protected override void OnMouseWheel(MouseEventArgs e) {
+            base.OnMouseWheel(e);
+            if (_inputEnabled)
+                _input.Enqueue(ViewerInput.Scroll(0, e.Delta / 120.0, e.X, e.Y));
         }
 
         /// <summary>

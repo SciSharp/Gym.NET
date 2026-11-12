@@ -41,6 +41,115 @@ namespace Gym.Environments.Envs.MuJoCo.Rendering {
 
         /// <summary>Whether the free camera projects orthographically.</summary>
         internal bool Orthographic;
+
+        /// <summary>The mouse actions (<c>mjtMouse</c>) Gymnasium's window drives the camera with (DR-70).</summary>
+        internal const int MouseRotateV = 1, MouseRotateH = 2, MouseMoveV = 3, MouseMoveH = 4, MouseZoom = 5;
+
+        /// <summary>
+        ///     Moves the camera by a mouse motion (<c>mjv_moveCamera</c>): orbit (azimuth and elevation, 180° per window), pan of
+        ///     the look-at point scaled so the point follows the mouse at its depth, or zoom (the distance, logarithmic in it);
+        ///     then the azimuth is wrapped once into [-180, 180], the elevation clamped to ±89° and the distance to 0.01 to 100
+        ///     model extents. A fixed camera does not move, and a tracking camera's look-at point does not pan (nor is it
+        ///     clamped then, as MuJoCo returns early).
+        /// </summary>
+        /// <param name="m">The model: its field of view, near plane and extent scale the pan and the zoom.</param>
+        /// <param name="action">One of <see cref="MouseRotateV"/>, <see cref="MouseRotateH"/>, <see cref="MouseMoveV"/>,
+        ///     <see cref="MouseMoveH"/>, <see cref="MouseZoom"/>.</param>
+        /// <param name="reldx">The horizontal motion as a fraction of the window's width.</param>
+        /// <param name="reldy">The vertical motion as a fraction of the window's height (down positive).</param>
+        /// <exception cref="ArgumentOutOfRangeException">Another action than the five.</exception>
+        /// <remarks>
+        ///     Reference:
+        ///     <see href="https://github.com/google-deepmind/mujoco/blob/4.0.0/src/engine/engine_vis_interact.c#L328">engine_vis_interact.c</see>.
+        /// </remarks>
+        internal void Move(MjModel m, int action, double reldx, double reldy) {
+            if (Type == Fixed)
+                return;
+            switch (action) {
+                case MouseRotateV:
+                case MouseRotateH:
+                    Azimuth -= reldx * 180.0;
+                    Elevation -= reldy * 180.0;
+                    break;
+
+                case MouseMoveV:
+                case MouseMoveH: {
+                    if (Type == Tracking)
+                        return;
+                    double ca = Math.Cos(Azimuth / 180.0 * Math.PI), sa = Math.Sin(Azimuth / 180.0 * Math.PI);
+                    double ce = Math.Cos(Elevation / 180.0 * Math.PI), se = Math.Sin(Elevation / 180.0 * Math.PI);
+                    double[] forward = [ce * ca, ce * sa, se];
+                    double[] headpos = new double[3];
+                    for (int i = 0; i < 3; i++)
+                        headpos[i] = Lookat[i] - Distance * forward[i];
+
+                    // convert2D: the motion in the camera's horizontal frame, then turned to the gaze's azimuth
+                    double v0 = reldx, v1 = action == MouseMoveV ? 0 : -reldy, v2 = action == MouseMoveV ? -reldy : 0;
+                    double norm = Math.Sqrt(forward[0] * forward[0] + forward[1] * forward[1]);
+                    // mju_normalize scales by the reciprocal (not a division, which can differ in the last bit), and leaves a
+                    // vector shorter than mjMINVAL at (1, 0): straight up or down, the pan runs along x
+                    double inv = 1 / norm;
+                    double y0 = norm < 1e-15 ? 1 : forward[0] * inv, y1 = norm < 1e-15 ? 0 : forward[1] * inv;
+                    double[] vec = [v0 * y1 + v1 * y0, v0 * -y0 + v1 * y1, v2];
+
+                    // scaling: the look-at point's displacement on screen equals the mouse's
+                    double dot = 0;
+                    for (int i = 0; i < 3; i++)
+                        dot += (Lookat[i] - headpos[i]) * forward[i];
+                    double scl = FrustumHeight(m) * dot;
+                    // MuJoCo's own "mystery coefficient" for orthographic cameras (its TODO b/346130949)
+                    if (Orthographic)
+                        scl *= 0.15;
+                    for (int i = 0; i < 3; i++)
+                        Lookat[i] -= scl * vec[i];
+                    break;
+                }
+
+                case MouseZoom:
+                    Distance -= Math.Log(1 + Distance / m.extent / 3) * reldy * 9 * m.extent;
+                    break;
+
+                default:
+                    throw new ArgumentOutOfRangeException(nameof(action), action, "not a mouse action Gymnasium's viewer uses");
+            }
+
+            // the clamps every move but the early returns ends with: one wrap of the azimuth into [-180, 180], the elevation
+            // within ±89° (the free camera never looks straight up or down), the distance within [0.01, 100] model extents
+            if (Azimuth > 180)
+                Azimuth -= 360;
+            if (Azimuth < -180)
+                Azimuth += 360;
+            if (Elevation > 89)
+                Elevation = 89;
+            if (Elevation < -89)
+                Elevation = -89;
+            if (Distance < 0.01 * m.extent)
+                Distance = 0.01 * m.extent;
+            if (Distance > 100 * m.extent)
+                Distance = 100 * m.extent;
+        }
+
+        /// <summary>
+        ///     The free camera's frustum height at unit distance (<c>cameraFrustumHeight</c> through
+        ///     <c>mjv_cameraFrustum</c>): twice the half-height of the near plane over its distance, or the orthographic
+        ///     camera's height itself.
+        /// </summary>
+        /// <param name="m">The model.</param>
+        /// <returns>The height.</returns>
+        /// <exception cref="InvalidOperationException">The near plane is at zero distance (MuJoCo's "frustum_near too small").</exception>
+        private double FrustumHeight(MjModel m) {
+            // float32, as mjv_cameraFrustum computes it
+            float znear = (float)(m.vis_znear * m.extent);
+            if (Orthographic) {
+                float half = (float)(m.vis_fovy / 2);
+                return half + half;
+            }
+
+            float zver = (float)(znear * Math.Tan(m.vis_fovy * Math.PI / 360.0));
+            if (znear < 1e-15)
+                throw new InvalidOperationException("mjvScene frustum_near too small");
+            return (zver + zver) / znear;
+        }
     }
 
     /// <summary>One eye's OpenGL camera (<c>mjvGLCamera</c>), float32 as MuJoCo stores it.</summary>
@@ -186,6 +295,24 @@ namespace Gym.Environments.Envs.MuJoCo.Rendering {
         /// <summary>The visual flag of static bodies (<c>mjVIS_STATIC</c>).</summary>
         internal const int VisStatic = 22;
 
+        /// <summary>The visual flags of contact points, contact forces and their split into normal and friction (<c>mjVIS_CONTACT*</c>).</summary>
+        internal const int VisContactPoint = 14, VisContactForce = 16, VisContactSplit = 17;
+
+        /// <summary>The decoration geom types (<c>mjGEOM_ARROW</c>, <c>ARROW1</c>, <c>ARROW2</c>): a contact force's arrows.</summary>
+        internal const int GeomArrow = 100, GeomArrow1 = 101, GeomArrow2 = 102;
+
+        /// <summary>The decorations' category (<c>mjCAT_DECOR</c>): never shadow casters.</summary>
+        internal const int CategoryDecor = 4;
+
+        /// <summary>The frames drawn (<c>mjvOption.frame</c>, <c>mjtFrame</c>): none, every body's, or the world's.</summary>
+        internal const int FrameNone = 0, FrameBody = 1, FrameWorld = 7;
+
+        /// <summary>
+        ///     Which frames the scene decorates (<c>mjvOption.frame</c>): <see cref="FrameNone"/>, or <see cref="FrameBody"/>
+        ///     as the human window's E key toggles it (DR-70), or <see cref="FrameWorld"/>.
+        /// </summary>
+        internal int Frame = FrameNone;
+
         /// <summary>
         ///     The most geoms a frame holds (<c>maxgeom</c>, Gymnasium's <c>max_geom</c>): the model's geoms and sites past it
         ///     are not drawn, as MuJoCo's full buffer drops them.
@@ -229,8 +356,240 @@ namespace Gym.Environments.Envs.MuJoCo.Rendering {
                 catmask &= ~1;
             AddGeoms(m, d, catmask);
             AddSites(m, d, catmask);
+            // the decorations, in the order mjv_addGeoms adds them (its other decorations are off in every Gymnasium scene)
+            if ((catmask & CategoryDecor) != 0) {
+                AddBodyFrames(m, d, catmask);
+                AddContacts(m, d);
+            }
+
             UpdateCamera(m, d, cam);
             MakeLights(m, d);
+        }
+
+        /// <summary>
+        ///     The bodies' coordinate frames (<c>addWorldBodyFrameGeoms</c>): for <see cref="FrameBody"/> every body but the
+        ///     world, for <see cref="FrameWorld"/> the world's alone at twice the size; each three axis cylinders.
+        /// </summary>
+        /// <param name="m">The model.</param>
+        /// <param name="d">The data.</param>
+        /// <param name="catmask">The categories drawn: a static body's frame needs its category.</param>
+        private void AddBodyFrames(MjModel m, MjData d, int catmask) {
+            float scl = (float)m.stat_meansize;
+            for (int i = Frame == FrameWorld ? 0 : 1; i < (Frame == FrameBody ? m.nbody : 1); i++) {
+                if (i > 0 && (BodyCategory(m, i) & ~catmask) != 0)
+                    continue;
+                // the products in float, as MuJoCo multiplies its float scale and size
+                float length = m.vis_scale_framelength * scl * (i == 0 ? 2 : 1);
+                float width = m.vis_scale_framewidth * scl * (i == 0 ? 2 : 1);
+                if (!AddFrame(d.xpos, 3 * i, d.xmat, 9 * i, length, width))
+                    return;
+            }
+        }
+
+        /// <summary>One frame (<c>addFrame</c>): a cylinder along each axis of <paramref name="rot"/>, x red, y green, z blue.</summary>
+        /// <param name="pos">The origin's array.</param>
+        /// <param name="posOffset">The origin's offset.</param>
+        /// <param name="rot">The orientation's array, row-major.</param>
+        /// <param name="rotOffset">The orientation's offset.</param>
+        /// <param name="length">The axes' length.</param>
+        /// <param name="width">The axes' radius.</param>
+        /// <returns>False when the scene was full (the caller stops, as MuJoCo's loops return).</returns>
+        private bool AddFrame(double[] pos, int posOffset, double[] rot, int rotOffset, float length, float width) {
+            for (int j = 0; j < 3; j++) {
+                double[] from = [pos[posOffset], pos[posOffset + 1], pos[posOffset + 2]], to = new double[3];
+                for (int r = 0; r < 3; r++)
+                    to[r] = from[r] + rot[rotOffset + 3 * r + j] * length;
+                SceneGeom g = Decoration();
+                Connector(g, 5, width, from, to);
+                for (int k = 0; k < 3; k++)
+                    g.Rgba[k] = j == k ? 0.9f : 0;
+                g.Rgba[3] = 1;
+                if (!TryAdd(g))
+                    return false;
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        ///     The contacts (<c>addContactGeoms</c>), with <see cref="VisContactPoint"/> and <see cref="VisContactForce"/> as the
+        ///     window's C key turns both on: a flat cylinder at each contact point, and an arrow for each active contact's force,
+        ///     scaled by <c>vis.map.force</c> over the mean mass and pointing to the body with the higher id (a double arrow
+        ///     between two moving bodies); with <see cref="VisContactSplit"/>, the normal and friction parts apart.
+        /// </summary>
+        /// <param name="m">The model.</param>
+        /// <param name="d">The data, after a forward pass (its contacts and constraint forces).</param>
+        /// <remarks>
+        ///     MuJoCo's surface-velocity arrows, island colours, labels and contact frames are left out: no Gymnasium model has
+        ///     surface velocities, and the window turns on none of the others.
+        /// </remarks>
+        private void AddContacts(MjModel m, MjData d) {
+            bool points = VisFlags[VisContactPoint], forces = VisFlags[VisContactForce];
+            if (!points && !forces)
+                return;
+            double scl = m.stat_meansize;
+            double[] mat = new double[9];
+            for (int i = 0; i < d.ncon; i++) {
+                int efc = d.con_efc_address[i], dim = d.con_dim[i];
+                if (points) {
+                    // the contact frame with the normal along z: its rows 2 and 3, then row 1, transposed into columns
+                    for (int r = 0; r < 3; r++) {
+                        int row = r < 2 ? r + 1 : 0;
+                        for (int c = 0; c < 3; c++)
+                            mat[3 * c + r] = d.con_frame[9 * i + 3 * row + c];
+                    }
+
+                    SceneGeom g = Decoration();
+                    g.Type = 5;
+                    g.Size[0] = g.Size[1] = (float)(m.vis_scale_contactwidth * scl);
+                    float halfheight = (float)(m.vis_scale_contactheight * scl), halfdepth = (float)(-d.con_dist[i] / 2);
+                    g.Size[2] = Math.Max(halfheight, halfdepth);
+                    for (int k = 0; k < 3; k++)
+                        g.Pos[k] = (float)d.con_pos[3 * i + k];
+                    for (int k = 0; k < 9; k++)
+                        g.Mat[k] = (float)mat[k];
+                    Array.Copy(efc >= 0 ? m.vis_rgba_contactpoint : m.vis_rgba_contactgap, g.Rgba, 4);
+                    if (!TryAdd(g))
+                        return;
+                }
+
+                // excluded contacts carry no force
+                if (efc < 0 || !forces)
+                    continue;
+                // the frame with the normal along x: the contact frame transposed
+                for (int r = 0; r < 3; r++) {
+                    for (int c = 0; c < 3; c++)
+                        mat[3 * r + c] = d.con_frame[9 * i + 3 * c + r];
+                }
+
+                double[] confrc = ContactForce(d, i);
+                double[] frc = new double[3];
+                Array.Copy(confrc, frc, Math.Min(3, dim));
+                if (Math.Sqrt(frc[0] * frc[0] + frc[1] * frc[1] + frc[2] * frc[2]) < 1e-15)
+                    continue;
+                bool split = VisFlags[VisContactSplit] && dim > 1;
+                for (int j = split ? 1 : 0; j < (split ? 3 : 1); j++) {
+                    double[] vec = j switch {
+                        0 => [mat[0] * frc[0] + mat[1] * frc[1] + mat[2] * frc[2], mat[3] * frc[0] + mat[4] * frc[1] + mat[5] * frc[2],
+                              mat[6] * frc[0] + mat[7] * frc[1] + mat[8] * frc[2]],
+                        1 => [mat[0] * frc[0], mat[3] * frc[0], mat[6] * frc[0]],
+                        _ => [mat[1] * frc[1] + mat[2] * frc[2], mat[4] * frc[1] + mat[5] * frc[2], mat[7] * frc[1] + mat[8] * frc[2]],
+                    };
+                    double s = m.vis_map_force / m.stat_meanmass;
+                    for (int k = 0; k < 3; k++)
+                        vec[k] *= s;
+                    int bf0 = m.geom_bodyid[d.con_geom1[i]], bf1 = m.geom_bodyid[d.con_geom2[i]];
+                    // the arrow points to the body with the higher id
+                    if (bf0 > bf1) {
+                        for (int k = 0; k < 3; k++)
+                            vec[k] = -vec[k];
+                    }
+
+                    double[] from = [d.con_pos[3 * i], d.con_pos[3 * i + 1], d.con_pos[3 * i + 2]];
+                    double[] to = [from[0] + vec[0], from[1] + vec[1], from[2] + vec[2]];
+                    SceneGeom g = Decoration();
+                    Connector(g, bf0 > 0 && bf1 > 0 && !split ? GeomArrow2 : GeomArrow, m.vis_scale_forcewidth * scl, from, to);
+                    Array.Copy(j == 2 ? m.vis_rgba_contactfriction : m.vis_rgba_contactforce, g.Rgba, 4);
+                    if (!TryAdd(g))
+                        return;
+                }
+            }
+        }
+
+        /// <summary>
+        ///     A contact's force and torque in its frame (<c>mj_contactForce</c>) from the pyramidal cone's edge forces
+        ///     (<c>mju_decodePyramid</c>): the normal force is their sum, each tangent force the difference of its pair times its
+        ///     friction coefficient. The engine refuses elliptic cones, and no Gymnasium model has adhesion.
+        /// </summary>
+        /// <param name="d">The data.</param>
+        /// <param name="i">The contact.</param>
+        /// <returns>Six numbers: the force along the normal and the tangents, then the torques (zero beyond the contact's dimension).</returns>
+        private static double[] ContactForce(MjData d, int i) {
+            var result = new double[6];
+            int efc = d.con_efc_address[i], dim = d.con_dim[i];
+            if (efc < 0)
+                return result;
+            if (dim == 1) {
+                result[0] = d.efc_force[efc];
+                return result;
+            }
+
+            for (int k = 0; k < 2 * (dim - 1); k++)
+                result[0] += d.efc_force[efc + k];
+            for (int k = 0; k < dim - 1; k++)
+                result[k + 1] = (d.efc_force[efc + 2 * k] - d.efc_force[efc + 2 * k + 1]) * d.con_friction[5 * i + k];
+            return result;
+        }
+
+        /// <summary>A fresh decoration geom, as <c>acquireGeom</c> initializes one (<c>mjv_initGeom</c>'s defaults, the decor category).</summary>
+        /// <returns>The geom, not yet in the scene.</returns>
+        private static SceneGeom Decoration() {
+            var g = new SceneGeom { Category = CategoryDecor };
+            InitGeom(g, 1001, [0.1, 0.1, 0.1], 0, [0, 0, 0], 0, [1, 0, 0, 0, 1, 0, 0, 0, 1], 0);
+            return g;
+        }
+
+        /// <summary>
+        ///     Sets a geom to connect two points (<c>mjv_connector</c>): a cylinder or capsule centred between them with half the
+        ///     distance as its half-length, an arrow starting at the first with the whole distance as its length; turned by the
+        ///     minimal rotation from +z to the direction.
+        /// </summary>
+        /// <param name="g">The geom.</param>
+        /// <param name="type">5 (cylinder), 3 (capsule), or one of the arrows.</param>
+        /// <param name="width">The radius.</param>
+        /// <param name="from">The start.</param>
+        /// <param name="to">The end.</param>
+        private static void Connector(SceneGeom g, int type, double width, double[] from, double[] to) {
+            double[] dif = [to[0] - from[0], to[1] - from[1], to[2] - from[2]];
+            g.Type = type;
+            g.Size[0] = g.Size[1] = (float)width;
+            g.Size[2] = (float)Math.Sqrt(dif[0] * dif[0] + dif[1] * dif[1] + dif[2] * dif[2]);
+            if (type == 3 || type == 5) {
+                for (int k = 0; k < 3; k++)
+                    g.Pos[k] = (float)(0.5 * (from[k] + to[k]));
+                g.Size[2] *= 0.5f;
+            } else {
+                for (int k = 0; k < 3; k++)
+                    g.Pos[k] = (float)from[k];
+            }
+
+            Span<double> quat = stackalloc double[4], mat = stackalloc double[9];
+            QuatZ2Vec(quat, dif);
+            Spatial.Quat2Mat(mat, quat);
+            for (int k = 0; k < 9; k++)
+                g.Mat[k] = (float)mat[k];
+        }
+
+        /// <summary>
+        ///     The minimal rotation taking +z to a direction (<c>mju_quatZ2Vec</c>): none for a vector shorter than 1e-15, a half
+        ///     turn about x for one opposite +z.
+        /// </summary>
+        /// <param name="quat">The quaternion, written.</param>
+        /// <param name="vec">The direction.</param>
+        private static void QuatZ2Vec(Span<double> quat, double[] vec) {
+            quat[0] = 1;
+            quat[1] = quat[2] = quat[3] = 0;
+            Span<double> vn = [vec[0], vec[1], vec[2]];
+            if (Spatial.Normalize3(vn) < 1e-15)
+                return;
+            // the axis z x vn as mju_cross computes it with z = (0, 0, 1), products of zero included: their signed zeros
+            // reach the rotation matrix (an axis-aligned frame's off-diagonal zeros keep MuJoCo's signs only this way)
+            const double z0 = 0, z1 = 0, z2 = 1;
+            Span<double> axis = [z1 * vn[2] - z2 * vn[1], z2 * vn[0] - z0 * vn[2], z0 * vn[1] - z1 * vn[0]];
+            double a = Spatial.Normalize3(axis);
+            // mju_dot3(vn, z), left to right
+            double dot = vn[0] * z0 + vn[1] * z1 + vn[2] * z2;
+            if (Math.Abs(a) < 1e-15) {
+                if (dot < 0) {
+                    quat[0] = 0;
+                    quat[1] = 1;
+                }
+
+                return;
+            }
+
+            a = Math.Atan2(a, dot);
+            Spatial.AxisAngle2Quat(quat, axis, a);
         }
 
         /// <summary>

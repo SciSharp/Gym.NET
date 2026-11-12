@@ -69,11 +69,16 @@ namespace Gym.Environments.Envs.MuJoCo.Rendering {
         /// <param name="scn">The scene.</param>
         /// <param name="width">The frame's width.</param>
         /// <param name="height">The frame's height.</param>
+        /// <param name="window">
+        ///     Whether the frame is the human window's (DR-70): GLFW's default framebuffer, which Gymnasium's window asks no
+        ///     multisampling of and which holds 24-bit depths with an 8-bit stencil, where the offscreen buffer is multisampled
+        ///     as the model's <c>offsamples</c> asks and holds float depths.
+        /// </param>
         /// <exception cref="InvalidOperationException">The camera's near plane is degenerate while there are geoms to draw.</exception>
-        internal void Render(MujocoScene scn, int width, int height) {
-            int samples = _m.vis_offsamples > 1 ? 4 : 1;
-            if (_off == null || _off.Width != width || _off.Height != height || _off.Samples != samples)
-                _off = new GlTarget(width, height, samples, color: true, stencil: true);
+        internal void Render(MujocoScene scn, int width, int height, bool window = false) {
+            int samples = window ? 1 : _m.vis_offsamples > 1 ? 4 : 1;
+            if (_off == null || _off.Width != width || _off.Height != height || _off.Samples != samples || _off.Depth24 != window)
+                _off = new GlTarget(width, height, samples, color: true, stencil: true, depth24: window);
             GlCamera cam = AverageCamera(scn.Camera[0], scn.Camera[1]);
             if (cam.FrustumNear < 1e-15) {
                 if (scn.Geoms.Count > 0)
@@ -173,6 +178,21 @@ namespace Gym.Environments.Envs.MuJoCo.Rendering {
             _gl.Blend = false;
             foreach (GlLight l in _gl.Lights)
                 l.Enabled = false;
+        }
+
+        /// <summary>
+        ///     Draws a text overlay over the whole frame's viewport (<c>mjr_overlay</c> after <c>mjr_render</c>), as the human
+        ///     window draws its menu (DR-70).
+        /// </summary>
+        /// <param name="gridpos">The grid position (<see cref="MujocoOverlay.TopLeft"/>, ...).</param>
+        /// <param name="text1">The first column's text.</param>
+        /// <param name="text2">The second column's text, or an empty string for one column.</param>
+        /// <exception cref="InvalidOperationException">Nothing was rendered yet, or the embedded font is missing.</exception>
+        /// <exception cref="ArgumentOutOfRangeException">A grid position outside <c>mjtGridPos</c>.</exception>
+        /// <exception cref="System.IO.InvalidDataException">The embedded font is not MuJoCo's layout.</exception>
+        internal void DrawOverlay(int gridpos, string text1, string text2) {
+            GlTarget off = _off ?? throw new InvalidOperationException("Nothing was rendered yet.");
+            MujocoOverlay.Draw(off, gridpos, 0, 0, off.Width, off.Height, text1, text2);
         }
 
         /// <summary>
@@ -684,6 +704,35 @@ namespace Gym.Environments.Envs.MuJoCo.Rendering {
                 case 6:
                     _gl.MultModelview(GlMath.Scale(s[0], s[1], s[2]));
                     _gl.DrawMesh(_meshes.Box);
+                    break;
+                case MujocoScene.GeomArrow:
+                    // a shaft of a third of the length and a head of a sixth, 1.75 times as wide (MuJoCo's arrow)
+                    _gl.MultModelview(GlMath.Scale(s[0], s[1], s[2] / 6.0f));
+                    _gl.MultModelview(GlMath.Translate(0, 0, 1));
+                    _gl.DrawMesh(_meshes.Cylinder);
+                    _gl.MultModelview(GlMath.Translate(0, 0, 1));
+                    _gl.MultModelview(GlMath.Scale(1.75f, 1.75f, 1));
+                    _gl.DrawMesh(_meshes.Cone);
+                    break;
+                case MujocoScene.GeomArrow1:
+                    // the same arrow with a head no wider than the shaft
+                    _gl.MultModelview(GlMath.Scale(s[0], s[1], s[2] / 6.0f));
+                    _gl.MultModelview(GlMath.Translate(0, 0, 1));
+                    _gl.DrawMesh(_meshes.Cylinder);
+                    _gl.MultModelview(GlMath.Translate(0, 0, 1));
+                    _gl.DrawMesh(_meshes.Cone);
+                    break;
+                case MujocoScene.GeomArrow2:
+                    // a double arrow: an open shaft along the whole length, a head at each end
+                    _gl.MultModelview(GlMath.Scale(s[0], s[1], s[2] / 3.0f));
+                    _gl.DrawMesh(_meshes.CylinderOpen);
+                    _gl.MultModelview(GlMath.Scale(1.75f, 1.75f, 0.5f));
+                    _gl.MultModelview(GlMath.Translate(0, 0, -2));
+                    _gl.MultModelview(GlMath.Rotate(180.0f, 1.0f, 0.0f, 0.0f));
+                    _gl.DrawMesh(_meshes.Cone);
+                    _gl.MultModelview(GlMath.Rotate(180.0f, 1.0f, 0.0f, 0.0f));
+                    _gl.MultModelview(GlMath.Translate(0, 0, 4));
+                    _gl.DrawMesh(_meshes.Cone);
                     break;
             }
 

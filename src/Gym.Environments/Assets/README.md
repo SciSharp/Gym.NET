@@ -14,9 +14,10 @@ hashes in step when a re-pin re-copies the files.
 Each file is embedded under the resource name `assets/<path>` (forward slashes on every OS), read through
 `EnvAssets.Load` and decoded with `ImageIO.Load(Stream)`.
 
-Two kinds of file are not copies but recordings: `fonts/freesansbold-42.json`, CarRacing's score glyphs, recorded from
-pygame-ce (see [fonts](#fonts) below), and `mujoco/*.json` with `mujoco/textures/*.png`, Gymnasium's MuJoCo models as
-the pinned MuJoCo compiles them (see [mujoco](#mujoco) below). Their tables record the source each was made from.
+Three kinds of file are not copies but recordings: `fonts/freesansbold-42.json`, CarRacing's score glyphs, recorded from
+pygame-ce (see [fonts](#fonts) below), `mujoco/*.json` with `mujoco/textures/*.png`, Gymnasium's MuJoCo models as
+the pinned MuJoCo compiles them (see [mujoco](#mujoco) below), and `mujoco/fonts/normal150.json`, MuJoCo's own overlay
+font (see [mujoco fonts](#mujoco-fonts) below). Their tables record the source each was made from.
 
 ## classic_control
 
@@ -190,3 +191,21 @@ Re-record after a re-pin of MuJoCo or Gymnasium, with a Python holding the pinne
 embedded, the files were compared with the models the trace checker's 50 MuJoCo 4.0.0 traces
 (`tools/parity/mujoco/halfcheetah_poc`) ran on, field by field: 9,450 fields of the 13 models the traces use (all but
 `pusher`, which Pusher-v5 takes only through `xml_file`), all equal.
+
+## mujoco fonts
+
+The text of a MuJoCo env's human window (DR-70): its menu and statistics, drawn by `MujocoOverlay` as MuJoCo's
+`mjr_overlay` draws them. Gymnasium's window creates its MuJoCo context at the 150% font scale, so the font is MuJoCo's
+`normal150`, compiled into the MuJoCo library rather than shipped as a file: the JSON holds the source array's bytes
+unchanged (base64), MuJoCo's own layout of each printable character's code, width, height and 1-bit rows, beside the
+source's identity, as converted by `tools/parity/mujoco/convert_font.py`. MuJoCo is Apache-2.0 (Copyright 2021 DeepMind
+Technologies Limited), the licence the package already carries (DR-49); the attribution is in the file.
+
+| File | Source | Source SHA-256 | SHA-256 |
+|---|---|---|---|
+| `mujoco/fonts/normal150.json` | MuJoCo 4.0.0's [`src/render/classic/font/normal150.inc`](https://github.com/google-deepmind/mujoco/blob/4.0.0/src/render/classic/font/normal150.inc) | `71b85445eb911ef63cb3180e28daf7c37b598fb115febab193c2c136a0ea9ec8` | `84d442759d102279795bb0aedc3ae653f22513261ad18cf2c3f2825fdeba189d` |
+
+The parity cell `MujocoWindowLiveParityTests.GymNet_Overlay_IsMujocosMjrOverlay` draws every printable character with
+this font and with MuJoCo's own `mjr_overlay` and requires the pixels equal, so a MuJoCo re-pin that changes the font
+fails there. Re-convert from the new tag's file, downloaded into a folder of its own:
+`python -I tools/parity/mujoco/convert_font.py <normal150.inc> src/Gym.Environments/Assets/mujoco/fonts/normal150.json`.

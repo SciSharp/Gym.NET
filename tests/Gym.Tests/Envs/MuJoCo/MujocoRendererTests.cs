@@ -113,17 +113,6 @@ namespace Gym.Tests.Envs.MuJoCo {
         }
 
         /// <summary>
-        ///     <c>human</c> mode's window (DR-70) is not written yet: drawing one refuses with <see cref="NotImplementedError"/>
-        ///     rather than showing nothing.
-        /// </summary>
-        [TestMethod]
-        public void Human_RefusesUntilTheWindowIsWritten() {
-            using IEnv env = Make("Reacher-v5", new { render_mode = "human" });
-            var e = Assert.ThrowsExactly<NotImplementedError>(() => env.Unwrapped.Render());
-            StringAssert.Contains(e.Message, "DR-70");
-        }
-
-        /// <summary>
         ///     A colour reaches the 8-bit buffer as the reference GPU stores it: truncated to 12 bits, then rounded with an
         ///     exact half going down. So ½ stores 127 (a plain rounding gives 128), level 1 starts at 9/4096 rather than at
         ///     0.5/255, and the ends and NaN clamp.

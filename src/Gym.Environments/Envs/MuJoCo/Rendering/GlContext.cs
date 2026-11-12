@@ -1267,19 +1267,29 @@ namespace Gym.Environments.Envs.MuJoCo.Rendering {
             // source colour and alpha are stored to 8 bits first, then each channel is the exact integer combination of
             // the levels, rounded to the nearest level and clamped, the factors in units of 1/255
             int sf = Factor(BlendSrc, sa), df = Factor(BlendDst, sa);
-            px[o] = Mix(sr, px[o], sf, df);
-            px[o + 1] = Mix(sg, px[o + 1], sf, df);
-            px[o + 2] = Mix(sb, px[o + 2], sf, df);
-            px[o + 3] = Mix(sa, px[o + 3], sf, df);
+            px[o] = BlendLevel(sr, px[o], sf, df);
+            px[o + 1] = BlendLevel(sg, px[o + 1], sf, df);
+            px[o + 2] = BlendLevel(sb, px[o + 2], sf, df);
+            px[o + 3] = BlendLevel(sa, px[o + 3], sf, df);
 
             static int Factor(GlBlend f, int alpha) => f switch {
                 GlBlend.One => 255,
                 GlBlend.SrcAlpha => alpha,
                 _ => 255 - alpha,
             };
-
-            static byte Mix(int s, int d, int sf, int df) => (byte)Math.Min(255, (s * sf + d * df + 127) / 255);
         }
+
+        /// <summary>
+        ///     One channel of a blend as the reference GPU computes it in an 8-bit buffer: the exact integer combination of the
+        ///     stored source and destination levels, rounded to the nearest level and clamped (measured, 20,000 of 20,000 for
+        ///     both of MuJoCo's blend modes). <see cref="MujocoOverlay"/>'s half-black box uses it too.
+        /// </summary>
+        /// <param name="s">The source level, already stored to 8 bits (<see cref="ToUnorm8"/>).</param>
+        /// <param name="d">The destination level.</param>
+        /// <param name="sf">The source factor in units of 1/255 (255 for <c>GL_ONE</c>, the source's alpha level for <c>GL_SRC_ALPHA</c>).</param>
+        /// <param name="df">The destination factor in units of 1/255.</param>
+        /// <returns>The new level.</returns>
+        internal static byte BlendLevel(int s, int d, int sf, int df) => (byte)Math.Min(255, (s * sf + d * df + 127) / 255);
 
         /// <summary>
         ///     A colour channel as the GPU stores it in an 8-bit buffer: clamped, truncated to 12 fractional bits, then

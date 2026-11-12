@@ -558,3 +558,26 @@ Effects of approved designs that only showed up in code. None changes a design; 
   parameter can hold. Those parameters are nullable and `null` stands for Gymnasium's default; Python's explicit `None`
   (which Gymnasium fails on) has no counterpart. Reacher-v5's `reward_control_weight`, `null` by default, uses the same
   rule to keep Gymnasium's default an int 1, so an integer action's cost stays an `np.int64` as there.
+- **DR-70, the human window, where Gymnasium leaves GLFW to decide** (P9, 2026-11-12): the window draws its frame at
+  the viewer's client size in the viewer's own unit (Avalonia's device-independent pixels, WinForms' pixels), so the
+  pointer needs no framebuffer scale (GLFW's `_scale` is 1 on Windows too). Its buffer is GLFW's default framebuffer:
+  one sample, 24-bit depths and an 8-bit stencil, where the offscreen modes keep 4x multisampling and float depths.
+  `swap_interval(1)`'s wait for the display is a 60 Hz `Clock` tick. A missing width or height opens a 960 × 540 window
+  (half a 1920 × 1080 monitor; Gymnasium halves the monitor's size, which a viewer factory cannot report). T writes to
+  Gymnasium's `/tmp/frame_%07d.png`, which Windows resolves on the current drive, and creates the folder when it is
+  missing, where imageio fails. After Esc (still printing `Pressed ESC` and `Quitting.`) or the close button the window
+  draws nothing more and a paused `render()` returns, where Gymnasium's viewer keeps calling GLFW on its destroyed window
+  (warnings, then MuJoCo drawing without a context) and spins while paused. A visual option outside `mjtVisFlag` fails
+  before the window opens (Gymnasium's opens first and leaks it). Keys are the viewer's layout keys (DR-47), where GLFW
+  names keys by their US position. The mouse reaches only the MuJoCo window: `PygameDisplay` does not pump the mouse
+  kinds into pygame's queue. Kept because the frames show them: the menu's lines pile up over the frames of one
+  `render()` (a paused window repeats the menu until `mjr_overlay`'s 500-character cap), the run speed's arithmetic uses
+  the model's timestep, not the env's `dt`, the camera starts at MuJoCo's default free camera (not the offscreen modes'
+  median look-at point) and ignores `camera_id`, and R changes the env's own model in float32, so the alphas need not
+  round-trip. The frames come from the software renderer: a few to a few dozen a second, and a paused window keeps a
+  core busy. The parity cells run Gymnasium's own `WindowViewer` (render loop, callbacks, menu, `mjv_moveCamera`) with
+  only GLFW, the GL calls, the clock and imageio replaced by scripted stand-ins, since its real window would take the
+  screen; MuJoCo's own `mjr_overlay` over Gymnasium's single-sampled frames (byte-exact, pinned to the reference GPU);
+  and MuJoCo's own `mjv_updateScene` decorations (float32 bit for bit). They found two defects before the commit:
+  `mjv_moveCamera`'s final clamps (elevation within ±89°, the azimuth wrap, the distance range) were missing, and
+  `mju_quatZ2Vec`'s cross product with +z has signed zeros of its own, which reach the frames' and arrows' matrices.

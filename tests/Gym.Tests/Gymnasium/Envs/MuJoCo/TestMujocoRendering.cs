@@ -2,9 +2,9 @@
 using System;
 using System.IO;
 using System.Linq;
+using Gym.Environments;
 using Gym.Environments.Envs.MuJoCo;
 using Gym.Envs;
-using Gym.Exceptions;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using NumSharp;
 
@@ -19,8 +19,8 @@ namespace Gym.Tests.Gymnasium.Envs.MuJoCo {
     ///         compile (DR-63): the fixture cases draw Walker2d-v5's own model instead, which differs only in its feet.
     ///         Gymnasium's <c>OffScreenViewer</c> and its markers are not ported (DR-69): the dimension case draws through
     ///         <see cref="MujocoRenderer"/>, which inlines the offscreen viewer, and <see cref="TestAddMarkers"/> pins that
-    ///         no marker API exists. The <c>human</c> cases check the renderer's settings only until the window (DR-70) is
-    ///         written; drawing one throws <see cref="NotImplementedError"/>, which <c>MujocoRendererTests</c> pins.
+    ///         no marker API exists. The <c>human</c> cases open the window (DR-70) on <see cref="NullEnvViewer"/>, so they
+    ///         stay headless; <c>MujocoWindowTests</c> drives its controls.
     ///     </para>
     ///     <para>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/tests/envs/mujoco/test_mujoco_rendering.py">tests/envs/mujoco/test_mujoco_rendering.py</see>.</para>
     /// </remarks>
@@ -145,8 +145,15 @@ namespace Gym.Tests.Gymnasium.Envs.MuJoCo {
 
             // assert max_geom attribute
             Assert.AreEqual(maxGeom, renderer.MaxGeom);
-            if (renderMode == "human")
+            if (renderMode == "human") {
+                // the window's scene holds the cap, as Gymnasium reads viewer.scn.maxgeom; a headless viewer keeps the screen free
+                var human = new MujocoRenderer(mujocoEnv.Model, mujocoEnv.Data, width: DefaultSize, height: DefaultSize, maxGeom: maxGeom,
+                                               viewerFactory: NullEnvViewer.Factory);
+                Assert.IsTrue(human.Render("human").IsNone);
+                Assert.AreEqual(maxGeom, human.Window!.Scene.MaxGeom);
+                human.Close();
                 return;
+            }
 
             // the cap's effect: Walker2d-v5 draws 8 geoms, so every cap here keeps them all; 3 drops some
             // copied out: disposing the result releases its arrays (DR-51)

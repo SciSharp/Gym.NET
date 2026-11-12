@@ -65,6 +65,42 @@ namespace Gym.MuJoCo {
         /// <summary>The model's centre (<c>stat.center</c>).</summary>
         internal double[] stat_center = new double[3];
 
+        /// <summary>The mean body size (<c>stat.meansize</c>), the unit of every decoration's size (frames, contacts, forces).</summary>
+        internal double stat_meansize = 1;
+
+        /// <summary>The mean body mass (<c>stat.meanmass</c>): a contact force's arrow is the force scaled by <c>vis.map.force</c> over it.</summary>
+        internal double stat_meanmass = 1;
+
+        /// <summary>The force-to-length scale of the contact force arrows (<c>vis.map.force</c>).</summary>
+        internal float vis_map_force = 0.005f;
+
+        /// <summary>A contact point's cylinder radius in mean sizes (<c>vis.scale.contactwidth</c>).</summary>
+        internal float vis_scale_contactwidth = 0.3f;
+
+        /// <summary>A contact point's cylinder half-height in mean sizes (<c>vis.scale.contactheight</c>).</summary>
+        internal float vis_scale_contactheight = 0.1f;
+
+        /// <summary>A force arrow's width in mean sizes (<c>vis.scale.forcewidth</c>).</summary>
+        internal float vis_scale_forcewidth = 0.1f;
+
+        /// <summary>A body frame's axis length in mean sizes (<c>vis.scale.framelength</c>).</summary>
+        internal float vis_scale_framelength = 1f;
+
+        /// <summary>A body frame's axis width in mean sizes (<c>vis.scale.framewidth</c>).</summary>
+        internal float vis_scale_framewidth = 0.1f;
+
+        /// <summary>The colour of an active contact's point (<c>vis.rgba.contactpoint</c>).</summary>
+        internal float[] vis_rgba_contactpoint = [0.9f, 0.6f, 0.2f, 1f];
+
+        /// <summary>The colour of a contact in the margin's gap, excluded from the constraint (<c>vis.rgba.contactgap</c>).</summary>
+        internal float[] vis_rgba_contactgap = [0.5f, 0.8f, 0.9f, 1f];
+
+        /// <summary>The colour of a contact force's arrow (<c>vis.rgba.contactforce</c>).</summary>
+        internal float[] vis_rgba_contactforce = [0.7f, 0.9f, 0.9f, 1f];
+
+        /// <summary>The colour of a split-off friction force's arrow (<c>vis.rgba.contactfriction</c>).</summary>
+        internal float[] vis_rgba_contactfriction = [0.9f, 0.8f, 0.4f, 1f];
+
         /// <summary>Each camera's tracking mode: 0 fixed, 1 track, 2 track the subtree's centre of mass, 3/4 target a body.</summary>
         internal int[] cam_mode = [];
         /// <summary>Each camera's body.</summary>
@@ -221,10 +257,28 @@ namespace Gym.MuJoCo {
                 vis_shadowscale = (float)map.GetProperty("shadowscale").GetDouble();
                 vis_rgba_haze = Floats(rgba.GetProperty("haze"));
                 vis_rgba_fog = Floats(rgba.GetProperty("fog"));
+                // the decorations of the human window's toggles (DR-70: C contact forces, E frames)
+                JsonElement scale = vis.GetProperty("scale");
+                vis_map_force = (float)map.GetProperty("force").GetDouble();
+                vis_scale_contactwidth = (float)scale.GetProperty("contactwidth").GetDouble();
+                vis_scale_contactheight = (float)scale.GetProperty("contactheight").GetDouble();
+                vis_scale_forcewidth = (float)scale.GetProperty("forcewidth").GetDouble();
+                vis_scale_framelength = (float)scale.GetProperty("framelength").GetDouble();
+                vis_scale_framewidth = (float)scale.GetProperty("framewidth").GetDouble();
+                vis_rgba_contactpoint = Floats(rgba.GetProperty("contactpoint"));
+                vis_rgba_contactgap = Floats(rgba.GetProperty("contactgap"));
+                vis_rgba_contactforce = Floats(rgba.GetProperty("contactforce"));
+                vis_rgba_contactfriction = Floats(rgba.GetProperty("contactfriction"));
             }
 
-            if (root.TryGetProperty("stat", out JsonElement stat) && stat.TryGetProperty("center", out JsonElement center))
-                stat_center = center.EnumerateArray().Select(e => e.GetDouble()).ToArray();
+            if (root.TryGetProperty("stat", out JsonElement stat)) {
+                if (stat.TryGetProperty("center", out JsonElement center))
+                    stat_center = center.EnumerateArray().Select(e => e.GetDouble()).ToArray();
+                if (stat.TryGetProperty("meansize", out JsonElement meansize))
+                    stat_meansize = meansize.GetDouble();
+                if (stat.TryGetProperty("meanmass", out JsonElement meanmass))
+                    stat_meanmass = meanmass.GetDouble();
+            }
 
             // a trace dump records no visual arrays: everything below stays empty
             if (!arrays.TryGetProperty("geom_matid", out _))

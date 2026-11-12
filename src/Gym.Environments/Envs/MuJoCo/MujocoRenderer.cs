@@ -113,12 +113,16 @@ namespace Gym.Environments.Envs.MuJoCo {
             internal required MujocoFrame Frame;
         }
 
-        /// <summary>The viewers by render mode (<c>_viewers</c>).</summary>
+        /// <summary>The viewers by render mode (<c>_viewers</c>), but for <c>human</c>'s.</summary>
         private readonly Dictionary<string, Viewer> _viewers = new(StringComparer.Ordinal);
+
+        /// <summary>The <c>human</c> mode's window (<c>_viewers["human"]</c>, Gymnasium's <c>WindowViewer</c>), opened by its first frame.</summary>
+        private MujocoWindow? _window;
 
         /// <summary>
         ///     Draws one frame in <paramref name="renderMode"/> (<c>render</c>): the scene from the camera (the free camera
-        ///     with the env's default configuration, or the chosen model camera), drawn by Gym.NET's own rasterizer (DR-62).
+        ///     with the env's default configuration, or the chosen model camera), drawn by Gym.NET's own rasterizer (DR-62);
+        ///     in <c>human</c> mode, into the window with Gymnasium's menu and controls (DR-70).
         /// </summary>
         /// <param name="renderMode">The mode; <see langword="null"/> is refused, as in Gymnasium.</param>
         /// <returns>
@@ -128,9 +132,16 @@ namespace Gym.Environments.Envs.MuJoCo {
         /// </returns>
         /// <exception cref="AssertionError">A mode other than <c>human</c> without a width or height, with Gymnasium's message.</exception>
         /// <exception cref="AttributeError">An unknown mode, or none, with Gymnasium's message.</exception>
-        /// <exception cref="NotImplementedError"><c>human</c> mode, whose window (DR-70) is not written yet.</exception>
-        /// <exception cref="ArgumentOutOfRangeException">The camera id names no model camera.</exception>
+        /// <exception cref="ArgumentOutOfRangeException">The camera id names no model camera; or a human window's width or height is not positive.</exception>
+        /// <exception cref="DependencyNotInstalled"><c>human</c> mode with neither a <c>viewer_factory</c> nor <c>Gymnasium.HumanViewerFactory</c> (DR-20).</exception>
+        /// <exception cref="ValueError"><c>human</c> mode with a NaN simulation time or timestep, which the menu's step count cannot round.</exception>
+        /// <exception cref="OverflowException"><c>human</c> mode with an infinite step count in the menu (Python's <c>OverflowError</c>).</exception>
+        /// <exception cref="System.IO.IOException">The human window's T key could not write its PNG.</exception>
+        /// <exception cref="UnauthorizedAccessException">The human window's T key may not write its PNG there.</exception>
+        /// <exception cref="InvalidCastException">A camera configuration value of a kind the camera field cannot take.</exception>
+        /// <exception cref="IndexError">A visual option whose flag index is not an <c>mjtVisFlag</c>, with NumPy's message.</exception>
         /// <remarks>
+        ///     <para>
         ///     Frames are measured against Gymnasium's GPU frames, not required equal (DR-67, DR-71): lighting, textures,
         ///     the floor's reflection, shadows and multisampling follow MuJoCo's classic renderer in software, with the
         ///     reference GPU's measured rounding, and the rest of the GPU's choices still decide some pixels at edges and on
@@ -138,6 +149,14 @@ namespace Gym.Environments.Envs.MuJoCo {
         ///     one level; depths bit for bit but for a few ulps). A 480×480 frame costs about 0.05 to 0.5 s of one desktop
         ///     core's time spread over all cores, the shadow map (4096² depths per shadow light) a good part of it, so an
         ///     <c>rgb_array</c> loop renders far slower than it steps.
+        ///     </para>
+        ///     <para>
+        ///     <c>human</c> mode opens a viewer from the env's <c>viewer_factory</c> or <c>Gymnasium.HumanViewerFactory</c>
+        ///     titled <c>mujoco</c>, at the renderer's width and height, and keeps Gymnasium's controls: Space pauses, and
+        ///     while paused this call returns only when Space or → is released in the window (see the window's controls in
+        ///     the MuJoCo guide). Its camera starts at MuJoCo's default free camera with the env's
+        ///     <see cref="DefaultCamConfig"/>; <see cref="CameraId"/> is not used, as in Gymnasium.
+        ///     </para>
         /// </remarks>
         public RenderResult Render(string? renderMode) {
             if (renderMode != "human" && (Width == null || Height == null))
@@ -146,8 +165,11 @@ namespace Gym.Environments.Envs.MuJoCo {
             if (renderMode is not ("human" or "rgb_array" or "depth_array" or "rgbd_tuple"))
                 throw new AttributeError(
                     $"Unexpected mode: {renderMode ?? "None"}, expected modes: human, rgb_array, depth_array, or rgbd_tuple");
-            if (renderMode == "human")
-                throw new NotImplementedError("Gym.NET's MuJoCo human window (DR-70) is not written yet");
+            if (renderMode == "human") {
+                // WindowViewer.render: no camera id, the window's own camera as the user moved it
+                GetWindow().Render();
+                return RenderResult.None;
+            }
 
             Viewer viewer = GetViewer(renderMode);
             int width = Width!.Value, height = Height!.Value;
@@ -209,37 +231,7 @@ namespace Gym.Environments.Envs.MuJoCo {
             }
 
             cam.Distance = Model.extent;
-            if (DefaultCamConfig != null) {
-                foreach ((string key, object? value) in DefaultCamConfig) {
-                    switch (key) {
-                        case "lookat":
-                            double[] point = value as double[] ?? throw new InvalidCastException($"default_cam_config's lookat must be three numbers, got {value}.");
-                            Array.Copy(point, cam.Lookat, 3);
-                            break;
-                        case "distance":
-                            cam.Distance = Convert.ToDouble(value, System.Globalization.CultureInfo.InvariantCulture);
-                            break;
-                        case "azimuth":
-                            cam.Azimuth = Convert.ToDouble(value, System.Globalization.CultureInfo.InvariantCulture);
-                            break;
-                        case "elevation":
-                            cam.Elevation = Convert.ToDouble(value, System.Globalization.CultureInfo.InvariantCulture);
-                            break;
-                        case "trackbodyid":
-                            cam.TrackBodyId = Convert.ToInt32(value, System.Globalization.CultureInfo.InvariantCulture);
-                            break;
-                        case "fixedcamid":
-                            cam.FixedCamId = Convert.ToInt32(value, System.Globalization.CultureInfo.InvariantCulture);
-                            break;
-                        case "type":
-                            cam.Type = Convert.ToInt32(value, System.Globalization.CultureInfo.InvariantCulture);
-                            break;
-                        case "orthographic":
-                            cam.Orthographic = Convert.ToInt32(value, System.Globalization.CultureInfo.InvariantCulture) != 0;
-                            break;
-                    }
-                }
-            }
+            SetCamConfig(cam);
 
             _viewers[renderMode] = viewer;
             return viewer;
@@ -253,7 +245,91 @@ namespace Gym.Environments.Envs.MuJoCo {
             }
         }
 
-        /// <summary>Closes every window and buffer the modes opened (<c>close</c>); drawing again opens them again.</summary>
-        public void Close() => _viewers.Clear();
+        /// <summary>
+        ///     The <c>human</c> mode's window, opened on its first frame (<c>_get_viewer("human")</c>): Gymnasium's
+        ///     <c>WindowViewer</c> leaves MuJoCo's default free camera as it is (no <c>_init_camera</c>), then the env's default
+        ///     camera configuration applies (<c>_set_cam_config</c>).
+        /// </summary>
+        /// <returns>The window.</returns>
+        /// <exception cref="IndexError">A visual option whose flag index is not an <c>mjtVisFlag</c>; no window opens.</exception>
+        /// <exception cref="DependencyNotInstalled">No viewer factory is set; a later frame tries again.</exception>
+        /// <exception cref="ArgumentOutOfRangeException">A width or height that is not positive.</exception>
+        /// <exception cref="InvalidCastException">A camera configuration value of a kind the camera field cannot take.</exception>
+        private MujocoWindow GetWindow() {
+            if (_window != null)
+                return _window;
+            var window = new MujocoWindow(Model, Data, Width, Height, MaxGeom, VisualOptions, ViewerFactory);
+            if (WindowClock != null)
+                window.Time = WindowClock;
+            try {
+                SetCamConfig(window.Camera);
+            } catch {
+                // a configuration the camera refuses leaves no window open behind the exception
+                window.Close();
+                throw;
+            }
+
+            return _window = window;
+        }
+
+        /// <summary>
+        ///     Applies the env's <see cref="DefaultCamConfig"/> to a camera (<c>_set_cam_config</c>): each known key sets the
+        ///     camera field of its name; other keys are ignored.
+        /// </summary>
+        /// <param name="cam">The camera.</param>
+        /// <exception cref="InvalidCastException">A value of a kind the camera field cannot take.</exception>
+        private void SetCamConfig(MjvCamera cam) {
+            if (DefaultCamConfig == null)
+                return;
+            foreach ((string key, object? value) in DefaultCamConfig) {
+                switch (key) {
+                    case "lookat":
+                        double[] point = value as double[] ?? throw new InvalidCastException($"default_cam_config's lookat must be three numbers, got {value}.");
+                        Array.Copy(point, cam.Lookat, 3);
+                        break;
+                    case "distance":
+                        cam.Distance = Convert.ToDouble(value, System.Globalization.CultureInfo.InvariantCulture);
+                        break;
+                    case "azimuth":
+                        cam.Azimuth = Convert.ToDouble(value, System.Globalization.CultureInfo.InvariantCulture);
+                        break;
+                    case "elevation":
+                        cam.Elevation = Convert.ToDouble(value, System.Globalization.CultureInfo.InvariantCulture);
+                        break;
+                    case "trackbodyid":
+                        cam.TrackBodyId = Convert.ToInt32(value, System.Globalization.CultureInfo.InvariantCulture);
+                        break;
+                    case "fixedcamid":
+                        cam.FixedCamId = Convert.ToInt32(value, System.Globalization.CultureInfo.InvariantCulture);
+                        break;
+                    case "type":
+                        cam.Type = Convert.ToInt32(value, System.Globalization.CultureInfo.InvariantCulture);
+                        break;
+                    case "orthographic":
+                        cam.Orthographic = Convert.ToInt32(value, System.Globalization.CultureInfo.InvariantCulture) != 0;
+                        break;
+                }
+            }
+        }
+
+        /// <summary>
+        ///     Closes every window and buffer the modes opened (<c>close</c>): the human window shuts (a paused frame loop
+        ///     cannot be running, since it holds the env's thread); drawing again opens them again.
+        /// </summary>
+        public void Close() {
+            _window?.Close();
+            _window = null;
+            _viewers.Clear();
+        }
+
+        /// <summary>The <c>human</c> window, or <see langword="null"/> before its first frame and after <see cref="Close"/>; for tests.</summary>
+        internal MujocoWindow? Window => _window;
+
+        /// <summary>
+        ///     The clock the <c>human</c> window measures its frames with, given to it when it opens; <see langword="null"/> for
+        ///     the stopwatch. A parity test sets it before the first frame, so its frame times and counts are scripted like
+        ///     Gymnasium's (<see cref="MujocoWindow.Time"/>).
+        /// </summary>
+        internal Func<double>? WindowClock { get; set; }
     }
 }

@@ -1507,7 +1507,7 @@ departure and depth ties where two bodies intersect.
 
 ### 17.4 Still open
 
-- The human window with Gymnasium's controls (DR-70).
+- ~~The human window with Gymnasium's controls (DR-70)~~: landed, §17.5.
 - ~~The frame cells and the frame goldens (DR-71)~~: landed. `MujocoFrameLiveParityTests` measures each id's
   `rgb_array` and `depth_array` frames after a seeded reset and after ten sampled steps, gated on
   `tests/Gym.Tests.Parity/Baselines/mujoco_frames.json` plus Gymnasium's noise, on the reference GPU only, with two
@@ -1515,3 +1515,49 @@ departure and depth ties where two bodies intersect.
   (85 of 85 replays on net8.0 and net10.0).
 - Speed: a 480×480 frame takes about 0.05 s (InvertedPendulum) to 0.5 s (Humanoid) of CPU spread over all cores, the
   shadow maps a good part of it.
+
+### 17.5 The human window (DR-70)
+
+`render_mode="human"` opens a viewer from the env's `viewer_factory` or `Gymnasium.HumanViewerFactory`, titled `mujoco`,
+and runs Gymnasium's `WindowViewer` inside `MujocoRenderer` (`Rendering/MujocoWindow.cs`): one frame per render, or while
+paused frames until Space or → is released, or with D off the frames real time owes; keys act on release (Tab, Space, →,
+S, F, D, T, C, E, H, R, 0–4, Esc), the left drag orbits, the right drag pans (Shift: horizontally), the wheel zooms, all
+through `MjvCamera.Move` (`mjv_moveCamera`). The viewer contract reports the mouse (`ViewerInputKind.MouseDown`,
+`MouseUp`, `MouseMove`, `Scroll`), from both the Avalonia and the WinForms viewers.
+
+What it draws:
+
+- **The scene**, by the renderer of §17.1 into a single-sampled buffer with 24-bit depths, as GLFW's default framebuffer
+  holds (the offscreen modes keep 4x multisampling).
+- **The menu**, by `MujocoOverlay` (`mjr_overlay`): MuJoCo's `normal150` bitmap font, embedded as compiled into MuJoCo
+  4.0.0 (`Assets/mujoco/fonts/normal150.json`, converted by `tools/parity/mujoco/convert_font.py`), the box blended half
+  with black at the GPU's stored alpha (level 127) and integer blend, labels at level 178 (what the GPU stores 0.7 as),
+  values at 255, the 500-character cap, the eight grid positions.
+- **The decorations**: the C key's contact points (flat cylinders) and contact forces (arrows from `mj_contactForce`'s
+  pyramid decoding, double arrows between two moving bodies, split into normal and friction when asked), the E key's
+  body frames; the arrows' cone joins the builtin meshes.
+
+How it is checked (`MujocoWindowLiveParityTests`, on the reference platform):
+
+| Cell | Oracle | Result (2026-11-12) |
+|---|---|---|
+| `GymNet_WindowControls_AreGymnasiumsWindowViewer` | Gymnasium's own `WindowViewer.render`, its four callbacks and `_create_overlay` on Humanoid-v5, GLFW, the GL calls, the clock and imageio replaced by scripted stand-ins | 25 render calls equal: frames per call, every frame's menu text, the camera's float64 bits, the scene options, the model's float32 alphas, every state field |
+| `PlantedSlowerClock_FailsTheControlsComparison` | the same, Gym.NET's clock twice as slow | reported at the first render call's frame time |
+| `GymNet_Overlay_IsMujocosMjrOverlay` | MuJoCo's `mjr_overlay` over Gymnasium's single-sampled InvertedPendulum-v5 frame (`offsamples = 0`) | 7 sets byte-exact: the window's menus (running, paused and piled past 500 characters), every printable character at the eight positions in one and two columns, oversized boxes |
+| `GymNet_Decorations_AreMujocosSceneGeoms` | MuJoCo's `mjv_updateScene` with contact points and forces, split forces, body and world frames | 7 ids, up to three states each (HumanoidStandup's 12 contacts included): every geom's type, category, size, position, orientation, colour and material, float32 bit for bit |
+
+The cells found two defects before they landed: `mjv_moveCamera`'s closing clamps (elevation ±89°, one wrap of the
+azimuth, the distance between 0.01 and 100 extents) were missing, and the arrows' and frames' matrices had the wrong
+signed zeros (MuJoCo's cross product with +z multiplies by its zeros). The unit tests (`MujocoWindowTests`,
+`MujocoOverlayTests`) drive the window through a scripted viewer: the first frame equals the scene plus the expected menu
+byte for byte, the pause waits, the capture writes the frame shown, Esc and the close button end the window. What GLFW
+decides and Gym.NET reads its own way (the 60 Hz pacing, the 960 × 540 fallback size, the capture folder, the closed
+window) is recorded with DR-70 in `DESIGN_REVIEW.md`.
+
+A manual pass in a disposable Windows 11 desktop (2026-11-12) ran HalfCheetah-v5 in the Avalonia viewer and Humanoid-v5
+and InvertedPendulum-v5 in the WinForms viewer at 480 × 480: the left drag orbits, the right drag pans, the wheel zooms
+both ways, Tab, C, E, R, H, T (the PNG written to `C:	mp`), Space with the piled-up paused menu and Esc behave as
+described, at 3 (Humanoid) to 42 (InvertedPendulum) frames a second on the desktop's four virtual cores. It found one
+older defect, fixed with the window: the WinForms viewer sized its form by the outer size plus 12 pixels, so on
+Windows 10 and 11 the title bar cropped about 27 rows off the bottom of every env's frame; its client area is now the
+frame's size.

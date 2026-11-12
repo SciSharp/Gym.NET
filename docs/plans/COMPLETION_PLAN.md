@@ -1002,7 +1002,12 @@ Specs: the port plan's §5.7 and §11.4; sources 6,153 lines. Postponed by DR-35
 - **Frame cells and goldens (DR-71):** 42 cells measure every id's `rgb_array` and `depth_array` frames against
   Gymnasium's, gated on a recorded baseline plus Gymnasium's own render-to-render noise on the reference GPU; the MuJoCo
   goldens replay Gym.NET's own frames bit for bit.
-- **Left:** human mode with Gymnasium's full `WindowViewer` controls (DR-70; it raises until then).
+- **Human window (DR-70, 2026-11-12):** `render_mode="human"` opens a viewer titled `mujoco` with Gymnasium's full
+  `WindowViewer` controls (mouse orbit, pan and zoom through `mjv_moveCamera`, Tab, Space and →, S/F, D, C, E, R, 0–4, T,
+  H, Esc) and its menu drawn as `mjr_overlay` draws it; the viewer contract reports the mouse. Gymnasium's own
+  `WindowViewer` code, MuJoCo's `mjr_overlay` and its `mjv_updateScene` decorations are the oracles of
+  `MujocoWindowLiveParityTests`: controls and menus equal over 25 scripted render calls, overlays byte-exact, decorations
+  float32 bit for bit. The readings DR-70 records (DESIGN_REVIEW.md, consequences) await the maintainer's confirmation.
 
 [`MUJOCO_ASSESSMENT.md`](MUJOCO_ASSESSMENT.md) (2026-11-11) measures what completing it takes, against Gymnasium
 `8ba8c3a6` and MuJoCo 3.15.0:

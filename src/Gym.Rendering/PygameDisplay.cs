@@ -170,6 +170,8 @@ namespace Gym.Rendering {
                             _surface = new Surface(input.Width, input.Height);
                             events.Add(new Event(EventType.WindowResized, new Info { ["x"] = input.Width, ["y"] = input.Height }));
                             break;
+                        // The mouse kinds (DR-70, for MuJoCo's window) are not pumped: pygame's queue would carry them as
+                        // MOUSEMOTION/MOUSEBUTTON*/MOUSEWHEEL, which nothing in this layer posts or reads (play reads keys).
                     }
                 }
             }

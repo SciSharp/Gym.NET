@@ -21,7 +21,7 @@ option records.
 |---|---|---|---|
 | Gym.NET | `src/Gym` | The env contract, wrappers, spaces, registry and `Gymnasium.Make`/`MakeVec`, vector envs, checkers, seeding, errors, the Python-semantics helpers, `Gym.Legacy`; the source generator ships inside it as an analyzer | NumSharp 0.80.0, SixLabors.ImageSharp 2.1.13 |
 | Gym.NET.Rendering | `src/Gym.Rendering` | The rasterizer the envs draw `rgb_array` frames with: `Surface`, `GfxDraw`, `Draw`, `Transform`, `ImageIO`, `SurfArray`, `Vector2`, `Clock` | Gym.NET, ImageSharp (PNG decoding) |
-| Gym.NET.Environments | `src/Gym.Environments` | classic_control, box2d (LunarLander, BipedalWalker, CarRacing), toy_text and mujoco (the 22 ids' classes in `Envs/MuJoCo`), `CartPoleVectorEnv`, the embedded images, CarRacing's score glyphs and Gymnasium's 14 compiled MuJoCo models, the registration of the built-in ids; the Box2D engine in `Box2D/` (namespace `Gym.Box2D`, DR-65) and the MuJoCo engine in `MuJoCo/` (namespace `Gym.MuJoCo`, DR-65, DR-66) | Gym.NET, Gym.NET.Rendering, SixLabors.ImageSharp 2.1.13 (the human window's images) |
+| Gym.NET.Environments | `src/Gym.Environments` | classic_control, box2d (LunarLander, BipedalWalker, CarRacing), toy_text and mujoco (the 22 ids' classes in `Envs/MuJoCo`), `CartPoleVectorEnv`, the embedded images, CarRacing's score glyphs, Gymnasium's 14 compiled MuJoCo models and MuJoCo's overlay font, the registration of the built-in ids; the Box2D engine in `Box2D/` (namespace `Gym.Box2D`, DR-65) and the MuJoCo engine in `MuJoCo/` (namespace `Gym.MuJoCo`, DR-65, DR-66) | Gym.NET, Gym.NET.Rendering, SixLabors.ImageSharp 2.1.13 (the human window's images) |
 | Gym.NET.Rendering.Avalonia | `src/Gym.Rendering.Avalonia` | `AvaloniaEnvViewer`, a window for `human` mode; `AvaloniaPlotFigure`, `PlayPlot`'s ScottPlot figure (DR-39) | Gym.NET.Environments, Avalonia 12, ScottPlot.Avalonia 5.1 |
 | Gym.NET.Rendering.WinForm | `src/Gym.Rendering.WinForm` | `WinFormEnvViewer`, the same on Windows Forms; `WinFormPlotFigure` | Gym.NET.Environments, Windows Forms, ScottPlot.WinForms 5.1 |
 | (inside Gym.NET) | `src/Gym.SourceGenerators` | The generator behind `[GymOptions]`, `[GymTuple]` and `[GymDict]` (DR-13, DR-34) | Roslyn 4.8 |
@@ -116,6 +116,13 @@ draw are Gymnasium's own, embedded in Gym.NET.Environments (DR-19).
 `human` mode renders into a viewer: the env's own `viewerFactory`, else the app-wide `Gymnasium.HumanViewerFactory`, else
 `DependencyNotInstalled` at the first frame, as Gymnasium does without pygame (DR-20). Frames are paced by
 `Gym.Rendering.Clock` at the env's `render_fps`.
+
+The MuJoCo envs draw their frames with a renderer of their own (`Envs/MuJoCo/Rendering`, DR-62, DR-69): MuJoCo's classic
+renderer in software, with the reference GPU's measured rounding, measured against Gymnasium's frames (DR-71). Their
+`human` window is Gymnasium's MuJoCo viewer (DR-70): the mouse orbits, pans and zooms the camera, keys pause, step,
+switch cameras, contact forces, frames, transparency and geom groups, save a frame or hide the menu MuJoCo's overlay
+draws. It reads the viewer's input through `IInteractiveEnvViewer` (the Avalonia and WinForms viewers; another viewer
+only shows the frames) and is paced at the display's 60 Hz, as GLFW's swap is, rather than at `render_fps`.
 
 ## Array ownership
 

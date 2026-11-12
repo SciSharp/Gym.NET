@@ -7,7 +7,8 @@
 > process workers) or that Gym.NET merges by design. What remains is the release itself (completion plan P10.5).
 > On 2026-11-12 MuJoCo resumed (DR-61): its 22 ids landed on Gym.NET's own engine, bit for bit with MuJoCo 4.0.0, and the
 > missing names are now MuJoCo's three renderer classes and `AtariPreprocessing`. Gym.NET draws their `rgb_array`,
-> `depth_array` and `rgbd_tuple` frames itself (DR-62, DR-69), measured against Gymnasium's; the human window is to come (DR-70).
+> `depth_array` and `rgbd_tuple` frames itself (DR-62, DR-69), measured against Gymnasium's, and their human window with
+> Gymnasium's controls (DR-70).
 >
 > Update this page when anything changes; the numbers under "Verification" are those of 2026-11-11, after P8, and of
 > 2026-11-12, after the MuJoCo envs.
@@ -25,7 +26,7 @@ It replaces 0.2's API, which followed gym before 0.26, with Gymnasium's.
 | Gym.NET.Rendering (new) | The rasterizer `rgb_array` frames are drawn with, equal to pygame-ce's pixels |
 | Gym.NET.Environments | classic_control, toy_text, box2d (LunarLander, BipedalWalker, CarRacing) and mujoco (Ant, HalfCheetah, Hopper, Humanoid, HumanoidStandup, the two inverted pendulums, Pusher, Reacher, Swimmer, Walker2d), CartPole's vector env, their registration; inside its assembly, the `Gym.Box2D` namespace: Box2D 2.3.0 in managed C#, bit for bit as pybox2d 2.3.10, with pybox2d's surface (zlib notices in THIRD-PARTY-NOTICES.md), and the `Gym.MuJoCo` namespace: Gym.NET's own engine, bit for bit with MuJoCo 4.0.0 on Gymnasium's 14 bundled models, embedded as MuJoCo compiled them |
 | Gym.NET.Rendering.Avalonia | A window for `human` mode on Avalonia 12 (Windows, Linux, macOS), and `PlayPlot`'s live charts on ScottPlot (`AvaloniaPlotFigure`) |
-| Gym.NET.Rendering.WinForm | The same on Windows Forms (`WinFormPlotFigure`) |
+| Gym.NET.Rendering.WinForm | The same on Windows Forms (`WinFormPlotFigure`); its window's client area is the frame's size, where 0.2's form cropped the frame's bottom rows behind the title bar |
 
 All target .NET 8 and .NET 10, depend on NumSharp 0.80.0, and are Apache-2.0, the repository's license (decision
 DR-49). The sources Gym.NET translates (Box2D 2.3.0 and pybox2d, SDL_gfx, SDL_ttf, OpenCV's resize, pygame-ce's
@@ -97,7 +98,8 @@ In short:
 - **Utilities**: `StepApiCompatibility` (`step_api_compatibility`, single and vector), `Performance` (Gymnasium's
   benchmarks), `Video.SaveVideo`, `Cv2.Resize`, and the functional protocol `FuncEnv` (without JAX).
 - **Playing from the keyboard**: `Play.Run` (Gymnasium's `play`), `PlayableGame`, `Play.DisplayArr` and `PlayPlot`, in
-  a window from the viewer factory; the Avalonia and WinForms viewers report keys, their close button and resizes, and
+  a window from the viewer factory; the Avalonia and WinForms viewers report keys, their close button, resizes and the
+  mouse (which a MuJoCo env's human window reads for Gymnasium's camera controls, DR-70), and
   headless runs are driven by events posted to `Gym.Rendering.EventQueue`, as Gymnasium's tests post them.
   `Play.RunAsync` awaits a game, on a thread of its own for a window and on the thread pool headless; a
   `PygameContext` gives a game its own display and event queue, so two games can run at once. `PlayPlot`'s charts get
@@ -111,7 +113,7 @@ In short:
   | classic_control | CartPole-v0, CartPole-v1 (and its vector env), MountainCar-v0, MountainCarContinuous-v0, Pendulum-v1, Acrobot-v1 |
   | box2d | LunarLander-v3, LunarLanderContinuous-v3, BipedalWalker-v3, BipedalWalkerHardcore-v3, CarRacing-v3 (on `Gym.Box2D`, Box2D 2.3.0 in managed C#) |
   | toy_text | FrozenLake-v1, FrozenLake8x8-v1, CliffWalking-v1, CliffWalkingSlippery-v1, Taxi-v4, Blackjack-v1 |
-  | mujoco | Ant, HalfCheetah, Hopper, Humanoid, HumanoidStandup, InvertedDoublePendulum, InvertedPendulum, Pusher, Reacher, Swimmer and Walker2d, each -v4 and -v5 (on `Gym.MuJoCo`, Gym.NET's engine following MuJoCo 4.0.0; Pusher-v4 refuses as Gymnasium's does on MuJoCo 3 and later). Observations, rewards, infos and their NumPy types match Gymnasium's; Gym.NET draws the frames itself, within one level of Gymnasium's on all but a few percent of the pixels (DR-62, DR-71); the human window is to come (DR-70) |
+  | mujoco | Ant, HalfCheetah, Hopper, Humanoid, HumanoidStandup, InvertedDoublePendulum, InvertedPendulum, Pusher, Reacher, Swimmer and Walker2d, each -v4 and -v5 (on `Gym.MuJoCo`, Gym.NET's engine following MuJoCo 4.0.0; Pusher-v4 refuses as Gymnasium's does on MuJoCo 3 and later). Observations, rewards, infos and their NumPy types match Gymnasium's; Gym.NET draws the frames itself, within one level of Gymnasium's on all but a few percent of the pixels (DR-62, DR-71); `human` opens a window with Gymnasium's mouse and key controls and its menu (DR-70) |
 
   Each steps faster than Gymnasium's on the same machine (Release builds, sampled actions, the medians of interleaved
   runs): 1.4× CartPole to 14× Acrobot, LunarLander 1.6×, BipedalWalker 3.6×, CarRacing 2.2× (the C# code review's
@@ -180,8 +182,9 @@ Out of 2.0 by decision:
 
 - **MuJoCo's frames are measured, not equal** (DR-62, DR-67, DR-71): Gym.NET draws them on the CPU, reproducing the
   reference GPU's measured rounding and filtering, so a frame differs from Gymnasium's in 0.07% (InvertedPendulum) to
-  16% (Humanoid's distant floor) of its pixels, nearly all by one level, and takes 0.05 to 0.5 s; `render_mode="human"`
-  raises until its window lands (DR-70). A MuJoCo env's `xml_file` takes only Gymnasium's 14 bundled model names
+  16% (Humanoid's distant floor) of its pixels, nearly all by one level, and takes 0.05 to 0.5 s; so the `human` window
+  (DR-70) shows a few to a few dozen frames a second, and its frames are single-sampled as Gymnasium's GLFW window's
+  are. A MuJoCo env's `xml_file` takes only Gymnasium's 14 bundled model names
   (DR-63): Gym.NET has no MJCF compiler.
 - `AtariPreprocessing`, which needs the Arcade Learning Environment (DR-36).
 - **Native AOT and trimming** (DR-55): NumSharp compiles its array kernels at run time, so Gym.NET needs the JIT. A .NET
