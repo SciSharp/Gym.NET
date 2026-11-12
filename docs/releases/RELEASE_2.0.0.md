@@ -6,7 +6,8 @@
 > names holds only MuJoCo's names and `AtariPreprocessing`, besides names that do not apply to .NET (JAX, pickling,
 > process workers) or that Gym.NET merges by design. What remains is the release itself (completion plan P10.5).
 > On 2026-11-12 MuJoCo resumed (DR-61): its 22 ids landed on Gym.NET's own engine, bit for bit with MuJoCo 4.0.0, and the
-> missing names are now MuJoCo's three renderer classes and `AtariPreprocessing`. Their frames are not drawn yet (DR-62).
+> missing names are now MuJoCo's three renderer classes and `AtariPreprocessing`. Gym.NET draws their `rgb_array`,
+> `depth_array` and `rgbd_tuple` frames itself (DR-62, DR-69), measured against Gymnasium's; the human window is to come (DR-70).
 >
 > Update this page when anything changes; the numbers under "Verification" are those of 2026-11-11, after P8, and of
 > 2026-11-12, after the MuJoCo envs.
@@ -110,7 +111,7 @@ In short:
   | classic_control | CartPole-v0, CartPole-v1 (and its vector env), MountainCar-v0, MountainCarContinuous-v0, Pendulum-v1, Acrobot-v1 |
   | box2d | LunarLander-v3, LunarLanderContinuous-v3, BipedalWalker-v3, BipedalWalkerHardcore-v3, CarRacing-v3 (on `Gym.Box2D`, Box2D 2.3.0 in managed C#) |
   | toy_text | FrozenLake-v1, FrozenLake8x8-v1, CliffWalking-v1, CliffWalkingSlippery-v1, Taxi-v4, Blackjack-v1 |
-  | mujoco | Ant, HalfCheetah, Hopper, Humanoid, HumanoidStandup, InvertedDoublePendulum, InvertedPendulum, Pusher, Reacher, Swimmer and Walker2d, each -v4 and -v5 (on `Gym.MuJoCo`, Gym.NET's engine following MuJoCo 4.0.0; Pusher-v4 refuses as Gymnasium's does on MuJoCo 3 and later). Observations, rewards, infos and their NumPy types match Gymnasium's; frames are not drawn yet (DR-62) |
+  | mujoco | Ant, HalfCheetah, Hopper, Humanoid, HumanoidStandup, InvertedDoublePendulum, InvertedPendulum, Pusher, Reacher, Swimmer and Walker2d, each -v4 and -v5 (on `Gym.MuJoCo`, Gym.NET's engine following MuJoCo 4.0.0; Pusher-v4 refuses as Gymnasium's does on MuJoCo 3 and later). Observations, rewards, infos and their NumPy types match Gymnasium's; Gym.NET draws the frames itself, within one level of Gymnasium's on all but a few percent of the pixels (DR-62, DR-71); the human window is to come (DR-70) |
 
   Each steps faster than Gymnasium's on the same machine (Release builds, sampled actions, the medians of interleaved
   runs): 1.4× CartPole to 14× Acrobot, LunarLander 1.6×, BipedalWalker 3.6×, CarRacing 2.2× (the C# code review's
@@ -177,9 +178,11 @@ Nothing of P6 or P8 is deferred.
 
 Out of 2.0 by decision:
 
-- **MuJoCo's frames** (DR-62): the 22 ids step, reset and report bit for bit, but `render()` raises until Gym.NET's own
-  drawing of the scene lands; its frames will be measured against Gymnasium's, not required equal (DR-67). A MuJoCo
-  env's `xml_file` takes only Gymnasium's 14 bundled model names (DR-63): Gym.NET has no MJCF compiler.
+- **MuJoCo's frames are measured, not equal** (DR-62, DR-67, DR-71): Gym.NET draws them on the CPU, reproducing the
+  reference GPU's measured rounding and filtering, so a frame differs from Gymnasium's in 0.07% (InvertedPendulum) to
+  16% (Humanoid's distant floor) of its pixels, nearly all by one level, and takes 0.05 to 0.5 s; `render_mode="human"`
+  raises until its window lands (DR-70). A MuJoCo env's `xml_file` takes only Gymnasium's 14 bundled model names
+  (DR-63): Gym.NET has no MJCF compiler.
 - `AtariPreprocessing`, which needs the Arcade Learning Environment (DR-36).
 - **Native AOT and trimming** (DR-55): NumSharp compiles its array kernels at run time, so Gym.NET needs the JIT. A .NET
   10 file-based app (`dotnet run app.cs`), which publishes AOT by default, sets `#:property PublishAot=false`.

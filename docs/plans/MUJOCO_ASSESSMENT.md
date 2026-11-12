@@ -1445,8 +1445,70 @@ and the MuJoCo ids joined every layer the other families have, except frames (`t
 
 ### 16.4 Still open
 
-- Frames: `MujocoRenderer` raises `NotImplementedError` until Gym.NET's drawing of the scene lands (DR-62, DR-67).
-  Gymnasium's own frames are not a fixed reference: rendered five times from the same state, Humanoid-v5's frames
-  differ from one render to the next in 15 to 21 pixels and Hopper-v5's in 1 to 19, while HalfCheetah-v5's and
-  Walker2d-v5's repeat exactly (measured 2026-11-12 on this machine's GPU, through MuJoCo's free camera; the cause is not
-  established). DR-67's measuring, rather than gating, already allows for that.
+- Frames: `MujocoRenderer` raised `NotImplementedError` until Gym.NET's drawing of the scene landed (§17). Gymnasium's
+  own frames are not a fixed reference: rendered five times from the same state, Humanoid-v5's frames differ from one
+  render to the next in 15 to 21 pixels and Hopper-v5's in 1 to 19, while HalfCheetah-v5's and Walker2d-v5's repeat
+  exactly (measured 2026-11-12 on this machine's GPU, through MuJoCo's free camera; the cause is not established).
+  DR-67's measuring and DR-71's noise allowance, rather than equality, allow for that.
+
+## 17. The renderer (2026-11-12)
+
+Round 23 of the design review settled the surface (DR-69: everything inside `MujocoRenderer`, Gymnasium's viewer
+classes not ported), the human window (DR-70: Gymnasium's full `WindowViewer` controls) and the gate (DR-71: a measured
+baseline plus Gym.NET's own frames as goldens). The `rgb_array`, `depth_array` and `rgbd_tuple` modes landed first.
+
+### 17.1 What landed
+
+`src/Gym.Environments/Envs/MuJoCo/Rendering` (internal, about 4,500 lines): `MujocoScene` is `mjv_updateScene` for
+Gymnasium's scenes (geoms and sites by category and group, the infinite plane re-centred on the camera, the free,
+tracking and fixed cameras, `mj_camlight`, the headlight and model lights); `MujocoMeshes` builds MuJoCo's builtin
+meshes as `makeBuiltin` and `makePlane` do; `MujocoFrame` is `mjr_render`'s pass structure (the reflective floor through
+the stencil and a clip plane, the regular pass, one 4096² shadow map and additive lit pass per shadow light, the skybox,
+the haze, the transparent geoms) and `mjr_readPixels`; `GlContext` is the fixed-function OpenGL those passes drive
+(per-vertex lighting with a local viewer, object- and eye-linear texture generation, near/far/user clipping, reverse-Z
+depth, 4x multisampling, stencil, blending, polygon offset), with `GlTexture` and `GlMath`. `MujocoRenderer` keeps one
+scene and context per mode, applies Gymnasium's camera rules (`_init_camera`, `default_camera_config`, `camera_id` and
+`camera_name`) and `visual_options`, and caps the scene at `max_geom` with MuJoCo's warning. Frames are deterministic:
+the same state draws the same bytes.
+
+### 17.2 The GPU's choices, measured
+
+OpenGL leaves rounding, filtering and multisampling details to the GPU, and Gymnasium's frames carry the reference
+GPU's (an NVIDIA RTX 4060 Ti, driver 616.56). `tools/parity/mujoco/gpu_probe.py` measures them in MuJoCo's own GL
+context, and the renderer reproduces what it found; each probe scores Gym.NET's model against the GPU:
+
+| Behaviour | The reference GPU | Score |
+|---|---|---|
+| Colour store | truncated to 12 bits, then rounded with an exact half down (`ToUnorm8`) | 3,485 of 3,485 colours |
+| Blending | source colour and alpha stored to 8 bits first, then an exact integer blend | 40,000 of 40,000 |
+| Resolve (4x) | `(sum + 1) / 4`: a quarter up from three, a half down | every uniform pixel; 97% of mixed ones (a few halves round up) |
+| Centroid | an edge pixel's colour at its first covered sample; texture coordinates at the centre | 2,743 and 2,663 of as many |
+| Quads, lighting | (0, 1, 2) and (0, 2, 3); OpenGL's equation in float | 3,600 of 3,600; 3,999 of 4,000 |
+| Bilinear | weights rounded to 1/256 | 1,024 of 1,024 |
+| Level of detail | one per 2×2 quad from its lower-left pixel's differences; the exponent plus a 256-entry table of the mantissa truncated to 8 bits, in 1/256 steps | 992 of 992 quads uniform; the table 256 of 256 |
+| Derivative length | not Euclidean: `max + 0.3442·min` in 9-bit fixed point fits it | 701 of 722 (a fit) |
+| Mipmaps | the area box with ties down, but the GPU's 25 → 12 step departs in 10 texels | levels 1, 2, 6 exact; 10, 4, 2 texels off by one in 3, 4, 5 |
+
+### 17.3 How close the frames are
+
+Against Gymnasium's GPU frames at `reset(seed=0)`, 480×480 (scratch comparison tools):
+
+| Id | Pixels differing | Mean abs. delta | Note |
+|---|---|---|---|
+| InvertedPendulum-v5 | 0.07% (153), all by 1 | 0.000 | depth: 99.95% bit-equal, the rest 1 ulp |
+| Reacher-v5 | 0.33% | 0.001 | |
+| HalfCheetah-v5 | 1.90% | 0.013 | depth: 99.3% bit-equal, at most 3 ulps |
+| Ant-v5 | 2.64% | 0.019 | 6 single samples at body intersections (depth ties) |
+| Humanoid-v5 | 15.8%, mostly by 1 | 0.122 | the distant checker floor's level of detail |
+
+Before the GPU's behaviours were measured, the same frames differed in 2.97% to 35.4% of their pixels; the resolve
+alone had added a +1 in about 1.5% of every frame. What remains is the derivative length's fit, the level-3 mipmap
+departure and depth ties where two bodies intersect.
+
+### 17.4 Still open
+
+- The human window with Gymnasium's controls (DR-70).
+- The frame cells, each gated on its measured baseline plus Gymnasium's render-to-render noise and pinned to the
+  reference GPU, and Gym.NET's own frames in the MuJoCo goldens (DR-71).
+- Speed: a 480×480 frame takes about 0.05 s (InvertedPendulum) to 0.5 s (Humanoid) of CPU spread over all cores, the
+  shadow maps a good part of it.

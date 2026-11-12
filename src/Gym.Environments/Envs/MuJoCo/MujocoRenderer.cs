@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Gym.Environments.Envs.MuJoCo.Rendering;
 using Gym.Envs;
 using Gym.Exceptions;
 using Gym.MuJoCo;
@@ -98,16 +99,46 @@ namespace Gym.Environments.Envs.MuJoCo {
         internal IEnvironmentViewerFactoryDelegate? ViewerFactory { get; }
 
         /// <summary>
-        ///     Draws one frame in <paramref name="renderMode"/> (<c>render</c>).
+        ///     One render mode's viewer (Gymnasium's <c>OffScreenViewer</c>, inlined per DR-69): its own scene, camera and
+        ///     drawing context, created with the first frame of that mode.
+        /// </summary>
+        private sealed class Viewer {
+            /// <summary>The scene, kept between frames as MuJoCo's <c>MjvScene</c> is.</summary>
+            internal readonly MujocoScene Scene = new();
+
+            /// <summary>The abstract camera.</summary>
+            internal readonly MjvCamera Camera = new();
+
+            /// <summary>The drawing context.</summary>
+            internal required MujocoFrame Frame;
+        }
+
+        /// <summary>The viewers by render mode (<c>_viewers</c>).</summary>
+        private readonly Dictionary<string, Viewer> _viewers = new(StringComparer.Ordinal);
+
+        /// <summary>
+        ///     Draws one frame in <paramref name="renderMode"/> (<c>render</c>): the scene from the camera (the free camera
+        ///     with the env's default configuration, or the chosen model camera), drawn by Gym.NET's own rasterizer (DR-62).
         /// </summary>
         /// <param name="renderMode">The mode; <see langword="null"/> is refused, as in Gymnasium.</param>
         /// <returns>
         ///     <c>rgb_array</c>: an <c>(height, width, 3)</c> uint8 frame; <c>depth_array</c>: an <c>(height, width)</c> float32
-        ///     depth; <c>rgbd_tuple</c>: both; <c>human</c>: <see cref="RenderResult.None"/> after showing the frame.
+        ///     depth (0 at the near plane, 1 at the far one, as MuJoCo reads it back); <c>rgbd_tuple</c>: both;
+        ///     <c>human</c>: <see cref="RenderResult.None"/> after showing the frame. The caller owns the arrays.
         /// </returns>
         /// <exception cref="AssertionError">A mode other than <c>human</c> without a width or height, with Gymnasium's message.</exception>
         /// <exception cref="AttributeError">An unknown mode, or none, with Gymnasium's message.</exception>
-        /// <exception cref="NotImplementedError">The frame itself: Gym.NET's MuJoCo rasterizer (DR-62) is not written yet.</exception>
+        /// <exception cref="NotImplementedError"><c>human</c> mode, whose window (DR-70) is not written yet.</exception>
+        /// <exception cref="ArgumentOutOfRangeException">The camera id names no model camera.</exception>
+        /// <remarks>
+        ///     Frames are measured against Gymnasium's GPU frames, not required equal (DR-67, DR-71): lighting, textures,
+        ///     the floor's reflection, shadows and multisampling follow MuJoCo's classic renderer in software, with the
+        ///     reference GPU's measured rounding, and the rest of the GPU's choices still decide some pixels at edges and on
+        ///     distant textures (on 2026-11-12, 0.07% of InvertedPendulum-v5's pixels to 16% of Humanoid-v5's, nearly all by
+        ///     one level; depths bit for bit but for a few ulps). A 480×480 frame costs about 0.05 to 0.5 s of one desktop
+        ///     core's time spread over all cores, the shadow map (4096² depths per shadow light) a good part of it, so an
+        ///     <c>rgb_array</c> loop renders far slower than it steps.
+        /// </remarks>
         public RenderResult Render(string? renderMode) {
             if (renderMode != "human" && (Width == null || Height == null))
                 throw new AssertionError(
@@ -115,10 +146,114 @@ namespace Gym.Environments.Envs.MuJoCo {
             if (renderMode is not ("human" or "rgb_array" or "depth_array" or "rgbd_tuple"))
                 throw new AttributeError(
                     $"Unexpected mode: {renderMode ?? "None"}, expected modes: human, rgb_array, depth_array, or rgbd_tuple");
-            throw new NotImplementedError("Gym.NET's MuJoCo frames (DR-62) are not drawn yet");
+            if (renderMode == "human")
+                throw new NotImplementedError("Gym.NET's MuJoCo human window (DR-70) is not written yet");
+
+            Viewer viewer = GetViewer(renderMode);
+            int width = Width!.Value, height = Height!.Value;
+
+            // OffScreenViewer.render: the camera id is applied on every frame
+            if (CameraId == -1) {
+                viewer.Camera.Type = MjvCamera.Free;
+            } else {
+                viewer.Camera.Type = MjvCamera.Fixed;
+            }
+
+            viewer.Camera.FixedCamId = CameraId;
+            viewer.Scene.Update(Model, Data, viewer.Camera);
+            viewer.Frame.Render(viewer.Scene, width, height);
+
+            bool wantRgb = renderMode is "rgb_array" or "rgbd_tuple", wantDepth = renderMode is "depth_array" or "rgbd_tuple";
+            byte[]? rgb = wantRgb ? new byte[3 * width * height] : null;
+            float[]? depth = wantDepth ? new float[width * height] : null;
+            viewer.Frame.ReadPixels(rgb, depth);
+            NDArray? rgbFrame = rgb == null ? null : np.array(rgb).reshape(height, width, 3);
+            NDArray? depthFrame = depth == null ? null : np.array(depth).reshape(height, width);
+            return renderMode switch {
+                "rgb_array" => new RenderResult.Rgb(rgbFrame!),
+                "depth_array" => new RenderResult.Depth(depthFrame!),
+                _ => new RenderResult.RgbDepth(rgbFrame!, depthFrame!),
+            };
+        }
+
+        /// <summary>
+        ///     The viewer of a mode, created on its first frame: the free camera aimed at the geoms' median position from the
+        ///     model's extent (<c>_init_camera</c>), then the env's default camera configuration (<c>_set_cam_config</c>).
+        /// </summary>
+        /// <param name="renderMode">The mode.</param>
+        /// <returns>The viewer.</returns>
+        /// <exception cref="InvalidCastException">A camera configuration value of a kind the camera field cannot take.</exception>
+        /// <exception cref="IndexError">A visual option whose flag index is not an <c>mjtVisFlag</c>, with NumPy's message.</exception>
+        private Viewer GetViewer(string renderMode) {
+            if (_viewers.TryGetValue(renderMode, out Viewer? viewer))
+                return viewer;
+            viewer = new Viewer { Frame = new MujocoFrame(Model) };
+            viewer.Scene.MaxGeom = MaxGeom;
+            // BaseRender.__init__: the visual options switch the viewer's own flags once, over MuJoCo's defaults; a flag
+            // index outside mjtVisFlag fails as MjvOption's flags array refuses it
+            foreach ((int flag, bool on) in VisualOptions) {
+                if ((uint)flag >= (uint)viewer.Scene.VisFlags.Length)
+                    throw new IndexError($"index {flag} is out of bounds for axis 0 with size {viewer.Scene.VisFlags.Length}");
+                viewer.Scene.VisFlags[flag] = on;
+            }
+
+            MjvCamera cam = viewer.Camera;
+            cam.Type = MjvCamera.Free;
+            cam.FixedCamId = -1;
+            int ngeom = Model.ngeom;
+            var column = new double[ngeom];
+            for (int i = 0; i < 3; i++) {
+                for (int g = 0; g < ngeom; g++)
+                    column[g] = Data.geom_xpos[3 * g + i];
+                cam.Lookat[i] = Median(column);
+            }
+
+            cam.Distance = Model.extent;
+            if (DefaultCamConfig != null) {
+                foreach ((string key, object? value) in DefaultCamConfig) {
+                    switch (key) {
+                        case "lookat":
+                            double[] point = value as double[] ?? throw new InvalidCastException($"default_cam_config's lookat must be three numbers, got {value}.");
+                            Array.Copy(point, cam.Lookat, 3);
+                            break;
+                        case "distance":
+                            cam.Distance = Convert.ToDouble(value, System.Globalization.CultureInfo.InvariantCulture);
+                            break;
+                        case "azimuth":
+                            cam.Azimuth = Convert.ToDouble(value, System.Globalization.CultureInfo.InvariantCulture);
+                            break;
+                        case "elevation":
+                            cam.Elevation = Convert.ToDouble(value, System.Globalization.CultureInfo.InvariantCulture);
+                            break;
+                        case "trackbodyid":
+                            cam.TrackBodyId = Convert.ToInt32(value, System.Globalization.CultureInfo.InvariantCulture);
+                            break;
+                        case "fixedcamid":
+                            cam.FixedCamId = Convert.ToInt32(value, System.Globalization.CultureInfo.InvariantCulture);
+                            break;
+                        case "type":
+                            cam.Type = Convert.ToInt32(value, System.Globalization.CultureInfo.InvariantCulture);
+                            break;
+                        case "orthographic":
+                            cam.Orthographic = Convert.ToInt32(value, System.Globalization.CultureInfo.InvariantCulture) != 0;
+                            break;
+                    }
+                }
+            }
+
+            _viewers[renderMode] = viewer;
+            return viewer;
+
+            // NumPy's median: the middle value, or the mean of the two middle values
+            static double Median(double[] values) {
+                var sorted = (double[])values.Clone();
+                Array.Sort(sorted);
+                int n = sorted.Length;
+                return n == 0 ? double.NaN : n % 2 == 1 ? sorted[n / 2] : (sorted[n / 2 - 1] + sorted[n / 2]) / 2.0;
+            }
         }
 
         /// <summary>Closes every window and buffer the modes opened (<c>close</c>); drawing again opens them again.</summary>
-        public void Close() { }
+        public void Close() => _viewers.Clear();
     }
 }

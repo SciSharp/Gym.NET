@@ -424,6 +424,8 @@ namespace Gym.MuJoCo {
             // the recorded colours are float32 values written as doubles, so the cast back is exact
             if (r.TryGetProperty("geom_rgba", out _))
                 m.geom_rgba = D("geom_rgba").Select(v => (float)v).ToArray();
+            // the renderer's fields (DR-62): cameras, lights, materials, textures; empty for a trace dump
+            m.LoadVisual(root, r, sizes);
             m.Validate(r, sizes, opt);
             return m;
         }

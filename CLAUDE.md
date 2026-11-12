@@ -86,7 +86,13 @@ refs/Gym.NET/
 │   │   │                          #   Hopper, Humanoid (+ MassCenter), HumanoidStandup, InvertedDoublePendulum, InvertedPendulum, Pusher
 │   │   │                          #   (PusherEnvV4 refuses, as Gymnasium's on MuJoCo 3+), Reacher, Swimmer, Walker2d; MujocoMath (internal:
 │   │   │                          #   NumPy's pairwise sums, norms and the control cost in the action's dtype; DR-08 info scalars);
-│   │   │                          #   MujocoRenderer (cameras and modes; frames not drawn yet, DR-62/DR-67); MujocoUtils (utils' 3 functions)
+│   │   │                          #   MujocoRenderer (Gymnasium's camera rules, rgb_array/depth_array/rgbd_tuple; human's window to come,
+│   │   │                          #   DR-70); MujocoUtils (utils' 3 functions)
+│   │   ├── Envs/MuJoCo/Rendering/ # internal (DR-69): MuJoCo's classic renderer drawn in software (DR-62): MujocoScene (mjv_updateScene),
+│   │   │                          #   MujocoMeshes (the builtin meshes), MujocoFrame (mjr_render's passes: reflection, shadow maps, skybox,
+│   │   │                          #   haze, transparency; mjr_readPixels), GlContext (the fixed-function OpenGL MuJoCo uses: lighting,
+│   │   │                          #   texgen, clipping, 4x MSAA, stencil, blending), GlTexture (mipmaps, filtering), GlMath. Where the GPU
+│   │   │                          #   decides (rounding, LOD, centroid, resolve), the reference GPU's measured behaviour: gpu_probe.py
 │   │   ├── Envs/                  # NpScalar (NEP 50 scalars), HumanWindow (DR-20), EnvAssets (DR-19), RenderMath
 │   │   ├── Assets/                # Embedded env images copied from Gymnasium (classic_control, toy_text), CarRacing's recorded score glyphs
 │   │   │                          #   (fonts/freesansbold-42.json, DR-48) and Gymnasium's 14 MuJoCo models as MuJoCo 4.0.0 compiles them
@@ -116,7 +122,8 @@ refs/Gym.NET/
 │   └── Gym.Tests.Plugin/          # A module that registers an id when loaded, for make("Gym.Tests.Plugin:RegisterDuringMake-v0")
 │
 ├── tools/parity/                  # Parity stack: manifest.json (pins), requirements.txt, setup_venv.{ps1,sh}; audit probes
-├── tools/parity/mujoco/           # record_models.py (the embedded MuJoCo models, --check); halfcheetah_poc/: the trace checker over the
+├── tools/parity/mujoco/           # record_models.py (the embedded MuJoCo models, --check); gpu_probe.py (re-measures the GPU behaviours
+│                                  #   the renderer reproduces, scoring its models); halfcheetah_poc/: the trace checker over the
 │                                  #   product engine (oracle.py records MuJoCo's state per mj_step; verify/: traces.txt, record_traces.py,
 │                                  #   negative_controls.py, branch_search.py, cs_coverage.py), and play/, a playable HalfCheetah
 ├── tools/showreel/                # The front-page media (DR-59, DR-60): the synthwave video and README GIF (docs/media), the site's 8-bit

@@ -994,10 +994,13 @@ Specs: the port plan's §5.7 and §11.4; sources 6,153 lines. Postponed by DR-35
   `mujoco==4.0.0`, and the 22 ids have every live parity layer the other families have except frames: lockstep cells
   (`MujocoLiveParityTests`), registration, `make`'s warnings, sync and async vectors, Gymnasium's `check_env` and
   `check_environments_match` through the reverse bridge, and 21 goldens (`tests/Gym.Tests.Parity/CLAUDE.md` §5.1).
-- **Left:** the frames (DR-62, measured against Gymnasium's by DR-67; `MujocoRenderer` raises until then). Round 23
-  settled their surface: everything inlined into `MujocoRenderer`, Gymnasium's viewer classes not ported (DR-69);
-  human mode with Gymnasium's full `WindowViewer` controls (DR-70); frame cells gated on a measured baseline, with
-  Gym.NET's own frames as goldens (DR-71).
+- **Frames (2026-11-12):** Gym.NET draws `rgb_array`, `depth_array` and `rgbd_tuple` itself (DR-62, DR-69), with the
+  reference GPU's measured rounding, filtering and multisampling (`tools/parity/mujoco/gpu_probe.py`): 0.07% to 2.6% of
+  the pixels of InvertedPendulum, Reacher, HalfCheetah and Ant differ from Gymnasium's frames, nearly all by one level,
+  and 16% of Humanoid's, its distant checker floor; depths are bit for bit but for a few ulps
+  ([`MUJOCO_ASSESSMENT.md`](MUJOCO_ASSESSMENT.md) §17).
+- **Left:** human mode with Gymnasium's full `WindowViewer` controls (DR-70; it raises until then), and the frame cells
+  gated on a measured baseline, with Gym.NET's own frames as goldens (DR-71).
 
 [`MUJOCO_ASSESSMENT.md`](MUJOCO_ASSESSMENT.md) (2026-11-11) measures what completing it takes, against Gymnasium
 `8ba8c3a6` and MuJoCo 3.15.0:
