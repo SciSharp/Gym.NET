@@ -6,13 +6,13 @@ _layout: landing
 <section class="gn-hero" aria-label="The Gym.NET showreel">
 <video class="gn-video" autoplay muted loop playsinline controls preload="metadata" poster="images/showreel-poster.jpg">
 <source src="../media/gym-net-showreel.mp4" type="video/mp4">
-<img src="../media/gym-net-hero.gif" alt="Gym.NET's environments playing in panels over a synthwave grid">
+<img src="../media/gym-net-hero.webp" alt="Gym.NET's environments playing in panels over a synthwave grid">
 </video>
 </section>
 <section class="gn-intro">
 <p class="gn-kicker">Reinforcement learning environments for .NET</p>
 <h1 class="gn-title">Gym.NET</h1>
-<p class="gn-lede">Farama Gymnasium's API and behavior in C#. Given the same seed and actions, every environment returns the same observations, rewards, flags and infos as Gymnasium's, bit for bit, and renders the same frames, pixel for pixel. A test suite that runs Gymnasium itself inside the test process checks it, call by call.</p>
+<p class="gn-lede">Farama Gymnasium's API and behavior in C#. Given the same seed and actions, every environment returns the same observations, rewards, flags and infos as Gymnasium's, bit for bit, and renders the same frames, pixel for pixel (MuJoCo's within one level). A test suite that runs Gymnasium itself inside the test process checks it, call by call.</p>
 <div class="gn-actions">
 <a class="gn-button gn-button-primary" href="../guides/getting_started.md">Get started</a>
 <a class="gn-button" href="#select-your-environment">Environments</a>

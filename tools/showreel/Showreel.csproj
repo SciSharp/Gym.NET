@@ -1,9 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- The front-page showreel: plays every visually distinct built-in env under a scripted policy, composes the
-       synthwave video (docs/media/gym-net-showreel.mp4), the README's GIF loop (docs/media/gym-net-hero.gif) and the
-       docs site's cartridge gallery (docs/website-src/images/envs), and proves its parity segment against Gymnasium
-       running in Python. Not part of Gym.NET.sln; nothing ships from here. README.md has the commands. -->
+  <!-- The front-page showreel: plays every visually distinct built-in env under a scripted or trained policy, composes
+       the synthwave video (docs/media/gym-net-showreel.mp4), the README's animation, its 51 s cut as animated WebP
+       (docs/media/gym-net-hero.webp), and the docs site's cartridge gallery (docs/website-src/images/envs), and proves
+       its parity segment against Gymnasium running in Python. Not part of Gym.NET.sln; nothing ships from here.
+       README.md has the commands. -->
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net10.0</TargetFramework>

@@ -6,34 +6,37 @@ played by a scripted or trained policy, composed in C# over a synthwave backdrop
 | Output | Where it is used |
 |---|---|
 | `docs/media/gym-net-showreel.mp4`: 85 s, 1280x720, 30 fps, H.264 (about 13 MB) | The docs site's landing page, and linked from the README |
-| `docs/media/gym-net-hero.gif`: a 12 s loop, 800x450, 15 fps (about 4.6 MB; it must stay under 5 MB, see below) | The top of `README.md` (GitHub and nuget.org) |
+| `docs/media/gym-net-hero.webp`: the same tour cut to 51 s, animated WebP, 800x450, 15 fps (about 8 MB) | The top of `README.md` (GitHub and nuget.org), and the site's fallback where video does not play |
 | `docs/website-src/images/envs/*.webp`, `*.png`, `envs.json` | The site's 8-bit "select your environment" gallery |
 | `docs/website-src/images/showreel-poster.jpg`, `gymnet-logo.png`, `gymnet-icon.png` | The video's poster, the site's navbar logo and favicon |
 
 ```bash
-dotnet run --project tools/showreel -c Release                  # everything (about 12 minutes on 32 threads)
+dotnet run --project tools/showreel -c Release                  # everything (about 13 minutes on 32 threads: the video 7.5, the README cut 2.5)
 dotnet run --project tools/showreel -c Release -- video         # or one output: video, hero, gallery
-dotnet run --project tools/showreel -c Release -- stills --board video --at 2.6,17.5,50 --out stills
+dotnet run --project tools/showreel -c Release -- hero --format gif   # the README cut as a GIF instead (19 MB)
+dotnet run --project tools/showreel -c Release -- stills --board hero --at 2.6,17.5,40 --out stills
 dotnet run --project tools/showreel -c Release -- parity        # only the Gymnasium comparison
 dotnet run --project tools/showreel -c Release -- train --env Hopper-v5   # retrain a committed MuJoCo policy
 ```
 
 Pass the command after `--`. Options: `--repo DIR` (default: the checkout it runs in), `--ffmpeg EXE`, `--python EXE`,
 `--gymnasium DIR` (default `refs/Gymnasium`), `--work DIR` (the Python exchange files, about 1 GB while it runs),
-`--no-parity`, `--gif-width N`, and for `train`, `--env ID[,ID...]` and `--minutes M`.
+`--no-parity`, `--width N` (the README animation's, default 800; `--gif-width` is the same option), `--format webp|gif`,
+and for `train`, `--env ID[,ID...]` and `--minutes M`.
 
 ## Requirements
 
 - ffmpeg on `PATH` (checked with 7.0).
-- For the parity segment (the video and `parity` only): a Python with the parity suite's reference stack
-  (`tools/parity/requirements.txt`: Python 3.12, NumPy 2.4.2, pygame-ce 2.5.8, Box2D 2.3.10;
+- For the parity segment (the video, the README cut, `stills` and `parity`): a Python with the parity suite's reference
+  stack (`tools/parity/requirements.txt`: Python 3.12, NumPy 2.4.2, pygame-ce 2.5.8, Box2D 2.3.10;
   `pwsh tools/parity/setup_venv.ps1` makes one), passed with `--python`, and the `refs/Gymnasium` submodule
-  initialized. `--no-parity` renders the video without that segment.
+  initialized. `--no-parity` renders without that segment.
 - Time: the MuJoCo frames cost 17 ms (InvertedPendulum) to 380 ms (HumanoidStandup) each, drawn in software on every
   core, so they take most of the render.
-- Size: GitHub shows README images through its camo proxy, which refuses files over 5 MB, so a larger GIF shows as a
-  broken image. MuJoCo's shaded panels compress worse than the 2-D envs': the GIF's dithering is set for that budget
-  (`FfmpegPipe.Gif`), so check the size after changing the hero storyboard or `--gif-width`.
+- Size: the README's image comes straight from `raw.githubusercontent.com`. GitHub's camo proxy, which refuses images
+  over 5 MB, only fronts images on other hosts (checked with GitHub's markdown renderer), so the size costs load time,
+  not display. Measured on the 51 s cut: animated WebP 7.2 MB, the GIF 19 MB (one palette for 24 envs dithers and
+  smears the grey MuJoCo skies), AVIF 3.0 MB at 1280x720 (newer browsers only); DR-73 chose WebP.
 
 ## What it shows
 
@@ -46,6 +49,12 @@ between existing envs the new envs"):
 intro, classic control, MuJoCo's control tasks (CartPole stays on beside InvertedPendulum, MuJoCo's cart-pole), Box2D,
 MuJoCo's locomotion (CarRacing stays on beside HalfCheetah), toy text, the parity segment, a finale flipping through all
 24 ids, the outro.
+
+The README shows the same tour cut to 51 s (DR-73, 2026-11-12: "the gif is not great, redo the showreel but -2/5 of the
+time of the mp4"): every section and env, each on screen about 60% as long, in place of DR-59's 12 s loop of seven
+envs. Where a panel became too short for the moment its episode is known for, it joins mid-episode so that moment still
+lands on screen: MountainCar's summit, Acrobot's crossing, LunarLander's landing, the toy-text goals
+(`Storyboards.Hero`).
 
 Stamps such as `LANDED!` mark how an episode ended.
 

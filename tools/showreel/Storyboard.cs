@@ -382,29 +382,170 @@ internal static class Storyboards {
     }
 
     /// <summary>
-    ///     The README's 12-second loop: the lander alone; HalfCheetah and the race car side by side; FrozenLake, Ant,
-    ///     CartPole and Hopper; then a white flash that hides the seam where the GIF starts over.
+    ///     The README's animation: the whole showreel cut to 51 seconds, the video's 85 minus two fifths. The sections are
+    ///     the video's, in its order and with its hand-overs: intro; classic control (1, 2, then 4 panels); MuJoCo's
+    ///     control tasks (CartPole beside InvertedPendulum, then 4); Box2D (1, 2, 1); MuJoCo's locomotion (CarRacing beside
+    ///     HalfCheetah, then 1, 2 and 4); toy text (4, then 1); the parity segment; the finale through all 24 ids; the
+    ///     outro, which fades into the intro where the loop starts over.
     /// </summary>
-    /// <returns>The storyboard (rendered at 1280x720, scaled down by the encoder).</returns>
-    public static Storyboard Hero() {
+    /// <param name="parity">The Gymnasium replays for the parity segment, or <see langword="null"/> to leave it out (the cut is then 3.6 s shorter).</param>
+    /// <returns>The storyboard (rendered at 1280x720 and 15 fps, scaled down by the encoder).</returns>
+    /// <remarks>
+    ///     <para>
+    ///     The maintainer, 2026-11-12: "the gif is not great, redo the showreel but -2/5 of the time of the mp4" (DR-73).
+    ///     The cut keeps every env and shortens how long each stays: a solo of 6 s in the video holds about 3.5 s here, and
+    ///     the finale flips every 0.45 s instead of 0.6 s. The episodes still play at their own speed.
+    ///     </para>
+    ///     <para>
+    ///     Where a panel is now too short to reach the moment its episode is known for, it joins mid-episode
+    ///     (<see cref="Mid"/>), timed so the moment lands on screen: MountainCar's summit, Acrobot crossing the line,
+    ///     LunarLander's landing, the toy-text goals. Each such tick is the episode's length minus what the panel can show,
+    ///     from the recipe's steps per second (the toy texts' lengths are the README table's: goal in 63 and 41 steps, the
+    ///     edge path in 13, the delivery in 16).
+    ///     </para>
+    ///     <para>
+    ///     The title runs 0.3–3.75 s, as long as its two lines need to type on at 32 letters a second and be read before it
+    ///     leaves; the outro gets the last 3 s for the same reason. What remains is shared in the video's proportions.
+    ///     </para>
+    /// </remarks>
+    public static Storyboard Hero(ParityReplays? parity) {
         var tracks = new List<Track>();
         var overlays = new List<Overlay>();
-        HeaderLogo(overlays, 0, 12);
-        Caption(overlays, 0, 12, "RL ENVIRONMENTS FOR .NET · BIT FOR BIT", Cyan, typeOn: false);
-        tracks.Add(Panel(Cyan, new[] { new Content(0, Mid("LunarLander-v3", 0, 165)) },
-            K(0, Slots.One), K(3.0, Slots.One), K(3.5, Slots.OffTop(Slots.One), Ease.InBack)));
-        tracks.Add(Panel(Orange, new[] { new Content(3.0, Mid("HalfCheetah-v5", 3.0, 40)) },
-            K(3.0, Slots.OffLeft(Slots.TwoLeft)), K(3.6, Slots.TwoLeft, Ease.OutBack), K(6.6, Slots.TwoLeft), K(7.1, Slots.OffLeft(Slots.TwoLeft), Ease.InBack)));
-        tracks.Add(Panel(Pink, new[] { new Content(3.1, Mid("CarRacing-v3", 3.1, 140)) },
-            K(3.1, Slots.OffRight(Slots.TwoRight)), K(3.7, Slots.TwoRight, Ease.OutBack), K(6.6, Slots.TwoRight), K(7.1, Slots.OffRight(Slots.TwoRight), Ease.InBack)));
-        var four = new[] { ("FrozenLake8x8-v1", Slots.FourTL, Cyan, 20), ("Ant-v5", Slots.FourTR, Yellow, 40), ("CartPole-v1", Slots.FourBL, Green, 100), ("Hopper-v5", Slots.FourBR, Pink, 150) };
-        for (int i = 0; i < four.Length; i++) {
-            var (id, slot, neon, tick) = four[i];
-            double t0 = 6.9 + 0.1 * i;
-            tracks.Add(Panel(neon, new[] { new Content(t0, Mid(id, t0, tick)) },
-                K(t0, Slots.OffTop(slot)), K(t0 + 0.8, slot, Ease.OutBounce), K(11.2, slot), K(11.7, Slots.Point(slot), Ease.InBack)));
+        var flashes = new List<double> { 1.37 };
+
+        Title(overlays, 0.3, 3.75);
+
+        // Classic control, 3.5-9.9 s: one panel, then two, then four; CartPole stays for the hand-over to MuJoCo.
+        Caption(overlays, 3.5, 9.8, "CLASSIC CONTROL", Cyan);
+        tracks.Add(Panel(Cyan, Play("CartPole-v1", 3.5),
+            K(3.5, Slots.OffBottom(Slots.One)), K(4.0, Slots.One, Ease.OutBack), K(5.5, Slots.One), K(6.0, Slots.TwoLeft, Ease.InOutCubic),
+            K(7.1, Slots.TwoLeft), K(7.6, Slots.FourTL, Ease.InOutCubic), K(9.5, Slots.FourTL), K(10.0, Slots.TwoLeft, Ease.InOutCubic),
+            K(11.9, Slots.TwoLeft), K(12.4, Slots.OffLeft(Slots.TwoLeft), Ease.InBack)));
+        // The summit comes at step 122 (30 steps a second): joined at step 30, the car tops the hill at 8.6 s.
+        tracks.Add(Panel(Pink, new[] { new Content(5.5, Mid("MountainCar-v0", 5.5, 30)) },
+            K(5.5, Slots.OffRight(Slots.TwoRight)), K(6.0, Slots.TwoRight, Ease.OutBack), K(7.1, Slots.TwoRight), K(7.6, Slots.FourTR, Ease.InOutCubic),
+            K(9.5, Slots.FourTR), K(10.0, Slots.OffRight(Slots.FourTR), Ease.InBack)));
+        tracks.Add(Panel(Yellow, Play("Pendulum-v1", 7.2),
+            K(7.2, Slots.OffBottom(Slots.FourBL)), K(7.8, Slots.FourBL, Ease.OutBack), K(9.55, Slots.FourBL), K(10.05, Slots.OffBottom(Slots.FourBL), Ease.InBack)));
+        // Over the line at step 65, at the video's 20 steps a second: joined at step 30, it crosses at 9.1 s.
+        tracks.Add(Panel(Green, new[] { new Content(7.35, Mid("Acrobot-v1", 7.35, 30, speed: 20.0 / 15.0)) },
+            K(7.35, Slots.OffBottom(Slots.FourBR)), K(7.95, Slots.FourBR, Ease.OutBack), K(9.6, Slots.FourBR), K(10.1, Slots.OffBottom(Slots.FourBR), Ease.InBack)));
+
+        // MuJoCo's control tasks, 9.9-14.8 s: InvertedPendulum beside CartPole, then four panels.
+        Caption(overlays, 9.9, 14.7, "MUJOCO PHYSICS · BIT FOR BIT, IN C#", Orange);
+        tracks.Add(Panel(Orange, Play("InvertedPendulum-v5", 9.9),
+            K(9.9, Slots.OffRight(Slots.TwoRight)), K(10.4, Slots.TwoRight, Ease.OutBack), K(11.9, Slots.TwoRight), K(12.4, Slots.FourTL, Ease.InOutCubic),
+            K(14.3, Slots.FourTL), K(14.8, Slots.OffLeft(Slots.FourTL), Ease.InBack)));
+        // Pusher joins at step 40 of 100, so its 2.4 s on screen show the push rather than the reach.
+        var control = new[] { ("InvertedDoublePendulum-v5", Slots.FourTR, Pink, 0), ("Reacher-v5", Slots.FourBL, Yellow, 0), ("Pusher-v5", Slots.FourBR, Green, 40) };
+        for (int i = 0; i < control.Length; i++) {
+            var (id, slot, neon, tick) = control[i];
+            double t0 = 11.9 + 0.1 * i;
+            RectF entry = slot.Cy < 360 ? Slots.OffTop(slot) : Slots.OffBottom(slot);
+            RectF exit = slot.Cx < 640 ? Slots.OffLeft(slot) : Slots.OffRight(slot);
+            tracks.Add(Panel(neon, new[] { new Content(t0, Mid(id, t0, tick)) }, K(t0, entry), K(t0 + 0.6, slot, Ease.OutBack),
+                K(14.35 + 0.05 * i, slot), K(14.85 + 0.05 * i, exit, Ease.InBack)));
         }
-        return new Storyboard(12, 30, tracks, overlays, new[] { 12.0, 0.0 }, _ => 1, _ => 1);
+
+        // Box2D, 14.8-25.0 s: the lander alone, the two walkers side by side, then the race car, which stays for the hand-over.
+        Caption(overlays, 14.8, 24.9, "BOX2D", Pink);
+        // It lands at step 299 (50 a second): joined at step 125, it touches down at 18.3 s, half a second before it leaves.
+        tracks.Add(Panel(Cyan, new[] { new Content(14.8, Mid("LunarLander-v3", 14.8, 125)) },
+            K(14.8, Slots.Point(Slots.One)), K(15.3, Slots.One, Ease.OutBack), K(18.8, Slots.One), K(19.3, Slots.OffTop(Slots.One), Ease.InBack)));
+        tracks.Add(Panel(Yellow, Play("BipedalWalker-v3", 19.0),
+            K(19.0, Slots.OffLeft(Slots.TwoLeft)), K(19.6, Slots.TwoLeft, Ease.OutBack), K(22.3, Slots.TwoLeft), K(22.8, Slots.OffLeft(Slots.TwoLeft), Ease.InBack)));
+        // The hardcore walker trips at step 157, 3.1 s after it starts: on screen, as in the video.
+        tracks.Add(Panel(Orange, Play("BipedalWalkerHardcore-v3", 19.1),
+            K(19.1, Slots.OffRight(Slots.TwoRight)), K(19.7, Slots.TwoRight, Ease.OutBack), K(22.3, Slots.TwoRight), K(22.8, Slots.OffRight(Slots.TwoRight), Ease.InBack)));
+        tracks.Add(Panel(Pink, Play("CarRacing-v3", 22.6),
+            K(22.6, Slots.OffBottom(Slots.One)), K(23.2, Slots.One, Ease.OutBack), K(24.9, Slots.One), K(25.4, Slots.TwoLeft, Ease.InOutCubic),
+            K(27.0, Slots.TwoLeft), K(27.5, Slots.OffLeft(Slots.TwoLeft), Ease.InBack)));
+
+        // MuJoCo's locomotion, 25.0-34.3 s: HalfCheetah beside CarRacing, then alone; the hopper and the walker; four more.
+        Caption(overlays, 25.0, 34.2, "MUJOCO · LOCOMOTION", Orange);
+        tracks.Add(Panel(Orange, Play("HalfCheetah-v5", 25.0),
+            K(25.0, Slots.OffRight(Slots.TwoRight)), K(25.6, Slots.TwoRight, Ease.OutBack), K(27.0, Slots.TwoRight), K(27.5, Slots.One, Ease.InOutCubic),
+            K(29.2, Slots.One), K(29.7, Slots.OffTop(Slots.One), Ease.InBack)));
+        tracks.Add(Panel(Cyan, Play("Hopper-v5", 29.4),
+            K(29.4, Slots.OffLeft(Slots.TwoLeft)), K(30.0, Slots.TwoLeft, Ease.OutBack), K(31.8, Slots.TwoLeft), K(32.3, Slots.OffLeft(Slots.TwoLeft), Ease.InBack)));
+        tracks.Add(Panel(Pink, Play("Walker2d-v5", 29.5),
+            K(29.5, Slots.OffRight(Slots.TwoRight)), K(30.1, Slots.TwoRight, Ease.OutBack), K(31.8, Slots.TwoRight), K(32.3, Slots.OffRight(Slots.TwoRight), Ease.InBack)));
+        var locomotion = new[] { ("Ant-v5", Slots.FourTL, Yellow), ("Humanoid-v5", Slots.FourTR, Green), ("Swimmer-v5", Slots.FourBL, Cyan), ("HumanoidStandup-v5", Slots.FourBR, Pink) };
+        for (int i = 0; i < locomotion.Length; i++) {
+            var (id, slot, neon) = locomotion[i];
+            double t0 = 32.1 + 0.1 * i;
+            RectF exit = slot.Cx < 640 ? Slots.OffLeft(slot) : Slots.OffRight(slot);
+            tracks.Add(Panel(neon, Play(id, t0 + 0.7), K(t0, Slots.OffTop(slot)), K(t0 + 0.8, slot, Ease.OutBounce), K(34.3, slot), K(34.8, exit, Ease.InBack)));
+        }
+
+        // Toy text, 34.3-41.25 s: four panels dropping in, each joined so its goal lands on screen, then the small lake alone.
+        Caption(overlays, 34.3, 41.15, "TOY TEXT", Yellow);
+        var toy = new[] {
+            ("FrozenLake8x8-v1", Slots.FourTL, Cyan, 33), ("CliffWalking-v1", Slots.FourTR, Pink, 3), ("Taxi-v4", Slots.FourBL, Yellow, 7),
+            ("Blackjack-v1", Slots.FourBR, Green, 0),
+        };
+        for (int i = 0; i < toy.Length; i++) {
+            var (id, slot, neon, tick) = toy[i];
+            double t0 = 34.2 + 0.1 * i;
+            RectF exit = slot.Cx < 640 ? Slots.OffLeft(slot) : Slots.OffRight(slot);
+            tracks.Add(Panel(neon, new[] { new Content(t0 + 0.7, Mid(id, t0 + 0.7, tick)) }, K(t0, Slots.OffTop(slot)), K(t0 + 0.8, slot, Ease.OutBounce),
+                K(37.9, slot), K(38.4, exit, Ease.InBack)));
+        }
+        // The goal at step 41, at the video's 10 steps a second: joined at step 20, it arrives at 40.0 s.
+        tracks.Add(Panel(Cyan, new[] { new Content(37.9, Mid("FrozenLake-v1", 37.9, 20, speed: 10.0 / 8.0)) },
+            K(37.9, Slots.Point(Slots.One)), K(38.5, Slots.One, Ease.OutBack), K(40.75, Slots.One), K(41.25, Slots.OffBottom(Slots.One), Ease.InBack)));
+
+        double finale = 41.25;
+        if (parity is not null) {
+            // Parity, 41.25-44.85 s: Gymnasium on the left, Gym.NET on the right, the same seeds and actions, a pixel count between them.
+            Caption(overlays, 41.25, 44.75, "SAME SEED · SAME ACTIONS · SAME PIXELS", Green);
+            Columns(overlays, 41.45, 44.65);
+            var rows = new[] { (parity.Lander, Slots.FourTL, Slots.FourTR), (parity.Racer, Slots.FourBL, Slots.FourBR) };
+            for (int i = 0; i < rows.Length; i++) {
+                var (replay, left, right) = rows[i];
+                double t0 = 41.25 + 0.15 * i;
+                tracks.Add(Panel(Cyan, new[] { new Content(t0, () => new ReplaySource(replay, t0, gymNet: false)) },
+                    K(t0, Slots.Point(left)), K(t0 + 0.6, left, Ease.OutBack), K(44.45, left), K(44.95, Slots.OffLeft(left), Ease.InBack)));
+                tracks.Add(Panel(Pink, new[] { new Content(t0, () => new ReplaySource(replay, t0, gymNet: true)) },
+                    K(t0, Slots.Point(right)), K(t0 + 0.6, right, Ease.OutBack), K(44.45, right), K(44.95, Slots.OffRight(right), Ease.InBack)));
+                DiffBadge(overlays, replay, t0, 44.65, (left.Cy + right.Cy) / 2);
+            }
+            finale = 44.85;
+        }
+
+        // Finale: the video's four panels and order of all 24 ids, flipping every 0.45 s instead of 0.6 s.
+        Caption(overlays, finale, finale + 3.0, "22 ENVS · 39 IDS · ONE API", Cyan);
+        string[,] order = {
+            { "LunarLander-v3", "HalfCheetah-v5", "Taxi-v4", "Ant-v5" },
+            { "Hopper-v5", "CartPole-v1", "Humanoid-v5", "CarRacing-v3" },
+            { "FrozenLake8x8-v1", "Walker2d-v5", "Acrobot-v1", "Reacher-v5" },
+            { "InvertedDoublePendulum-v5", "BipedalWalker-v3", "Swimmer-v5", "Blackjack-v1" },
+            { "MountainCar-v0", "Pusher-v5", "CliffWalking-v1", "HumanoidStandup-v5" },
+            { "InvertedPendulum-v5", "Pendulum-v1", "BipedalWalkerHardcore-v3", "FrozenLake-v1" },
+        };
+        RectF[] quad = { Slots.FourTL, Slots.FourTR, Slots.FourBL, Slots.FourBR };
+        Rgb[] neons = { Cyan, Pink, Yellow, Green };
+        for (int q = 0; q < 4; q++) {
+            var contents = new List<Content>();
+            for (int k = 0; k < order.GetLength(0); k++) {
+                double at = finale + 0.05 * q + 0.45 * k;
+                contents.Add(new Content(at, Mid(order[k, q], at)));
+            }
+            RectF slot = quad[q];
+            double t0 = finale + 0.05 * q;
+            tracks.Add(Panel(neons[q], contents, K(t0, Slots.Point(slot)), K(t0 + 0.4, slot, Ease.OutBack), K(finale + 2.75, slot),
+                K(finale + 3.15, Slots.Point(slot), Ease.InBack)));
+        }
+
+        double outro = finale + 3.15;
+        flashes.Add(outro);
+        HeaderLogo(overlays, 3.45, outro + 0.2);
+        Outro(overlays, outro, outro + 3.0);
+        double seconds = outro + 3.0;
+        // The video's sun-rise and fades: the loop's seam is the fade from the outro to the next intro.
+        return new Storyboard(seconds, 30, tracks, overlays, flashes,
+            t => Ease.OutCubic((float)Math.Clamp(t / 2.2, 0, 1)),
+            t => (float)Math.Min(Math.Clamp(t / 0.8, 0, 1), Math.Clamp((seconds - t) / 0.6, 0, 1)));
     }
 
     /// <summary>A keyframe, short for the storyboards' long lists.</summary>
@@ -435,11 +576,15 @@ internal static class Storyboards {
     /// <param name="id">The recipe's id.</param>
     /// <param name="at">Seconds at which it appears.</param>
     /// <param name="tick">The tick it starts from; by default a fifth of the way into a typical episode.</param>
+    /// <param name="speed">
+    ///     Playback speed factor, as <see cref="Play"/>'s: the README cut joins Acrobot and FrozenLake mid-episode at the
+    ///     speeds the video plays them at.
+    /// </param>
     /// <returns>The source factory.</returns>
-    private static Func<IPanelSource> Mid(string id, double at, int? tick = null) {
+    private static Func<IPanelSource> Mid(string id, double at, int? tick = null, double speed = 1) {
         EpisodeRecipe recipe = Episodes.Get(id);
         int start = tick ?? (int)(recipe.StepsPerSecond * 1.5);
-        return () => new EpisodeSource(recipe, at, 1, start);
+        return () => new EpisodeSource(recipe, at, speed, start);
     }
 
     /// <summary>The title: the chrome logo dropping in with a bounce, then the two lines of the pitch typing on.</summary>

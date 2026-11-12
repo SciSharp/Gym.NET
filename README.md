@@ -3,12 +3,13 @@
 [![NuGet](https://img.shields.io/nuget/v/Gym.NET.Environments?label=Gym.NET.Environments)](https://www.nuget.org/packages/Gym.NET.Environments)
 [![NuGet downloads](https://img.shields.io/nuget/dt/Gym.NET)](https://www.nuget.org/packages/Gym.NET)
 
-[![Gym.NET's environments playing in neon panels over a synthwave grid: LunarLander, HalfCheetah, CarRacing, FrozenLake, Ant, CartPole and Hopper, each played by a scripted or trained policy](https://raw.githubusercontent.com/SciSharp/Gym.NET/master/docs/media/gym-net-hero.gif)](https://github.com/SciSharp/Gym.NET/blob/master/docs/media/gym-net-showreel.mp4)
+[![Gym.NET's 24 visually distinct environments playing in neon panels over a synthwave grid: classic control, MuJoCo, Box2D and toy text, each played by a scripted or trained policy, then Gymnasium and Gym.NET side by side with zero pixels different](https://raw.githubusercontent.com/SciSharp/Gym.NET/master/docs/media/gym-net-hero.webp)](https://github.com/SciSharp/Gym.NET/blob/master/docs/media/gym-net-showreel.mp4)
 
-Each panel above shows an environment's own `rgb_array` frames, played by a scripted or trained policy. The
-[showreel](https://github.com/SciSharp/Gym.NET/blob/master/docs/media/gym-net-showreel.mp4) plays 24 of them, MuJoCo's
-among the rest, then puts Gymnasium and Gym.NET side by side on the same seed and actions and counts the pixels that
-differ: zero. [tools/showreel](https://github.com/SciSharp/Gym.NET/tree/master/tools/showreel) makes both.
+Each panel above shows an environment's own `rgb_array` frames, played by a scripted or trained policy: 24 of them,
+MuJoCo's among the rest. Then Gymnasium and Gym.NET play side by side on the same seed and actions, and the count of
+pixels that differ stays at zero. This is a 51-second cut of the
+[showreel](https://github.com/SciSharp/Gym.NET/blob/master/docs/media/gym-net-showreel.mp4), and
+[tools/showreel](https://github.com/SciSharp/Gym.NET/tree/master/tools/showreel) makes both.
 
 Reinforcement-learning environments for .NET with [Farama Gymnasium](https://github.com/Farama-Foundation/Gymnasium)'s
 API and behavior. Given the same seed and actions, Gym.NET's environments return the same observations, rewards,

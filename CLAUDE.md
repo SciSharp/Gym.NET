@@ -9,7 +9,7 @@ Gym.NET is a native C# (.NET) reinforcement learning environment toolkit and ben
 - **Canonical SOT Submodule:** `refs/Gymnasium` (Farama Foundation Gymnasium Git submodule for behavioral, mathematical, and algorithmic parity).
 - **Roadmap:** `docs/plans/COMPLETION_PLAN.md` orders the work to one release, 1.0.0 (planned as 2.0 until decision D23 of 2026-11-12), through phases R0, P0r, P2, P3, P7, P4, P5, P6, P8, P9 (MuJoCo, resumed by DR-61) and P10, of which P10.5, the release itself, is left; it records the decisions D2–D24; `docs/plans/GYMNASIUM_PORT_PLAN.md` holds the per-area specifications.
 - **User docs (P10):** `docs/README.md` indexes the guides, `docs/architecture.md` and the release notes `docs/releases/RELEASE_1.0.0.md` (not yet published); every code sample in them was compiled and run against the tree. Keep them true when the API changes.
-- **Design gate:** `docs/plans/DESIGN_REVIEW.md` holds the approved implementation designs (DR-01…DR-72). Implement only what an approved design covers; a design question no DR-xx answers goes back to the maintainer for review before the step continues.
+- **Design gate:** `docs/plans/DESIGN_REVIEW.md` holds the approved implementation designs (DR-01…DR-74). Implement only what an approved design covers; a design question no DR-xx answers goes back to the maintainer for review before the step continues.
 - **Working branch:** `journey1` until 1.0 (decision D20); it merges into `master` once, at the release.
 
 ---
@@ -130,7 +130,7 @@ refs/Gym.NET/
 │                                  #   the renderer reproduces, scoring its models); halfcheetah_poc/: the trace checker over the
 │                                  #   product engine (oracle.py records MuJoCo's state per mj_step; verify/: traces.txt, record_traces.py,
 │                                  #   negative_controls.py, branch_search.py, cs_coverage.py), and play/, a playable HalfCheetah
-├── tools/showreel/                # The front-page media (DR-59, DR-60, DR-72): the synthwave video and README GIF (docs/media), the site's 8-bit
+├── tools/showreel/                # The front-page media (DR-59, DR-60, DR-72, DR-73): the synthwave video and the README's 51 s WebP cut of it (docs/media), the site's 8-bit
 │                                  #   gallery (docs/website-src/images/envs), from the envs' own frames under scripted or trained policies (the
 │                                  #   MuJoCo envs' ARS-trained linear policies in policies/, retrained by its train command); its parity
 │                                  #   segment is checked against Gymnasium in Python (gymnasium_replay.py). Not in the sln; README.md has the commands

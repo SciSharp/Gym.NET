@@ -8,8 +8,8 @@ using System.Threading.Tasks;
 namespace Gym.Showreel;
 
 /// <summary>
-///     An ffmpeg process fed raw RGB24 frames on stdin, encoding to one file: the video, the README's GIF and the gallery's
-///     WebP loops all go through it, so the tool itself never encodes anything.
+///     An ffmpeg process fed raw RGB24 frames on stdin, encoding to one file: the video, the README's WebP animation (or
+///     its GIF) and the gallery's WebP loops all go through it, so the tool itself never encodes anything.
 /// </summary>
 /// <remarks>
 ///     ffmpeg must be on <c>PATH</c> (or named with <c>--ffmpeg</c>); this machine's is 7.0. The process runs with
@@ -139,23 +139,39 @@ internal sealed class FfmpegPipe : IDisposable {
     }
 
     /// <summary>
-    ///     Options for the README's GIF: area-scaled to a width, one 256-colour palette for the whole loop, ordered
-    ///     dithering (it compresses far better than error diffusion and does not crawl between frames), and only the
-    ///     changed rectangle stored per frame.
+    ///     Options for the README animation as a GIF (<c>hero --format gif</c>; the README itself shows the WebP of
+    ///     <see cref="WebP"/>): area-scaled to a width, one 256-colour palette for the whole animation, ordered dithering
+    ///     (it compresses far better than error diffusion and does not crawl between frames), and only the changed
+    ///     rectangle stored per frame.
     /// </summary>
     /// <param name="width">Output width; the height follows the aspect.</param>
     /// <returns>The output options.</returns>
     /// <remarks>
-    ///     The GIF must stay under 5 MB: GitHub serves README images through its camo proxy, which refuses larger files,
-    ///     and the README would show a broken image. MuJoCo's shaded panels dither into more distinct runs than the 2-D
-    ///     envs, so with the loop's MuJoCo panels <c>bayer_scale=3</c> made 5.4 MB at 800 px; scale 4 (a fainter
-    ///     pattern, slightly more banding in the glows) makes 4.6 MB from the same frames. A wider <c>--gif-width</c>
-    ///     or more MuJoCo in <see cref="Storyboards.Hero"/> needs that budget checked again.
+    ///     One palette cannot cover the 51 s cut's 24 envs: measured on it, the GIF is 19 MB, dithered, with pink smears
+    ///     where the grey MuJoCo skies find no fitting colour, which is why DR-73 moved the README to WebP. There is no
+    ///     5 MB ceiling to respect: GitHub's camo proxy refuses larger images, but it only fronts images on other hosts,
+    ///     and the README's come straight from <c>raw.githubusercontent.com</c> (checked with GitHub's own markdown
+    ///     renderer, 2026-11-12). The previous edition dithered at <c>bayer_scale=4</c> to meet that ceiling; the
+    ///     ceiling never applied, so this is DR-59's scale 3 again.
     /// </remarks>
     public static string[] Gif(int width) => new[] {
-        "-vf", $"scale={width}:-2:flags=area,split[a][b];[a]palettegen=max_colors=256:stats_mode=full[p];[b][p]paletteuse=dither=bayer:bayer_scale=4:diff_mode=rectangle",
+        "-vf", $"scale={width}:-2:flags=area,split[a][b];[a]palettegen=max_colors=256:stats_mode=full[p];[b][p]paletteuse=dither=bayer:bayer_scale=3:diff_mode=rectangle",
         "-loop", "0",
     };
+
+    /// <summary>
+    ///     Options for the README animation (DR-73): area-scaled to a width, lossy animated WebP at quality 75 through
+    ///     libwebp's animation encoder, looping. Every frame keeps its own colours, with no palette and no dithering.
+    /// </summary>
+    /// <param name="width">Output width; the height follows the aspect.</param>
+    /// <returns>The output options.</returns>
+    /// <remarks>
+    ///     Measured on the 51 s cut at 800 px: 7.2 MB, against 19 MB for <see cref="Gif"/> and 17.4 MB for ffmpeg's
+    ///     single-image <c>libwebp</c> encoder, which stores every frame whole; <c>libwebp_anim</c> stores what changed. At
+    ///     quality 75 the MuJoCo skies and the sun's glow stay smooth, with faint block edges only around sharp neon lines.
+    /// </remarks>
+    public static string[] WebP(int width) =>
+        new[] { "-vf", $"scale={width}:-2:flags=area", "-c:v", "libwebp_anim", "-lossless", "0", "-quality", "75", "-compression_level", "4", "-loop", "0" };
 
     /// <summary>Options for a gallery loop: area-scaled to the 8-bit size, lossless animated WebP, looping.</summary>
     /// <param name="width">Output width.</param>

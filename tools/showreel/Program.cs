@@ -12,15 +12,17 @@ namespace Gym.Showreel;
 /// </summary>
 /// <remarks>
 ///     <code>
-///     Showreel [all]       gallery and logo, README loop, then the video (the default)
+///     Showreel [all]       gallery and logo, the README animation, then the video (the default; one parity run for both)
 ///     Showreel video       docs/media/gym-net-showreel.mp4 and the site's poster for it (needs the parity stack unless --no-parity)
-///     Showreel hero        docs/media/gym-net-hero.gif
+///     Showreel hero        docs/media/gym-net-hero.webp, the README's 51 s cut (also needs the parity stack unless --no-parity);
+///                          --format gif writes docs/media/gym-net-hero.gif instead
 ///     Showreel gallery     docs/website-src/images/envs/*, the site's logo and icon
 ///     Showreel parity      only the Gymnasium comparison, printing what was compared
 ///     Showreel stills      PNG frames of a storyboard: --board video|hero --at 1.5,20,33 [--out DIR]
 ///     Showreel train       trains MuJoCo policies with ARS into tools/showreel/policies: --env Hopper-v5,Ant-v5 [--minutes M]
 ///     options: --repo DIR (default: the checkout this runs in), --ffmpeg EXE, --python EXE, --gymnasium DIR,
-///              --work DIR (Python exchange files), --no-parity, --gif-width N (default 800)
+///              --work DIR (Python exchange files), --no-parity, --width N (the README animation's, default 800;
+///              --gif-width is the same option), --format webp|gif
 ///     </code>
 ///     <para>
 ///     The MuJoCo recipes play the committed policies in <c>tools/showreel/policies</c>; <c>train</c> is only needed to
@@ -39,14 +41,20 @@ internal static class Program {
             switch (command) {
                 case "all":
                     Gallery(options);
-                    Hero(options);
-                    Video(options);
+                    // The README cut and the video show the same verified replays: one Python run serves both, and its
+                    // temporary files are released when both are rendered, even if one fails.
+                    using (ParityReplays? parity = options.NoParity ? null : ParityReplays.Create(options.Python, Console.Out)) {
+                        Hero(options, parity);
+                        Video(options, parity);
+                    }
                     return 0;
                 case "video":
-                    Video(options);
+                    using (ParityReplays? parity = options.NoParity ? null : ParityReplays.Create(options.Python, Console.Out))
+                        Video(options, parity);
                     return 0;
                 case "hero":
-                    Hero(options);
+                    using (ParityReplays? parity = options.NoParity ? null : ParityReplays.Create(options.Python, Console.Out))
+                        Hero(options, parity);
                     return 0;
                 case "gallery":
                     Gallery(options);
@@ -97,24 +105,35 @@ internal static class Program {
     }
 
     /// <summary>
-    ///     Renders the video, with the parity segment unless <c>--no-parity</c>, and the docs site's poster for it (the
+    ///     Renders the video, with the parity segment when replays are given, and the docs site's poster for it (the
     ///     title, 3.3 s in). No scanlines: the site scales the video to its column, and resampled scanlines moiré.
     /// </summary>
     /// <param name="o">The options.</param>
-    private static void Video(Options o) {
+    /// <param name="parity">The verified Gymnasium replays, or <see langword="null"/> for <c>--no-parity</c>; the caller disposes them.</param>
+    private static void Video(Options o, ParityReplays? parity) {
         string output = o.Output ?? Path.Combine(o.Repo, "docs", "media", "gym-net-showreel.mp4");
-        using (ParityReplays? parity = o.NoParity ? null : ParityReplays.Create(o.Python, Console.Out))
-            Render(Storyboards.Video(parity), output, o.Ffmpeg, FfmpegPipe.Mp4(), scanlines: false);
+        Render(Storyboards.Video(parity), output, o.Ffmpeg, FfmpegPipe.Mp4(), scanlines: false);
         if (o.Output is null)
             FfmpegPipe.ExtractFrame(o.Ffmpeg, output, 3.3, Path.Combine(o.Repo, "docs", "website-src", "images", "showreel-poster.jpg"));
     }
 
-    /// <summary>Renders the README's loop as a GIF.</summary>
+    /// <summary>
+    ///     Renders the README animation, the showreel's 51 s cut (DR-73), at 15 frames a second: an animated WebP, or a GIF
+    ///     with <c>--format gif</c>. No scanlines, as for the video.
+    /// </summary>
     /// <param name="o">The options.</param>
-    private static void Hero(Options o) {
-        string output = o.Output ?? Path.Combine(o.Repo, "docs", "media", "gym-net-hero.gif");
-        Storyboard board = Storyboards.Hero() with { Fps = 15 };
-        Render(board, output, o.Ffmpeg, FfmpegPipe.Gif(o.GifWidth), scanlines: false);
+    /// <param name="parity">The verified Gymnasium replays, or <see langword="null"/> for <c>--no-parity</c>; the caller disposes them.</param>
+    /// <exception cref="ArgumentException"><c>--format</c> is neither <c>webp</c> nor <c>gif</c>.</exception>
+    private static void Hero(Options o, ParityReplays? parity) {
+        // Checked before rendering, so a typo costs nothing rather than minutes of frames.
+        string[] encoder = o.Format switch {
+            "webp" => FfmpegPipe.WebP(o.Width),
+            "gif" => FfmpegPipe.Gif(o.Width),
+            _ => throw new ArgumentException($"unknown --format '{o.Format}': webp or gif"),
+        };
+        string output = o.Output ?? Path.Combine(o.Repo, "docs", "media", "gym-net-hero." + o.Format);
+        Storyboard board = Storyboards.Hero(parity) with { Fps = 15 };
+        Render(board, output, o.Ffmpeg, encoder, scanlines: false);
     }
 
     /// <summary>Writes the gallery's loops and manifest and the site's logo.</summary>
@@ -133,9 +152,9 @@ internal static class Program {
             throw new ArgumentException("stills needs --at with comma-separated seconds");
         if (o.Board is not ("video" or "hero"))
             throw new ArgumentException($"unknown board '{o.Board}': video or hero");
-        // The replays own large temporary files: dispose them even when a still fails.
-        using ParityReplays? parity = o.Board == "video" && !o.NoParity ? ParityReplays.Create(o.Python, Console.Out) : null;
-        Storyboard board = o.Board == "video" ? Storyboards.Video(parity) : Storyboards.Hero();
+        // The replays own large temporary files: dispose them even when a still fails. Both boards hold the parity segment.
+        using ParityReplays? parity = o.NoParity ? null : ParityReplays.Create(o.Python, Console.Out);
+        Storyboard board = o.Board == "video" ? Storyboards.Video(parity) : Storyboards.Hero(parity);
         string folder = o.Output ?? Path.Combine(Path.GetTempPath(), "gymnet-showreel-stills");
         Directory.CreateDirectory(folder);
         using var compositor = new Compositor(board, scanlines: o.Board == "video");
@@ -189,8 +208,11 @@ internal static class Program {
         /// <summary>Whether to leave the parity segment out.</summary>
         public bool NoParity { get; private set; }
 
-        /// <summary>The README GIF's width.</summary>
-        public int GifWidth { get; private set; } = 800;
+        /// <summary>The README animation's width (<c>--width</c>, or its older name <c>--gif-width</c>).</summary>
+        public int Width { get; private set; } = 800;
+
+        /// <summary>The README animation's format: <c>webp</c> (what the README shows) or <c>gif</c>.</summary>
+        public string Format { get; private set; } = "webp";
 
         /// <summary>The storyboard for <c>stills</c>.</summary>
         public string Board { get; private set; } = "video";
@@ -222,7 +244,8 @@ internal static class Program {
                     case "--gymnasium": gymnasium = Value(); break;
                     case "--work": work = Value(); break;
                     case "--no-parity": o.NoParity = true; break;
-                    case "--gif-width": o.GifWidth = int.Parse(Value(), CultureInfo.InvariantCulture); break;
+                    case "--width" or "--gif-width": o.Width = int.Parse(Value(), CultureInfo.InvariantCulture); break;
+                    case "--format": o.Format = Value().ToLowerInvariant(); break;
                     case "--board": o.Board = Value(); break;
                     case "--at":
                         o.At.AddRange(Value().Split(',', StringSplitOptions.RemoveEmptyEntries).Select(s => double.Parse(s, CultureInfo.InvariantCulture)));

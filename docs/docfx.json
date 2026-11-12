@@ -47,7 +47,7 @@
         "dest": "."
       },
       {
-        "files": ["media/*.mp4", "media/*.gif"],
+        "files": ["media/*.mp4", "media/*.webp", "media/*.gif"],
         "dest": "docs"
       }
     ],
