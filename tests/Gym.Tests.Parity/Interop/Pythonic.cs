@@ -3479,6 +3479,36 @@ namespace Gym.Tests.Parity {
             }
         }
 
+        /// <summary><c>OpenGL</c>, PyOpenGL (a dependency of <c>mujoco</c>): which GPU drew Gymnasium's MuJoCo frames.</summary>
+        internal static class OpenGL {
+            /// <summary><c>OpenGL.GL</c>.</summary>
+            internal static class GL {
+                /// <summary><c>GL_RENDERER</c>: the GPU's name.</summary>
+                internal const int GL_RENDERER = 0x1F01;
+
+                /// <summary><c>GL_VERSION</c>: the OpenGL version and the driver's.</summary>
+                internal const int GL_VERSION = 0x1F02;
+
+                /// <summary>
+                ///     <c>OpenGL.GL.glGetString(name).decode()</c>, of the GL context current on the calling thread: right after
+                ///     a MuJoCo env's <c>render()</c>, Gymnasium's offscreen context.
+                /// </summary>
+                /// <param name="name"><see cref="GL_RENDERER"/> or <see cref="GL_VERSION"/>.</param>
+                /// <returns>The string; empty when no context is current (PyOpenGL then returns <c>None</c>).</returns>
+                /// <exception cref="PythonException">Thrown when PyOpenGL is missing or the call fails.</exception>
+                internal static string glGetString(int name) {
+                    using PyObject function = PythonRuntime.Import("OpenGL.GL").GetAttr("glGetString");
+                    using var which = new PyInt(name);
+                    using PyObject value = function.Invoke(which);
+                    if (value.IsNone())
+                        return "";
+                    using PyObject decode = value.GetAttr("decode");
+                    using PyObject text = decode.Invoke();
+                    return text.As<string>();
+                }
+            }
+        }
+
         /// <summary>The <c>mujoco</c> bindings, the oracle of Gym.NET's MuJoCo engine (DR-64).</summary>
         internal static class mujoco {
             /// <summary><c>mujoco.__version__</c>.</summary>

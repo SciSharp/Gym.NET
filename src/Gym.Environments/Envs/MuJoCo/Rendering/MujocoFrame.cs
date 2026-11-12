@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Gym.MuJoCo;
+using NumSharp;
 
 namespace Gym.Environments.Envs.MuJoCo.Rendering {
     /// <summary>
@@ -24,7 +25,8 @@ namespace Gym.Environments.Envs.MuJoCo.Rendering {
         /// <summary>The renders' modes for <see cref="RenderGeom"/>.</summary>
         private const int Normal = 0, ShadowMapMode = 1, ShadowCast = 2;
 
-        /// <summary>The model.</summary>
+        /// <summary>The model drawn: the env's, borrowed (the frame reads it and never disposes it).</summary>
+        [NDBorrowed]
         private readonly MjModel _m;
 
         /// <summary>The builtin meshes.</summary>

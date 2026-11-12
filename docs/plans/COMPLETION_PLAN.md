@@ -999,8 +999,10 @@ Specs: the port plan's §5.7 and §11.4; sources 6,153 lines. Postponed by DR-35
   the pixels of InvertedPendulum, Reacher, HalfCheetah and Ant differ from Gymnasium's frames, nearly all by one level,
   and 16% of Humanoid's, its distant checker floor; depths are bit for bit but for a few ulps
   ([`MUJOCO_ASSESSMENT.md`](MUJOCO_ASSESSMENT.md) §17).
-- **Left:** human mode with Gymnasium's full `WindowViewer` controls (DR-70; it raises until then), and the frame cells
-  gated on a measured baseline, with Gym.NET's own frames as goldens (DR-71).
+- **Frame cells and goldens (DR-71):** 42 cells measure every id's `rgb_array` and `depth_array` frames against
+  Gymnasium's, gated on a recorded baseline plus Gymnasium's own render-to-render noise on the reference GPU; the MuJoCo
+  goldens replay Gym.NET's own frames bit for bit.
+- **Left:** human mode with Gymnasium's full `WindowViewer` controls (DR-70; it raises until then).
 
 [`MUJOCO_ASSESSMENT.md`](MUJOCO_ASSESSMENT.md) (2026-11-11) measures what completing it takes, against Gymnasium
 `8ba8c3a6` and MuJoCo 3.15.0:

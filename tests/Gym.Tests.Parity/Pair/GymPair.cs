@@ -89,6 +89,18 @@ namespace Gym.Tests.Parity.Pair {
         /// </remarks>
         public GoldenRecorder? Recorder { get; set; }
 
+        /// <summary>
+        ///     Whether frames are measured instead of required equal (DR-71, the MuJoCo cases): <see cref="CompareFrame"/>
+        ///     then notes how Gym.NET's frame differs from Gymnasium's and hands the recorder Gym.NET's own frame, which the
+        ///     Python-free replay requires bit for bit. The default, <see langword="false"/>, keeps frames byte-exact.
+        /// </summary>
+        /// <remarks>
+        ///     Gymnasium's MuJoCo frames carry its GPU's own rounding (DR-67), so no golden of them could be replayed against
+        ///     Gym.NET; how far Gym.NET's frames may drift from them is the frame cells' gate
+        ///     (<c>MujocoFrameLiveParityTests</c>), not this pair's.
+        /// </remarks>
+        public bool MeasureFrames { get; set; }
+
         /// <summary>The trajectory position for a report: the step count after a seeded reset, none before one.</summary>
         private int? Position => _seeded ? StepsTaken : null;
 
@@ -161,7 +173,8 @@ namespace Gym.Tests.Parity.Pair {
 
         /// <summary>
         ///     Renders both sides and compares the frames pixel for pixel (plan §6), writing <c>python.png</c>,
-        ///     <c>dotnet.png</c> and <c>diff.png</c> when they differ.
+        ///     <c>dotnet.png</c> and <c>diff.png</c> when they differ; with <see cref="MeasureFrames"/>, measures them and
+        ///     records Gym.NET's frame instead (frames of different sizes still fail).
         /// </summary>
         /// <param name="label">Where in the trajectory, for the report and the artifacts' directory.</param>
         /// <exception cref="ParityException">Thrown when the frames differ, with field <c>frame</c>.</exception>
@@ -169,6 +182,13 @@ namespace Gym.Tests.Parity.Pair {
             Frame python = Python.Render();
             Frame dotnet = DotNet.Render();
             FrameComparison comparison = FrameDiff.Compare(python, dotnet);
+            if (MeasureFrames && comparison.SameSize) {
+                // measured, not gated (DR-71): the note reports the difference, the golden keeps Gym.NET's own frame
+                _notes.Add($"frame {label} (step {StepsTaken}): {comparison.Describe()}");
+                Recorder?.Frame(label, StepsTaken, dotnet);
+                return;
+            }
+
             if (comparison.Identical) {
                 // Only an identical frame is recorded, so a golden frame is always one both sides drew.
                 Recorder?.Frame(label, StepsTaken, python);

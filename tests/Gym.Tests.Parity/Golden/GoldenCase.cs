@@ -57,6 +57,14 @@ namespace Gym.Tests.Parity.Golden {
         public bool ViaMake { get; init; }
 
         /// <summary>
+        ///     Whether the case's frames are Gym.NET's own (DR-71): the live cell measures them against Gymnasium's without
+        ///     requiring equality and records Gym.NET's, and the replay requires those bit for bit. For the MuJoCo cases,
+        ///     whose frames Gymnasium's GPU rounds its own way (DR-67); the frame cells gate how far they may drift.
+        /// </summary>
+        /// <remarks>Not stored in the golden's header: the frames' PNGs are what the replay compares, whoever drew them.</remarks>
+        public bool RecordsGymNetFrames { get; init; }
+
+        /// <summary>
         ///     What makes the trajectory depend on the platform (<c>CartPole's cos/sin</c>), or <see langword="null"/>. Such a
         ///     case is strict only on the manifest's reference platform; elsewhere a replay divergence is reported Inconclusive
         ///     (port plan §14.9), because another libm may round one ulp differently.

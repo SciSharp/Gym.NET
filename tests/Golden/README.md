@@ -2,7 +2,10 @@
 
 Every file here is a recording of a live parity cell that passed: Gymnasium (`refs/Gymnasium`, embedded through
 pythonnet) and Gym.NET ran the same case in lockstep, every call and frame matched byte for byte, and only then was
-Gymnasium's side written (decision DR-04, completion plan step P0r.3). The replay cells check Gym.NET against these
+Gymnasium's side written (decision DR-04, completion plan step P0r.3). The one exception is the `mujoco` suite's frames
+(DR-71): Gymnasium's carry its GPU's own rounding, so those PNGs are Gym.NET's own frames (240 × 240, after the reset
+and once in motion), measured against Gymnasium's when recorded and required bit for bit on replay; how far they may
+drift from Gymnasium's is `MujocoFrameLiveParityTests`'s gate. The replay cells check Gym.NET against these
 files **without Python**, so a machine without the reference stack (the Linux CI job, a laptop) still verifies whole
 trajectories and frames.
 
@@ -21,6 +24,9 @@ dotnet test tests/Gym.Tests.Parity/Gym.Tests.Parity.csproj --filter "TestCategor
 
 # Record or re-record from the live cells (Windows reference stack); an unchanged golden is left untouched
 GYMNET_PARITY_RECORD=1 dotnet test tests/Gym.Tests.Parity/Gym.Tests.Parity.csproj -f net10.0 --filter "FullyQualifiedName~GoldenLiveTests"
+
+# Only one suite (the data row's name holds the case's key), for example after a change to the MuJoCo renderer
+GYMNET_PARITY_RECORD=1 dotnet test tests/Gym.Tests.Parity/Gym.Tests.Parity.csproj -f net10.0 --filter "FullyQualifiedName~GoldenLiveTests&Name~mujoco"
 ```
 
 Re-record after changing a case's parameters and after every Gymnasium re-pin: the replay refuses a golden whose

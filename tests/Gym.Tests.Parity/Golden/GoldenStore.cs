@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Linq;
 using Gym.Tests.Parity.Frames;
 using Gym.Tests.Parity.Session;
 using SixLabors.ImageSharp;
@@ -45,6 +46,14 @@ namespace Gym.Tests.Parity.Golden {
         /// <exception cref="InvalidOperationException">Thrown when the test binaries are not inside a Gym.NET checkout.</exception>
         public static string ManifestPath => Path.Combine(RepositoryRoot.Value ?? throw new InvalidOperationException(
             $"No Gym.NET.sln in {AppContext.BaseDirectory} or above it."), "tools", "parity", "manifest.json");
+
+        /// <summary>A path inside the checkout, for the parity data that is not a golden (the MuJoCo frame baseline).</summary>
+        /// <param name="parts">The path's parts below the checkout's root.</param>
+        /// <returns>The absolute path.</returns>
+        /// <exception cref="InvalidOperationException">Thrown when the test binaries are not inside a Gym.NET checkout.</exception>
+        public static string CheckoutPath(params string[] parts) => Path.Combine(new[] {
+            RepositoryRoot.Value ?? throw new InvalidOperationException($"No Gym.NET.sln in {AppContext.BaseDirectory} or above it."),
+        }.Concat(parts).ToArray());
 
         /// <summary>The trajectory file of a case.</summary>
         /// <param name="case">The case.</param>
@@ -151,7 +160,7 @@ namespace Gym.Tests.Parity.Golden {
         /// <summary>Writes a file through a temporary sibling and a move, so readers and a parallel writer never see half of it.</summary>
         /// <param name="path">The destination.</param>
         /// <param name="content">The bytes.</param>
-        private static void WriteAtomically(string path, byte[] content) {
+        internal static void WriteAtomically(string path, byte[] content) {
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
             // A per-process name, so the two target frameworks recording at once never share a temporary file.
             string temporary = $"{path}.{Environment.ProcessId}.tmp";

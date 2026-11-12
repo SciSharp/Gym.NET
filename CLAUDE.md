@@ -239,6 +239,10 @@ dotnet test tests/Gym.Tests.Parity/Gym.Tests.Parity.csproj --filter "TestCategor
 
 # The goldens (tests/Golden), replayed without Python; record them with GYMNET_PARITY_RECORD=1 (see its CLAUDE.md)
 dotnet test tests/Gym.Tests.Parity/Gym.Tests.Parity.csproj --filter "TestCategory=Golden"
+
+# The MuJoCo frame cells (DR-71) gate on tests/Gym.Tests.Parity/Baselines/mujoco_frames.json, recorded on the reference GPU;
+# re-record it after a deliberate change to the renderer (tools/parity/mujoco/gpu_probe.py re-checks a new GPU first)
+GYMNET_PARITY_RECORD_BASELINE=1 dotnet test tests/Gym.Tests.Parity/Gym.Tests.Parity.csproj -f net10.0 --filter "FullyQualifiedName~MujocoFrameLiveParityTests"
 ```
 
 CI (`.github/workflows/ci.yml`, informational on `journey1` until 2.0, decision D20): a Windows job builds Debug and

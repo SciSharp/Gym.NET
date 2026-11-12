@@ -41,7 +41,7 @@ namespace Gym.Tests.Parity.Tests.Golden {
             }
 
             PairRun run;
-            using (var pair = new GymPair(python, dotnet, @case.StateAttribute) { Recorder = recorder })
+            using (var pair = new GymPair(python, dotnet, @case.StateAttribute) { Recorder = recorder, MeasureFrames = @case.RecordsGymNetFrames })
                 run = pair.Run(@case.Seed, @case.Actions.CreateLive(), @case.MaxSteps, @case.FrameEvery);
             TestContext.WriteLine(run.ToString());
 

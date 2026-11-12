@@ -279,11 +279,13 @@ namespace Gym.Tests.Parity.Golden {
             },
             // The mujoco envs run on Gym.NET's managed MuJoCo 4.0.0 (DR-61, DR-64), whose joint rotations, gains and camera
             // math call the C runtime's sin/cos/tan/pow, so their goldens are strict on the reference platform only. Every
-            // id that runs on MuJoCo 3 and later (Pusher-v4 refuses, as Gymnasium's does) under seeded float32 actions,
-            // without frames (DR-62, DR-67): the reset's noise draws, the observation layout, the reward and every info
-            // term with its NumPy type, and the termination of the ids that fall. The v5 ids use seed 0, the v4 ids seed 1;
-            // the ids that never terminate stop at a step count that keeps each golden small (Humanoid's 348 and 376
-            // float64 observation entries are about 3 KB a step).
+            // id that runs on MuJoCo 3 and later (Pusher-v4 refuses, as Gymnasium's does) under seeded float32 actions: the
+            // reset's noise draws, the observation layout, the reward and every info term with its NumPy type, and the
+            // termination of the ids that fall. The v5 ids use seed 0, the v4 ids seed 1; the ids that never terminate stop
+            // at a step count that keeps each golden small (Humanoid's 348 and 376 float64 observation entries are about 3 KB
+            // a step). Their frames are Gym.NET's own (DR-71), 240 x 240, after the reset and once in motion: the
+            // live cell measures them against Gymnasium's, and the replay requires them bit for bit, so a change to the
+            // renderer shows here without Python, while the frame cells gate how far it may drift from Gymnasium's.
             // Reacher-v4 for its whole 50-step limit: the goal drawn at the reset, and the reward priced before the step.
             new GoldenCase {
                 Suite = "mujoco",
@@ -292,8 +294,11 @@ namespace Gym.Tests.Parity.Golden {
                 Seed = 1,
                 Actions = new GoldenActions.Sampled(1),
                 MaxSteps = 50,
+                FrameEvery = 30,
+                RecordsGymNetFrames = true,
+                Kwargs = MujocoFrameSize,
                 PlatformDependence = MujocoPlatformDependence,
-                CreateDotNet = renderMode => new GymNetEnv(new ReacherEnvV4(renderMode: renderMode)),
+                CreateDotNet = renderMode => new GymNetEnv(new ReacherEnvV4(renderMode: renderMode, width: MujocoFrameSide, height: MujocoFrameSide)),
             },
             // Reacher-v5 for its whole 50-step limit: the reward priced after the step, its int control weight.
             new GoldenCase {
@@ -303,8 +308,11 @@ namespace Gym.Tests.Parity.Golden {
                 Seed = 0,
                 Actions = new GoldenActions.Sampled(0),
                 MaxSteps = 50,
+                FrameEvery = 30,
+                RecordsGymNetFrames = true,
+                Kwargs = MujocoFrameSize,
                 PlatformDependence = MujocoPlatformDependence,
-                CreateDotNet = renderMode => new GymNetEnv(new ReacherEnvV5(renderMode: renderMode)),
+                CreateDotNet = renderMode => new GymNetEnv(new ReacherEnvV5(renderMode: renderMode, width: MujocoFrameSide, height: MujocoFrameSide)),
             },
             // Pusher-v5 for its whole 100-step limit: the cylinder redrawn at the reset until it lies 0.17 from the fixed goal
             // (and written into init_qpos itself, as Gymnasium's reset does), the arm's distances to it and to the goal.
@@ -315,8 +323,11 @@ namespace Gym.Tests.Parity.Golden {
                 Seed = 0,
                 Actions = new GoldenActions.Sampled(0),
                 MaxSteps = 100,
+                FrameEvery = 60,
+                RecordsGymNetFrames = true,
+                Kwargs = MujocoFrameSize,
                 PlatformDependence = MujocoPlatformDependence,
-                CreateDotNet = renderMode => new GymNetEnv(new PusherEnvV5(renderMode: renderMode)),
+                CreateDotNet = renderMode => new GymNetEnv(new PusherEnvV5(renderMode: renderMode, width: MujocoFrameSide, height: MujocoFrameSide)),
             },
             // InvertedPendulum-v4 until the pole falls.
             new GoldenCase {
@@ -326,8 +337,11 @@ namespace Gym.Tests.Parity.Golden {
                 Seed = 1,
                 Actions = new GoldenActions.Sampled(1),
                 MaxSteps = 1000,
+                FrameEvery = 3,
+                RecordsGymNetFrames = true,
+                Kwargs = MujocoFrameSize,
                 PlatformDependence = MujocoPlatformDependence,
-                CreateDotNet = renderMode => new GymNetEnv(new InvertedPendulumEnvV4(renderMode: renderMode)),
+                CreateDotNet = renderMode => new GymNetEnv(new InvertedPendulumEnvV4(renderMode: renderMode, width: MujocoFrameSide, height: MujocoFrameSide)),
             },
             // InvertedPendulum-v5 until the pole falls: v5's reward of 0 at the terminating step.
             new GoldenCase {
@@ -337,8 +351,11 @@ namespace Gym.Tests.Parity.Golden {
                 Seed = 0,
                 Actions = new GoldenActions.Sampled(0),
                 MaxSteps = 1000,
+                FrameEvery = 3,
+                RecordsGymNetFrames = true,
+                Kwargs = MujocoFrameSize,
                 PlatformDependence = MujocoPlatformDependence,
-                CreateDotNet = renderMode => new GymNetEnv(new InvertedPendulumEnvV5(renderMode: renderMode)),
+                CreateDotNet = renderMode => new GymNetEnv(new InvertedPendulumEnvV5(renderMode: renderMode, width: MujocoFrameSide, height: MujocoFrameSide)),
             },
             // InvertedDoublePendulum-v4 until the tip drops: the reward's distance and velocity penalties, and the three
             // constraint forces in its 11-entry observation.
@@ -349,8 +366,11 @@ namespace Gym.Tests.Parity.Golden {
                 Seed = 1,
                 Actions = new GoldenActions.Sampled(1),
                 MaxSteps = 1000,
+                FrameEvery = 5,
+                RecordsGymNetFrames = true,
+                Kwargs = MujocoFrameSize,
                 PlatformDependence = MujocoPlatformDependence,
-                CreateDotNet = renderMode => new GymNetEnv(new InvertedDoublePendulumEnvV4(renderMode: renderMode)),
+                CreateDotNet = renderMode => new GymNetEnv(new InvertedDoublePendulumEnvV4(renderMode: renderMode, width: MujocoFrameSide, height: MujocoFrameSide)),
             },
             // InvertedDoublePendulum-v5 until the tip drops: v5's info terms (survival, distance and velocity penalties) and
             // its 9-entry observation.
@@ -361,8 +381,11 @@ namespace Gym.Tests.Parity.Golden {
                 Seed = 0,
                 Actions = new GoldenActions.Sampled(0),
                 MaxSteps = 1000,
+                FrameEvery = 4,
+                RecordsGymNetFrames = true,
+                Kwargs = MujocoFrameSize,
                 PlatformDependence = MujocoPlatformDependence,
-                CreateDotNet = renderMode => new GymNetEnv(new InvertedDoublePendulumEnvV5(renderMode: renderMode)),
+                CreateDotNet = renderMode => new GymNetEnv(new InvertedDoublePendulumEnvV5(renderMode: renderMode, width: MujocoFrameSide, height: MujocoFrameSide)),
             },
             // HalfCheetah-v4 for 150 steps (it never terminates): the forward reward and the control cost.
             new GoldenCase {
@@ -372,8 +395,11 @@ namespace Gym.Tests.Parity.Golden {
                 Seed = 1,
                 Actions = new GoldenActions.Sampled(1),
                 MaxSteps = 150,
+                FrameEvery = 80,
+                RecordsGymNetFrames = true,
+                Kwargs = MujocoFrameSize,
                 PlatformDependence = MujocoPlatformDependence,
-                CreateDotNet = renderMode => new GymNetEnv(new HalfCheetahEnvV4(renderMode: renderMode)),
+                CreateDotNet = renderMode => new GymNetEnv(new HalfCheetahEnvV4(renderMode: renderMode, width: MujocoFrameSide, height: MujocoFrameSide)),
             },
             // HalfCheetah-v5 for 150 steps: the uniform and standard-normal reset noise, the ground contacts.
             new GoldenCase {
@@ -383,8 +409,11 @@ namespace Gym.Tests.Parity.Golden {
                 Seed = 0,
                 Actions = new GoldenActions.Sampled(0),
                 MaxSteps = 150,
+                FrameEvery = 80,
+                RecordsGymNetFrames = true,
+                Kwargs = MujocoFrameSize,
                 PlatformDependence = MujocoPlatformDependence,
-                CreateDotNet = renderMode => new GymNetEnv(new HalfCheetahEnvV5(renderMode: renderMode)),
+                CreateDotNet = renderMode => new GymNetEnv(new HalfCheetahEnvV5(renderMode: renderMode, width: MujocoFrameSide, height: MujocoFrameSide)),
             },
             // Hopper-v4 until it falls: the health ranges that end the episode.
             new GoldenCase {
@@ -394,8 +423,11 @@ namespace Gym.Tests.Parity.Golden {
                 Seed = 1,
                 Actions = new GoldenActions.Sampled(1),
                 MaxSteps = 1000,
+                FrameEvery = 7,
+                RecordsGymNetFrames = true,
+                Kwargs = MujocoFrameSize,
                 PlatformDependence = MujocoPlatformDependence,
-                CreateDotNet = renderMode => new GymNetEnv(new HopperEnvV4(renderMode: renderMode)),
+                CreateDotNet = renderMode => new GymNetEnv(new HopperEnvV4(renderMode: renderMode, width: MujocoFrameSide, height: MujocoFrameSide)),
             },
             // Hopper-v5 until it falls: the survival reward as a Python float, the info's positions and velocity.
             new GoldenCase {
@@ -405,8 +437,11 @@ namespace Gym.Tests.Parity.Golden {
                 Seed = 0,
                 Actions = new GoldenActions.Sampled(0),
                 MaxSteps = 1000,
+                FrameEvery = 14,
+                RecordsGymNetFrames = true,
+                Kwargs = MujocoFrameSize,
                 PlatformDependence = MujocoPlatformDependence,
-                CreateDotNet = renderMode => new GymNetEnv(new HopperEnvV5(renderMode: renderMode)),
+                CreateDotNet = renderMode => new GymNetEnv(new HopperEnvV5(renderMode: renderMode, width: MujocoFrameSide, height: MujocoFrameSide)),
             },
             // Swimmer-v4 for 150 steps (it never terminates): the viscous fluid's drag.
             new GoldenCase {
@@ -416,8 +451,11 @@ namespace Gym.Tests.Parity.Golden {
                 Seed = 1,
                 Actions = new GoldenActions.Sampled(1),
                 MaxSteps = 150,
+                FrameEvery = 80,
+                RecordsGymNetFrames = true,
+                Kwargs = MujocoFrameSize,
                 PlatformDependence = MujocoPlatformDependence,
-                CreateDotNet = renderMode => new GymNetEnv(new SwimmerEnvV4(renderMode: renderMode)),
+                CreateDotNet = renderMode => new GymNetEnv(new SwimmerEnvV4(renderMode: renderMode, width: MujocoFrameSide, height: MujocoFrameSide)),
             },
             // Swimmer-v5 for 150 steps.
             new GoldenCase {
@@ -427,8 +465,11 @@ namespace Gym.Tests.Parity.Golden {
                 Seed = 0,
                 Actions = new GoldenActions.Sampled(0),
                 MaxSteps = 150,
+                FrameEvery = 80,
+                RecordsGymNetFrames = true,
+                Kwargs = MujocoFrameSize,
                 PlatformDependence = MujocoPlatformDependence,
-                CreateDotNet = renderMode => new GymNetEnv(new SwimmerEnvV5(renderMode: renderMode)),
+                CreateDotNet = renderMode => new GymNetEnv(new SwimmerEnvV5(renderMode: renderMode, width: MujocoFrameSide, height: MujocoFrameSide)),
             },
             // Walker2d-v4 until it falls.
             new GoldenCase {
@@ -438,8 +479,11 @@ namespace Gym.Tests.Parity.Golden {
                 Seed = 1,
                 Actions = new GoldenActions.Sampled(1),
                 MaxSteps = 1000,
+                FrameEvery = 9,
+                RecordsGymNetFrames = true,
+                Kwargs = MujocoFrameSize,
                 PlatformDependence = MujocoPlatformDependence,
-                CreateDotNet = renderMode => new GymNetEnv(new Walker2dEnvV4(renderMode: renderMode)),
+                CreateDotNet = renderMode => new GymNetEnv(new Walker2dEnvV4(renderMode: renderMode, width: MujocoFrameSide, height: MujocoFrameSide)),
             },
             // Walker2d-v5 until it falls: v5's own model (walker2d_v5.xml: both feet at friction 1.9, where v4's right foot
             // has 0.9) and the survival reward as np.float64.
@@ -450,8 +494,11 @@ namespace Gym.Tests.Parity.Golden {
                 Seed = 0,
                 Actions = new GoldenActions.Sampled(0),
                 MaxSteps = 1000,
+                FrameEvery = 25,
+                RecordsGymNetFrames = true,
+                Kwargs = MujocoFrameSize,
                 PlatformDependence = MujocoPlatformDependence,
-                CreateDotNet = renderMode => new GymNetEnv(new Walker2dEnvV5(renderMode: renderMode)),
+                CreateDotNet = renderMode => new GymNetEnv(new Walker2dEnvV5(renderMode: renderMode, width: MujocoFrameSide, height: MujocoFrameSide)),
             },
             // Ant-v4 for 100 steps: the 27-entry observation without contact forces, the health check.
             new GoldenCase {
@@ -461,8 +508,11 @@ namespace Gym.Tests.Parity.Golden {
                 Seed = 1,
                 Actions = new GoldenActions.Sampled(1),
                 MaxSteps = 100,
+                FrameEvery = 60,
+                RecordsGymNetFrames = true,
+                Kwargs = MujocoFrameSize,
                 PlatformDependence = MujocoPlatformDependence,
-                CreateDotNet = renderMode => new GymNetEnv(new AntEnvV4(renderMode: renderMode)),
+                CreateDotNet = renderMode => new GymNetEnv(new AntEnvV4(renderMode: renderMode, width: MujocoFrameSide, height: MujocoFrameSide)),
             },
             // Ant-v5 for at most 60 steps (seed 0's torso leaves the healthy height at step 46): the clipped contact forces
             // in its 105-entry observation, the contact cost and the termination.
@@ -473,8 +523,11 @@ namespace Gym.Tests.Parity.Golden {
                 Seed = 0,
                 Actions = new GoldenActions.Sampled(0),
                 MaxSteps = 60,
+                FrameEvery = 25,
+                RecordsGymNetFrames = true,
+                Kwargs = MujocoFrameSize,
                 PlatformDependence = MujocoPlatformDependence,
-                CreateDotNet = renderMode => new GymNetEnv(new AntEnvV5(renderMode: renderMode)),
+                CreateDotNet = renderMode => new GymNetEnv(new AntEnvV5(renderMode: renderMode, width: MujocoFrameSide, height: MujocoFrameSide)),
             },
             // Humanoid-v4 until it falls: the 376-entry observation (inertias, velocities, actuator and external forces)
             // and the mass centre's velocity.
@@ -485,8 +538,11 @@ namespace Gym.Tests.Parity.Golden {
                 Seed = 1,
                 Actions = new GoldenActions.Sampled(1),
                 MaxSteps = 1000,
+                FrameEvery = 13,
+                RecordsGymNetFrames = true,
+                Kwargs = MujocoFrameSize,
                 PlatformDependence = MujocoPlatformDependence,
-                CreateDotNet = renderMode => new GymNetEnv(new HumanoidEnvV4(renderMode: renderMode)),
+                CreateDotNet = renderMode => new GymNetEnv(new HumanoidEnvV4(renderMode: renderMode, width: MujocoFrameSide, height: MujocoFrameSide)),
             },
             // Humanoid-v5 until it falls: the 348-entry observation (the world body's rows and the free joint's actuator
             // forces left out) and the contact cost.
@@ -497,8 +553,11 @@ namespace Gym.Tests.Parity.Golden {
                 Seed = 0,
                 Actions = new GoldenActions.Sampled(0),
                 MaxSteps = 1000,
+                FrameEvery = 13,
+                RecordsGymNetFrames = true,
+                Kwargs = MujocoFrameSize,
                 PlatformDependence = MujocoPlatformDependence,
-                CreateDotNet = renderMode => new GymNetEnv(new HumanoidEnvV5(renderMode: renderMode)),
+                CreateDotNet = renderMode => new GymNetEnv(new HumanoidEnvV5(renderMode: renderMode, width: MujocoFrameSide, height: MujocoFrameSide)),
             },
             // HumanoidStandup-v4 for 40 steps (it never terminates): the height reward and the quadratic costs.
             new GoldenCase {
@@ -508,8 +567,11 @@ namespace Gym.Tests.Parity.Golden {
                 Seed = 1,
                 Actions = new GoldenActions.Sampled(1),
                 MaxSteps = 40,
+                FrameEvery = 21,
+                RecordsGymNetFrames = true,
+                Kwargs = MujocoFrameSize,
                 PlatformDependence = MujocoPlatformDependence,
-                CreateDotNet = renderMode => new GymNetEnv(new HumanoidStandupEnvV4(renderMode: renderMode)),
+                CreateDotNet = renderMode => new GymNetEnv(new HumanoidStandupEnvV4(renderMode: renderMode, width: MujocoFrameSide, height: MujocoFrameSide)),
             },
             // HumanoidStandup-v5 for 40 steps: the impact cost clipped to its range.
             new GoldenCase {
@@ -519,10 +581,26 @@ namespace Gym.Tests.Parity.Golden {
                 Seed = 0,
                 Actions = new GoldenActions.Sampled(0),
                 MaxSteps = 40,
+                FrameEvery = 21,
+                RecordsGymNetFrames = true,
+                Kwargs = MujocoFrameSize,
                 PlatformDependence = MujocoPlatformDependence,
-                CreateDotNet = renderMode => new GymNetEnv(new HumanoidStandupEnvV5(renderMode: renderMode)),
+                CreateDotNet = renderMode => new GymNetEnv(new HumanoidStandupEnvV5(renderMode: renderMode, width: MujocoFrameSide, height: MujocoFrameSide)),
             },
         }.ToDictionary(c => c.Key, StringComparer.Ordinal);
+
+        /// <summary>
+        ///     The side of the mujoco goldens' frames, in pixels: a quarter of the default frame keeps each golden's PNGs small,
+        ///     and draws through the same passes (the shadow maps keep their 4096² whatever the frame's size).
+        /// </summary>
+        private const int MujocoFrameSide = 240;
+
+        /// <summary>
+        ///     The mujoco goldens' keyword arguments: Gymnasium's side renders at <see cref="MujocoFrameSide"/> too. A property,
+        ///     not a field: the catalog's own static initializer reads it before a later field would be assigned.
+        /// </summary>
+        private static IReadOnlyDictionary<string, object?> MujocoFrameSize =>
+            new Dictionary<string, object?> { ["width"] = (long)MujocoFrameSide, ["height"] = (long)MujocoFrameSide };
 
         /// <summary>
         ///     What makes every mujoco golden depend on the platform: Gym.NET's engine computes MuJoCo 4.0.0's win-x64 bits,

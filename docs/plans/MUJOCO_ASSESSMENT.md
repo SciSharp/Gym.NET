@@ -1508,7 +1508,10 @@ departure and depth ties where two bodies intersect.
 ### 17.4 Still open
 
 - The human window with Gymnasium's controls (DR-70).
-- The frame cells, each gated on its measured baseline plus Gymnasium's render-to-render noise and pinned to the
-  reference GPU, and Gym.NET's own frames in the MuJoCo goldens (DR-71).
+- ~~The frame cells and the frame goldens (DR-71)~~: landed. `MujocoFrameLiveParityTests` measures each id's
+  `rgb_array` and `depth_array` frames after a seeded reset and after ten sampled steps, gated on
+  `tests/Gym.Tests.Parity/Baselines/mujoco_frames.json` plus Gymnasium's noise, on the reference GPU only, with two
+  negative controls; the 21 MuJoCo goldens hold two of Gym.NET's own 240 × 240 frames each, replayed bit for bit
+  (85 of 85 replays on net8.0 and net10.0).
 - Speed: a 480×480 frame takes about 0.05 s (InvertedPendulum) to 0.5 s (Humanoid) of CPU spread over all cores, the
   shadow maps a good part of it.
