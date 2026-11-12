@@ -31,6 +31,10 @@ namespace Gym.Environments.Envs.MuJoCo {
         /// <param name="cameraId">The camera id (<c>camera_id</c>), or <see langword="null"/>.</param>
         /// <param name="cameraName">The camera name (<c>camera_name</c>), or <see langword="null"/>.</param>
         /// <param name="visualOptions">MuJoCo visual flags to switch (<c>visual_options</c>), or <see langword="null"/>.</param>
+        /// <param name="viewerFactory">
+        ///     Gym.NET's <c>viewer_factory</c> (DR-20): the window <c>human</c> mode shows frames in, or <see langword="null"/>
+        ///     for <c>Gymnasium.HumanViewerFactory</c>.
+        /// </param>
         /// <exception cref="ArgumentNullException">A null model or data.</exception>
         /// <exception cref="ValueError">Both a camera id and a camera name, with Gymnasium's message.</exception>
         /// <remarks>
@@ -39,13 +43,14 @@ namespace Gym.Environments.Envs.MuJoCo {
         /// </remarks>
         public MujocoRenderer(MjModel model, MjData data, IReadOnlyDictionary<string, object?>? defaultCamConfig = null, int? width = null,
                               int? height = null, int maxGeom = 1000, int? cameraId = null, string? cameraName = null,
-                              IReadOnlyDictionary<int, bool>? visualOptions = null) {
+                              IReadOnlyDictionary<int, bool>? visualOptions = null, IEnvironmentViewerFactoryDelegate? viewerFactory = null) {
             Model = model ?? throw new ArgumentNullException(nameof(model));
             Data = data ?? throw new ArgumentNullException(nameof(data));
             DefaultCamConfig = defaultCamConfig;
             Width = width;
             Height = height;
             MaxGeom = maxGeom;
+            ViewerFactory = viewerFactory;
             VisualOptions = visualOptions ?? new Dictionary<int, bool>();
             if (cameraId != null && cameraName != null)
                 throw new ValueError("Both `camera_id` and `camera_name` cannot be specified at the same time.");
@@ -88,6 +93,9 @@ namespace Gym.Environments.Envs.MuJoCo {
 
         /// <summary>The visual flags switched for the frames (<c>_vopt</c>), by <c>mjtVisFlag</c> value.</summary>
         internal IReadOnlyDictionary<int, bool> VisualOptions { get; }
+
+        /// <summary>The window factory <c>human</c> mode uses (DR-20), or <see langword="null"/> for the app-wide one.</summary>
+        internal IEnvironmentViewerFactoryDelegate? ViewerFactory { get; }
 
         /// <summary>
         ///     Draws one frame in <paramref name="renderMode"/> (<c>render</c>).

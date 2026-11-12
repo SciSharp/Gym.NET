@@ -117,9 +117,9 @@ namespace Gym.MuJoCo {
             ArgumentNullException.ThrowIfNull(name);
             int id = name.Length == 0 ? -1 : Array.IndexOf(m.body_names, name);
             if (id < 0) {
-                // MuJoCo's text holds Python's repr of the sorted list (['left_foot', ..., 'world']), and a KeyError's text is
-                // the repr of its argument, as Gym's other KeyErrors give it
-                string valid = string.Join(", ", m.body_names.OrderBy(n => n, StringComparer.Ordinal).Select(PyBuiltins.Repr));
+                // MuJoCo's text holds Python's repr of the sorted list of the named bodies (['left_foot', ..., 'world']; an
+                // unnamed body is not listed), and a KeyError's text is the repr of its argument, as Gym's other KeyErrors give it
+                string valid = string.Join(", ", m.body_names.Where(n => n.Length > 0).OrderBy(n => n, StringComparer.Ordinal).Select(PyBuiltins.Repr));
                 throw new KeyError(PyBuiltins.Repr($"Invalid name {PyBuiltins.Repr(name)}. Valid names: [{valid}]"));
             }
             return new MjDataBody(this, id);

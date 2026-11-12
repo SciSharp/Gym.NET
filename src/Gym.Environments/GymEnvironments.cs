@@ -5,6 +5,7 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using Gym.Environments.Envs.Box2D;
 using Gym.Environments.Envs.Classic;
+using Gym.Environments.Envs.MuJoCo;
 using Gym.Environments.Envs.ToyText;
 using Gym.Envs;
 using Gym.Envs.Registration;
@@ -29,9 +30,11 @@ namespace Gym.Environments {
     ///     <para>
     ///     Ids register in Gymnasium's order as their phases port them: classic_control's (CartPole-v0/v1, MountainCar-v0,
     ///     MountainCarContinuous-v0, Pendulum-v1, Acrobot-v1), box2d's (LunarLander-v3, LunarLanderContinuous-v3,
-    ///     BipedalWalker-v3, BipedalWalkerHardcore-v3, CarRacing-v3) and toy_text's (Blackjack-v1,
-    ///     FrozenLake-v1, FrozenLake8x8-v1, CliffWalking-v1, CliffWalkingSlippery-v1, Taxi-v4). CartPole's two register
-    ///     <c>CartPoleVectorEnv</c> as their vectorized entry point.
+    ///     BipedalWalker-v3, BipedalWalkerHardcore-v3, CarRacing-v3), toy_text's (Blackjack-v1,
+    ///     FrozenLake-v1, FrozenLake8x8-v1, CliffWalking-v1, CliffWalkingSlippery-v1, Taxi-v4) and mujoco's 22 (Reacher,
+    ///     Pusher, InvertedPendulum, InvertedDoublePendulum, HalfCheetah, Hopper, Swimmer, Walker2d, Ant, Humanoid and
+    ///     HumanoidStandup, each v4 and v5; Pusher-v4 refuses at construction, as Gymnasium's does on MuJoCo 3 and later).
+    ///     CartPole's two register <c>CartPoleVectorEnv</c> as their vectorized entry point.
     ///     </para>
     ///     <para>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/envs/__init__.py">gymnasium/envs/__init__.py</see>.</para>
     /// </remarks>
@@ -101,6 +104,40 @@ namespace Gym.Environments {
             EnvRegistry.Register("CliffWalkingSlippery-v1", typeof(CliffWalkingEnv), kwargs: new CliffWalkingEnvOptions { IsSlippery = true });
             // Gymnasium registers reward_threshold=8, an int; Gym.NET's thresholds are float64 like its rewards, so the spec prints 8.0.
             EnvRegistry.Register("Taxi-v4", typeof(TaxiEnv), rewardThreshold: 8, maxEpisodeSteps: 200);
+
+            // MuJoCo
+            // ----------------------------------------
+            // Gym.NET's own engine, bit for bit with MuJoCo 4.0.0 (DR-61, DR-64), on Gymnasium's embedded models (DR-63).
+            // Gymnasium's v2/v3 ids, which only point at gymnasium-robotics, are not registered.
+
+            // manipulation
+            EnvRegistry.Register("Reacher-v4", typeof(ReacherEnvV4), maxEpisodeSteps: 50, rewardThreshold: -3.75);
+            EnvRegistry.Register("Reacher-v5", typeof(ReacherEnvV5), maxEpisodeSteps: 50, rewardThreshold: -3.75);
+            // Pusher-v4 registers as in Gymnasium, and refuses at construction as Gymnasium does on MuJoCo 3 and later.
+            EnvRegistry.Register("Pusher-v4", typeof(PusherEnvV4), maxEpisodeSteps: 100, rewardThreshold: 0.0);
+            EnvRegistry.Register("Pusher-v5", typeof(PusherEnvV5), maxEpisodeSteps: 100, rewardThreshold: 0.0);
+
+            // balance
+            EnvRegistry.Register("InvertedPendulum-v4", typeof(InvertedPendulumEnvV4), maxEpisodeSteps: 1000, rewardThreshold: 950.0);
+            EnvRegistry.Register("InvertedPendulum-v5", typeof(InvertedPendulumEnvV5), maxEpisodeSteps: 1000, rewardThreshold: 950.0);
+            EnvRegistry.Register("InvertedDoublePendulum-v4", typeof(InvertedDoublePendulumEnvV4), maxEpisodeSteps: 1000, rewardThreshold: 9100.0);
+            EnvRegistry.Register("InvertedDoublePendulum-v5", typeof(InvertedDoublePendulumEnvV5), maxEpisodeSteps: 1000, rewardThreshold: 9100.0);
+
+            // runners
+            EnvRegistry.Register("HalfCheetah-v4", typeof(HalfCheetahEnvV4), maxEpisodeSteps: 1000, rewardThreshold: 4800.0);
+            EnvRegistry.Register("HalfCheetah-v5", typeof(HalfCheetahEnvV5), maxEpisodeSteps: 1000, rewardThreshold: 4800.0);
+            EnvRegistry.Register("Hopper-v4", typeof(HopperEnvV4), maxEpisodeSteps: 1000, rewardThreshold: 3800.0);
+            EnvRegistry.Register("Hopper-v5", typeof(HopperEnvV5), maxEpisodeSteps: 1000, rewardThreshold: 3800.0);
+            EnvRegistry.Register("Swimmer-v4", typeof(SwimmerEnvV4), maxEpisodeSteps: 1000, rewardThreshold: 360.0);
+            EnvRegistry.Register("Swimmer-v5", typeof(SwimmerEnvV5), maxEpisodeSteps: 1000, rewardThreshold: 360.0);
+            EnvRegistry.Register("Walker2d-v4", typeof(Walker2dEnvV4), maxEpisodeSteps: 1000);
+            EnvRegistry.Register("Walker2d-v5", typeof(Walker2dEnvV5), maxEpisodeSteps: 1000);
+            EnvRegistry.Register("Ant-v4", typeof(AntEnvV4), maxEpisodeSteps: 1000, rewardThreshold: 6000.0);
+            EnvRegistry.Register("Ant-v5", typeof(AntEnvV5), maxEpisodeSteps: 1000, rewardThreshold: 6000.0);
+            EnvRegistry.Register("Humanoid-v4", typeof(HumanoidEnvV4), maxEpisodeSteps: 1000);
+            EnvRegistry.Register("Humanoid-v5", typeof(HumanoidEnvV5), maxEpisodeSteps: 1000);
+            EnvRegistry.Register("HumanoidStandup-v4", typeof(HumanoidStandupEnvV4), maxEpisodeSteps: 1000);
+            EnvRegistry.Register("HumanoidStandup-v5", typeof(HumanoidStandupEnvV5), maxEpisodeSteps: 1000);
         }
 
         /// <summary>

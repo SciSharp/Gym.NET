@@ -22,7 +22,7 @@ namespace Gym.Tests.Gymnasium.Envs.Registration {
     ///     <para>
     ///     Parts that need later phases are the <c>[OpenBugs]</c> methods: the <c>HumanRendering</c>, <c>NormalizeReward</c>,
     ///     <c>TimeAwareObservation</c> and <c>FlattenObservation</c> wrappers (P6) and CarRacing (P8). Gymnasium's
-    ///     <c>Humanoid-v0</c> deprecation case is not ported: MuJoCo is postponed beyond 2.0 (DR-35).
+    ///     <c>Humanoid-v0</c> deprecation case runs against the MuJoCo ids (DR-61).
     ///     </para>
     ///     <para>
     ///     <c>make("tests.envs.registration.utils_unregistered_env:RegisterDuringMake-v0")</c> imports a module that registers
@@ -403,10 +403,15 @@ namespace Gym.Tests.Gymnasium.Envs.Registration {
             return new NormalizeReward<object?, NDArray>(new TimeAwareObservation<NDArray, NDArray>(new FlattenObservation<NDArray, NDArray>(made)), gamma: 0.8);
         }
 
-        /// <summary>An unknown name is reported with Gymnasium's message.</summary>
+        /// <summary>A deprecated version and an unknown name are reported with Gymnasium's messages.</summary>
         /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/tests/envs/registration/test_make.py#L440">test_make_errors</see>.</remarks>
         [TestMethod]
         public void TestMakeErrors() {
+            // pytest.raises(gym.error.Error) takes any subclass; Gym.NET raises DeprecatedEnv, one of them
+            using (Warnings.Catch())
+                StringAssert.Contains(Assert.Throws<Error>(() => Make("Humanoid-v0")).Message,
+                    "Environment version v0 for `Humanoid` is deprecated. Please use `Humanoid-v5` instead.");
+
             StringAssert.Contains(Assert.ThrowsExactly<NameNotFound>(() => Make("NonExistenceEnv-v0")).Message, "Environment `NonExistenceEnv` doesn't exist.");
         }
 

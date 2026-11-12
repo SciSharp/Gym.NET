@@ -164,7 +164,7 @@ parser reads back to the same bits. `tools/parity/mujoco/record_models.py` docum
 | `mujoco/humanoidstandup.json` | `refs/Gymnasium/gymnasium/envs/mujoco/assets/humanoidstandup.xml` | `c135edbf02a7b59a8371ba244e8c27a720aa4d8cf502f68157598e0b1106cb33` | `ee484fcb0e2138cdd91e7e7b03e2e817430b0dd6d86ce44281b1ef3bc7ae3a3b` | HumanoidStandup-v4, HumanoidStandup-v5 |
 | `mujoco/inverted_double_pendulum.json` | `refs/Gymnasium/gymnasium/envs/mujoco/assets/inverted_double_pendulum.xml` | `66fd208bbeb5b7a912d7bf2636398a6aeb9fce577c484e7565ca4f7a4c5fb250` | `d94aaaef1c687f779432fa3f090ce812e4a95f94224d5cbfee2d48b9bd1909f3` | InvertedDoublePendulum-v4, InvertedDoublePendulum-v5 |
 | `mujoco/inverted_pendulum.json` | `refs/Gymnasium/gymnasium/envs/mujoco/assets/inverted_pendulum.xml` | `4456cc21fff17f87bf7760eee8753a454fdc272a50f46e5c7e4669e4e240d07c` | `101104dc9f2ccbb1da8afa389b14a3f9afb46b5b2101289eb3cdfa5adbd8d566` | InvertedPendulum-v4, InvertedPendulum-v5 |
-| `mujoco/point.json` | `refs/Gymnasium/gymnasium/envs/mujoco/assets/point.xml` | `9ff7bb872106c2db7925ae918476a5d1a388e39412aee1c554becfbe49eed846` | `2ad3a58f3986f9c31643414b8c5bd4a8abeda31822410880338508b1dd4b2b2a` | no registered id: Gymnasium's custom-env tests |
+| `mujoco/point.json` | `refs/Gymnasium/gymnasium/envs/mujoco/assets/point.xml` | `9ff7bb872106c2db7925ae918476a5d1a388e39412aee1c554becfbe49eed846` | `2ad3a58f3986f9c31643414b8c5bd4a8abeda31822410880338508b1dd4b2b2a` | no registered id: Gymnasium's custom-env test (`PointEnv`), mirrored in `TestMujocoCustomEnv` |
 | `mujoco/pusher.json` | `refs/Gymnasium/gymnasium/envs/mujoco/assets/pusher.xml` | `91b2983c6ad315636af04a167f458a87e05b97da82a0c050eaf95871b664ac4a` | `3f1ebc90693dead8349b4bb003956ff0dede5c064104f859e1a79f5158d0de18` | Pusher-v5 with `xml_file="pusher.xml"` (Pusher-v4 is refused, as Gymnasium refuses it on MuJoCo 3 and later) |
 | `mujoco/pusher_v5.json` | `refs/Gymnasium/gymnasium/envs/mujoco/assets/pusher_v5.xml` | `937f3487d73e16b22256d4d3ac3ed03db59cc17e631f4633c29fdac8833a0b50` | `c900ab72f8640d25c2a281d71e8287733e0c0c1340dbbb88c82c6700f7dab3b3` | Pusher-v5 |
 | `mujoco/reacher.json` | `refs/Gymnasium/gymnasium/envs/mujoco/assets/reacher.xml` | `8d3cd344fd96db12f939716e47a84bb67102a349f6e3c0db519c1125bf76fdbc` | `30b17d01a1bc788008a78b6460813bc8f5f913d663174dde626b7131897229da` | Reacher-v4, Reacher-v5 |
@@ -187,6 +187,6 @@ file records in full beside the PNG's path. The inverted pendulums, Pusher and R
 Re-record after a re-pin of MuJoCo or Gymnasium, with a Python holding the pinned `mujoco` and NumPy:
 `python -I tools/parity/mujoco/record_models.py`; the files change only where the compiler's output changed, and
 `--check` compares the committed files with a fresh recording instead (exit 1 on any difference). When they were
-embedded, the files were compared with the models the trace checker's 49 MuJoCo 4.0.0 traces
-(`tools/parity/mujoco/halfcheetah_poc`) ran on, field by field: 9,261 fields of the 12 models the traces use (all but
-`point` and `pusher`), all equal.
+embedded, the files were compared with the models the trace checker's 50 MuJoCo 4.0.0 traces
+(`tools/parity/mujoco/halfcheetah_poc`) ran on, field by field: 9,450 fields of the 13 models the traces use (all but
+`pusher`, which Pusher-v5 takes only through `xml_file`), all equal.

@@ -210,9 +210,19 @@ namespace Gym.MuJoCo {
         /// <param name="model">The model.</param>
         internal MjOption(MjModel model) => this.model = model;
 
-        /// <summary>The simulation time step in seconds (<c>timestep</c>); an env's <c>dt</c> is this times its frame skip.</summary>
+        /// <summary>
+        ///     The simulation time step in seconds (<c>timestep</c>); an env's <c>dt</c> is this times its frame skip.
+        ///     Writable, as Python's is: the next physics step uses the new value.
+        /// </summary>
+        /// <remarks>
+        ///     Footgun: an env's frame rate (<c>metadata["render_fps"]</c>) was derived from the step at construction and is not
+        ///     updated, as in Gymnasium.
+        /// </remarks>
         [PyName("timestep")]
-        public double Timestep => model.timestep;
+        public double Timestep {
+            get => model.timestep;
+            set => model.timestep = value;
+        }
     }
 
     /// <summary>

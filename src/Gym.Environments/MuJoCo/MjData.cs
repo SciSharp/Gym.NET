@@ -18,13 +18,14 @@ namespace Gym.MuJoCo {
     ///     </para>
     ///     <para>
     ///         It is not a translation of MuJoCo's sources: it computes only what such models need (hinge and slide joints
-    ///         under an optional free root in each kinematic tree, a ground plane with spheres, capsules and cylinders, the
+    ///         under an optional free root in each kinematic tree, a ground plane with spheres, capsules and cylinders, a box's
+    ///         plane test (point.xml's arrow, which never reaches the floor; a box that would touch is refused), the
     ///         native convex collider's GJK, EPA and multi-contact pass for a capsule against a cylinder (the capsule's edge
     ///         clipped against the cylinder's disk), joint limits, pyramidal and frictionless contacts, motors, constraint
     ///         islands with the dense Newton solve per island or PGS on one tree, Euler with implicit joint damping or RK4
     ///         with its free-joint velocity correction, fixed tendons' lengths, sites, the inertia-box fluid forces, the
     ///         external contact forces of <c>mj_rnePostConstraint</c>) and drops MuJoCo's generality (sparse paths, sleeping,
-    ///         flex, active tendons, sensors, callbacks, meshes and boxes, the convex collider's face-face and discrete-geom
+    ///         flex, active tendons, sensors, callbacks, meshes, box contacts, the convex collider's face-face and discrete-geom
     ///         paths). <see cref="MjModel.Load(byte[])"/> refuses models outside that scope.
     ///     </para>
     ///     <para>
@@ -70,6 +71,9 @@ namespace Gym.MuJoCo {
         private const int Sphere = 2;
         private const int Capsule = 3;
         private const int Cylinder = 5;
+
+        /// <summary>MuJoCo's <c>mjGEOM_BOX</c>: point.xml's arrow, the one box of the bundled models.</summary>
+        private const int Box = 6;
         private const int SolverPgs = 0;
         private const int IntegratorRk4 = 1;
         /// <summary>The constraint type of a joint-limit row (MuJoCo's <c>mjCNSTR_LIMIT_JOINT</c>).</summary>
@@ -976,6 +980,9 @@ namespace Gym.MuJoCo {
                     case (Plane, Cylinder):
                         PlaneCylinder(g1, g2, margin + gap);
                         break;
+                    case (Plane, Box):
+                        PlaneBox(g1, g2, margin + gap);
+                        break;
                     case (Capsule, Cylinder):
                         Convex(g1, g2, margin + gap);
                         break;
@@ -1075,6 +1082,45 @@ namespace Gym.MuJoCo {
                 con_frame[9 * c + 3 + k] = 0;
             }
             return true;
+        }
+
+        /// <summary>
+        ///     A box against a plane (<c>mjc_PlaneBox</c>): the box center's height over the plane, then each of its eight
+        ///     corners in MuJoCo's order; a corner within <paramref name="margin"/> of the plane and not above the center
+        ///     would make a contact. The core reproduces the test, not the contacts, and refuses when one would form.
+        /// </summary>
+        /// <param name="plane">The plane geom.</param>
+        /// <param name="g">The box geom.</param>
+        /// <param name="margin">The detection margin.</param>
+        /// <exception cref="NotSupportedException">
+        ///     A corner reaches the plane: MuJoCo would make a contact there, which the core does not reproduce (no bundled
+        ///     model lets one form: point.xml's arrow box hangs 0.4 above the floor on joints that never lower it).
+        /// </exception>
+        /// <remarks>
+        ///     Refusing keeps the core exact or stopped, never approximate: the test itself is MuJoCo's arithmetic (the
+        ///     distance <c>(pos2 - pos1)·n</c>, each corner <c>mat2 * (±size)</c> and its <c>·n</c>), so where it finds no
+        ///     contact MuJoCo finds none either.
+        /// </remarks>
+        private void PlaneBox(int plane, int g, double margin) {
+            Span<double> normal = stackalloc double[3], dif = stackalloc double[3], vec = stackalloc double[3], corner = stackalloc double[3];
+            for (int k = 0; k < 3; k++) {
+                normal[k] = geom_xmat[9 * plane + 3 * k + 2];
+                dif[k] = geom_xpos[3 * g + k] - geom_xpos[3 * plane + k];
+            }
+            double dist = Spatial.Dot3(dif, normal);
+            ReadOnlySpan<double> size = m.geom_size.AsSpan(3 * g, 3);
+            for (int i = 0; i < 8; i++) {
+                // the corner in local coordinates, then relative to the box center in global ones
+                vec[0] = (i & 1) != 0 ? size[0] : -size[0];
+                vec[1] = (i & 2) != 0 ? size[1] : -size[1];
+                vec[2] = (i & 4) != 0 ? size[2] : -size[2];
+                Spatial.MulMatVec3(corner, geom_xmat.AsSpan(9 * g, 9), vec);
+                double ldist = Spatial.Dot3(normal, corner);
+                // MuJoCo skips a corner too far from the plane or pointing up; any other one becomes a contact
+                if (dist + ldist > margin || ldist > 0)
+                    continue;
+                throw new NotSupportedException($"the core: geom {g}, a box, reaches plane geom {plane} (mjc_PlaneBox's contacts are not reproduced)");
+            }
         }
 
         /// <summary>

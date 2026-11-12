@@ -21,7 +21,7 @@ option records.
 |---|---|---|---|
 | Gym.NET | `src/Gym` | The env contract, wrappers, spaces, registry and `Gymnasium.Make`/`MakeVec`, vector envs, checkers, seeding, errors, the Python-semantics helpers, `Gym.Legacy`; the source generator ships inside it as an analyzer | NumSharp 0.80.0, SixLabors.ImageSharp 2.1.13 |
 | Gym.NET.Rendering | `src/Gym.Rendering` | The rasterizer the envs draw `rgb_array` frames with: `Surface`, `GfxDraw`, `Draw`, `Transform`, `ImageIO`, `SurfArray`, `Vector2`, `Clock` | Gym.NET, ImageSharp (PNG decoding) |
-| Gym.NET.Environments | `src/Gym.Environments` | classic_control, box2d (LunarLander, BipedalWalker, CarRacing) and toy_text, `CartPoleVectorEnv`, the embedded images and CarRacing's score glyphs, the registration of the built-in ids; the Box2D engine in `Box2D/` (namespace `Gym.Box2D`, DR-65) | Gym.NET, Gym.NET.Rendering, SixLabors.ImageSharp 2.1.13 (the human window's images) |
+| Gym.NET.Environments | `src/Gym.Environments` | classic_control, box2d (LunarLander, BipedalWalker, CarRacing), toy_text and mujoco (the 22 ids' classes in `Envs/MuJoCo`), `CartPoleVectorEnv`, the embedded images, CarRacing's score glyphs and Gymnasium's 14 compiled MuJoCo models, the registration of the built-in ids; the Box2D engine in `Box2D/` (namespace `Gym.Box2D`, DR-65) and the MuJoCo engine in `MuJoCo/` (namespace `Gym.MuJoCo`, DR-65, DR-66) | Gym.NET, Gym.NET.Rendering, SixLabors.ImageSharp 2.1.13 (the human window's images) |
 | Gym.NET.Rendering.Avalonia | `src/Gym.Rendering.Avalonia` | `AvaloniaEnvViewer`, a window for `human` mode; `AvaloniaPlotFigure`, `PlayPlot`'s ScottPlot figure (DR-39) | Gym.NET.Environments, Avalonia 12, ScottPlot.Avalonia 5.1 |
 | Gym.NET.Rendering.WinForm | `src/Gym.Rendering.WinForm` | `WinFormEnvViewer`, the same on Windows Forms; `WinFormPlotFigure` | Gym.NET.Environments, Windows Forms, ScottPlot.WinForms 5.1 |
 | (inside Gym.NET) | `src/Gym.SourceGenerators` | The generator behind `[GymOptions]`, `[GymTuple]` and `[GymDict]` (DR-13, DR-34) | Roslyn 4.8 |
@@ -40,6 +40,8 @@ Gymnasium's modules map to namespaces by area, with Gymnasium's class names kept
 | `gymnasium.error` | `Gym.Exceptions`; Python's built-in exceptions come from NumSharp (D17) |
 | `gymnasium.utils` | `Gym.Utils` |
 | `gymnasium.envs.classic_control`, `toy_text` | `Gym.Environments.Envs.Classic`, `Gym.Environments.Envs.ToyText` |
+| `gymnasium.envs.box2d`, `mujoco` | `Gym.Environments.Envs.Box2D`, `Gym.Environments.Envs.MuJoCo` (the classes `AntEnvV4`/`AntEnvV5`... with Gymnasium's names as `[PyName]`, DR-66) |
+| `mujoco` (the bindings Gymnasium's MuJoCo envs call) | `Gym.MuJoCo`: `MjModel`, `MjData`, `Mujoco.MjStep`/`MjForward`/..., `MjtState`, `MjtObj` (DR-68) |
 
 ## The env contract
 

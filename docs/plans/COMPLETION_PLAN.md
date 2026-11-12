@@ -127,14 +127,14 @@ Gymnasium.
 | D18 | ImageSharp advisories | **Suppress the five advisories and keep ImageSharp 2.1.13** | R0.2; consumers of the packages still see the advisories in their own restores (§8) |
 | D19 | Array ownership (migration step 4, and NUMSHARP_MIGRATION_PLAN's M5) | **Explicit ownership plus `[NDScoped]`**: spaces own and dispose their arrays, carried arrays are `[NDBorrowed]`, `StepResult`/`ResetResult` implement `INDArrayCarrier`, and ported methods' temporaries are reclaimed by `[NDScoped]`, woven by NumSharp.Build (a development dependency, never in consumers' graphs) | P2.1, then every phase |
 | D20 | Branch and CI | **One branch until 2.0**: all work continues on `journey1` (cut from `feat/numsharp-master-migration` on 2026-11-08) and merges into `master` once, at the release. CI runs on the branch, informational | P0r.1, P10.5 |
-| D21 | Release cut | **One 2.0 with everything except MuJoCo**: P2–P8, then P10. MuJoCo (P9) was postponed out of 2.0 by DR-35 | §4 |
+| D21 | Release cut | **One 2.0 with everything except MuJoCo**: P2–P8, then P10. MuJoCo (P9) was postponed out of 2.0 by DR-35. *Amended 2026-11-12 by DR-61: the postponement ended; MuJoCo's envs run on Gym.NET's own engine and register like the others* | §4 |
 | DR-01…DR-36 | The implementation designs | Approved in [`DESIGN_REVIEW.md`](DESIGN_REVIEW.md) in ten rounds; its "Coverage by phase" table lists which designs each phase rests on | Every phase |
 
 ### 3.2 Still open, with the default that applies unless the maintainer overrides it
 
 | # | Decision | Default | Needed by |
 |---|---|---|---|
-| D6 | MuJoCo version | Decided when MuJoCo resumes (DR-35); the managed port (DR-30) is checked against a pinned Python `mujoco` | P9 (postponed) |
+| D6 | MuJoCo version | *Decided 2026-11-12 by DR-64: MuJoCo 4.0.0*, the version the engine follows and the parity stack pins | P9 |
 | D9 | Legacy shim | `Gym.Legacy` stays through 2.x, `[Obsolete]` | P10 |
 | D13 | `examples/` | Rewrite one CartPole example on the new API, remove the rest | P10 |
 | D15 | Golden storage | In the repo as gzip JSONL (DR-04 decides how they are made) | P0r.3 |
@@ -155,7 +155,7 @@ D7 (`AsyncVectorEnv`) is settled by DR-22, D14 (toy_text assets) by DR-19, and D
 | **P5 toy_text** | Blackjack, FrozenLake, CliffWalking, Taxi with `ansi` and v1.4.0's art embedded (DR-19) | L3 and L4 for all 6 ids | M |
 | **P6 Vector and wrappers** | `VectorEnv` typed and untyped (DR-21), `SyncVectorEnv`, `AsyncVectorEnv` in three modes (DR-22), vector utils, 35 wrappers, vector wrappers named by DR-24, F8 (DR-23), F9 (DR-25), `play`/`PlayPlot`, `FuncEnv`, `performance` (DR-36); `AtariPreprocessing` out | `tests/vector` (76) and `tests/wrappers` (146) green; async equals sync bitwise in every mode | L |
 | **P8 Box2D** | The managed Box2D 2.3.x engine, core plus pybox2d facade (D5, DR-26, DR-29), `LunarLanderEnv`, `BipedalWalkerEnv`, `CarRacingEnv` (DR-32), CarRacing's text from recorded glyphs (DR-27); Aether removed | Engine goldens; L3 and L4 for all 5 ids; 0 `[OpenBugs]` | XL |
-| **P9 MuJoCo** | **Postponed out of 2.0 (DR-35).** When it resumes: a managed port (DR-30) of what Gymnasium's 22 envs reach (DR-33), with MuJoCo's own renderer offscreen (DR-31) | Hopper-v5 bitwise against Python `mujoco`, then all 22 at L3 | XXL |
+| **P9 MuJoCo** | **Resumed by DR-61 (2026-11-12).** Gym.NET's own engine for Gymnasium's 14 bundled models (DR-61, DR-63) on MuJoCo 4.0.0 (DR-64), inside Gym.Environments (DR-65, DR-66); the 22 ids as env classes; Gymnasium's reach under .NET names (DR-68); frames drawn by Gym.NET and measured (DR-62, DR-67) | All 22 ids bit for bit with Gymnasium on MuJoCo 4.0.0; frames measured | XL |
 | **P10 Release 2.0.0** | Docs, migration guide, examples, packages; merge into `master` | The port plan's definition of done (§1.5) for everything but MuJoCo | M |
 
 The order is sequential. P7 moves in front of P4 because MountainCar and Acrobot already call `pygame.draw`, and P5
@@ -979,9 +979,20 @@ reset waits on NumSharp's N-1).*
     LunarLander-v3, and the release notes list the removal among the breaking changes.
 - **Exit:** engine goldens; L3 and L4 for all five ids; no `[OpenBugs]` cell left in the suite.
 
-### P9 MuJoCo (postponed out of 2.0, DR-35)
+### P9 MuJoCo (resumed by DR-61, 2026-11-12)
 
-Specs: the port plan's §5.7 and §11.4; sources 6,153 lines. Nothing here starts before MuJoCo resumes.
+Specs: the port plan's §5.7 and §11.4; sources 6,153 lines. Postponed by DR-35 until round 21 of the design review
+(DR-61…DR-65) and round 22 (DR-66…DR-68) turned the proof of concept below into the product:
+
+- **Status (2026-11-12).** The engine lives in `src/Gym.Environments/MuJoCo` (namespace `Gym.MuJoCo`, DR-65, DR-66) and
+  follows MuJoCo 4.0.0 (DR-64): the trace checker (`tools/parity/mujoco/halfcheetah_poc`, compiling the product files)
+  holds it bit-exact over 50 traces, point.xml's included. Gymnasium's 14 models are embedded as MuJoCo compiled them
+  (`Assets/mujoco`, DR-63). The 22 ids register as `<Name>EnvV4`/`<Name>EnvV5` classes on `MujocoEnv` (Pusher-v4
+  refusing as Gymnasium does on MuJoCo 3 and later), and match Gymnasium on MuJoCo 4.0.0 value, bit and NumPy type
+  for 143 compared runs (every id, two seeds, 36 keyword variants, actions of six dtypes; 421,367 dumped values).
+  Gymnasium's `test_mujoco_v5.py` and `test_mujoco_custom_env.py` run in the unit suite.
+- **Left:** the frames (DR-62, measured against Gymnasium's by DR-67; `MujocoRenderer` raises until then), and the
+  live parity cells with `mujoco==4.0.0` pinned in the parity stack.
 
 [`MUJOCO_ASSESSMENT.md`](MUJOCO_ASSESSMENT.md) (2026-11-11) measures what completing it takes, against Gymnasium
 `8ba8c3a6` and MuJoCo 3.15.0:
@@ -1010,17 +1021,20 @@ Specs: the port plan's §5.7 and §11.4; sources 6,153 lines. Nothing here start
   million physics steps found two more branches, both then recorded and exact. It took 40 minutes. It is still a proof
   of concept outside `Gym.NET.sln`: no env classes, registration, parity cells or frames.
 
-The approved designs for that time are:
+The designs approved for the resumption before round 21, superseded where noted:
 
 - **A managed port, 100%** (DR-30), inside `Gym.NET.Environments` with no native binaries, using NumSharp where it fits
-  (`np.evaluate`, accelerated `np.*`).
+  (`np.evaluate`, accelerated `np.*`). *Superseded by DR-61: the proof of concept's engine, written from scratch, not a
+  port of MuJoCo's sources.*
 - **Scope** (DR-33): the engine paths, MJCF compiler subset and renderer path that Gymnasium's 22 envs and their 14
   bundled models (primitive geoms only) reach. MuJoCo's engine alone is 2.56 MB of C in 90 files, and its compiler and
-  renderer another 2.63 MB of C/C++, so this is the largest phase (XXL).
+  renderer another 2.63 MB of C/C++, so this is the largest phase (XXL). *Superseded by DR-61 and DR-63: no compiler;
+  the bundled models embedded as MuJoCo compiled them.*
 - **Proof**: bitwise against live Python `mujoco` at a pinned version (D6), after measuring whether native builds fuse
   multiply-adds; any non-bitwise quantity documented with its ulp bound.
 - **Frames** (DR-31): MuJoCo's own `mjr_*` renderer, ported, drawing through a managed OpenGL binding in a hidden WGL or
-  EGL context; best-effort, as the port plan's §1.2 allows.
+  EGL context; best-effort, as the port plan's §1.2 allows. *Superseded by DR-62 and DR-67: Gym.NET draws the scene
+  itself, and its frames are measured against Gymnasium's, not gated.*
 - **Names** (DR-24): `AntEnvV4` / `AntEnvV5` and the other 10 pairs, each `[PyName("AntEnv")]`; models embedded
   (DR-19).
 
@@ -1033,7 +1047,8 @@ The approved designs for that time are:
 - **P10.3** One CartPole example on the new API; the rest removed (D13, B-36).
 - **P10.4** Packages at 2.0.0 (DR-16): Gym.NET, Gym.NET.Rendering, Gym.NET.Environments (classic_control, toy_text
   and box2d with the `Gym.Box2D` engine), Gym.NET.Rendering.Avalonia, Gym.NET.Rendering.WinForm. Release notes include
-  D18's advisory note and MuJoCo's postponement (DR-35).
+  D18's advisory note and MuJoCo's postponement (DR-35). *Since DR-61 the package also carries the MuJoCo envs and their
+  `Gym.MuJoCo` engine; the notes describe them instead.*
 - **P10.5** Merge `journey1` into `master` (D20), tag, publish.
 - **Exit:** the port plan's definition of done (§1.5) for everything but MuJoCo; the inventory's expected-missing list
   holds only MuJoCo's names and `AtariPreprocessing` (DR-36).

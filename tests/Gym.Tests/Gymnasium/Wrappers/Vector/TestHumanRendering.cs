@@ -8,8 +8,8 @@ namespace Gym.Tests.Gymnasium.Wrappers.Vector {
     /// <summary>Gymnasium's vector <c>HumanRendering</c> tests (<c>test_human_rendering.py</c>), run against <see cref="HumanRenderingVector{TObs, TAct}"/>.</summary>
     /// <remarks>
     ///     The window is <see cref="NullEnvViewer"/>'s (DR-20), so the tests open nothing on screen; the frames are paced at
-    ///     CartPole's 50 frames per second, as in Gymnasium. The <c>Ant-v4</c> cases wait for the MuJoCo envs (P9, postponed)
-    ///     and are <c>[OpenBugs("P9")]</c>.
+    ///     CartPole's 50 frames per second, as in Gymnasium. The <c>Ant-v4</c> cases wait for the MuJoCo renderer (P9,
+    ///     DR-62: the env steps, its frames are not drawn yet) and are <c>[OpenBugs("P9")]</c>.
     ///     Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/tests/wrappers/vector/test_human_rendering.py">tests/wrappers/vector/test_human_rendering.py</see>.
     /// </remarks>
     [TestClass]

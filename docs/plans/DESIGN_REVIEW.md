@@ -536,3 +536,14 @@ Effects of approved designs that only showed up in code. None changes a design; 
   out-of-range coordinate to `INT_MIN` and draws the visible part. P7's `Draw.Line(double…)` raised `ValueError` there
   instead; it now converts as pygame does, like the new `Polygon`, `Circle` and `Lines`. `Aaline`/`Aalines` (DR-37's
   translation) still refuse non-finite coordinates; pygame draws nothing for them.
+- **DR-61 with DR-63 on point.xml** (P9, 2026-11-12): one of the 14 embedded models, point.xml (Gymnasium's custom-env
+  test model, used by no id), has a box geom, which the proof of concept's loader refused, so `MjModel.FromXmlPath`
+  would have listed a name it cannot load. The engine now takes the box and runs `mjc_PlaneBox`'s test against the floor;
+  the test never finds a contact on that model (its box cannot reach the floor), and a box that would touch refuses at
+  that step rather than approximate. `oracle.py` records point.xml as `Point-v0`, and the trace checker steps it
+  bit-exact, so all 14 names load.
+- **DR-11 with C# defaults on the MuJoCo envs** (P9, 2026-11-12): Gymnasium's v5 kwargs default to tuples
+  (`healthy_z_range=(0.2, 1.0)`), a camera dictionary, or an `int | str` (`main_body=1`), none of which a C# optional
+  parameter can hold. Those parameters are nullable and `null` stands for Gymnasium's default; Python's explicit `None`
+  (which Gymnasium fails on) has no counterpart. Reacher-v5's `reward_control_weight`, `null` by default, uses the same
+  rule to keep Gymnasium's default an int 1, so an integer action's cost stays an `np.int64` as there.

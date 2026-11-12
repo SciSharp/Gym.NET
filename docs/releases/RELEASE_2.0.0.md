@@ -5,6 +5,8 @@
 > BipedalWalker-v3, BipedalWalkerHardcore-v3, CarRacing-v3) landed on 2026-11-11, and the inventory's list of missing
 > names holds only MuJoCo's names and `AtariPreprocessing`, besides names that do not apply to .NET (JAX, pickling,
 > process workers) or that Gym.NET merges by design. What remains is the release itself (completion plan P10.5).
+> On 2026-11-12 MuJoCo resumed (DR-61): its 22 ids landed on Gym.NET's own engine, bit for bit with MuJoCo 4.0.0, and the
+> missing names are now MuJoCo's three renderer classes and `AtariPreprocessing`. Their frames are not drawn yet (DR-62).
 >
 > Update this page when anything changes; the numbers under "Verification" are those of 2026-11-11, after P8.
 
@@ -19,7 +21,7 @@ It replaces 0.2's API, which followed gym before 0.26, with Gymnasium's.
 |---|---|
 | Gym.NET | The env contract, wrappers, spaces, registry (`Gymnasium.Make`, `MakeVec`), vector envs, checkers, seeding, errors; `Gym.Legacy` |
 | Gym.NET.Rendering (new) | The rasterizer `rgb_array` frames are drawn with, equal to pygame-ce's pixels |
-| Gym.NET.Environments | classic_control, toy_text and box2d (LunarLander, BipedalWalker, CarRacing), CartPole's vector env, their registration; inside its assembly, the `Gym.Box2D` namespace: Box2D 2.3.0 in managed C#, bit for bit as pybox2d 2.3.10, with pybox2d's surface (zlib notices in THIRD-PARTY-NOTICES.md) |
+| Gym.NET.Environments | classic_control, toy_text, box2d (LunarLander, BipedalWalker, CarRacing) and mujoco (Ant, HalfCheetah, Hopper, Humanoid, HumanoidStandup, the two inverted pendulums, Pusher, Reacher, Swimmer, Walker2d), CartPole's vector env, their registration; inside its assembly, the `Gym.Box2D` namespace: Box2D 2.3.0 in managed C#, bit for bit as pybox2d 2.3.10, with pybox2d's surface (zlib notices in THIRD-PARTY-NOTICES.md), and the `Gym.MuJoCo` namespace: Gym.NET's own engine, bit for bit with MuJoCo 4.0.0 on Gymnasium's 14 bundled models, embedded as MuJoCo compiled them |
 | Gym.NET.Rendering.Avalonia | A window for `human` mode on Avalonia 12 (Windows, Linux, macOS), and `PlayPlot`'s live charts on ScottPlot (`AvaloniaPlotFigure`) |
 | Gym.NET.Rendering.WinForm | The same on Windows Forms (`WinFormPlotFigure`) |
 
@@ -107,6 +109,7 @@ In short:
   | classic_control | CartPole-v0, CartPole-v1 (and its vector env), MountainCar-v0, MountainCarContinuous-v0, Pendulum-v1, Acrobot-v1 |
   | box2d | LunarLander-v3, LunarLanderContinuous-v3, BipedalWalker-v3, BipedalWalkerHardcore-v3, CarRacing-v3 (on `Gym.Box2D`, Box2D 2.3.0 in managed C#) |
   | toy_text | FrozenLake-v1, FrozenLake8x8-v1, CliffWalking-v1, CliffWalkingSlippery-v1, Taxi-v4, Blackjack-v1 |
+  | mujoco | Ant, HalfCheetah, Hopper, Humanoid, HumanoidStandup, InvertedDoublePendulum, InvertedPendulum, Pusher, Reacher, Swimmer and Walker2d, each -v4 and -v5 (on `Gym.MuJoCo`, Gym.NET's engine following MuJoCo 4.0.0; Pusher-v4 refuses as Gymnasium's does on MuJoCo 3 and later). Observations, rewards, infos and their NumPy types match Gymnasium's; frames are not drawn yet (DR-62) |
 
   Each steps faster than Gymnasium's on the same machine (Release builds, sampled actions, the medians of interleaved
   runs): 1.4× CartPole to 14× Acrobot, LunarLander 1.6×, BipedalWalker 3.6×, CarRacing 2.2× (the C# code review's
@@ -173,8 +176,9 @@ Nothing of P6 or P8 is deferred.
 
 Out of 2.0 by decision:
 
-- **MuJoCo's environments** are postponed (DR-35). When they resume, they become a fully managed port inside
-  Gym.NET.Environments, with no native binaries (DR-30).
+- **MuJoCo's frames** (DR-62): the 22 ids step, reset and report bit for bit, but `render()` raises until Gym.NET's own
+  drawing of the scene lands; its frames will be measured against Gymnasium's, not required equal (DR-67). A MuJoCo
+  env's `xml_file` takes only Gymnasium's 14 bundled model names (DR-63): Gym.NET has no MJCF compiler.
 - `AtariPreprocessing`, which needs the Arcade Learning Environment (DR-36).
 - **Native AOT and trimming** (DR-55): NumSharp compiles its array kernels at run time, so Gym.NET needs the JIT. A .NET
   10 file-based app (`dotnet run app.cs`), which publishes AOT by default, sets `#:property PublishAot=false`.

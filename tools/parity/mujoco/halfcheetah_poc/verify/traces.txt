@@ -59,3 +59,6 @@ pus5_s94 Pusher-v5 94 1 1
 pus5_s418 Pusher-v5 418 1 1
 pus5_s2851 Pusher-v5 2851 1 1
 pus5_s3016 Pusher-v5 3016 1 1
+# point.xml, the one bundled model no Gymnasium id uses (DR-63): Gymnasium's custom-env test PointEnv, registered by
+# oracle.py as Point-v0 and checked physics only (RK4, the sphere resting on the floor, the arrow box's plane test)
+point Point-v0 0 3 1

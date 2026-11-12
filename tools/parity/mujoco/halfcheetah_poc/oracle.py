@@ -21,8 +21,9 @@ Writes into the output folder:
 Args (command line):
     --out DIR         output folder (required; HalfCheetah writes about 40 MB per 1,000 env steps, Humanoid more: keep it
                       outside the repo).
-    --env ID          any Gymnasium MuJoCo id (default HalfCheetah-v5). The checker has env rules (EnvRules.cs) for the 21
-                      ids that run on MuJoCo 3 and 4 (every v4 and v5 but Pusher-v4, which refuses MuJoCo 3 and later), and checks any
+    --env ID          any Gymnasium MuJoCo id (default HalfCheetah-v5), or Point-v0: Gymnasium's custom-env test PointEnv on
+                      point.xml, which this script registers. The checker has env rules (EnvRules.cs) for the 21 ids that run
+                      on MuJoCo 3 and 4 (every v4 and v5 but Pusher-v4, which refuses MuJoCo 3 and later), and checks any
                       other id physics only.
     --seed N          the first episode's reset and action-space seed (default 42); episode k uses seed + k.
     --episodes N      how many episodes (default 1).
@@ -63,6 +64,70 @@ os.makedirs(OUT, exist_ok=True)
 KWARGS = {"terminate_when_unhealthy": False} if args.no_terminate else {}
 DEBUG_EPISODES = args.episodes if args.debug_episodes < 0 else args.debug_episodes
 
+
+def register_point_env():
+    """Registers Point-v0: the PointEnv of Gymnasium's custom-env test (tests/envs/mujoco/test_mujoco_custom_env.py) on
+    point.xml, the one bundled model no Gymnasium id uses, so a trace can hold it (the checker runs it physics only: it has
+    no env rules). Its reset is the reference state without noise, its reward the root's x displacement, its info empty.
+    """
+    from gymnasium.envs.mujoco import MujocoEnv
+    from gymnasium.spaces import Box
+
+    class PointEnv(MujocoEnv):
+        """Gymnasium's test PointEnv, without EzPickle."""
+
+        metadata = {"render_modes": ["human", "rgb_array", "depth_array", "rgbd_tuple"]}
+
+        def __init__(self, xml_file="point.xml", frame_skip=1, **kwargs):
+            """Loads the model and sets the spaces and the frame rate.
+
+            Args:
+                xml_file: the model.
+                frame_skip: physics steps per env step.
+                **kwargs: MujocoEnv's keyword arguments.
+            """
+            MujocoEnv.__init__(self, xml_file, frame_skip=frame_skip, observation_space=None, default_camera_config={},
+                               **kwargs)
+            self.metadata = {"render_modes": ["human", "rgb_array", "depth_array", "rgbd_tuple"],
+                             "render_fps": int(np.round(1.0 / self.dt))}
+            obs_size = self.data.qpos.size + self.data.qvel.size
+            self.observation_space = Box(low=-np.inf, high=np.inf, shape=(obs_size,), dtype=np.float64)
+
+        def step(self, action):
+            """One env step.
+
+            Args:
+                action: the controls.
+            Returns:
+                The observation, the x displacement as reward, False, False and an empty info.
+            """
+            x_position_before = self.data.qpos[0]
+            self.do_simulation(action, self.frame_skip)
+            x_position_after = self.data.qpos[0]
+            return self._get_obs(), x_position_after - x_position_before, False, False, {}
+
+        def _get_obs(self):
+            """The positions then the velocities.
+
+            Returns:
+                The observation.
+            """
+            return np.concatenate((self.data.qpos.flat.copy(), self.data.qvel.flat.copy()))
+
+        def reset_model(self):
+            """The reference state, no noise.
+
+            Returns:
+                The first observation.
+            """
+            self.set_state(self.init_qpos, self.init_qvel)
+            return self._get_obs()
+
+    gym.register("Point-v0", entry_point=PointEnv, max_episode_steps=1000)
+
+
+if args.env == "Point-v0":
+    register_point_env()
 env = gym.make(args.env, **KWARGS)
 u = env.unwrapped
 m, d = u.model, u.data

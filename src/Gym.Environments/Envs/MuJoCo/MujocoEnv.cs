@@ -65,13 +65,21 @@ namespace Gym.Environments.Envs.MuJoCo {
         /// <param name="defaultCameraConfig">The free camera's settings (<c>default_camera_config</c>): distance, elevation, azimuth, lookat, trackbodyid, type.</param>
         /// <param name="maxGeom">The most geoms a frame draws (<c>max_geom</c>).</param>
         /// <param name="visualOptions">MuJoCo visual flags to switch (<c>visual_options</c>), by <c>mjtVisFlag</c> value.</param>
+        /// <param name="viewerFactory">
+        ///     Gym.NET's <c>viewer_factory</c> (DR-20) for <c>human</c> mode; <see langword="null"/> uses
+        ///     <c>Gymnasium.HumanViewerFactory</c>.
+        /// </param>
         /// <exception cref="NotSupportedException"><paramref name="modelPath"/> is not one of the bundled models.</exception>
         /// <exception cref="AssertionError">The class metadata's <c>render_fps</c> does not match the time step.</exception>
-        /// <exception cref="ValueError">Both a camera id and a camera name, with Gymnasium's message.</exception>
+        /// <exception cref="OverflowException">A zero time step makes the frame rate infinite (Python's <c>OverflowError</c> of <c>int(inf)</c>).</exception>
+        /// <exception cref="ValueError">
+        ///     Both a camera id and a camera name, with Gymnasium's message; or a NaN time step (<c>int(nan)</c>).
+        /// </exception>
         protected MujocoEnv(string modelPath, int frameSkip, Space<NDArray>? observationSpace, Metadata classMetadata,
                             string? renderMode = null, int width = DefaultSize, int height = DefaultSize, int? cameraId = null,
                             string? cameraName = null, IReadOnlyDictionary<string, object?>? defaultCameraConfig = null,
-                            int maxGeom = 1000, IReadOnlyDictionary<int, bool>? visualOptions = null) {
+                            int maxGeom = 1000, IReadOnlyDictionary<int, bool>? visualOptions = null,
+                            IEnvironmentViewerFactoryDelegate? viewerFactory = null) {
             Metadata = classMetadata;
             Fullpath = ExpandModelPath(modelPath);
             Width = width;
@@ -83,7 +91,8 @@ namespace Gym.Environments.Envs.MuJoCo {
                 InitQvel = qvel.copy();
             FrameSkip = frameSkip;
             if (Metadata.ContainsKey(Metadata.RenderFpsKey)) {
-                long expected = (long)Math.Round(1.0 / Dt, MidpointRounding.ToEven);
+                // int(np.round(1.0 / self.dt)): half to even, then Python's int(), whose errors a zero or NaN step raises
+                long expected = RenderFpsOf(Dt);
                 long actual = Convert.ToInt64(Metadata[Metadata.RenderFpsKey]);
                 if (expected != actual)
                     throw new AssertionError($"Expected value: {expected}, Actual value: {actual}");
@@ -94,7 +103,8 @@ namespace Gym.Environments.Envs.MuJoCo {
             RenderMode = renderMode;
             CameraName = cameraName;
             CameraId = cameraId;
-            MujocoRenderer = new MujocoRenderer(Model, Data, defaultCameraConfig, width, height, maxGeom, cameraId, cameraName, visualOptions);
+            MujocoRenderer = new MujocoRenderer(Model, Data, defaultCameraConfig, width, height, maxGeom, cameraId, cameraName, visualOptions,
+                                                viewerFactory);
         }
 
         /// <summary>
@@ -278,8 +288,7 @@ namespace Gym.Environments.Envs.MuJoCo {
             Mujoco.MjResetData(Model, Data);
             NDArray ob = ResetModel();
             Info info = GetResetInfo();
-            if (RenderMode == "human")
-                Render();
+            RenderIfHuman();
             return new ResetResult<NDArray>(ob, info);
         }
 
@@ -330,7 +339,84 @@ namespace Gym.Environments.Envs.MuJoCo {
 
         /// <summary>The v5 envs' instance metadata: the render modes and <c>int(np.round(1.0 / self.dt))</c>.</summary>
         /// <returns>A new metadata dict.</returns>
-        protected Metadata MetadataFromDt() => MetadataFor((long)Math.Round(1.0 / Dt, MidpointRounding.ToEven));
+        /// <exception cref="OverflowException">A zero time step (Python's <c>OverflowError</c> of <c>int(inf)</c>).</exception>
+        /// <exception cref="ValueError">A NaN time step (<c>int(nan)</c>).</exception>
+        protected Metadata MetadataFromDt() => MetadataFor(RenderFpsOf(Dt));
+
+        /// <summary>
+        ///     <c>int(np.round(1.0 / dt))</c>: the frame rate Gymnasium derives from a step's duration, rounded half to even
+        ///     and converted as Python's <c>int()</c> converts.
+        /// </summary>
+        /// <param name="dt">The env step's duration in seconds.</param>
+        /// <returns>The frame rate.</returns>
+        /// <exception cref="OverflowException">A zero duration: <c>cannot convert float infinity to integer</c>.</exception>
+        /// <exception cref="ValueError">A NaN duration: <c>cannot convert float NaN to integer</c>.</exception>
+        private static long RenderFpsOf(double dt) => (long)PyBuiltins.Int(Math.Round(1.0 / dt, MidpointRounding.ToEven));
+
+        /// <summary>
+        ///     <c>self.np_random.uniform(low=low, high=high, size=size)</c>: <paramref name="size"/> draws from the env's
+        ///     generator, as the resets take their noise.
+        /// </summary>
+        /// <param name="low">The lower bound.</param>
+        /// <param name="high">The upper bound.</param>
+        /// <param name="size">How many values.</param>
+        /// <returns>The values, in draw order.</returns>
+        private protected double[] UniformNoise(double low, double high, int size) {
+            using NDArray values = NpRandom.uniform(low, high, new Shape(size));
+            return values.ToArray<double>();
+        }
+
+        /// <summary><c>self.np_random.standard_normal(size)</c>: <paramref name="size"/> draws from the env's generator.</summary>
+        /// <param name="size">How many values.</param>
+        /// <returns>The values, in draw order.</returns>
+        private protected double[] StandardNormalNoise(int size) {
+            using NDArray values = NpRandom.standard_normal(new Shape(size));
+            return values.ToArray<double>();
+        }
+
+        /// <summary>
+        ///     <c>self.init_qpos + noise</c> (or <c>self.init_qvel + noise</c>): each reference value plus its noise, a new
+        ///     array; adding to the reference turns a noise of -0 into +0, as NumPy's addition does.
+        /// </summary>
+        /// <param name="reference"><see cref="InitQpos"/> or <see cref="InitQvel"/>.</param>
+        /// <param name="noise">One value per element.</param>
+        /// <returns>The sums.</returns>
+        private protected static double[] AddNoise(NDArray reference, double[] noise) {
+            var sums = new double[noise.Length];
+            for (int i = 0; i < noise.Length; i++)
+                sums[i] = reference.GetDouble(i) + noise[i];
+            return sums;
+        }
+
+        /// <summary>
+        ///     <see cref="SetState"/> on arrays the env built itself: the positions and velocities copied into the simulation
+        ///     and the forward dynamics run, without the shape assertion (the lengths are the model's by construction).
+        /// </summary>
+        /// <param name="qpos">The positions, <c>nq</c> of them.</param>
+        /// <param name="qvel">The velocities, <c>nv</c> of them.</param>
+        private protected void SetStateValues(double[] qpos, double[] qvel) {
+            Array.Copy(qpos, Data.qpos, Model.Nq);
+            Array.Copy(qvel, Data.qvel, Model.Nv);
+            Mujoco.MjForward(Model, Data);
+        }
+
+        /// <summary>
+        ///     <c>Box(low=-np.inf, high=np.inf, shape=(size,), dtype=np.float64)</c>: every MuJoCo env's observation space.
+        /// </summary>
+        /// <param name="size">The observation's length.</param>
+        /// <returns>A new space, which the env that assigns it owns.</returns>
+        private protected static Box UnboundedBox(int size) =>
+            new(double.NegativeInfinity, double.PositiveInfinity, new Shape(size), np.float64);
+
+        /// <summary>
+        ///     <c>self.render()</c> when the render mode is <c>human</c>, as every env's step and Gymnasium's reset end:
+        ///     the frame shown, nothing returned.
+        /// </summary>
+        private protected void RenderIfHuman() {
+            // human mode returns RenderResult.None, which holds nothing to release
+            if (RenderMode == "human")
+                Render();
+        }
 
         /// <summary>Whether an array has the one-dimensional shape <c>(n,)</c>.</summary>
         /// <param name="array">The array.</param>

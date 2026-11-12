@@ -3,7 +3,7 @@
 | | |
 |---|---|
 | **Date** | 2026-11-11 |
-| **Status** | Assessment for P9, written while DR-35 had postponed it out of 2.0 and DR-30, DR-31 and DR-33 asked for a managed port of MuJoCo and its renderer. Rounds 21 and 22 of `DESIGN_REVIEW.md` (2026-11-12) replaced them: the proof of concept's core becomes the MuJoCo envs (DR-61), on MuJoCo 4.0.0 (DR-64), with frames drawn by Gym.NET and measured only (DR-62, DR-67), and Gymnasium's reach of the Python API under .NET names (DR-68). §14 verifies the core on 4.0.0; §15 is the API comparison behind DR-68 |
+| **Status** | Assessment for P9, written while DR-35 had postponed it out of 2.0 and DR-30, DR-31 and DR-33 asked for a managed port of MuJoCo and its renderer. Rounds 21 and 22 of `DESIGN_REVIEW.md` (2026-11-12) replaced them: the proof of concept's core becomes the MuJoCo envs (DR-61), on MuJoCo 4.0.0 (DR-64), with frames drawn by Gym.NET and measured only (DR-62, DR-67), and Gymnasium's reach of the Python API under .NET names (DR-68). §14 verifies the core on 4.0.0; §15 is the API comparison behind DR-68; §16 records the product stage: the engine in Gym.Environments and the 22 env classes |
 | **Measured against** | Gymnasium `8ba8c3a6` (v1.4.0, committed 2026-10-05); MuJoCo 3.15.0 (released the same day) for §1–§13 and MuJoCo 4.0.0 (2026-11-06) for §14–§15: their sources, and their `win_amd64` wheels for Python 3.12 in isolated venvs |
 | **Reproduce** | §8; the probes are in `tools/parity/mujoco/`, the proof of concept for HalfCheetah (§10), Hopper and Humanoid (§11) and all 21 ids (§13) in `tools/parity/mujoco/halfcheetah_poc/`, with its verification scripts (§13) in `halfcheetah_poc/verify/`, the engine's line coverage (§10.6, §12) in `tools/parity/mujoco/coverage/` |
 
@@ -1385,3 +1385,47 @@ leaves room to add them later without a breaking change. D cannot run Gymnasium'
 
 **Decided: C** (DR-68). The maintainer chose Gymnasium's reach under .NET names, each member `[PyName]`d to Python's,
 in line with how Gym.NET names its own members.
+
+## 16. The product stage (2026-11-12)
+
+The core left `tools/parity`: it is `Gym.MuJoCo` in `src/Gym.Environments/MuJoCo` (DR-65, DR-66), loading Gymnasium's 14
+models embedded as MuJoCo 4.0.0 compiled them (`Assets/mujoco`, recorded by `tools/parity/mujoco/record_models.py`,
+DR-63), with Gymnasium's reach under .NET names (DR-68). The trace checker compiles those product files, so every
+number below is the product's.
+
+### 16.1 What landed
+
+- **The engine** (7,989 lines with its API): the proof of concept's files moved, not rewritten; `MjData.ResetData` is
+  `mj_resetData`'s full reset, so one data serves every episode.
+- **point.xml**, Gymnasium's custom-env test model and the one bundled model no id uses, now loads: the engine accepts
+  its arrow, a box, and tests it against the floor as `mjc_PlaneBox` does. The test finds no contact on that model (the
+  box hangs 0.4 above the floor on joints that never lower it); a box that would touch refuses rather than guess.
+  `oracle.py` records it as `Point-v0` (Gymnasium's test `PointEnv`), and the checker steps it bit-exact: 3,000 of 3,000
+  steps closed loop and resynced, 717 of them with the sphere's floor contact.
+- **The env layer** (`src/Gym.Environments/Envs/MuJoCo`): `MujocoEnv`, the 22 classes `<Name>EnvV4`/`<Name>EnvV5`
+  `[PyName]`d to Gymnasium's (`PusherEnvV4` refusing with Gymnasium's `ImportError`), every v4 and v5 keyword argument,
+  Gymnasium's private attributes by their Python names (`_ctrl_cost_weight`, `observation_structure`, `is_healthy`, ...),
+  `MujocoMath` for NumPy's arithmetic, `MujocoUtils` for `utils`, and the 22 ids registered in Gymnasium's order.
+
+### 16.2 Verification
+
+- **Dumps against Gymnasium on MuJoCo 4.0.0** (scratch scripts dumping every observation, reward, flag and info value
+  with its NumPy type as bits): 143 runs identical, 421,367 lines. They cover every id with two seeds (1,200 and 300
+  sampled steps, through 42 runs' terminations and 16 runs' truncations), 36 keyword variants (frame skips, weights,
+  ranges, `xml_file` swaps, `main_body` by name and index, `use_contact_forces`, the observation switches), and actions of
+  six dtypes on 10 envs (float64, int64, int32, int8 with its wrapping squares, uint8, bool).
+- **What the dumps found**, each fixed: a switch expression whose arms were a 0-d array and a `double` typed itself as
+  `NDArray` (C#'s natural type), turning Python floats into 0-d arrays; and Reacher-v5's default `reward_control_weight`
+  is the Python int 1, which keeps an integer action's cost an `np.int64` (modelled now: `null` stands for that default).
+  The unit tests found a third: MuJoCo lists only named bodies in `data.body`'s `KeyError`.
+- **The unit suite** mirrors `test_mujoco_v5.py` (its 23 tests, 175 rows with the data rows) and `test_mujoco_custom_env.py`,
+  and pins the refusals, the `main_body` forms, the info types, the control cost's dtype paths, HumanoidStandup-v4's
+  integer cap and Pusher's aliasing reset: 222 rows, of which 5 skip where Gymnasium skips (Pusher-v4 on MuJoCo 3 and
+  later, the envs without `observation_structure`). The whole unit gate: 3,804 pass and 24 skip on net8.0 and net10.0.
+- **The trace checker** over the 50 traces (point.xml's added): bit-exact with the product files.
+
+### 16.3 Still open
+
+- Frames: `MujocoRenderer` raises `NotImplementedError` until Gym.NET's drawing of the scene lands (DR-62, DR-67).
+- The live parity cells: `mujoco==4.0.0` joins the parity stack's pins, and the MuJoCo ids join the lockstep,
+  registration, vector and bridge cells the other families have.

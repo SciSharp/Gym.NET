@@ -72,11 +72,11 @@ the pole, playing 100 carts at once through `Gymnasium.MakeVec`.
 | Wrappers | Every Gymnasium wrapper but `AtariPreprocessing` and the JAX/PyTorch conversions: `TimeLimit`, `Autoreset`, `RecordEpisodeStatistics`, the observation, action and reward transforms (`ResizeObservation` over OpenCV's resize in C#, `FrameStackObservation`, `NormalizeObservation`, `ClipAction`, `NormalizeReward`, ...), `RecordVideo`, `HumanRendering` |
 | Vector envs | `VectorEnv<TObs, TAct>`, `SyncVectorEnv` in every autoreset mode, `AsyncVectorEnv` on worker threads, every vector wrapper, `CartPoleVectorEnv` |
 | Checkers | `EnvChecker.CheckEnv`, `PassiveChecker`, `EnvMatch` |
-| Environments | classic_control: CartPole-v0/v1, MountainCar-v0, MountainCarContinuous-v0, Pendulum-v1, Acrobot-v1. box2d: LunarLander-v3, LunarLanderContinuous-v3, BipedalWalker-v3, BipedalWalkerHardcore-v3, CarRacing-v3 (on Box2D 2.3.0 in managed C#). toy_text: FrozenLake-v1, FrozenLake8x8-v1, CliffWalking-v1, CliffWalkingSlippery-v1, Taxi-v4, Blackjack-v1 |
+| Environments | classic_control: CartPole-v0/v1, MountainCar-v0, MountainCarContinuous-v0, Pendulum-v1, Acrobot-v1. box2d: LunarLander-v3, LunarLanderContinuous-v3, BipedalWalker-v3, BipedalWalkerHardcore-v3, CarRacing-v3 (on Box2D 2.3.0 in managed C#). toy_text: FrozenLake-v1, FrozenLake8x8-v1, CliffWalking-v1, CliffWalkingSlippery-v1, Taxi-v4, Blackjack-v1. mujoco: Ant, HalfCheetah, Hopper, Humanoid, HumanoidStandup, InvertedPendulum, InvertedDoublePendulum, Pusher, Reacher, Swimmer, Walker2d, each -v4 and -v5 (on Gym.NET's own engine, bit for bit with MuJoCo 4.0.0) |
 | Rendering | `rgb_array` and `ansi` frames equal to Gymnasium's; `human` mode in an Avalonia or Windows Forms window |
 
-MuJoCo's environments are postponed beyond 2.0. The release notes list what 2.0 leaves out and every known difference
-from Gymnasium:
+MuJoCo's environments step bit for bit but do not draw frames yet. The release notes list what 2.0 leaves out and
+every known difference from Gymnasium:
 [docs/releases/RELEASE_2.0.0.md](https://github.com/SciSharp/Gym.NET/blob/master/docs/releases/RELEASE_2.0.0.md).
 
 ## Documentation

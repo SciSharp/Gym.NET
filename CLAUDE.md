@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Gym.NET is a native C# (.NET) reinforcement learning environment toolkit and benchmark suite, API-compatible with Farama Gymnasium (the successor of OpenAI Gym) and aligned with it byte for byte. It is its own codebase: Gymnasium is the reference it measures itself against, not an identity it claims. It is part of the SciSharp STACK ecosystem and uses `NumSharp` for multidimensional tensor/array operations and `SixLabors.ImageSharp` for rendering.
 
 - **Canonical SOT Submodule:** `refs/Gymnasium` (Farama Foundation Gymnasium Git submodule for behavioral, mathematical, and algorithmic parity).
-- **Roadmap:** `docs/plans/COMPLETION_PLAN.md` orders the remaining work to one 2.0 release (phases R0, P0r, P2, P3, P7, P4, P5, P6, P8, P10; MuJoCo's P9 is postponed) and records the 2026-11-08 decisions; `docs/plans/GYMNASIUM_PORT_PLAN.md` holds the per-area specifications.
+- **Roadmap:** `docs/plans/COMPLETION_PLAN.md` orders the remaining work to one 2.0 release (phases R0, P0r, P2, P3, P7, P4, P5, P6, P8, P10; MuJoCo's P9, postponed until DR-61, is under way) and records the 2026-11-08 decisions; `docs/plans/GYMNASIUM_PORT_PLAN.md` holds the per-area specifications.
 - **User docs (P10):** `docs/README.md` indexes the guides, `docs/architecture.md` and the draft release notes `docs/releases/RELEASE_2.0.0.md`; every code sample in them was compiled and run against the tree. Keep them true when the API changes.
 - **Design gate:** `docs/plans/DESIGN_REVIEW.md` holds the approved implementation designs (DR-01…DR-36). Implement only what an approved design covers; a design question no DR-xx answers goes back to the maintainer for review before the step continues.
 - **Working branch:** `journey1` until 2.0 (decision D20); it merges into `master` once, at the release.
@@ -71,13 +71,27 @@ refs/Gym.NET/
 │   │   │                          #   b2World(gravity, doSleep), CreateDynamicBody, b2FixtureDef, b2PolygonShape(vertices/box),
 │   │   │                          #   b2RevoluteJointDef, contact listener, ray casts, SWIG's conversions and messages). Each file keeps Erin
 │   │   │                          #   Catto's or Ken Lauer's zlib notice
+│   │   ├── MuJoCo/                # namespace Gym.MuJoCo, compiled into Gym.Environments (DR-65, DR-66): Gym.NET's own engine, written from
+│   │   │                          #   scratch, bit for bit with MuJoCo 4.0.0 on win-x64 (DR-61, DR-64) on Gymnasium's 14 bundled models; it
+│   │   │                          #   refuses, by name, any model feature they do not use. MjModel (FromXmlPath over the embedded models,
+│   │   │                          #   DR-63), MjData (the simulation: Euler and RK4, the colliders, Newton and PGS), Ccd (the convex
+│   │   │                          #   collider), Kernels; Gymnasium's reach under .NET names (Mujoco.MjStep/MjForward/..., MjtState, MjtObj,
+│   │   │                          #   writable NDArray views; DR-68). Proven by tools/parity/mujoco/halfcheetah_poc's 50 traces
 │   │   ├── Envs/Classic/          # CartPoleEnv (+ CartPoleVectorEnv, CartPole's vector entry point), MountainCarEnv (MountainCar-v0 and
 │   │   │                          #   MountainCarContinuous-v0, DR-32), PendulumEnv, AcrobotEnv, ClassicControlUtils
 │   │   ├── Envs/ToyText/          # BlackjackEnv (+ BlackjackObservation, DR-13), FrozenLakeEnv, CliffWalkingEnv, TaxiEnv; ToyTextUtils (CategoricalSample,
 │   │   │                          #   CharMap: the 'c' map, N-2's workaround), PyKeys (Python's dict/list lookups of an action), ToyTextTransition
+│   │   ├── Envs/MuJoCo/           # MujocoEnv (the base: model by bundled name, SetState, DoSimulation, the resets' noise) and Gymnasium's 22
+│   │   │                          #   classes as <Name>EnvV4/<Name>EnvV5, each [PyName]d to Gymnasium's (DR-24, DR-66): Ant, HalfCheetah,
+│   │   │                          #   Hopper, Humanoid (+ MassCenter), HumanoidStandup, InvertedDoublePendulum, InvertedPendulum, Pusher
+│   │   │                          #   (PusherEnvV4 refuses, as Gymnasium's on MuJoCo 3+), Reacher, Swimmer, Walker2d; MujocoMath (internal:
+│   │   │                          #   NumPy's pairwise sums, norms and the control cost in the action's dtype; DR-08 info scalars);
+│   │   │                          #   MujocoRenderer (cameras and modes; frames not drawn yet, DR-62/DR-67); MujocoUtils (utils' 3 functions)
 │   │   ├── Envs/                  # NpScalar (NEP 50 scalars), HumanWindow (DR-20), EnvAssets (DR-19), RenderMath
-│   │   ├── Assets/                # Embedded env images copied from Gymnasium (classic_control, toy_text) and CarRacing's recorded score glyphs
-│   │   │                          #   (fonts/freesansbold-42.json, DR-48); README lists sources and hashes
+│   │   ├── Assets/                # Embedded env images copied from Gymnasium (classic_control, toy_text), CarRacing's recorded score glyphs
+│   │   │                          #   (fonts/freesansbold-42.json, DR-48) and Gymnasium's 14 MuJoCo models as MuJoCo 4.0.0 compiles them
+│   │   │                          #   (mujoco/*.json and their builtin textures, recorded by tools/parity/mujoco/record_models.py, DR-63);
+│   │   │                          #   README lists sources and hashes
 │   │   ├── Envs/Box2D/            # LunarLanderEnv (LunarLander-v3 and LunarLanderContinuous-v3, [PyName("LunarLander")], DR-32; Heuristic,
 │   │   │                          #   DemoHeuristicLander, a private ContactDetector, DR-28; LunarLanderContinuousEnv, the refusing stub) on Gym.Box2D;
 │   │   │                          #   BipedalWalkerEnv (BipedalWalker-v3 and BipedalWalkerHardcore-v3, [PyName("BipedalWalker")]; one world per env,
@@ -102,6 +116,9 @@ refs/Gym.NET/
 │   └── Gym.Tests.Plugin/          # A module that registers an id when loaded, for make("Gym.Tests.Plugin:RegisterDuringMake-v0")
 │
 ├── tools/parity/                  # Parity stack: manifest.json (pins), requirements.txt, setup_venv.{ps1,sh}; audit probes
+├── tools/parity/mujoco/           # record_models.py (the embedded MuJoCo models, --check); halfcheetah_poc/: the trace checker over the
+│                                  #   product engine (oracle.py records MuJoCo's state per mj_step; verify/: traces.txt, record_traces.py,
+│                                  #   negative_controls.py, branch_search.py, cs_coverage.py), and play/, a playable HalfCheetah
 ├── tools/showreel/                # The front-page media (DR-59, DR-60): the synthwave video and README GIF (docs/media), the site's 8-bit
 │                                  #   gallery (docs/website-src/images/envs), from the envs' own frames under scripted policies; its parity
 │                                  #   segment is checked against Gymnasium in Python (gymnasium_replay.py). Not in the sln; README.md has the commands

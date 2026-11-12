@@ -9,8 +9,9 @@ namespace Gym.MuJoCo {
     ///     A compiled MuJoCo model, what <c>mujoco.MjModel</c> is to Gymnasium's MuJoCo envs: one of Gymnasium's 14 bundled
     ///     models as MuJoCo 4.0.0 compiled it, embedded in Gym.Environments (DR-63), so every number is MuJoCo's own and
     ///     Gym.NET needs no MJCF compiler. It holds what the eleven envs need (HalfCheetah, Hopper, Walker2d, Ant, Humanoid,
-    ///     HumanoidStandup, InvertedPendulum, InvertedDoublePendulum, Reacher, Swimmer, Pusher): kinematic trees of hinge
-    ///     and slide joints, each under an optional free root; a ground plane with spheres, capsules and cylinders; motors on
+    ///     HumanoidStandup, InvertedPendulum, InvertedDoublePendulum, Reacher, Swimmer, Pusher) and Gymnasium's custom-env test
+    ///     model, point.xml: kinematic trees of hinge and slide joints, each under an optional free root; a ground plane with
+    ///     spheres, capsules, cylinders and point.xml's box (tested against the plane, refused if it would touch); motors on
     ///     joints; Euler or RK4; pyramidal and frictionless contacts; the dense Newton or PGS solver; inert fixed tendons;
     ///     sites; and the inertia-box fluid model.
     /// </summary>
@@ -484,8 +485,9 @@ namespace Gym.MuJoCo {
             Require(I("jnt_actuatorid").All(v => v == -1), "no actuator-inherited damping or armature");
             Require(D("geom_adhesion").All(v => v == 0), "no adhesion");
             Require(I("body_mocapid").All(v => v == -1), "no mocap bodies");
-            // geoms: those that can collide are planes on the world body, or spheres, capsules and cylinders on bodies, whose
-            // every pair has a collider here. A geom no geom of another body can touch (no compatible bitmask) never reaches a
+            // geoms: those that can collide are planes on the world body, or spheres, capsules, cylinders and boxes on bodies,
+            // whose every pair has a collider here (a box's only against a plane, point.xml's arrow, which refuses at the step
+            // where it would touch). A geom no geom of another body can touch (no compatible bitmask) never reaches a
             // collider, so it may be of any type and on any body, the world included (InvertedPendulum's rail, Reacher's
             // arena); the core still computes its frame.
             for (int g = 0; g < ngeom; g++) {
@@ -495,20 +497,20 @@ namespace Gym.MuJoCo {
                 if (!collides)
                     continue;
                 bool plane = geom_type[g] == 0 && geom_bodyid[g] == 0;
-                Require(plane || ((geom_type[g] == 2 || geom_type[g] == 3 || geom_type[g] == 5) && geom_bodyid[g] > 0),
-                        $"geom {g}: a plane on the world body, or a sphere, capsule or cylinder on a body");
+                Require(plane || ((geom_type[g] == 2 || geom_type[g] == 3 || geom_type[g] == 5 || geom_type[g] == 6) && geom_bodyid[g] > 0),
+                        $"geom {g}: a plane on the world body, or a sphere, capsule, cylinder or box on a body");
                 Require(geom_condim[g] == 1 || geom_condim[g] == 3, $"geom {g}: condim 1 or 3");
             }
-            // every pair of geoms that may touch needs a collider the core reproduces: plane against sphere, capsule or
-            // cylinder; sphere-sphere, sphere-capsule, capsule-capsule; capsule-cylinder through the convex collider (a
-            // superset of the real candidates, which the body filters thin further)
+            // every pair of geoms that may touch needs a collider the core reproduces: plane against sphere, capsule,
+            // cylinder or box (the box's test only); sphere-sphere, sphere-capsule, capsule-capsule; capsule-cylinder through
+            // the convex collider (a superset of the real candidates, which the body filters thin further)
             for (int g = 0; g < ngeom; g++)
                 for (int h = g + 1; h < ngeom; h++) {
                     if (geom_bodyid[g] == geom_bodyid[h]
                         || ((geom_contype[g] & geom_conaffinity[h]) == 0 && (geom_contype[h] & geom_conaffinity[g]) == 0))
                         continue;
                     int lo = Math.Min(geom_type[g], geom_type[h]), hi = Math.Max(geom_type[g], geom_type[h]);
-                    bool ok = (lo == 0 && (hi == 2 || hi == 3 || hi == 5)) || (lo == 2 && (hi == 2 || hi == 3)) || (lo == 3 && (hi == 3 || hi == 5));
+                    bool ok = (lo == 0 && (hi == 2 || hi == 3 || hi == 5 || hi == 6)) || (lo == 2 && (hi == 2 || hi == 3)) || (lo == 3 && (hi == 3 || hi == 5));
                     Require(ok, $"geoms {g} and {h}: a collider for geom types {lo} and {hi}");
                     // a capsule-cylinder pair needs no margin on MuJoCo 4: its convex collider clips the capsule's edge
                     // against the cylinder's disk with or without one (Ccd.Multicontact), where MuJoCo 3 perturbed instead
