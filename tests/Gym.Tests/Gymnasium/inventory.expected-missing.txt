@@ -11,9 +11,9 @@ gymnasium.envs.box2d.lunar_lander.ContactDetector                               
 gymnasium.envs.classic_control.continuous_mountain_car.Continuous_MountainCarEnv         by design: merged into MountainCarEnv(continuous) (DR-32)
 gymnasium.envs.functional_jax_env.FunctionalJaxEnv                                       n/a: JAX functional envs
 gymnasium.envs.functional_jax_env.FunctionalJaxVectorEnv                                 n/a: JAX functional envs
-gymnasium.envs.mujoco.mujoco_rendering.BaseRender                                        P9 mujoco renderer (DR-62, DR-67)
-gymnasium.envs.mujoco.mujoco_rendering.OffScreenViewer                                   P9 mujoco renderer (DR-62, DR-67)
-gymnasium.envs.mujoco.mujoco_rendering.WindowViewer                                      P9 mujoco renderer (DR-62, DR-67)
+gymnasium.envs.mujoco.mujoco_rendering.BaseRender                                        by design: inlined into MujocoRenderer (DR-69)
+gymnasium.envs.mujoco.mujoco_rendering.OffScreenViewer                                   by design: rgb, depth and rgbd frames inlined into MujocoRenderer (DR-69)
+gymnasium.envs.mujoco.mujoco_rendering.WindowViewer                                      by design: human mode's controls inlined into MujocoRenderer (DR-69, DR-70)
 gymnasium.envs.phys2d.cartpole.CartPoleFunctional                                        n/a: JAX functional envs
 gymnasium.envs.phys2d.cartpole.CartPoleJaxEnv                                            n/a: JAX functional envs
 gymnasium.envs.phys2d.cartpole.CartPoleJaxVectorEnv                                      n/a: JAX functional envs

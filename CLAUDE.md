@@ -9,7 +9,7 @@ Gym.NET is a native C# (.NET) reinforcement learning environment toolkit and ben
 - **Canonical SOT Submodule:** `refs/Gymnasium` (Farama Foundation Gymnasium Git submodule for behavioral, mathematical, and algorithmic parity).
 - **Roadmap:** `docs/plans/COMPLETION_PLAN.md` orders the remaining work to one 2.0 release (phases R0, P0r, P2, P3, P7, P4, P5, P6, P8, P10; MuJoCo's P9, postponed until DR-61, is under way) and records the 2026-11-08 decisions; `docs/plans/GYMNASIUM_PORT_PLAN.md` holds the per-area specifications.
 - **User docs (P10):** `docs/README.md` indexes the guides, `docs/architecture.md` and the draft release notes `docs/releases/RELEASE_2.0.0.md`; every code sample in them was compiled and run against the tree. Keep them true when the API changes.
-- **Design gate:** `docs/plans/DESIGN_REVIEW.md` holds the approved implementation designs (DR-01…DR-36). Implement only what an approved design covers; a design question no DR-xx answers goes back to the maintainer for review before the step continues.
+- **Design gate:** `docs/plans/DESIGN_REVIEW.md` holds the approved implementation designs (DR-01…DR-71). Implement only what an approved design covers; a design question no DR-xx answers goes back to the maintainer for review before the step continues.
 - **Working branch:** `journey1` until 2.0 (decision D20); it merges into `master` once, at the release.
 
 ---

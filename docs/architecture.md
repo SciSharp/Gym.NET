@@ -4,7 +4,7 @@
 
 How Gym.NET 2.0 is put together, and how it is held to Gymnasium's behavior. The reasons behind each choice are recorded
 in the [completion plan](plans/COMPLETION_PLAN.md) (decisions D1–D22) and the [design review](plans/DESIGN_REVIEW.md)
-(designs DR-01…DR-36); the references in parentheses point there.
+(designs DR-01…DR-71); the references in parentheses point there.
 
 ## What Gym.NET is
 
