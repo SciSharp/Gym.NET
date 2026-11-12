@@ -3,20 +3,23 @@ using System;
 namespace MujocoPoc;
 
 /// <summary>
-///     A from-scratch physics core for Gymnasium's MuJoCo envs (all eleven, the 21 ids that run on MuJoCo 3), written to
-///     step exactly as MuJoCo 3.15.0's <c>mj_step</c> does on win-x64: the same quantities in the same floating-point
-///     order, so every array it publishes (state, contacts, constraint rows, solver output) equals MuJoCo's bit for bit.
+///     A from-scratch physics core for Gymnasium's MuJoCo envs (all eleven, the 21 ids that run on MuJoCo 3 and 4),
+///     written to step exactly as MuJoCo 4.0.0's <c>mj_step</c> does on win-x64: the same quantities in the same
+///     floating-point order, so every array it publishes (state, contacts, constraint rows, solver output) equals MuJoCo's
+///     bit for bit. It followed MuJoCo 3.15.0 until the pin moved to 4.0.0 (DR-64), whose RK4, quaternion kernels,
+///     capsule pairs, PGS scale and convex collider round differently.
 /// </summary>
 /// <remarks>
 ///     <para>
 ///         It is not a translation of MuJoCo's sources: it computes only what such models need (hinge and slide joints
 ///         under an optional free root in each kinematic tree, a ground plane with spheres, capsules and cylinders, the
-///         native convex collider's GJK and EPA for a capsule against a cylinder with its perturbed extra contacts, joint
-///         limits, pyramidal and frictionless contacts, motors, constraint islands with the dense Newton solve per island
-///         or PGS on one tree, Euler with implicit joint damping or RK4, fixed tendons' lengths, sites, the inertia-box
-///         fluid forces, the external contact forces of <c>mj_rnePostConstraint</c>) and drops MuJoCo's generality
-///         (sparse paths, sleeping, flex, active tendons, sensors, callbacks, meshes and boxes, the convex collider's
-///         polygon clipping). <see cref="CheetahModel.Load"/> refuses models outside that scope. The class keeps its
+///         native convex collider's GJK, EPA and multi-contact pass for a capsule against a cylinder (the capsule's edge
+///         clipped against the cylinder's disk), joint limits, pyramidal and frictionless contacts, motors, constraint
+///         islands with the dense Newton solve per island or PGS on one tree, Euler with implicit joint damping or RK4
+///         with its free-joint velocity correction, fixed tendons' lengths, sites, the inertia-box fluid forces, the
+///         external contact forces of <c>mj_rnePostConstraint</c>) and drops MuJoCo's generality (sparse paths, sleeping,
+///         flex, active tendons, sensors, callbacks, meshes and boxes, the convex collider's face-face and discrete-geom
+///         paths). <see cref="CheetahModel.Load"/> refuses models outside that scope. The class keeps its
 ///         first name because HalfCheetah's play project compiles it as it is.
 ///     </para>
 ///     <para>
@@ -37,17 +40,17 @@ namespace MujocoPoc;
 ///         degenerate cases (tiny pivots, zero-length vectors and quaternions, a zero rotation angle).
 ///     </para>
 ///     <para>
-///         Reference: MuJoCo 3.15.0's <see href="https://github.com/google-deepmind/mujoco/blob/3.15.0/src/engine/engine_forward.c">engine_forward.c</see>,
-///         <see href="https://github.com/google-deepmind/mujoco/blob/3.15.0/src/engine/engine_core_smooth.c">engine_core_smooth.c</see>,
-///         <see href="https://github.com/google-deepmind/mujoco/blob/3.15.0/src/engine/engine_core_util.c">engine_core_util.c</see>,
-///         <see href="https://github.com/google-deepmind/mujoco/blob/3.15.0/src/engine/engine_collision_driver.c">engine_collision_driver.c</see>,
-///         <see href="https://github.com/google-deepmind/mujoco/blob/3.15.0/src/engine/engine_collision_primitive.c">engine_collision_primitive.c</see>,
-///         <see href="https://github.com/google-deepmind/mujoco/blob/3.15.0/src/engine/engine_collision_convex.c">engine_collision_convex.c</see>,
-///         <see href="https://github.com/google-deepmind/mujoco/blob/3.15.0/src/engine/engine_core_constraint.c">engine_core_constraint.c</see>,
-///         <see href="https://github.com/google-deepmind/mujoco/blob/3.15.0/src/engine/engine_island.c">engine_island.c</see>,
-///         <see href="https://github.com/google-deepmind/mujoco/blob/3.15.0/src/engine/engine_solver.c">engine_solver.c</see>,
-///         <see href="https://github.com/google-deepmind/mujoco/blob/3.15.0/src/engine/engine_passive.c">engine_passive.c</see> and
-///         <see href="https://github.com/google-deepmind/mujoco/blob/3.15.0/src/engine/engine_support.c">engine_support.c</see>
+///         Reference: MuJoCo 4.0.0's <see href="https://github.com/google-deepmind/mujoco/blob/4.0.0/src/engine/engine_forward.c">engine_forward.c</see>,
+///         <see href="https://github.com/google-deepmind/mujoco/blob/4.0.0/src/engine/engine_core_smooth.c">engine_core_smooth.c</see>,
+///         <see href="https://github.com/google-deepmind/mujoco/blob/4.0.0/src/engine/engine_core_util.c">engine_core_util.c</see>,
+///         <see href="https://github.com/google-deepmind/mujoco/blob/4.0.0/src/engine/engine_collision_driver.c">engine_collision_driver.c</see>,
+///         <see href="https://github.com/google-deepmind/mujoco/blob/4.0.0/src/engine/engine_collision_primitive.c">engine_collision_primitive.c</see>,
+///         <see href="https://github.com/google-deepmind/mujoco/blob/4.0.0/src/engine/engine_collision_convex.c">engine_collision_convex.c</see>,
+///         <see href="https://github.com/google-deepmind/mujoco/blob/4.0.0/src/engine/engine_core_constraint.c">engine_core_constraint.c</see>,
+///         <see href="https://github.com/google-deepmind/mujoco/blob/4.0.0/src/engine/engine_island.c">engine_island.c</see>,
+///         <see href="https://github.com/google-deepmind/mujoco/blob/4.0.0/src/engine/engine_solver.c">engine_solver.c</see>,
+///         <see href="https://github.com/google-deepmind/mujoco/blob/4.0.0/src/engine/engine_passive.c">engine_passive.c</see> and
+///         <see href="https://github.com/google-deepmind/mujoco/blob/4.0.0/src/engine/engine_support.c">engine_support.c</see>
 ///         (Apache-2.0); each member names the MuJoCo function whose arithmetic it reproduces. GJK and EPA are in
 ///         <see cref="Ccd"/>.
 ///     </para>
@@ -316,13 +319,13 @@ public sealed class CheetahCore {
         int njnt = m.njnt, ngeom = m.ngeom;
         (candA, candB) = CollisionCandidates(m);
         // Capacities from the candidates: plane-cylinder makes four contacts at most, capsule-cylinder (the convex
-        // collider) one plus four from MultiCCD's perturbations, a pair with a capsule two, others one; four pyramid rows
-        // per condim-3 contact, one row per frictionless contact; two sides per limited joint.
+        // collider, whose single pass asks for two and runs no MultiCCD) two, a pair with a capsule two, others one; four
+        // pyramid rows per condim-3 contact, one row per frictionless contact; two sides per limited joint.
         int maxcon = 0, maxefc = 0;
         for (int c = 0; c < candA.Length; c++) {
             int ga = candA[c], gb = candB[c];
             int ta = m.geom_type[ga], tb = m.geom_type[gb];
-            int contacts = ta == Cylinder || tb == Cylinder ? (ta == Plane || tb == Plane ? 4 : 5)
+            int contacts = ta == Cylinder || tb == Cylinder ? (ta == Plane || tb == Plane ? 4 : 2)
                          : ta == Capsule || tb == Capsule ? 2 : 1;
             int dim = m.geom_priority[ga] != m.geom_priority[gb]
                 ? m.geom_condim[m.geom_priority[ga] > m.geom_priority[gb] ? ga : gb]
@@ -1086,12 +1089,18 @@ public sealed class CheetahCore {
     }
 
     /// <summary>
-    ///     Appends the contacts of two capsules (<c>mjraw_CapsuleCapsule</c>): the closest points of the two segments,
-    ///     clipped to their ends, as two spheres; for (nearly) parallel axes, up to two contacts from the segments' ends.
+    ///     Appends the contacts of two capsules (<c>mjraw_CapsuleCapsule</c>, MuJoCo 4): the closest points of the two
+    ///     segments by <see cref="SegWeights"/>, each pair as two spheres; nearly parallel segments give up to two pairs.
     /// </summary>
     /// <param name="g1">The first capsule.</param>
     /// <param name="g2">The second capsule.</param>
     /// <param name="margin">The detection margin.</param>
+    /// <remarks>
+    ///     Reference: MuJoCo 4.0.0's
+    ///     <see href="https://github.com/google-deepmind/mujoco/blob/4.0.0/src/engine/engine_collision_primitive.c">engine_collision_primitive.c</see>.
+    ///     MuJoCo 3 solved the 2x2 system of the axes and had its own parallel case; 4 replaced both with the segment
+    ///     weights, so the contacts' last bits differ between the two versions.
+    /// </remarks>
     private void CapsuleCapsule(int g1, int g2, double margin) {
         ReadOnlySpan<double> pos1 = geom_xpos.AsSpan(3 * g1, 3), pos2 = geom_xpos.AsSpan(3 * g2, 3);
         ReadOnlySpan<double> mat1 = geom_xmat.AsSpan(9 * g1, 9), mat2 = geom_xmat.AsSpan(9 * g2, 9);
@@ -1099,64 +1108,104 @@ public sealed class CheetahCore {
         double r2 = m.geom_size[3 * g2], h2 = m.geom_size[3 * g2 + 1];
         Span<double> axis1 = stackalloc double[3] { mat1[2] * h1, mat1[5] * h1, mat1[8] * h1 };
         Span<double> axis2 = stackalloc double[3] { mat2[2] * h2, mat2[5] * h2, mat2[8] * h2 };
-        Span<double> dif = stackalloc double[3] { pos1[0] - pos2[0], pos1[1] - pos2[1], pos1[2] - pos2[2] };
-        double ma = Spatial.Dot3(axis1, axis1);
-        double mb = -Spatial.Dot3(axis1, axis2);
-        double mc = Spatial.Dot3(axis2, axis2);
-        double u = -Spatial.Dot3(axis1, dif);
-        double v = Spatial.Dot3(axis2, dif);
-        double det = ma * mc - mb * mb;
+        // the segments' ends: p1 = pos1 - axis1, p2 = pos1 + axis1, and likewise q1, q2 (mju_sub3, mju_add3)
+        Span<double> p1 = stackalloc double[3], p2 = stackalloc double[3], q1 = stackalloc double[3], q2 = stackalloc double[3];
+        for (int k = 0; k < 3; k++) {
+            p1[k] = pos1[k] - axis1[k];
+            p2[k] = pos1[k] + axis1[k];
+            q1[k] = pos2[k] - axis2[k];
+            q2[k] = pos2[k] + axis2[k];
+        }
+        Span<double> w = stackalloc double[4];
+        int n = SegWeights(w, p1, p2, q1, q2);
         Span<double> vec1 = stackalloc double[3], vec2 = stackalloc double[3];
-        // the points pos + axis*x of each segment, scaled then offset as MuJoCo does
-        void Point(Span<double> res, ReadOnlySpan<double> pos, ReadOnlySpan<double> axis, double x) {
+        for (int i = 0; i < n; i++) {
             for (int k = 0; k < 3; k++) {
-                res[k] = axis[k] * x;
-                res[k] += pos[k];
+                vec1[k] = p1[k] + w[2 * i] * (p2[k] - p1[k]);
+                vec2[k] = q1[k] + w[2 * i + 1] * (q2[k] - q1[k]);
             }
-        }
-        if (Math.Abs(det) >= Kernels.MinVal) {
-            double x1 = (mc * u - mb * v) / det;
-            double x2 = (ma * v - mb * u) / det;
-            if (x1 > 1) {
-                x1 = 1;
-                x2 = (v - mb) / mc;
-            } else if (x1 < -1) {
-                x1 = -1;
-                x2 = (v + mb) / mc;
-            }
-            if (x2 > 1) {
-                x2 = 1;
-                x1 = Clip((u - mb) / ma, -1, 1);
-            } else if (x2 < -1) {
-                x2 = -1;
-                x1 = Clip((u + mb) / ma, -1, 1);
-            }
-            Point(vec1, pos1, axis1, x1);
-            Point(vec2, pos2, axis2, x2);
             SphereSphere(vec1, mat1, r1, vec2, mat2, r2, margin);
-            return;
         }
-        // parallel axes: the first segment's ends against the second, then the second's ends against the first
-        for (int k = 0; k < 3; k++)
-            vec1[k] = pos1[k] + axis1[k];
-        Point(vec2, pos2, axis2, Clip((v - mb) / mc, -1, 1));
-        int n = SphereSphere(vec1, mat1, r1, vec2, mat2, r2, margin);
-        for (int k = 0; k < 3; k++)
-            vec1[k] = pos1[k] - axis1[k];
-        Point(vec2, pos2, axis2, Clip((v + mb) / mc, -1, 1));
-        n += SphereSphere(vec1, mat1, r1, vec2, mat2, r2, margin);
-        if (n >= 2)
-            return;
-        for (int k = 0; k < 3; k++)
-            vec2[k] = pos2[k] + axis2[k];
-        Point(vec1, pos1, axis1, Clip((u - mb) / ma, -1, 1));
-        n += SphereSphere(vec1, mat1, r1, vec2, mat2, r2, margin);
-        if (n >= 2)
-            return;
-        for (int k = 0; k < 3; k++)
-            vec2[k] = pos2[k] - axis2[k];
-        Point(vec1, pos1, axis1, Clip((u + mb) / ma, -1, 1));
-        SphereSphere(vec1, mat1, r1, vec2, mat2, r2, margin);
+    }
+
+    /// <summary>
+    ///     The weights <c>{s1, t1, s2, t2}</c> in [0, 1] of the closest points <c>a + s*(b - a)</c> and
+    ///     <c>c + t*(d - c)</c> of two segments (<c>mjc_segWeights</c>, Ericson's Voronoi regions): one pair, or two when
+    ///     the segments are parallel within sin²(0.006°) = 1e-8, where the closest pair is not unique.
+    /// </summary>
+    /// <param name="w">Receives the weights, two per pair.</param>
+    /// <param name="a">The first segment's start.</param>
+    /// <param name="b">The first segment's end.</param>
+    /// <param name="c">The second segment's start.</param>
+    /// <param name="d">The second segment's end.</param>
+    /// <returns>1, or 2 for (nearly) parallel segments.</returns>
+    /// <remarks>
+    ///     The determinant is Lagrange's <c>|ab x cd|²</c> and the first weight the Binet-Cauchy quotient, which MuJoCo
+    ///     uses to avoid cancellation near parallel; each operation follows MuJoCo 4.0.0's order.
+    /// </remarks>
+    private static int SegWeights(Span<double> w, ReadOnlySpan<double> a, ReadOnlySpan<double> b, ReadOnlySpan<double> c,
+                                  ReadOnlySpan<double> d) {
+        const double sin2 = 1e-8;
+        Span<double> ab = stackalloc double[3] { b[0] - a[0], b[1] - a[1], b[2] - a[2] };
+        Span<double> cd = stackalloc double[3] { d[0] - c[0], d[1] - c[1], d[2] - c[2] };
+        Span<double> ca = stackalloc double[3] { a[0] - c[0], a[1] - c[1], a[2] - c[2] };
+        double dot1 = Spatial.Dot3(ab, ab), dot2 = Spatial.Dot3(cd, cd), dot3 = Spatial.Dot3(cd, ca);
+        double dot4 = Spatial.Dot3(ab, ca), dot5 = Spatial.Dot3(ab, cd);
+        // degenerate segments: a point against a segment, or two points
+        if (dot1 <= Kernels.MinVal && dot2 <= Kernels.MinVal) {
+            w[0] = 0;
+            w[1] = 0;
+            return 1;
+        }
+        if (dot1 <= Kernels.MinVal) {
+            w[0] = 0;
+            w[1] = Clip(dot3 / dot2, 0, 1);
+            return 1;
+        }
+        if (dot2 <= Kernels.MinVal) {
+            w[0] = Clip(-dot4 / dot1, 0, 1);
+            w[1] = 0;
+            return 1;
+        }
+        // projections of c (t = 0) and d (t = 1) onto ab
+        double s0 = -dot4 / dot1, s1 = (dot5 - dot4) / dot1;
+        Span<double> cross = stackalloc double[3];
+        Spatial.Cross(cross, ab, cd);
+        double det = Spatial.Dot3(cross, cross);
+        if (det > sin2 * dot1 * dot2) {
+            Span<double> crossCa = stackalloc double[3];
+            Spatial.Cross(crossCa, cd, ca);
+            double s = Clip(Spatial.Dot3(cross, crossCa) / det, 0, 1);
+            ClampSeg(w, 0, s, (dot5 * s + dot3) / dot2, s0, s1);
+            return 1;
+        }
+        // (nearly) parallel: the closest points from both ends of the second segment
+        ClampSeg(w, 0, 0, dot3 / dot2, s0, s1);
+        ClampSeg(w, 2, 1, (dot5 + dot3) / dot2, s0, s1);
+        return 2;
+    }
+
+    /// <summary>
+    ///     Clamps a pair's second weight to [0, 1] and, when it clamps, recomputes the first as the projection of that end
+    ///     (<c>clampSeg</c>).
+    /// </summary>
+    /// <param name="w">The weights, written at <paramref name="at"/> and <paramref name="at"/> + 1.</param>
+    /// <param name="at">The pair's offset in <paramref name="w"/>.</param>
+    /// <param name="s">The first weight when the second is inside.</param>
+    /// <param name="t">The second weight, unclamped.</param>
+    /// <param name="s0">The first weight for <c>t = 0</c>, unclamped.</param>
+    /// <param name="s1">The first weight for <c>t = 1</c>, unclamped.</param>
+    private static void ClampSeg(Span<double> w, int at, double s, double t, double s0, double s1) {
+        if (t < 0) {
+            w[at] = Clip(s0, 0, 1);
+            w[at + 1] = 0;
+        } else if (t > 1) {
+            w[at] = Clip(s1, 0, 1);
+            w[at + 1] = 1;
+        } else {
+            w[at] = s;
+            w[at + 1] = t;
+        }
     }
 
     /// <summary>
@@ -1261,23 +1310,36 @@ public sealed class CheetahCore {
     }
 
     /// <summary>
-    ///     Appends the contacts of two convex geoms by MuJoCo's native convex collider (<c>mjc_Convex</c>): one query of
-    ///     <see cref="Ccd.Run"/>; when it finds one contact, MultiCCD rotates the two geoms by ±0.001 rad about each of
-    ///     the contact frame's tangents, around the contact point and in opposite senses, and keeps each new contact
+    ///     Appends the contacts of two convex geoms by MuJoCo 4's native convex collider (<c>mjc_Convex</c>): one query of
+    ///     <see cref="Ccd.Run"/> asking for <see cref="MaxContacts"/> contacts (two for a capsule against a cylinder, which
+    ///     the query's multi-contact pass finds by clipping the capsule's edge against the cylinder's disk). Only a pair
+    ///     that asks for a single contact goes on to MultiCCD's perturbations: the two geoms rotated by ±0.001 rad about
+    ///     each of the contact frame's tangents, around the contact point and in opposite senses, each new contact kept when
     ///     farther than 0.001 of the smaller bounding radius from all the others, with the first contact's distance.
     /// </summary>
     /// <param name="g1">The first geom (the capsule).</param>
     /// <param name="g2">The second geom (the cylinder).</param>
     /// <param name="margin">The detection margin (margin plus gap).</param>
-    /// <exception cref="NotSupportedException">A zero margin (MuJoCo's single-pass multi-contact), or a convex path not reproduced.</exception>
+    /// <remarks>
+    ///     Reference: MuJoCo 4.0.0's
+    ///     <see href="https://github.com/google-deepmind/mujoco/blob/4.0.0/src/engine/engine_collision_convex.c">engine_collision_convex.c</see>.
+    ///     MuJoCo 3 asked a margined pair for one contact and always perturbed; 4 asks an edge against a face for two in
+    ///     one pass and perturbs only the pairs that ask for one, so Pusher's gripper gets different contacts on the two
+    ///     versions.
+    /// </remarks>
+    /// <exception cref="NotSupportedException">A convex path the collider does not reproduce (see <see cref="Ccd"/>).</exception>
     private void Convex(int g1, int g2, double margin) {
         int first = ncon;
         ccdObj1.Init(m.geom_type[g1], m.geom_size.AsSpan(3 * g1, 3), geom_xpos.AsSpan(3 * g1, 3), geom_xmat.AsSpan(9 * g1, 9), margin);
         ccdObj2.Init(m.geom_type[g2], m.geom_size.AsSpan(3 * g2, 3), geom_xpos.AsSpan(3 * g2, 3), geom_xmat.AsSpan(9 * g2, 9), margin);
-        // maxContacts: a margin makes the single pass return one contact; without one, edge against face would want two
-        if (!(margin > 0))
-            throw new NotSupportedException("the convex collider: a pair without margin (single-pass multi-contact)");
-        int n = Penetration(first, margin);
+        int maxContacts = MaxContacts(m.geom_type[g1], m.geom_type[g2]);
+        // a sphere (MuJoCo: or an ellipsoid) touches at one point, so neither the single pass nor MultiCCD adds any
+        bool round = m.geom_type[g1] == Sphere || m.geom_type[g2] == Sphere;
+        int n = Penetration(first, maxContacts, margin);
+        if (maxContacts > 1 || round) {
+            ncon = first + n;
+            return;
+        }
         if (n == 1) {
             Span<double> frame = stackalloc double[9], quat = stackalloc double[4], rot = stackalloc double[9], invrot = stackalloc double[9];
             con_frame.AsSpan(9 * first, 3).CopyTo(frame);
@@ -1294,7 +1356,7 @@ public sealed class CheetahCore {
                     Kernels.Transpose(invrot, rot, 3, 3);
                     RotateFrame(con_pos.AsSpan(3 * first, 3), invrot, ccdObj2.Mat, ccdObj2.Pos);
                     // the candidate is written after the kept contacts and kept only when distinct
-                    if (Penetration(first + n, margin) > 0 && IsDistinctContact(first, n + 1, tolerance)) {
+                    if (Penetration(first + n, 1, margin) > 0 && IsDistinctContact(first, n + 1, tolerance)) {
                         con_dist[first + n] = con_dist[first];
                         n++;
                     }
@@ -1309,15 +1371,39 @@ public sealed class CheetahCore {
     }
 
     /// <summary>
+    ///     The contacts one pass of the native convex collider asks for (<c>maxContacts</c>, MuJoCo 4, with nativeccd and
+    ///     MultiCCD on as in every bundled model): 8 for two boxes, 4 for two geoms with flat faces (box, mesh, cylinder),
+    ///     2 when a capsule's edge meets a face or another capsule, else 1.
+    /// </summary>
+    /// <param name="type1">The first geom's type.</param>
+    /// <param name="type2">The second geom's type.</param>
+    /// <returns>The contacts wanted from the pass; above 1 the collider's multi-contact pass runs and MultiCCD does not.</returns>
+    private static int MaxContacts(int type1, int type2) {
+        const int box = 6, mesh = 7;
+        if (type1 == box && type2 == box)
+            return 8;
+        bool hasFace1 = type1 == box || type1 == mesh || type1 == Cylinder;
+        bool hasFace2 = type2 == box || type2 == mesh || type2 == Cylinder;
+        bool hasEdge1 = type1 == Capsule, hasEdge2 = type2 == Capsule;
+        if (hasFace1 && hasFace2)
+            return 4;
+        if ((hasEdge1 && hasFace2) || (hasFace1 && hasEdge2) || (hasEdge1 && hasEdge2))
+            return 2;
+        return 1;
+    }
+
+    /// <summary>
     ///     One convex query turned into contacts (<c>mjc_penetration</c>, nativeccd): each witness pair of a negative
     ///     distance gives a contact at the pair's midpoint, with distance <c>margin + witness distance</c> and normal from
     ///     the second witness to the first; the tangent is left zero.
     /// </summary>
     /// <param name="at">The index of the first contact written.</param>
+    /// <param name="nconmax">The contacts the query may return (the collider's <c>max_contacts</c>).</param>
     /// <param name="margin">The detection margin.</param>
-    /// <returns>The contacts written (0 when the geoms do not penetrate).</returns>
-    private int Penetration(int at, double margin) {
-        double dist = Ccd.Run(ccdStatus, ccdPoly, ccdObj1, ccdObj2, m.ccd_iterations, m.ccd_tolerance, 1);
+    /// <returns>The contacts written (0 when the geoms do not penetrate), at most <paramref name="nconmax"/>.</returns>
+    /// <exception cref="NotSupportedException">A convex path the collider does not reproduce (see <see cref="Ccd"/>).</exception>
+    private int Penetration(int at, int nconmax, double margin) {
+        double dist = Ccd.Run(ccdStatus, ccdPoly, ccdObj1, ccdObj2, m.ccd_iterations, m.ccd_tolerance, nconmax);
         if (!(dist < 0))
             return 0;
         int nwitness = ccdStatus.Nx;
@@ -2273,12 +2359,17 @@ public sealed class CheetahCore {
     ///     tolerance or after <c>iterations</c> sweeps.
     /// </summary>
     /// <remarks>
-    ///     The shuffle restarts its generator in every solve, so the sweep orders repeat from step to step. The
-    ///     improvement is scaled by the model's mean inertia, not the island's (unlike Newton). <see cref="efc_state"/>
-    ///     follows the sweeps.
+    ///     The shuffle restarts its generator in every solve, so the sweep orders repeat from step to step. MuJoCo 4 runs
+    ///     PGS per island and scales the improvement by the island's inverse inertia trace (<c>inertiaScale</c>), as
+    ///     Newton does; 3.x used the model's mean inertia. The core runs PGS on one tree only, so its one island holds
+    ///     every dof and the trace is over all of them, in dof order. <see cref="efc_state"/> follows the sweeps.
     /// </remarks>
     private void SolvePgs() {
-        double pgsScale = 1 / (m.meaninertia * Math.Max(1, nv));
+        double trace = 0;
+        for (int i = 0; i < nv; i++)
+            trace += M[m.M_rowadr[i] + m.M_rownnz[i] - 1];
+        // mju_max keeps its first argument on a tie
+        double pgsScale = 1 / MaxFirst(Kernels.MinVal, trace);
         for (int c = 0; c < nefc; c++)
             arInv[c] = 1 / efc_AR[c * (nefc + 1)];
         Array.Copy(efc_force, forcePrev, nefc);
@@ -2776,6 +2867,9 @@ public sealed class CheetahCore {
             xi.Slice(0, nq).CopyTo(qpos);
             xi.Slice(nq, nv).CopyTo(qvel);
             time = t[i - 1];
+            // RKMK (MuJoCo 4): the stage keeps its velocity, but the copy later stages read as a position rate gets
+            // its free-joint angular part mapped to a rotation-vector rate
+            RkCorrectVel(xi.Slice(nq, nv), dX.Slice(0, nv), h);
             Forward();
             qacc.AsSpan(0, nv).CopyTo(rkF.AsSpan(i * nv));
         }
@@ -2791,7 +2885,35 @@ public sealed class CheetahCore {
         Kernels.AddToScl(qvel, rkdX.AsSpan(nv, nv), h, nv);
         IntegratePos(qpos, rkdX.AsSpan(0, nv), h);
         time += h;
-        Array.Copy(qacc, qacc_warmstart, nv);
+        // MuJoCo 4 publishes the step's weighted acceleration as qacc, and warm-starts from the last stage's solve
+        Array.Copy(rkF, 3 * nv, qacc_warmstart, 0, nv);
+        Array.Copy(rkdX, nv, qacc, 0, nv);
+    }
+
+    /// <summary>
+    ///     The Runge-Kutta-Munthe-Kaas correction of a stage velocity (<c>rkCorrectVel</c>): each free joint's angular
+    ///     velocity becomes the rate of its rotation vector, <c>dexp^-1</c> of it at the stage's rotation <c>h*dqvel</c>,
+    ///     so RK4 stays fourth-order for orientations. Slides and hinges are unchanged.
+    /// </summary>
+    /// <param name="vel">The stage velocity, changed in place.</param>
+    /// <param name="dqvel">The stage's position-increment velocity (the rotation is <c>h</c> times its angular part).</param>
+    /// <param name="h">The time step.</param>
+    /// <remarks>
+    ///     Reference: MuJoCo 4.0.0's
+    ///     <see href="https://github.com/google-deepmind/mujoco/blob/4.0.0/src/engine/engine_forward.c">engine_forward.c</see>
+    ///     (<c>rkCorrectVel</c>). Ball joints, which no model here has, would take the same map on their three dofs.
+    /// </remarks>
+    private void RkCorrectVel(Span<double> vel, ReadOnlySpan<double> dqvel, double h) {
+        Span<double> rot = stackalloc double[3];
+        for (int j = 0; j < m.njnt; j++) {
+            if (m.jnt_type[j] != Free)
+                continue;
+            int vadr = m.jnt_dofadr[j] + 3;
+            rot[0] = h * dqvel[vadr];
+            rot[1] = h * dqvel[vadr + 1];
+            rot[2] = h * dqvel[vadr + 2];
+            Spatial.DerivExpmap(vel.Slice(vadr, 3), rot, vel.Slice(vadr, 3));
+        }
     }
 
     /// <summary>

@@ -16,9 +16,9 @@ namespace MujocoPoc;
 /// </summary>
 /// <remarks>
 ///     <see cref="Load"/> refuses any model that uses a feature the core does not reproduce (ball joints, springs on free
-///     joints, active tendons, equality constraints, frictionloss, colliding geoms of other types, a capsule-cylinder
-///     pair without a margin, elliptic cones, the ellipsoid fluid model, stateful actuators, PGS over several kinematic
-///     trees, other integrators or solvers), so a model that loads is one the core steps exactly. Arrays keep MuJoCo's
+///     joints, active tendons, equality constraints, frictionloss, colliding geoms of other types, elliptic cones, the
+///     ellipsoid fluid model, stateful actuators, PGS over several kinematic trees, other integrators or solvers), so a
+///     model that loads is one the core steps exactly (on MuJoCo 4.0.0, the version it follows). Arrays keep MuJoCo's
 ///     names and layouts (row-major, <c>3*i</c>, <c>4*i</c>, <c>9*i</c> strides). The class keeps its first name:
 ///     HalfCheetah's play project compiles it as it is.
 /// </remarks>
@@ -438,10 +438,8 @@ public sealed class CheetahModel {
                 int lo = Math.Min(geom_type[g], geom_type[h]), hi = Math.Max(geom_type[g], geom_type[h]);
                 bool ok = (lo == 0 && (hi == 2 || hi == 3 || hi == 5)) || (lo == 2 && (hi == 2 || hi == 3)) || (lo == 3 && (hi == 3 || hi == 5));
                 Require(ok, $"geoms {g} and {h}: a collider for geom types {lo} and {hi}");
-                // without a margin the convex collider makes several contacts by clipping polygons, which the core
-                // leaves out; with one it makes a single contact plus MuJoCo's perturbed ones (CheetahCore.Convex)
-                if (lo == 3 && hi == 5)
-                    Require(geom_margin[g] + geom_margin[h] > 0, $"geoms {g} and {h}: a capsule-cylinder pair needs a margin (one contact per pair)");
+                // a capsule-cylinder pair needs no margin on MuJoCo 4: its convex collider clips the capsule's edge
+                // against the cylinder's disk with or without one (Ccd.Multicontact), where MuJoCo 3 perturbed instead
             }
         // tendons: fixed, and inert in the dynamics (no limit, spring, damper, armature, friction loss or actuator), so the
         // core only reports their lengths and velocities

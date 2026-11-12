@@ -1,5 +1,5 @@
-"""Oracle for the from-scratch core (Gymnasium's 21 MuJoCo ids that run on MuJoCo 3, and any other MuJoCo env physics
-only): records MuJoCo 3.15.0's exact state after every mj_step of seeded episodes, and Gymnasium's env results, as
+"""Oracle for the from-scratch core (Gymnasium's 21 MuJoCo ids that run on MuJoCo 3 and 4, and any other MuJoCo env
+physics only): records the installed MuJoCo's exact state (the core follows 4.0.0, DR-64) after every mj_step of seeded episodes, and Gymnasium's env results, as
 binary files the C# checker compares against bit for bit.
 
 Writes into the output folder:
@@ -22,7 +22,7 @@ Args (command line):
     --out DIR         output folder (required; HalfCheetah writes about 40 MB per 1,000 env steps, Humanoid more: keep it
                       outside the repo).
     --env ID          any Gymnasium MuJoCo id (default HalfCheetah-v5). The checker has env rules (EnvRules.cs) for the 21
-                      ids that run on MuJoCo 3 (every v4 and v5 but Pusher-v4, which refuses MuJoCo 3), and checks any
+                      ids that run on MuJoCo 3 and 4 (every v4 and v5 but Pusher-v4, which refuses MuJoCo 3 and later), and checks any
                       other id physics only.
     --seed N          the first episode's reset and action-space seed (default 42); episode k uses seed + k.
     --episodes N      how many episodes (default 1).

@@ -11,7 +11,7 @@ using NumSharp;
 namespace MujocoPoc;
 
 /// <summary>
-///     Checks the core against MuJoCo 3.15.0 and Gymnasium bit for bit, for the 21 MuJoCo ids that run on MuJoCo 3 (the
+///     Checks the core against MuJoCo 4.0.0 and Gymnasium bit for bit, for the 21 MuJoCo ids that run on MuJoCo 4 (the
 ///     rules in <see cref="EnvRules"/>): the reset noise and the sampled actions (NumSharp's NumPy generator), every
 ///     mjData array oracle.py recorded after each physics step and each env step, and the env's observation, reward,
 ///     flags and info after each env step.

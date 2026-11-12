@@ -6,7 +6,7 @@ recording resumes where it stopped (delete a folder to record it again).
 
 Args (command line):
     --out DIR       the folder that receives one subfolder per trace (required).
-    --python PATH   the Python with numpy and mujoco 3.15.0 (default: this interpreter).
+    --python PATH   the Python with numpy and mujoco 4.0.0, the version the core follows (default: this interpreter).
     --jobs N        concurrent oracle.py runs (default 8; each is single-threaded).
     --only NAMES    record only these folder names (default: every line).
     --list PATH     the trace list (default: traces.txt next to this script).
