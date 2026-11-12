@@ -8,7 +8,6 @@
           "files": [
             "Gym/Gym.csproj",
             "Gym.Environments/Gym.Environments.csproj",
-            "Gym.Box2D/Gym.Box2D.csproj",
             "Gym.Rendering/Gym.Rendering.csproj",
             "Gym.Rendering.Avalonia/Gym.Rendering.Avalonia.csproj"
           ]

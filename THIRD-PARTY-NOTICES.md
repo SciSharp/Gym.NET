@@ -92,7 +92,7 @@ Andreas Schiffler -- aschiffler at ferzkopp dot net
 
 ## Box2D 2.3.0 and pybox2d 2.3.10 (zlib)
 
-`src/Gym.Box2D` (the `Gym.Box2D` assembly, shipped inside Gym.NET.Environments) is a C# translation of the
+`src/Gym.Environments/Box2D` (the `Gym.Box2D` namespace, compiled into Gym.NET.Environments' assembly) is a C# translation of the
 [Box2D](https://box2d.org) 2.3.0 C++ sources that [pybox2d](https://github.com/pybox2d/pybox2d) 2.3.10 bundles
 (`Box2D/Common`, `Collision`, `Dynamics`: the parts Gymnasium's box2d environments reach), and of pybox2d's SWIG
 extensions (`Box2D/*.i`) for the Python-shaped surface those environments call. Every file is an altered version, marked

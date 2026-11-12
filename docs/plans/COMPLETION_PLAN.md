@@ -833,6 +833,8 @@ reset waits on NumSharp's N-1).*
     sleeping switches; the keyword errors' prefixes and chained originals.
   - `Gym.Environments` references the engine privately and packs `Gym.Box2D.dll` (with its xml and pdb) into
     `lib/<tfm>/` of Gym.NET.Environments, with no package dependency of its own.*
+  *Since DR-65 (2026-11-12) the engine has no project of its own: its sources live in `src/Gym.Environments/Box2D`,
+  still in the `Gym.Box2D` namespace, and compile into Gym.Environments.dll, so nothing is packed separately.*
 - **P8.2** LunarLander-v3 and LunarLanderContinuous-v3 as `LunarLanderEnv` (DR-32, `[PyName("LunarLander")]`), with
   `heuristic` and a private nested `ContactDetector` (DR-28); the 8 LunarLander `[OpenBugs]` cells turn green.
   *Done 2026-11-11:*

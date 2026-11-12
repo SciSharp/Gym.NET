@@ -17,12 +17,11 @@
     <!-- The compositor's inner loops index spans by hand; AllowUnsafeBlocks is not needed, bounds checks stay on. -->
   </PropertyGroup>
 
-  <!-- The envs and their heuristics; Gym.Box2D is referenced directly because CarRacing's driver reads the hull's
-       b2Body (Gym.Environments references Gym.Box2D privately, so its types do not flow to this project). -->
+  <!-- The envs and their heuristics. CarRacing's driver reads the hull's b2Body, a Gym.Box2D type that Gym.Environments
+       compiles itself (DR-65), so this one reference brings it. -->
   <ItemGroup>
     <ProjectReference Include="..\..\src\Gym\Gym.csproj" />
     <ProjectReference Include="..\..\src\Gym.Environments\Gym.Environments.csproj" />
-    <ProjectReference Include="..\..\src\Gym.Box2D\Gym.Box2D.csproj" />
   </ItemGroup>
 
   <!-- The Python half of the parity segment, run as a separate process, sits next to the program. -->

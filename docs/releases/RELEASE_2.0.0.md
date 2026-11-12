@@ -19,7 +19,7 @@ It replaces 0.2's API, which followed gym before 0.26, with Gymnasium's.
 |---|---|
 | Gym.NET | The env contract, wrappers, spaces, registry (`Gymnasium.Make`, `MakeVec`), vector envs, checkers, seeding, errors; `Gym.Legacy` |
 | Gym.NET.Rendering (new) | The rasterizer `rgb_array` frames are drawn with, equal to pygame-ce's pixels |
-| Gym.NET.Environments | classic_control, toy_text and box2d (LunarLander, BipedalWalker, CarRacing), CartPole's vector env, their registration; inside it, `Gym.Box2D`: Box2D 2.3.0 in managed C#, bit for bit as pybox2d 2.3.10, with pybox2d's surface (zlib notices in THIRD-PARTY-NOTICES.md) |
+| Gym.NET.Environments | classic_control, toy_text and box2d (LunarLander, BipedalWalker, CarRacing), CartPole's vector env, their registration; inside its assembly, the `Gym.Box2D` namespace: Box2D 2.3.0 in managed C#, bit for bit as pybox2d 2.3.10, with pybox2d's surface (zlib notices in THIRD-PARTY-NOTICES.md) |
 | Gym.NET.Rendering.Avalonia | A window for `human` mode on Avalonia 12 (Windows, Linux, macOS), and `PlayPlot`'s live charts on ScottPlot (`AvaloniaPlotFigure`) |
 | Gym.NET.Rendering.WinForm | The same on Windows Forms (`WinFormPlotFigure`) |
 

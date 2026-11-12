@@ -36,8 +36,8 @@
     <ProjectReference Include="..\..\src\Gym.Environments\Gym.Environments.csproj" />
     <!-- The rasterizer, compared primitive by primitive with pygame.gfxdraw (Tests/Rendering). -->
     <ProjectReference Include="..\..\src\Gym.Rendering\Gym.Rendering.csproj" />
-    <!-- The Box2D engine, compared scene by scene with live pybox2d (Tests/Box2D); its internals are visible to this suite. -->
-    <ProjectReference Include="..\..\src\Gym.Box2D\Gym.Box2D.csproj" />
+    <!-- The Box2D engine, compared scene by scene with live pybox2d (Tests/Box2D), comes with Gym.Environments, which
+         compiles it (DR-65) and shows its internals to this suite. -->
   </ItemGroup>
 
   <!-- DR-17: the registration initializer Gym.NET.Environments' package compiles into a consuming app, imported by path (a
