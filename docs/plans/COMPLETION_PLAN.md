@@ -1122,6 +1122,16 @@ The designs approved for the resumption before round 21, superseded where noted:
     beyond its 60-minute limit and rendering MuJoCo frames on a GPU-less runner before it checks the GPU; the
     maintainer's decisions on DR-70's readings, review findings R12 and R13 (breaking after 1.0) and `DictInfoToList`'s
     result shape; at P10.5, pack with `-p:ContinuousIntegrationBuild=true` so no local paths ship.*
+  - *2026-11-13, before the release PR: CI's two known problems are fixed, and a third found while verifying them. The
+    windows job's limit is 240 minutes. Every cell that lets Gymnasium draw MuJoCo frames (the 44 frame cells, the
+    overlay cell, the 21 MuJoCo goldens' live cells) asks `MujocoGpuProbe` before Gymnasium's first render, so the
+    GPU-less runner reports them Inconclusive, as DR-71 rules, instead of failing inside Gymnasium's `render()`.
+    Measured by making Gymnasium refuse its OpenGL backend (`MUJOCO_GL=wgl`): the 66 failed before the fix and are
+    Inconclusive after it, and the whole gate under it gives 2,850 passed, 66 Inconclusive, none failed. The third:
+    with `GYMNET_PARITY_ARTIFACTS` set, as CI sets it, the three frameworks' test hosts wrote the frame cells' PNGs to
+    the same files at once (six `IOException`s on a GPU machine); a set root now gets a folder per framework. The whole
+    gate then passes 2,916 of 2,916 on net8.0, net10.0 and net11.0 on the reference GPU. CI itself has still never
+    run: the branch is not pushed.*
 
 ## 6. How every step is done
 

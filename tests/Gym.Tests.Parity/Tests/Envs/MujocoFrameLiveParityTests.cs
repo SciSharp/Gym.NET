@@ -28,8 +28,10 @@ namespace Gym.Tests.Parity.Tests.Envs {
     ///     Gym.NET reproduces where they were measured (<c>tools/parity/mujoco/gpu_probe.py</c>) and approximates elsewhere.
     ///     So the cells are pinned twice: to the reference platform, whose arithmetic the engine's trajectory is bit for bit
     ///     with, and to the GPU the baseline was recorded on (<see cref="MujocoFrameBaseline"/>); on another GPU or driver they
-    ///     are Inconclusive. A deliberate improvement re-records the baseline with <c>GYMNET_PARITY_RECORD_BASELINE=1</c>,
-    ///     which also measures the noise from five renders of each state.
+    ///     are Inconclusive, and so where Gymnasium cannot draw MuJoCo frames at all (a machine without a GPU, such as CI's
+    ///     hosted runner), which <see cref="MujocoGpuProbe"/> finds before Gymnasium's first render. A deliberate improvement
+    ///     re-records the baseline with <c>GYMNET_PARITY_RECORD_BASELINE=1</c>, which also measures the noise from five
+    ///     renders of each state.
     ///     </para>
     ///     <para>
     ///     The trajectory itself runs through <see cref="GymPair"/>, so every reset and step is still compared bit for bit
@@ -61,7 +63,7 @@ namespace Gym.Tests.Parity.Tests.Envs {
         /// <param name="id">The id.</param>
         /// <param name="mode"><c>rgb_array</c> or <c>depth_array</c>.</param>
         /// <exception cref="AssertFailedException">A frame worse than its baseline, a frame with no baseline, or frames of different shapes.</exception>
-        /// <exception cref="AssertInconclusiveException">Off the reference platform, or on another GPU than the baseline's.</exception>
+        /// <exception cref="AssertInconclusiveException">Off the reference platform, on another GPU than the baseline's, or where Gymnasium cannot draw MuJoCo frames (no GPU).</exception>
         /// <exception cref="ParityException">The trajectory diverged before a frame was taken.</exception>
         [TestMethod]
         [DynamicData(nameof(IdsAndModes))]
@@ -78,7 +80,7 @@ namespace Gym.Tests.Parity.Tests.Envs {
         ///     both states.
         /// </summary>
         /// <exception cref="AssertFailedException">The planted defect passed the gate.</exception>
-        /// <exception cref="AssertInconclusiveException">Off the reference platform or GPU, or while recording (the control would record its defect).</exception>
+        /// <exception cref="AssertInconclusiveException">Off the reference platform or GPU, where Gymnasium cannot draw MuJoCo frames (no GPU), or while recording (the control would record its defect).</exception>
         [TestMethod]
         public void PlantedTexturelessFloor_FailsTheGate() {
             SkipOffReferencePlatform(Platform);
@@ -96,7 +98,7 @@ namespace Gym.Tests.Parity.Tests.Envs {
         ///     (<c>default_camera_config</c>), so every depth value moves.
         /// </summary>
         /// <exception cref="AssertFailedException">The planted defect passed the gate.</exception>
-        /// <exception cref="AssertInconclusiveException">Off the reference platform or GPU, or while recording.</exception>
+        /// <exception cref="AssertInconclusiveException">Off the reference platform or GPU, where Gymnasium cannot draw MuJoCo frames (no GPU), or while recording.</exception>
         [TestMethod]
         public void PlantedFartherCamera_FailsTheDepthGate() {
             SkipOffReferencePlatform(Platform);
@@ -119,10 +121,20 @@ namespace Gym.Tests.Parity.Tests.Envs {
         /// <param name="dotnetKwargs">Gym.NET's side's keyword arguments (a negative control plants its defect here).</param>
         /// <param name="record">Whether to record instead of gating.</param>
         /// <returns>The states that failed the gate, each with its measurement; empty when all passed or recorded.</returns>
-        /// <exception cref="AssertInconclusiveException">Gymnasium draws on another GPU than the baseline's.</exception>
+        /// <exception cref="AssertInconclusiveException">
+        ///     Gymnasium cannot draw MuJoCo frames here (a machine without a GPU, found by <see cref="MujocoGpuProbe"/> before
+        ///     its first render), or draws them on another GPU than the baseline's.
+        /// </exception>
         /// <exception cref="ParityException">The trajectory diverged before a frame was taken.</exception>
         private List<string> Run(string id, string mode, Dictionary<string, object?> dotnetKwargs, bool record) {
             MujocoFrameBaseline baseline = MujocoFrameBaseline.Load();
+            // before Gymnasium's first render, which raises where it cannot draw MuJoCo frames (no GPU): such a machine, or
+            // another GPU than the baseline's, is Inconclusive (DR-71); recording needs only that Gymnasium can draw them,
+            // since the GPU it draws on becomes the baseline's
+            if (record)
+                MujocoGpuProbe.RequireRendering("Recording the MuJoCo frame baseline needs Gymnasium's frames");
+            else
+                MujocoGpuProbe.RequireGpu(baseline.Gpu, "The MuJoCo frame baseline was recorded");
             using var pair = new GymPair(PyGymEnv.Make(id, renderMode: mode),
                                          new GymNetEnv((IEnv)PyKwargs.Construct((Type)Gymnasium.Spec(id).EntryPoint!, dotnetKwargs)));
             var failures = new List<string>();

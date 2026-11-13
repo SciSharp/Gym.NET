@@ -349,10 +349,13 @@ result = (kinds, floats)
         ///     column, boxes larger than the frame, lines without a final newline: every pixel equal.
         /// </summary>
         /// <exception cref="AssertFailedException">A set's pixels differ.</exception>
-        /// <exception cref="AssertInconclusiveException">Off the reference platform, on another GPU than the baseline's, or when Gymnasium's two plain renders differ.</exception>
+        /// <exception cref="AssertInconclusiveException">Off the reference platform, on another GPU than the baseline's, where Gymnasium cannot draw MuJoCo frames (no GPU), or when Gymnasium's two plain renders differ.</exception>
         [TestMethod]
         public void GymNet_Overlay_IsMujocosMjrOverlay() {
             SkipOffReferencePlatform(Platform);
+            // before Gymnasium renders: a machine where it cannot draw MuJoCo frames (no GPU), or another GPU than the one the
+            // blending was measured on, is Inconclusive here instead of failing inside Gymnasium's render
+            MujocoGpuProbe.RequireGpu(MujocoFrameBaseline.Load().Gpu, "The overlay's blending was measured");
             List<(int Gridpos, string Text1, string Text2)[]> sets = OverlaySets();
             Frame? first = null, again = null;
             var frames = new List<Frame>();
