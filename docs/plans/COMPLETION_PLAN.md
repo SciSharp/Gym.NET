@@ -1132,6 +1132,14 @@ The designs approved for the resumption before round 21, superseded where noted:
     the same files at once (six `IOException`s on a GPU machine); a set root now gets a folder per framework. The whole
     gate then passes 2,916 of 2,916 on net8.0, net10.0 and net11.0 on the reference GPU. CI itself has still never
     run: the branch is not pushed.*
+  - *2026-11-21, the architecture review reopens the API before the release (design rounds 26 and 27, DR-75…DR-92): the
+    maintainer reviewed 24 decisions beyond the environments and kept eleven. Before the release PR: NumSharp 0.81.0
+    and its exceptions throughout (DR-76, DR-90); the render mode, `AutoresetMode` and `VectorizeMode` as enums with
+    string twins, and `RenderResult` convertible to `NDArray` and `Image` (DR-77, DR-84); the viewer contract split into
+    `IEnvViewer` and `IAsyncEnvViewer` over frames (DR-85); `Make` taking a render mode and a viewer factory (DR-89); a
+    static `Spaces` class and typed space members (DR-79, DR-86); `Gymnasium.Envs` id constants (DR-88); `Info`'s
+    converting `Get<T>`, 0.2's `Information`, reference equality with `PyEquals`, and generated info records for every
+    env (DR-78, DR-91, DR-92); `Clone()` for spaces (DR-81); `[NDScoped]` first in the guides (DR-80).*
 
 ## 6. How every step is done
 
