@@ -196,19 +196,31 @@ namespace Gym.Tests.Gymnasium.Wrappers {
         ///     Gym.NET's own: <see cref="FfmpegVideoWriter"/> writes the triggered videos as mp4 files of Gymnasium's names, when
         ///     <c>ffmpeg</c> is installed (Inconclusive otherwise).
         /// </summary>
+        /// <remarks>
+        ///     The writer starts ffmpeg when a recording stops, and here that happens inside <c>Close</c> (the stack trace of
+        ///     the failure on GitHub's Windows runner, which has no ffmpeg, shows <c>Close</c> calling <c>StopRecording</c>).
+        ///     So the Inconclusive check wraps the close as well as the steps; it wrapped only the steps, and a machine without
+        ///     ffmpeg failed the test with <see cref="Gym.Exceptions.DependencyNotInstalled"/> from the <c>finally</c>.
+        /// </remarks>
+        /// <exception cref="AssertInconclusiveException">Thrown when ffmpeg is not installed or not on <c>PATH</c>.</exception>
+        /// <exception cref="AssertFailedException">Thrown when ffmpeg ran but wrote no non-empty <c>rl-video-episode-0.mp4</c>.</exception>
         [TestMethod]
         public void TestFfmpegWriterWritesMp4Files() {
             string videoFolder = TemporaryFolder();
             try {
                 var env = new RecordVideo<NDArray, NDArray>(MakeRgb(), videoFolder, videoWriter: new FfmpegVideoWriter(), episodeTrigger: x => x == 0, videoLength: 5);
                 try {
-                    env.Reset(seed: 123);
-                    for (int i = 0; i < 6; i++)
-                        env.Step(env.ActionSpace.Sample());
+                    try {
+                        env.Reset(seed: 123);
+                        for (int i = 0; i < 6; i++)
+                            env.Step(env.ActionSpace.Sample());
+                    } finally {
+                        // Close stops the open recording, which is when the writer starts ffmpeg. It runs after a failed step
+                        // too, so the env is released; a missing ffmpeg it reports (again, after a step's) reaches the catch below.
+                        env.Close();
+                    }
                 } catch (Gym.Exceptions.DependencyNotInstalled e) {
                     Assert.Inconclusive(e.Message);
-                } finally {
-                    env.Close();
                 }
 
                 string video = Path.Combine(videoFolder, "rl-video-episode-0.mp4");
