@@ -1,7 +1,5 @@
 # Gym.NET 1.0.0+rc1
 
-<!-- Prepared, not published yet: verified on 2026-11-21 on the working branch journey1. It ships when the maintainer merges it into master, tags v1.0.0+rc1 and publishes the packages (completion plan P10.5). Before publishing: remove this comment, bring the Overview's commit count up to date, and paste the file without its H1 as the GitHub release body; the release title carries the name and version ("Gym.NET 1.0.0+rc1 - Gymnasium 1.4.0, Modernize and redesign Gym.NET"). -->
-
 Gym.NET 1.0 brings Farama Gymnasium v1.4.0's API and 39 of its environments (classic_control, box2d, toy_text and MuJoCo) to .NET: for the same seed and actions, they return Gymnasium's observations, rewards, flags and infos bit for bit and draw its frames pixel for pixel (MuJoCo's within a measured margin).
 Box2D and MuJoCo run as managed C# inside the package, with no native code to install, and a parity suite that runs Gymnasium inside the test process checks every value and every frame.
 It is the first release since 0.2.0 (March 2023), and it replaces 0.2's API, which followed gym before 0.26, with Gymnasium's.
@@ -21,7 +19,7 @@ It is the first release since 0.2.0 (March 2023), and it replaces 0.2's API, whi
 - **Memory released with `[NDScoped]`** - the guides and the 24 examples release what an env returns with NumSharp.Build's attribute, and every env, wrapper and vector env stays correct when stepped inside such a scope.
 - **.NET 8, .NET 10 and .NET 11** - every package carries a build for each (the Windows Forms viewer's for Windows).
 - **Release candidate 1, `1.0.0+rc1`** - NuGet ignores the `+rc1` build metadata, so to every NuGet client these are the stable 1.0.0 packages; whatever follows, a fix or the final, ships as 1.0.1.
-- **14 deliberate differences from Gymnasium**, **1 known gap**, **9 environments measured faster than Gymnasium** and **16 breaking changes from 0.2.0**, across the 117 commits since 0.2.0; the migration guide maps every 0.2 call, and `Gym.Legacy` keeps 0.2's commonest lines compiling, `[Obsolete]`, until 2.0.
+- **14 deliberate differences from Gymnasium**, **1 known gap**, **9 environments measured faster than Gymnasium** and **16 breaking changes from 0.2.0**, across the 118 commits since 0.2.0; the migration guide maps every 0.2 call, and `Gym.Legacy` keeps 0.2's commonest lines compiling, `[Obsolete]`, until 2.0.
 - **1 new NuGet package** - **Gym.NET.Rendering**.
 - **4,097 unit tests and 2,922 live parity cells** pass on net8.0, net10.0 and net11.0, Gymnasium's own tests, rewritten in C#, among them.
 
