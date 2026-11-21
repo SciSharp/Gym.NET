@@ -399,14 +399,24 @@ namespace Gym.Tests.Utils {
         ///     the time since the previous tick, and a canceled wait throws through its task.
         /// </summary>
         /// <returns>The test.</returns>
+        /// <remarks>
+        ///     The bounds prove that the tick waited, not how precisely. Windows' timers count whole system-timer periods
+        ///     (about 15.6 ms unless a process raised the resolution), and a wait between one and two periods may end at the
+        ///     first, so an awaited 19-20 ms wait can measure a few milliseconds short by the Stopwatch the clock reads:
+        ///     GitHub's Windows runner measured 18 ms against the former bound of 19 (and 15 for the stopwatch). A tick that
+        ///     did not wait measures 0-1 ms, so half a frame tells the two apart with a whole early period to spare.
+        /// </remarks>
+        /// <exception cref="AssertFailedException">Thrown when the tick did not wait, mismeasured, or a canceled wait did not throw.</exception>
         [TestMethod]
         public async Task Clock_TickAsync_PacesAndCancels() {
             var clock = new Clock();
             await clock.TickAsync(50);
             var watch = Stopwatch.StartNew();
             long passed = await clock.TickAsync(50);
-            Assert.IsTrue(watch.ElapsedMilliseconds >= 15, $"The tick waited {watch.ElapsedMilliseconds} ms for a 20 ms frame.");
-            Assert.IsTrue(passed >= 19, $"The tick measured {passed} ms for a 20 ms frame.");
+            Assert.IsTrue(watch.ElapsedMilliseconds >= 10, $"The tick waited {watch.ElapsedMilliseconds} ms for a 20 ms frame.");
+            Assert.IsTrue(passed >= 10, $"The tick measured {passed} ms for a 20 ms frame.");
+            // What it returns is the time since the previous tick, the wait included: the same value GetTime reads.
+            Assert.AreEqual(passed, clock.GetTime());
 
             using var cancellation = new CancellationTokenSource();
             cancellation.Cancel();

@@ -83,7 +83,10 @@ namespace Gym.Rendering {
         /// <remarks>
         ///     A wait shorter than the system timer's period may last a whole period (about 15.6 ms on Windows unless the
         ///     process raised the timer resolution), where <see cref="Tick"/>'s sleep has the same limit: hold rates of 60 fps
-        ///     and below for even pacing. One tick at a time: await each before the next, from any thread.
+        ///     and below for even pacing. The other way round, a wait between one and two periods may end at the first, so a
+        ///     tick can return a few milliseconds less than <c>1000 / framerate</c> (18 ms for a 20 ms frame was measured on
+        ///     a GitHub Windows runner); <see cref="Tick"/>'s sleep, and pygame's <c>tick</c>, which sleeps the same way, have
+        ///     the same limit. One tick at a time: await each before the next, from any thread.
         /// </remarks>
         public async ValueTask<long> TickAsync(double framerate = 0, CancellationToken cancellationToken = default) {
             long delay = Delay(framerate, out float rate);

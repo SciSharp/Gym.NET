@@ -25,6 +25,15 @@ opencv-python-headless==4.13.0.92
 # (src/Gym.Environments/MuJoCo) follows this version bit for bit on win-x64. It brings absl-py, etils, glfw and
 # PyOpenGL; rendering is not compared (DR-67), so no GL context is needed.
 mujoco==4.0.0
+# The rest of Gymnasium's extra "mujoco" (pyproject.toml: imageio>=2.14.1, packaging>=23.0), which
+# gymnasium/envs/mujoco/mujoco_rendering.py imports at module load, so no MuJoCo id makes without them. They were
+# missing here until CI's first parity run on a clean venv failed every MuJoCo cell with "No module named 'imageio'":
+# the reference machine's interpreter had both from other work, which hid the gap. The versions are that machine's;
+# pillow, which imageio requires, is pinned beside it so a clean venv resolves the same build. None of the three
+# computes a compared value.
+imageio==2.38.1
+packaging==26.0
+pillow==11.3.0
 # Gymnasium's own runtime dependencies (pyproject.toml, "dependencies"). cloudpickle and typing-extensions are the
 # versions on the reference machine. farama-notifications is not installed there (gymnasium/__init__.py imports it
 # inside try/except, and it only prints release notices), so it is pinned to its latest release, 0.0.6; it never
