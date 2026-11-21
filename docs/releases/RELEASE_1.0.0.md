@@ -306,7 +306,8 @@ against NumSharp 0.81.0):
   - Gymnasium's own `check_env` and `check_environments_match`, run through the reverse bridge on the 38 ids that build;
   - the 40 golden trajectories, replayed without Python;
   - the MuJoCo frame and window cells, on the reference GPU (NVIDIA GeForce RTX 4060 Ti, driver 616.56).
-- **The five packages at `1.0.0+rc1`** (2026-11-21), packed with `-p:ContinuousIntegrationBuild=true` on SDK 11.0.100:
+- **The five packages at `1.0.0+rc1`** (2026-11-21), built from a fresh export of the release commit with
+  `-p:ContinuousIntegrationBuild=true` on SDK 11.0.100 (building packs them):
   each manifest carries `1.0.0+rc1`, the files are named `<id>.1.0.0.nupkg` (NuGet drops the metadata from file names),
   the packages depend on each other at 1.0.0, and the assemblies are 1.0.0.0 with the product version `1.0.0+rc1`.
   Restored from a local feed into an app on .NET 10 that references `Version="1.0.0"`, they resolve to this candidate,

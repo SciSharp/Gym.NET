@@ -203,8 +203,10 @@ dotnet build src/Gym.Rendering.WinForm/Gym.Rendering.WinForm.csproj -c Release
 dotnet run --project examples/CartPole -c Release
 dotnet run --project examples/Hopper -c Release
 
-# The packages (version 1.0.0+rc1, decision D25: NuGet resolves it as 1.0.0, so the next release is 1.0.1; each carries README.md and THIRD-PARTY-NOTICES.md) into a folder of your choice; building also packs (GeneratePackageOnBuild)
-dotnet pack Gym.NET.sln -c Release -o <folder>
+# The packages (version 1.0.0+rc1, decision D25: NuGet resolves it as 1.0.0, so the next release is 1.0.1; each carries README.md and THIRD-PARTY-NOTICES.md) into a folder of your choice.
+# Build, not pack: with GeneratePackageOnBuild the Pack target skips the build, so `dotnet pack` on a fresh clone fails with NU5026
+# (the DLLs to pack do not exist yet); the build packs each project as it finishes. A release build adds -p:ContinuousIntegrationBuild=true.
+dotnet build src/Gym/Gym.csproj -c Release -p:ContinuousIntegrationBuild=true -p:PackageOutputPath=<folder>   # and the same for the four other packaged projects
 ```
 
 ### 3.2 Running Automated Tests

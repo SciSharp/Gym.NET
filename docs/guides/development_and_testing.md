@@ -37,7 +37,10 @@ dotnet build Gym.NET.sln -c Release
 
 The solution holds the five packaged libraries (`src/Gym`, `src/Gym.Rendering`, `src/Gym.Environments`,
 `src/Gym.Rendering.Avalonia`, `src/Gym.Rendering.WinForm`), the source generator (`src/Gym.SourceGenerators`), the test
-projects and `examples/CartPole`. Building the libraries also packs them (`GeneratePackageOnBuild`).
+projects and `examples/CartPole`. Building the libraries also packs them (`GeneratePackageOnBuild`): a release build is
+`dotnet build src/<project>/<project>.csproj -c Release -p:ContinuousIntegrationBuild=true -p:PackageOutputPath=<folder>`
+for each of the five. Build rather than `dotnet pack`: with `GeneratePackageOnBuild` the Pack target skips the build, so
+`dotnet pack` on a fresh clone stops with NU5026, the DLLs to pack not existing yet.
 
 ## The unit suite: tests/Gym.Tests
 
