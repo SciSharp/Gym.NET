@@ -138,6 +138,8 @@ so "0 pixels different" would not hold. The MuJoCo caption says what does: "MUJO
 
 ## The docs site
 
-`docfx docs/docfx.json` builds the site into `docs/website-src/_site`. Preview it with
+`docfx docs/docfx.json` builds the site into `docs/website-src/_site`, after
+`dotnet build src/Gym.SourceGenerators/Gym.SourceGenerators.csproj -c Release`: DocFX loads Gym.NET's source generator
+from that Release output, and without it every generated member fails to compile (CS0534). Preview it with
 `docfx docs/docfx.json --serve`; the gallery fetches `envs.json`, so it needs to be served over http, not opened as a
 file. `.github/workflows/docs.yml` publishes it to GitHub Pages from master.

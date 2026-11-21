@@ -58,6 +58,13 @@ jobs:
       - name: Install DocFX
         run: dotnet tool install -g docfx --version 2.78.4
 
+      # DocFX compiles the documented projects itself and loads Gym.NET's source generator (the [GymOptions] records,
+      # the [GymTuple]/[GymDict] records and the typed info records' ToInfoCore) from the generator's Release output.
+      # A clean runner has none, so DocFX reported FailedToResolveAnalyzer and every generated member then failed as
+      # CS0534 (first seen on the 1.0.0+rc1 PR). Building the generator first is what DocFX itself asks for.
+      - name: Build the source generator (DocFX loads it from bin/Release)
+        run: dotnet build src/Gym.SourceGenerators/Gym.SourceGenerators.csproj -c Release
+
       - name: Build
         run: docfx docs/docfx.json
 
