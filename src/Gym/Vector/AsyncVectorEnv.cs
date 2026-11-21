@@ -381,8 +381,10 @@ namespace Gym.Vector {
                 infos = AddInfo(infos, (Info)result[1]!, i);
             }
 
+            // The batch is kept for the next call, past any NumSharp scope the caller opened (DR-96); concatenating into the
+            // existing batch returns it, and keeping an untracked array does nothing.
             if (!SharedMemory)
-                _observations = VectorUtils.Concatenate(SingleObservationSpace, observations, _observations);
+                _observations = ScopeSafety.Keep(VectorUtils.Concatenate(SingleObservationSpace, observations, _observations));
             _state = AsyncState.Default;
             return new VectorResetResult<TObs>(ObservationsOut(), infos);
         }
@@ -465,8 +467,10 @@ namespace Gym.Vector {
 
             RaiseIfErrors(successes);
 
+            // The batch is kept for the next call, past any NumSharp scope the caller opened (DR-96); concatenating into the
+            // existing batch returns it, and keeping an untracked array does nothing.
             if (!SharedMemory)
-                _observations = VectorUtils.Concatenate(SingleObservationSpace, observations, _observations);
+                _observations = ScopeSafety.Keep(VectorUtils.Concatenate(SingleObservationSpace, observations, _observations));
             _state = AsyncState.Default;
             return new VectorStepResult<TObs>(ObservationsOut(), np.array(rewards.ToArray()), np.array(terminations.ToArray()), np.array(truncations.ToArray()), infos);
         }

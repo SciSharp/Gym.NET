@@ -66,8 +66,45 @@ The later samples also use `System.Collections.Generic`, `Gym.Observations`, `Gy
 
 ### Releasing what an env returns
 
-The arrays an env returns belong to the caller, and they hold native memory. Both results are `IDisposable`: disposing
-one releases its observation and the arrays in its info, so `using` does it at the end of the scope:
+The arrays an env returns belong to the caller, and they hold native memory. The way to release them is NumSharp's
+`[NDScoped]`: every array a scoped method builds, or receives from an env, and does not return is released when the
+method returns. NumSharp.Build, a build-time package, weaves the attribute into your assembly:
+
+```xml
+<PackageReference Include="NumSharp.Build" Version="0.81.0" PrivateAssets="all" />
+```
+
+```csharp
+using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("CartPole-v1");   // built outside the scoped method
+for (int episode = 0; episode < 3; episode++)
+    Console.WriteLine(RunEpisode(env, seed: episode));
+
+[NDScoped]   // every array this call builds and does not return is released when it returns
+static double RunEpisode(Env<NDArray, NDArray> env, int seed) {
+    env.Reset(seed: seed);
+    double episodeReturn = 0;
+    while (true) {
+        var (_, reward, terminated, truncated, _) = env.Step(env.ActionSpace.Sample());
+        episodeReturn += reward;
+        if (terminated || truncated)
+            return episodeReturn;
+    }
+}
+```
+
+Two rules come with it:
+
+- Build envs and spaces outside the scoped method, or dispose them inside it. An env built inside the scope and kept
+  after it would find its arrays released when the scope closes; NumSharp.Build refuses an `[NDScoped]` method that
+  returns one (NDW003), but cannot see one stored in a field.
+- Scope an episode, not a training run: a scope releases when its method returns, so a scoped method running a million
+  steps holds every step's arrays until it ends. An `async` method takes `[NDScopedAsync]`.
+
+Every built-in env, wrapper and vector env keeps working when you step it inside a scope: what they keep from one step
+to the next is detached from your scope (DR-96).
+
+`using` is the alternative, one result at a time. Both results are `IDisposable`: disposing one releases its observation
+and the arrays in its info:
 
 ```csharp
 using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("CartPole-v1");
@@ -78,7 +115,7 @@ Console.WriteLine($"{step.Observation.Shape} {step.Reward}");   // (4) 1
 ```
 
 A copy of a result shares its arrays: dispose one of them, after the last use, and `.copy()` an observation you keep
-longer. The vector results (`VectorStepResult`, `VectorResetResult`) work the same way.
+longer. The vector results (`VectorStepResult`, `VectorResetResult`) work the same way, and so does `[NDScoped]`.
 
 ### Typed and untyped
 

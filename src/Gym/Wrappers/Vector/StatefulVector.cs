@@ -230,7 +230,8 @@ namespace Gym.Wrappers.Vector {
 
             using (NDArray ended = np.logical_or(result.Terminations, result.Truncations)) {
                 _prevDones.Dispose();
-                _prevDones = ended.astype(np.float32);
+                // Kept until the next step, past any NumSharp scope the caller opened (DR-96).
+                _prevDones = ScopeSafety.Keep(ended.astype(np.float32));
             }
 
             if (_autoresetMode == AutoresetMode.SameStep) {

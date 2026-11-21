@@ -531,6 +531,8 @@ namespace Gym.Environments.Envs.Box2D {
 
             NDArray state = RenderFrame("state_pixels")!;
             _state?.Dispose();
+            // The state pixels are kept until the next step, past any NumSharp scope the caller opened around this one (DR-96).
+            NDScope.Detach(state);
             _state = state;
 
             double stepReward = 0;

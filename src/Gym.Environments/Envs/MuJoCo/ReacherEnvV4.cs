@@ -133,6 +133,8 @@ namespace Gym.Environments.Envs.MuJoCo {
             }
             goal?.Dispose();
             goal = np.array(drawn);
+            // The goal lives for the episode, past any NumSharp scope the caller opened around this reset (DR-96).
+            NDScope.Detach(goal);
             qpos[nq - 2] = drawn[0];
             qpos[nq - 1] = drawn[1];
             double[] qvel = AddNoise(InitQvel, UniformNoise(-0.005, 0.005, nv));

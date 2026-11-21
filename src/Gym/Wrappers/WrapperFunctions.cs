@@ -1,6 +1,7 @@
 #nullable enable
 using System;
 using System.Linq;
+using Gym.Utils;
 using NumSharp;
 
 namespace Gym.Wrappers {
@@ -58,6 +59,9 @@ namespace Gym.Wrappers {
         /// <param name="batchCount">The batch's length.</param>
         public void UpdateFromMoments(NDArray batchMean, NDArray batchVar, long batchCount) {
             (NDArray mean, NDArray var, double count) = WrapperFunctions.UpdateMeanVarCountFromMoments(Mean, Var, Count, batchMean, batchVar, batchCount);
+            // The new moments are kept until the next update, past any NumSharp scope the caller opened around this step (DR-96).
+            ScopeSafety.Keep(mean);
+            ScopeSafety.Keep(var);
             Mean.Dispose();
             Var.Dispose();
             Mean = mean;

@@ -134,7 +134,8 @@ namespace Gym.Wrappers {
             // action is copied, since the caller may dispose it once the step returns.
             if (!repeated) {
                 ReleaseLastAction();
-                LastAction = (TAct?)PyCopy.DeepCopy(action);
+                // The copy outlives this step and the caller's NumSharp scope around it (DR-96).
+                LastAction = ScopeSafety.Keep((TAct?)PyCopy.DeepCopy(action));
             }
 
             _hasLastAction = true;

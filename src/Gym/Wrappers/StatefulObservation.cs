@@ -368,9 +368,11 @@ namespace Gym.Wrappers {
         /// <param name="observation">The env's observation; the wrapper holds it until its turn.</param>
         /// <returns>The delayed observation (the env's own object), or a new zero element.</returns>
         public override TObs Observation(TObs observation) {
-            ObservationQueue.Enqueue(observation);
+            // Queued observations outlive this step and the caller's NumSharp scope around it (DR-96); the one leaving the queue
+            // goes back to the caller, whose scope (if one is open) adopts it as it adopts what it builds.
+            ObservationQueue.Enqueue(ScopeSafety.Keep(observation));
             if (ObservationQueue.Count > Delay)
-                return ObservationQueue.Dequeue();
+                return ScopeSafety.HandOver(ObservationQueue.Dequeue());
             return (TObs)WrapperFunctions.CreateZeroArray(ObservationSpace)!;
         }
 
@@ -537,7 +539,9 @@ namespace Gym.Wrappers {
         /// <summary>Appends an observation to the fixed-length queue (<c>deque(maxlen=stack_size).append</c>): the oldest falls out.</summary>
         /// <param name="observation">The observation.</param>
         private void Append(object? observation) {
-            ObsQueue.AddLast(observation);
+            // The stack keeps the env's observations (and a reset's padding, the same object) for StackSize steps, past the
+            // caller's NumSharp scopes (DR-96); the caller gets a deep copy of the stack, never these.
+            ObsQueue.AddLast(ScopeSafety.Keep(observation));
             if (ObsQueue.Count > StackSize)
                 ObsQueue.RemoveFirst();
         }

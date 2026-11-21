@@ -50,7 +50,11 @@ namespace Gym.Vector {
         /// <summary>The single action space batched, untyped: what <c>iterate</c> splits the actions with.</summary>
         private readonly Space _batchedActionSpace;
 
-        /// <summary>The sub-envs' last observations, unbatched (Python's <c>_env_obs</c>).</summary>
+        /// <summary>
+        ///     The sub-envs' last observations, unbatched (Python's <c>_env_obs</c>). Each is kept past the caller's NumSharp
+        ///     scope where it is stored (DR-96): a masked reset concatenates the unmasked sub-envs' observations from an
+        ///     earlier step, which that step's scope would otherwise have disposed.
+        /// </summary>
         private readonly object?[] _envObs;
 
         /// <summary>The batch the observations are concatenated into (Python's <c>_observations</c>), returned as is when <see cref="Copy"/> is off.</summary>
@@ -203,10 +207,12 @@ namespace Gym.Vector {
             }
 
             // Concatenate the observations.
-            _observations = VectorUtils.Concatenate(SingleObservationSpace, _envObs, _observations);
+            // The batch and the autoreset flags are kept for the next call, past any NumSharp scope the caller opened (DR-96);
+            // concatenating into the existing batch returns it, and keeping an untracked array does nothing.
+            _observations = ScopeSafety.Keep(VectorUtils.Concatenate(SingleObservationSpace, _envObs, _observations));
             NDArray autoresetEnvs = np.logical_or(_terminations, _truncations);
             _autoresetEnvs.Dispose();
-            _autoresetEnvs = autoresetEnvs;
+            _autoresetEnvs = ScopeSafety.Keep(autoresetEnvs);
             return new VectorStepResult<TObs>(ObservationsOut(), _rewards.copy(), _terminations.copy(), _truncations.copy(), infos);
         }
 
@@ -310,20 +316,20 @@ namespace Gym.Vector {
                     if (!resetMask.GetBoolean(i))
                         continue;
                     (object? observation, Info envInfo) = Envs[i].Reset(seeds[i], subOptions);
-                    _envObs[i] = observation;
+                    _envObs[i] = ScopeSafety.Keep(observation);
                     infos = AddInfo(infos, envInfo, i);
                 }
             } else {
                 ReplaceFlags();
                 for (int i = 0; i < NumEnvs; i++) {
                     (object? observation, Info envInfo) = Envs[i].Reset(seeds[i], options);
-                    _envObs[i] = observation;
+                    _envObs[i] = ScopeSafety.Keep(observation);
                     infos = AddInfo(infos, envInfo, i);
                 }
             }
 
-            // Concatenate the observations.
-            _observations = VectorUtils.Concatenate(SingleObservationSpace, _envObs, _observations);
+            // Concatenate the observations, into a batch kept for the next call (DR-96).
+            _observations = ScopeSafety.Keep(VectorUtils.Concatenate(SingleObservationSpace, _envObs, _observations));
             return new VectorResetResult<TObs>(ObservationsOut(), infos);
         }
 
@@ -339,7 +345,7 @@ namespace Gym.Vector {
                 if (_autoresetEnvs.GetBoolean(i)) {
                     // The episode ended at the previous step: reset now, ignoring the action, with a reward of 0.
                     (object? observation, Info resetInfo) = env.Reset();
-                    _envObs[i] = observation;
+                    _envObs[i] = ScopeSafety.Keep(observation);
                     envInfo = resetInfo;
                     _rewards.SetValue(0.0, i);
                     _terminations.SetValue(false, i);
@@ -359,7 +365,7 @@ namespace Gym.Vector {
                     // sub-env starts its next episode within this step.
                     AddInfo(infos, new Info { ["final_obs"] = _envObs[i], ["final_info"] = envInfo }, i);
                     (object? observation, Info resetInfo) = env.Reset();
-                    _envObs[i] = observation;
+                    _envObs[i] = ScopeSafety.Keep(observation);
                     envInfo = resetInfo;
                 }
             }
@@ -372,7 +378,7 @@ namespace Gym.Vector {
         /// <param name="result">Its transition.</param>
         /// <returns>Its info.</returns>
         private Info Store(int i, Observations.StepResult<object?> result) {
-            _envObs[i] = result.Observation;
+            _envObs[i] = ScopeSafety.Keep(result.Observation);
             _rewards.SetValue(result.Reward, i);
             _terminations.SetValue(result.Terminated, i);
             _truncations.SetValue(result.Truncated, i);
@@ -391,9 +397,10 @@ namespace Gym.Vector {
             _terminations.Dispose();
             _truncations.Dispose();
             _autoresetEnvs.Dispose();
-            _terminations = np.zeros(new Shape(NumEnvs), NPTypeCode.Boolean);
-            _truncations = np.zeros(new Shape(NumEnvs), NPTypeCode.Boolean);
-            _autoresetEnvs = np.zeros(new Shape(NumEnvs), NPTypeCode.Boolean);
+            // A reset inside the caller's NumSharp scope must not lose the new flags when that scope closes (DR-96).
+            _terminations = ScopeSafety.Keep(np.zeros(new Shape(NumEnvs), NPTypeCode.Boolean));
+            _truncations = ScopeSafety.Keep(np.zeros(new Shape(NumEnvs), NPTypeCode.Boolean));
+            _autoresetEnvs = ScopeSafety.Keep(np.zeros(new Shape(NumEnvs), NPTypeCode.Boolean));
         }
 
         /// <summary>Gymnasium's checks of <c>options["reset_mask"]</c>: an array, of shape <c>(num_envs,)</c>, of bool, with a <see langword="true"/>.</summary>

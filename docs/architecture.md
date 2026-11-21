@@ -162,6 +162,16 @@ replaces is let go, undisposed. Results that carry arrays (`StepResult`, `ResetR
 `INDArrayCarrier`, so NumSharp.Build's `[NDScoped]` weaving keeps them alive while it reclaims a method's temporaries.
 NumSharp's analyzer reports arrays that are created and dropped (`NDW012`).
 
+A caller may step an env inside its own NumSharp scope (an `[NDScoped]` method, the way the guides release what an env
+returns, DR-80), which releases every array built while it was open when it closes. So every env, wrapper and vector
+env that keeps an array it built during `Reset`, `Step` or `Render` (running statistics, frame stacks and delay queues,
+collected frames and videos, a reset's goal, the last state pixels, a vector env's kept observations and flags) detaches
+it from that scope where it stores it, and hands back through the caller's scope what it stops keeping and returns (the
+popped frames): `ScopeSafety.Keep`/`HandOver` in Gym, `NDScope.Detach` in Gym.Environments (DR-96). `ScopeSafetyTests`
+runs every registered id, render mode, wrapper and vector env in caller scopes against no scope, bit for bit, and fails
+on any array an env still references after a scope disposed it. Envs and spaces are built outside the scoped method:
+one built inside it and kept after it is not covered.
+
 ## How parity is proven
 
 - **Gymnasium's own tests**: `tests/Gym.Tests/Gymnasium` rewrites Gymnasium's pytest files in C#, file for file.

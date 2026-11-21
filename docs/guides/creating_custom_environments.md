@@ -20,6 +20,13 @@ The sample on this page compiles and passes `EnvChecker.CheckEnv` as shown.
 Return new arrays from `Reset` and `Step`: the caller owns them and may dispose them, and Gymnasium's checker refuses an
 env that hands out the same buffer twice.
 
+Keep an array past the call that built it only after detaching it from the caller's NumSharp scope. A caller may step
+the env inside an `[NDScoped]` method (the way the guides release what an env returns), and that scope releases, when it
+closes, every array built while it was open. So an array `Reset` or `Step` builds and stores in a field (a goal drawn at
+reset, the last frame, running statistics) is released under the env unless it is detached where it is stored:
+`_goal = np.array(drawn); NDScope.Detach(_goal);`. Arrays built in the constructor need nothing. Every built-in env,
+wrapper and vector env does this (DR-96), and `NDScope.Detach` on an array no scope tracks does nothing.
+
 ## An example: a corridor
 
 ```csharp

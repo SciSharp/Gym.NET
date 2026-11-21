@@ -72,7 +72,8 @@ namespace Gym.Wrappers {
             // Using the `discounted_reward` rather than `reward` makes no sense but for backward compatibility, it is being kept.
             double discounted = DiscountedReward.GetDouble(0) * Gamma * (1 - (result.Terminated ? 1 : 0)) + result.Reward;
             NDArray replaced = DiscountedReward;
-            DiscountedReward = np.array(new[] { discounted });
+            // The running return is kept until the next step, past any NumSharp scope the caller opened (DR-96).
+            DiscountedReward = ScopeSafety.Keep(np.array(new[] { discounted }));
             replaced.Dispose();
             if (UpdateRunningMean)
                 ReturnRms.Update(DiscountedReward);

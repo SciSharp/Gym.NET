@@ -173,6 +173,11 @@ In short:
   Gymnasium's strings (DR-84); every env takes its render mode as the enum or the string, `MakeVec` takes the
   vectorization and autoreset modes as enums (`MakeVec("CartPole-v1", 4, VectorizeMode.Async, AutoresetMode.SameStep)`),
   and the strings keep working everywhere Gymnasium takes them, specs and kwargs included.
+- **Releasing arrays with `[NDScoped]`**: the guides release what an env returns with NumSharp.Build's `[NDScoped]` on
+  the method that steps it (DR-80), `using` beside it. Every built-in env, wrapper and vector env is safe to step in
+  such a scope (DR-96): what it keeps from one step to the next (running statistics, frame stacks, delay queues,
+  collected frames, a reset's goal) is detached from the caller's scope, and a test runs every id, render mode, wrapper
+  and vector env in caller scopes against no scope, bit for bit. Envs and spaces are built outside the scoped method.
 
 ## Differences from Gymnasium, by design
 

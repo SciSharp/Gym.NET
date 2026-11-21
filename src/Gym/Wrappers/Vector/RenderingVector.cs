@@ -192,7 +192,8 @@ namespace Gym.Wrappers.Vector {
                 }
 
                 LastMosaic?.Dispose();
-                LastMosaic = merged;
+                // The mosaic is kept until the next render, past any NumSharp scope the caller opened (DR-96).
+                LastMosaic = ScopeSafety.Keep(merged);
                 if (_window is null) {
                     EnvViewerFactory factory = global::Gym.Gymnasium.ResolveHumanViewerFactory(ViewerFactory);
                     // The factory returns once its window is up (DR-85: synchronous, no task to block on).
@@ -527,7 +528,8 @@ namespace Gym.Wrappers.Vector {
                     frames = new[] { frames[0] };
                 if (FrameCols == -1 || FrameRows == -1)
                     ChooseGrid(frames.Length, (int)frames[0].shape[0], (int)frames[0].shape[1]);
-                RecordedFrames.Add(ConcatFrames(frames));
+                // The video's frames are kept until it is written, past the caller's NumSharp scopes (DR-96).
+                RecordedFrames.Add(ScopeSafety.Keep(ConcatFrames(frames)));
             } finally {
                 foreach (RenderResult render in renders)
                     render.Dispose();

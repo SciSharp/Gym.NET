@@ -135,7 +135,8 @@ namespace Gym.Wrappers.Vector {
 
             NDArray dones = np.logical_or(result.Terminations, result.Truncations);
             PrevDones.Dispose();
-            PrevDones = dones;
+            // Kept until the next step, past any NumSharp scope the caller opened around this one (DR-96).
+            PrevDones = ScopeSafety.Keep(dones);
             long numDones = dones.ToArray<bool>().LongCount(done => done);
             if (numDones > 0) {
                 if (infos.ContainsKey(_statsKey) || infos.ContainsKey($"_{_statsKey}"))

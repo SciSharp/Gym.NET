@@ -229,6 +229,9 @@ namespace Gym.Environments.Envs.MuJoCo {
         /// <param name="value">The new array, which the env now owns, or <see langword="null"/>.</param>
         private void ReplaceCylinderPos(NDArray? value) {
             cylinderPos?.Dispose();
+            // Kept for the episode, past any NumSharp scope the caller opened around this reset (DR-96).
+            if (value is not null)
+                NDScope.Detach(value);
             cylinderPos = value;
         }
 
@@ -236,6 +239,9 @@ namespace Gym.Environments.Envs.MuJoCo {
         /// <param name="value">The new array, which the env now owns, or <see langword="null"/>.</param>
         private void ReplaceGoalPos(NDArray? value) {
             goalPos?.Dispose();
+            // Kept for the episode, past any NumSharp scope the caller opened around this reset (DR-96).
+            if (value is not null)
+                NDScope.Detach(value);
             goalPos = value;
         }
 

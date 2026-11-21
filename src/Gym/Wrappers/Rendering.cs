@@ -82,7 +82,8 @@ namespace Gym.Wrappers {
         /// <returns>The env's transition.</returns>
         public override StepResult<TObs> Step(TAct action) {
             StepResult<TObs> output = base.Step(action);
-            FrameList.Add(base.Render());
+            // The frame outlives this call and any NumSharp scope the caller opened around it (DR-96).
+            FrameList.Add(ScopeSafety.Keep(base.Render()));
             return output;
         }
 
@@ -95,7 +96,8 @@ namespace Gym.Wrappers {
             ResetResult<TObs> output = base.Reset(seed, options);
             if (ResetClean)
                 ReleaseFrames();
-            FrameList.Add(base.Render());
+            // Kept past the caller's NumSharp scope, as every collected frame (DR-96).
+            FrameList.Add(ScopeSafety.Keep(base.Render()));
             return output;
         }
 
@@ -106,10 +108,12 @@ namespace Gym.Wrappers {
         /// <returns>The frames.</returns>
         public override RenderResult Render() {
             var frames = new RenderResult.Frames(FrameList);
-            if (PopFrames)
-                // The frames now belong to the caller; a fresh list keeps the wrapper from releasing them.
-                FrameList = new List<RenderResult>();
-            return frames;
+            if (!PopFrames)
+                return frames;
+            // The frames now belong to the caller; a fresh list keeps the wrapper from releasing them, and the caller's NumSharp
+            // scope, if one is open, adopts them as it adopts what it builds (they were detached when collected, DR-96).
+            FrameList = new List<RenderResult>();
+            return ScopeSafety.HandOver(frames);
         }
 
         /// <summary>Releases the frames still collected, then closes and disposes the env as every wrapper does.</summary>
@@ -324,15 +328,17 @@ namespace Gym.Wrappers {
         public override RenderResult Render() {
             RenderResult renderOut = base.Render();
             if (Recording && renderOut is RenderResult.Frames frames) {
-                // The caller owns the returned frames, so the video keeps copies.
+                // The caller owns the returned frames, so the video keeps copies, kept past the caller's NumSharp scope (DR-96).
                 foreach (RenderResult item in frames.Items)
                     if (item is RenderResult.Rgb rgb)
-                        RecordedFrames.Add(rgb.Frame.copy());
+                        RecordedFrames.Add(ScopeSafety.Keep(rgb.Frame.copy()));
             }
 
             if (_renderHistory.Count > 0) {
                 List<RenderResult> history = _renderHistory;
                 _renderHistory = new List<RenderResult>();
+                // The history was kept past the caller's scopes; handing it over lets the caller's scope adopt it (DR-96).
+                ScopeSafety.HandOver<IEnumerable<object?>>(history);
                 IEnumerable<RenderResult> rest = renderOut is RenderResult.Frames list ? list.Items : new[] { renderOut };
                 return new RenderResult.Frames(history.Concat(rest));
             }
@@ -406,13 +412,15 @@ namespace Gym.Wrappers {
                     return;
                 }
 
-                _renderHistory.AddRange(list.Items);
+                // The history outlives this call and the caller's NumSharp scope until Render hands it over (DR-96).
+                _renderHistory.AddRange(ScopeSafety.Keep(list.Items));
                 // The history hands the frames to the caller later, so the video keeps its own copy of the last one.
                 frame = list.Items[list.Items.Count - 1] is RenderResult.Rgb last ? new RenderResult.Rgb(last.Frame.copy()) : list.Items[list.Items.Count - 1];
             }
 
             if (frame is RenderResult.Rgb rgb) {
-                RecordedFrames.Add(rgb.Frame);
+                // The video's frames are kept until it is written: past any scope the caller opened (DR-96).
+                RecordedFrames.Add(ScopeSafety.Keep(rgb.Frame));
             } else {
                 StopRecording();
                 Logger.Warn($"Recording stopped: expected type of frame returned by render to be a numpy array, got instead {RenderTypeRepr(frame)}.");
