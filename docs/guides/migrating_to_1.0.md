@@ -24,8 +24,8 @@ will be removed in 2.0.
   from NumSharp.Lite's: dtypes are `DType`s (`np.float32` still reads the same), indices are `long`, and random
   generators are NumPy's `Generator`.
 - Avalonia 12 for Gym.NET.Rendering.Avalonia (0.2's was built on Avalonia 0.10).
-- In a build that treats warnings as errors, two suppressions, both explained in the
-  [release notes](../releases/RELEASE_1.0.0.md#upgrading-from-02): ImageSharp 2.1.13's five advisories, and, with
+- In a build that treats warnings as errors, two suppressions, both explained, with the lines to add, under Breaking
+  Changes in the [release notes](../releases/RELEASE_1.0.0.md): ImageSharp 2.1.13's five advisories, and, with
   Gym.NET.Rendering.WinForm, NU1701 for the .NET Framework packages ScottPlot.WinForms brings.
 
 ## The calls, old and new
