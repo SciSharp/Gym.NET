@@ -116,11 +116,15 @@ In short:
 - **Spaces**: all ten (`Box`, `Discrete`, `MultiBinary`, `MultiDiscrete`, `Tuple`, `Dict`, `Text`, `Sequence`, `Graph`,
   `OneOf`), typed as `Space<T>`, with `SpaceUtils` (flatten, unflatten, flatdim, `is_space_dtype_shape_equiv`) and the
   vector space utilities (`batch_space`, `batch_differing_spaces`, `iterate`, `concatenate`, `create_empty_array`,
-  `create_shared_memory`, `read_from_shared_memory`, `write_to_shared_memory`).
+  `create_shared_memory`, `read_from_shared_memory`, `write_to_shared_memory`). The static class `Gym.Spaces.Spaces` is
+  the `gymnasium.spaces` module (`Spaces.Discrete(4, seed: 0)`, `Spaces.Flatdim(space)`; DR-79, DR-86); `Sample` takes
+  typed masks where Gymnasium's shape is fixed (`Discrete`, `MultiBinary`, `MultiDiscrete` as one array per entry,
+  `Box.Sample()`; DR-97), a simple space's `Seed` returns a `BigInteger`, and `Clone()` is `DeepCopy()` (DR-81).
 - **Registry**: `Gymnasium.Make` and `Gymnasium.MakeVec`, typed and untyped; `Register`, `Spec`, `PprintRegistry`,
   namespaces and versions with Gymnasium's errors and "Did you mean" suggestions; `EnvSpec` to and from JSON; constructor
   arguments by Python name from anonymous objects, dictionaries, or generated `<Class>Options` records
-  (`[GymOptions]`); the built-in ids registered before `Main`.
+  (`[GymOptions]`); the built-in ids registered before `Main`, and named by constants in `Gymnasium.Envs`
+  (`Gymnasium.Make(Gymnasium.Envs.CartPoleV1)`, DR-88).
 - **Wrappers**: every Gymnasium wrapper but `AtariPreprocessing` and the JAX/PyTorch conversions: `TimeLimit`,
   `OrderEnforcing`, `PassiveEnvChecker`, `Autoreset`, `RecordEpisodeStatistics`, `RenderCollection`; the observation
   transforms (`TransformObservation`, `FilterObservation`, `FlattenObservation`, `GrayscaleObservation`,

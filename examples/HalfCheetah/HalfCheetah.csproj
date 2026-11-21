@@ -46,6 +46,12 @@
     <PackageReference Include="NumSharp" Version="0.81.0" />
   </ItemGroup>
 
+  <!-- NumSharp.Build weaves [NDScoped] (DR-80): the autopilot's episode method releases every array the episode creates
+       when it returns, the way the guides release what an env returns. A build-time package only, kept out of the output. -->
+  <ItemGroup>
+    <PackageReference Include="NumSharp.Build" Version="0.81.0" PrivateAssets="all" />
+  </ItemGroup>
+
   <!-- What the Gym.NET.Environments package's buildTransitive targets do for a C# app (DR-17): register the built-in env
        ids before Main, so Gymnasium.Make("HalfCheetah-v5") works with no set-up call. -->
   <Import Project="..\..\src\Gym.Environments\buildTransitive\Gym.NET.Environments.targets" />

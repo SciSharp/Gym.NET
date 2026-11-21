@@ -27,7 +27,8 @@ refs/Gym.NET/
 │   │   │   │                      #   EnvRegistry.MakeVec.cs (make_vec: sync, async and vector entry point), VectorizeMode
 │   │   │   └── Viewers/           # IEnvViewer (sync, NDArray frames) + IAsyncEnvViewer, EnvViewerFactory (DR-85), IInteractiveEnvViewer + ViewerInput (keys, close, resizes, mouse: DR-70),
 │   │   │                          #   NullEnvViewer (namespace Gym.Environments; DR-20); Clock (Gym.Rendering)
-│   │   ├── Spaces/                # Space (base), Box (bounded/continuous), Discrete
+│   │   ├── Spaces/                # Space (base), Box (bounded/continuous), Discrete; Spaces (static: the gymnasium.spaces module, factories and flattening,
+│   │   │                          #   DR-79/86); typed Sample masks and Seed on the simple spaces, Clone = DeepCopy (DR-81, DR-86, DR-97)
 │   │   ├── Observations/          # StepResult<TObs> (5-tuple), ResetResult<TObs>, DoneStepResult<TObs> (pre-0.26 4-tuple)
 │   │   ├── Vector/                # IVectorEnv, VectorEnv<TObs, TAct> (batched types, DR-21; _add_info), VectorStepResult/VectorResetResult, AutoresetMode,
 │   │   │                          #   SyncVectorEnv (typed, and untyped as SyncVectorEnv), AsyncVectorEnv (worker threads, AsyncExecutionMode, AsyncState;
@@ -51,7 +52,8 @@ refs/Gym.NET/
 │   │   │                          # OpenCV's own kernel, not IPP's), Video (save_video; PNG/ffmpeg writers),
 │   │   │                          # Performance (benchmark_step/vector_step/init/render; DR-36)
 │   │   ├── Experimental/Functional/ # FuncEnv (Gymnasium's functional protocol, no JAX; DR-36)
-│   │   ├── Gymnasium.cs           # The `gymnasium` facade: Make, MakeVec, Spec, Register, Registry, PprintRegistry, HumanViewerFactory (DR-20)
+│   │   ├── Gymnasium.cs           # The `gymnasium` facade: Make, MakeVec, Spec, Register, Registry, PprintRegistry, HumanViewerFactory (DR-20);
+│   │   │                          #   Gymnasium.Envs.cs: the built-in ids as constants (Gymnasium.Envs.CartPoleV1, DR-88)
 │   │   ├── Logger.cs              # Warnings as gymnasium.logger issues them (colourised, Python's default filters)
 │   │   └── Exceptions/            # Every gymnasium.error class (Error, ResetNeeded, ...), AssertionError, NotImplementedError, ImportError; 0.2's three as [Obsolete] bases of InvalidAction, AlreadyPendingCallError, NoAsyncCallError (DR-58)
 │   │
@@ -138,7 +140,8 @@ refs/Gym.NET/
 ├── examples/                      # One project per env the showreel plays (DR-74), all in Gym.NET.sln so API changes break their build;
 │   │                              #   README.md indexes them. Each plays a seeded episode with its agent (the showreel's: controllers,
 │   │                              #   Gymnasium's heuristics, value iteration, ARS-trained policy.json files), --render in a window,
-│   │                              #   --play from the keyboard through Play.Run where a few keys and the frame cost allow
+│   │                              #   --play from the keyboard through Play.Run where a few keys and the frame cost allow; each episode
+│   │                              #   is one [NDScoped] method (NumSharp.Build in every project, DR-80)
 │   ├── CartPole/                  # The first example (D13): the cross-entropy method over linear policies, 100 carts at once through
 │   │                              #   MakeVec, then a played episode; --controller the showreel's hand-written controller
 │   ├── HalfCheetah/               # The autopilot through Gymnasium.Make, and the playable HalfCheetah (moved from tools/parity), which

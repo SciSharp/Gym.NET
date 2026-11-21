@@ -30,7 +30,7 @@ namespace Gym {
     ///     </para>
     ///     <para>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/__init__.py">gymnasium/__init__.py</see>.</para>
     /// </remarks>
-    public static class Gymnasium {
+    public static partial class Gymnasium {
         /// <summary>
         ///     The viewer every env renders <c>render_mode="human"</c> into unless it was given its own <c>viewer_factory</c>
         ///     (DR-20): set it once at start-up (<c>Gymnasium.HumanViewerFactory = AvaloniaEnvViewer.Factory;</c>). Left

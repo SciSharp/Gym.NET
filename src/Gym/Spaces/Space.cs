@@ -292,6 +292,18 @@ namespace Gym.Spaces {
         /// </remarks>
         public Space DeepCopy() => DeepCopyCore();
 
+        /// <summary>
+        ///     A deep copy of this space, .NET's name for <see cref="DeepCopy"/> (DR-81): the same parameters, copies of every
+        ///     array, subspace and generator, so drawing from the copy never moves the original.
+        /// </summary>
+        /// <returns>The copy; the caller owns it, and it belongs to no env until one takes it (DR-40).</returns>
+        /// <remarks>
+        ///     The two names are one copy: a space that overrides <see cref="DeepCopyCore"/> changes both. It is deep, unlike
+        ///     .NET's usual shallow <c>Clone</c> convention and unlike 0.2's <c>Dict.Clone</c>, because a space shares nothing
+        ///     safely: a shallow copy would draw from, and dispose, the original's arrays and generator.
+        /// </remarks>
+        public Space Clone() => DeepCopyCore();
+
         /// <summary>The copying behind <see cref="DeepCopy"/>; see its remarks.</summary>
         /// <returns>The copy.</returns>
         protected virtual Space DeepCopyCore() {

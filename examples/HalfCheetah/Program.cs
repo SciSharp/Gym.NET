@@ -104,8 +104,8 @@ internal static class Program {
     /// <exception cref="IOException">The policy file cannot be read.</exception>
     /// <remarks>
     ///     Seed 0 returns 5,797.0, the bits <c>score</c> prints for the game's own copy of the engine, and the bits
-    ///     replay_in_gymnasium.py gets from Gymnasium on MuJoCo 4.0.0. The arrays a reset or a step returns are the caller's
-    ///     (D19): each result is released once the autopilot has read its observation.
+    ///     replay_in_gymnasium.py gets from Gymnasium on MuJoCo 4.0.0. Each episode is one <see cref="PlayEpisode"/> call,
+    ///     whose scope releases its arrays when it returns.
     /// </remarks>
     private static int Episodes(string policyPath, int seed, int episodes, bool render) {
         LinearPolicy policy = LinearPolicy.Load(policyPath);
@@ -115,38 +115,43 @@ internal static class Program {
         double sum = 0;
         var action = new float[CheetahGame.ActionSize];
         for (int episode = 0; episode < episodes; episode++) {
-            using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("HalfCheetah-v5", render ? new { render_mode = "human" } : null);
-            ResetResult<NDArray> reset = env.Reset(seed: seed + episode);
-            // The result whose observation the autopilot reads next; a boxed copy shares its arrays, so disposing it frees them.
-            IDisposable held = reset;
-            NDArray observation = reset.Observation;
-            int steps = 0;
-            double total = 0;
-            try {
-                while (true) {
-                    // HalfCheetah's motors take [-1, 1], the autopilot's own range: its outputs are the action as they are.
-                    policy.Act(observation.ToArray<double>(), action);
-                    StepResult<NDArray> step;
-                    using (NDArray a = np.array(action))
-                        step = env.Step(a);
-                    held.Dispose();
-                    held = step;
-                    observation = step.Observation;
-                    steps++;
-                    total += step.Reward;
-                    // HalfCheetah never terminates: every episode is cut by the 1,000-step time limit.
-                    if (step.Terminated || step.Truncated)
-                        break;
-                }
-            } finally {
-                held.Dispose();
-            }
+            (int steps, double total) = PlayEpisode(policy, action, seed + episode, render);
             sum += total;
             Console.WriteLine($"HalfCheetah-v5, seed {seed + episode}: {steps} steps, return {total:F1}, truncated by the time limit");
         }
         if (episodes > 1)
             Console.WriteLine($"Mean return over {episodes} episodes: {sum / episodes:F1}");
         return 0;
+    }
+
+    /// <summary>One episode of HalfCheetah-v5 flown by the autopilot, through <c>Gymnasium.Make</c>.</summary>
+    /// <param name="policy">The autopilot.</param>
+    /// <param name="action">The buffer the autopilot writes its action into; reused across steps.</param>
+    /// <param name="seed">The reset seed.</param>
+    /// <param name="render">Whether to show the episode in MuJoCo's window.</param>
+    /// <returns>The steps taken and the return.</returns>
+    /// <remarks>
+    ///     The arrays a reset or a step returns are the caller's (D19). The method is <c>[NDScoped]</c> (DR-80):
+    ///     NumSharp.Build releases every array the episode creates (the results, the actions) when it returns, one episode's
+    ///     worth at a time. The env is built and disposed inside it, the guides' rule for an env in a scoped method.
+    /// </remarks>
+    [NDScoped]
+    private static (int Steps, double Return) PlayEpisode(LinearPolicy policy, float[] action, int seed, bool render) {
+        using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("HalfCheetah-v5", render ? new { render_mode = "human" } : null);
+        NDArray observation = env.Reset(seed: seed).Observation;
+        int steps = 0;
+        double total = 0;
+        while (true) {
+            // HalfCheetah's motors take [-1, 1], the autopilot's own range: its outputs are the action as they are.
+            policy.Act(observation.ToArray<double>(), action);
+            StepResult<NDArray> step = env.Step(np.array(action));
+            observation = step.Observation;
+            steps++;
+            total += step.Reward;
+            // HalfCheetah never terminates: every episode is cut by the 1,000-step time limit.
+            if (step.Terminated || step.Truncated)
+                return (steps, total);
+        }
     }
 
     /// <summary>The positional argument after a command (a file or folder).</summary>

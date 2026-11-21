@@ -202,6 +202,17 @@ namespace Gym.Spaces {
             }
         }
 
+        /// <summary>
+        ///     Reseeds the space's generator (Gymnasium's <c>seed</c>), typed (DR-86): a simple space's seed is one integer, so
+        ///     it comes back as a <see cref="System.Numerics.BigInteger"/> where <see cref="Space.Seed(System.Numerics.BigInteger?)"/> returns it boxed.
+        /// </summary>
+        /// <param name="seed">Any non-negative integer, or <see langword="null"/> for a fresh generator from OS entropy.</param>
+        /// <returns>The seed used: <paramref name="seed"/> itself, or the 128-bit entropy of an unseeded call, which reproduces it.</returns>
+        /// <exception cref="Gym.Exceptions.Error">Thrown when <paramref name="seed"/> is negative, with Gymnasium's message.</exception>
+        /// <exception cref="InvalidCastException">Thrown by a subclass whose seeding returns something other than one integer.</exception>
+        /// <remarks>Footgun: a call through a <see cref="Space"/> reference binds the untyped base method, which returns the same seed as an <see langword="object"/>.</remarks>
+        public new System.Numerics.BigInteger Seed(System.Numerics.BigInteger? seed = null) => (System.Numerics.BigInteger)base.Seed(seed);
+
         /// <summary>Whether <paramref name="x"/> is a string of the right length (in code points) made of the charset's characters.</summary>
         /// <param name="x">The candidate.</param>
         /// <returns><see langword="true"/> for an element.</returns>

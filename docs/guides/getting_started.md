@@ -4,7 +4,9 @@
 
 Gym.NET's API is Gymnasium's, spelled in C#: `gymnasium.make("CartPole-v1")` is `Gymnasium.Make("CartPole-v1")`,
 `env.reset(seed=42)` is `env.Reset(seed: 42)`, and an env built with the same seed and fed the same actions returns
-the same numbers as Gymnasium's. Every sample on this page compiles and runs as shown, warning-free.
+the same numbers as Gymnasium's. Every sample on this page compiles and runs as shown, warning-free. The built-in ids
+are also constants, so the compiler checks them and the IDE lists them: `Gymnasium.Make(Gymnasium.Envs.CartPoleV1)`
+(DR-88).
 
 ## Install
 
@@ -195,6 +197,15 @@ All ten of Gymnasium's spaces are in `Gym.Spaces`: `Box`, `Discrete`, `MultiBina
 are `object?[]`), `Dict` (samples are `Info`), `Text` (strings), `Sequence`, `Graph` (`GraphInstance`) and `OneOf`.
 `SpaceUtils` holds `flatdim`, `flatten_space`, `flatten` and `unflatten`. Spaces own unmanaged memory (their bounds and
 generators): dispose the ones you build yourself; an env disposes its own.
+
+The static class `Spaces` is the `gymnasium.spaces` module: with `using Gym.Spaces;`, `Spaces.Discrete(4, seed: 0)`
+reads as `spaces.Discrete(4, seed=0)` and builds what `new Discrete(4, seed: 0)` builds, and `Spaces.Flatdim`,
+`Flatten`, `FlattenSpace` and `Unflatten` are the module's functions (DR-79, DR-86). Inside a `Gym.*` namespace the
+simple name `Spaces` is the namespace, so write `new Discrete(4)` there. The masks are typed where Gymnasium's shape is
+fixed (DR-97): `discrete.Sample(mask)` and `discrete.Sample(probability: p)` take `NDArray`s, `box.Sample()` takes
+nothing, and `multiDiscrete.Sample(masks)` takes one int8 array per entry, Gymnasium's tuple as a list (`object?[]`
+tuples keep working, nested ones included). `Seed` returns a simple space's seed as a `BigInteger`, and `Clone()` is
+`DeepCopy()` (DR-81).
 
 ## Rendering
 

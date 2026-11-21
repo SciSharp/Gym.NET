@@ -86,37 +86,27 @@ namespace Gym.Examples.CliffWalking {
         ///     The steps taken, the return (float64, as every Gym.NET reward), and how the episode ended.
         /// </returns>
         /// <remarks>
-        ///     The arrays a reset or a step returns belong to the caller (D19): each result is released once the agent
-        ///     has acted on its observation, and the last one when the episode ends.
+        ///     The arrays a reset or a step returns belong to the caller (D19). The method is <c>[NDScoped]</c> (DR-80):
+        ///     NumSharp.Build releases every array the episode creates (the results, the actions) when it returns. The env
+        ///     is built and disposed inside it, the guides' rule for an env in a scoped method.
         /// </remarks>
+        [NDScoped]
         private static (int Steps, double Return, string Ending) PlayEpisode(long seed, bool render) {
             // make's stack: TimeLimit over OrderEnforcing over PassiveEnvChecker over the env. The render mode is a
             // constructor argument, fixed for the env's life, as in Gymnasium.
             using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>(Id, render ? new { render_mode = "human" } : null);
             // The plan comes from the env's own model of itself: the transition table of the unwrapped env.
             long[] plan = Plan(((CliffWalkingEnv)env.Unwrapped).P);
-            ResetResult<NDArray> reset = env.Reset(seed: seed);
-            // The result whose observation the agent reads next; a boxed copy shares its arrays, so disposing it frees them.
-            IDisposable held = reset;
-            NDArray observation = reset.Observation;
+            NDArray observation = env.Reset(seed: seed).Observation;
             int steps = 0;
             double total = 0;
-            try {
-                while (true) {
-                    StepResult<NDArray> step;
-                    using (NDArray action = NDArray.Scalar(plan[State(observation)]))
-                        step = env.Step(action);
-                    // The agent is done with the previous observation: release it with its info, and hold the new result.
-                    held.Dispose();
-                    held = step;
-                    observation = step.Observation;
-                    steps++;
-                    total += step.Reward;
-                    if (step.Terminated || step.Truncated)
-                        return (steps, total, step.Terminated ? "reached the goal" : "truncated by the time limit");
-                }
-            } finally {
-                held.Dispose();
+            while (true) {
+                StepResult<NDArray> step = env.Step(NDArray.Scalar(plan[State(observation)]));
+                observation = step.Observation;
+                steps++;
+                total += step.Reward;
+                if (step.Terminated || step.Truncated)
+                    return (steps, total, step.Terminated ? "reached the goal" : "truncated by the time limit");
             }
         }
 

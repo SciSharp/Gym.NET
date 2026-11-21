@@ -14,6 +14,10 @@ Every project is self-contained, so it can be copied out on its own. Each README
 default run, the keys, and the API it shows. The default seed is the episode the showreel plays, and every run of it on
 one machine prints the same numbers ([which machine](#the-numbers)).
 
+Each episode is one `[NDScoped]` method (DR-80): NumSharp.Build, which every project references, releases every array
+the episode creates (the results, the actions) when the method returns, the way the guides release what an env
+returns. The env is built and disposed inside that method, the guides' rule for an env in a scoped method.
+
 | Example | Agent | Default episode | Keyboard |
 |---|---|---|---|
 | **Classic control** | | | |

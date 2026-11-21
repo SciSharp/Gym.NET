@@ -102,7 +102,7 @@ namespace Gym.Tests.Parity.Tests.Spaces {
 
         /// <summary>
         ///     Five seeded samples (dtype, shape, bytes) and the generator state after them are Gymnasium's:
-        ///     <see cref="Box.Sample"/> makes Gymnasium's draws in Gymnasium's order, and casts, floors and clips alike.
+        ///     <see cref="Box.Sample(object, object)"/> makes Gymnasium's draws in Gymnasium's order, and casts, floors and clips alike.
         /// </summary>
         /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/spaces/box.py#L404">gymnasium/spaces/box.py (Box.sample)</see>.</remarks>
         /// <param name="box">The index into <see cref="Boxes"/>.</param>

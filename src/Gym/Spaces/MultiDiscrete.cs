@@ -165,6 +165,71 @@ namespace Gym.Spaces {
         }
 
         /// <summary>
+        ///     Draws one element, typed (DR-86, DR-97): Gymnasium's <c>sample(mask, probability)</c> with one array per entry,
+        ///     Gymnasium's tuple as a list. For a one-dimensional space the list is that tuple; for a multi-dimensional one it
+        ///     holds the entries in C order (row by row), which this method groups into Gymnasium's nested tuples. A call on a
+        ///     <see cref="MultiDiscrete"/> reference binds this overload unless an argument is typed <see langword="object"/>;
+        ///     it draws exactly what <see cref="Sample(object, object)"/> draws with the tuples.
+        /// </summary>
+        /// <param name="mask">
+        ///     <see langword="null"/>, or one int8 array per entry, of length <c>nvec[i]</c>, with 1 for the values that may be
+        ///     drawn (all 0: that entry's start).
+        /// </param>
+        /// <param name="probability"><see langword="null"/>, or one float64 array per entry, of length <c>nvec[i]</c>, summing to 1.</param>
+        /// <returns>A new array of the space's dtype and shape, owned by the caller.</returns>
+        /// <exception cref="NumSharp.ValueError">
+        ///     Thrown when both masks are given, or when a multi-dimensional space gets a list whose length is not its number of
+        ///     entries (one-dimensional spaces report a wrong length with Gymnasium's assertion).
+        /// </exception>
+        /// <exception cref="NumSharp.AssertionError">Thrown for a malformed array, with Gymnasium's messages.</exception>
+        public NDArray Sample(IReadOnlyList<NDArray>? mask = null, IReadOnlyList<NDArray>? probability = null) =>
+            // The tuples go to the untyped draw (the casts pick it), which checks them with Gymnasium's assertions.
+            Sample((object?)Nest(mask, nameof(mask)), (object?)Nest(probability, nameof(probability)));
+
+        /// <summary>
+        ///     Reseeds the space's generator (Gymnasium's <c>seed</c>), typed (DR-86): a simple space's seed is one integer, so
+        ///     it comes back as a <see cref="System.Numerics.BigInteger"/> where <see cref="Space.Seed(System.Numerics.BigInteger?)"/> returns it boxed.
+        /// </summary>
+        /// <param name="seed">Any non-negative integer, or <see langword="null"/> for a fresh generator from OS entropy.</param>
+        /// <returns>The seed used: <paramref name="seed"/> itself, or the 128-bit entropy of an unseeded call, which reproduces it.</returns>
+        /// <exception cref="Gym.Exceptions.Error">Thrown when <paramref name="seed"/> is negative, with Gymnasium's message.</exception>
+        /// <exception cref="InvalidCastException">Thrown by a subclass whose seeding returns something other than one integer.</exception>
+        /// <remarks>Footgun: a call through a <see cref="Space"/> reference binds the untyped base method, which returns the same seed as an <see langword="object"/>.</remarks>
+        public new System.Numerics.BigInteger Seed(System.Numerics.BigInteger? seed = null) => (System.Numerics.BigInteger)base.Seed(seed);
+
+        /// <summary>
+        ///     Turns the typed overload's list into the tuple form the untyped draw reads: the list itself as Python's tuple for
+        ///     a one-dimensional space, else nested tuples of <see cref="Nvec"/>'s shape filled in C order.
+        /// </summary>
+        /// <param name="arrays">The per-entry arrays, or <see langword="null"/>.</param>
+        /// <param name="name">The parameter's name, for the message.</param>
+        /// <returns>The tuple (<see langword="object"/>?[]), or <see langword="null"/> for no list.</returns>
+        /// <exception cref="NumSharp.ValueError">Thrown when a multi-dimensional space gets a list of another length than its number of entries.</exception>
+        private object?[]? Nest(IReadOnlyList<NDArray>? arrays, string name) {
+            if (arrays is null)
+                return null;
+            long[] dims = Nvec.Shape.dimensions ?? Array.Empty<long>();
+            // One dimension: the list is Gymnasium's tuple as it stands, so a wrong length meets Gymnasium's own assertion.
+            if (dims.Length <= 1)
+                return arrays.Select(a => (object?)a).ToArray();
+            long entries = dims.Aggregate(1L, (product, d) => product * d);
+            if (arrays.Count != entries)
+                throw new ValueError($"`{name}` holds one array per entry of nvec in C order: expected {entries} arrays for nvec of shape {ShapeRepr(Nvec.Shape)}, got {arrays.Count}");
+            int next = 0;
+            return Level(0);
+
+            // One tuple per axis level, the last level holding the arrays themselves, as Gymnasium's nested tuples do.
+            object?[] Level(int axis) {
+                var items = new object?[dims[axis]];
+                // The (object?) cast types the conditional as object: typed NDArray, the inner tuple would go through
+                // NDArray's implicit conversion from Array and become an array of objects, which NumSharp refuses.
+                for (long i = 0; i < dims[axis]; i++)
+                    items[i] = axis == dims.Length - 1 ? (object?)arrays[next++] : Level(axis + 1);
+                return items;
+            }
+        }
+
+        /// <summary>
         ///     Whether <paramref name="x"/> is an element (Gymnasium's <c>contains</c>): an array (a .NET array or list is
         ///     converted first) of the space's shape, a dtype that casts safely to the space's, and every entry between its start
         ///     and its largest value.

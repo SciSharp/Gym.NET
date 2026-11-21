@@ -124,7 +124,8 @@ namespace Gym.Examples.CartPole {
             using VectorEnv<NDArray, NDArray> envs = Gymnasium.MakeVec<NDArray, NDArray>("CartPole-v1", numEnvs: Population);
             for (int generation = 0; generation < MaxGenerations; generation++) {
                 double[][] candidates = Sample(rng, mean, deviation);
-                double[] returns = Evaluate(envs, candidates, seed: generation);
+                var returns = new double[Population];
+                Evaluate(envs, candidates, seed: generation, returns);
                 // OrderByDescending is stable, so equal returns keep their draw order and the run stays reproducible.
                 int[] elite = Enumerable.Range(0, Population).OrderByDescending(i => returns[i]).Take(EliteCount).ToArray();
                 Refit(candidates, elite, mean, deviation);
@@ -132,7 +133,9 @@ namespace Gym.Examples.CartPole {
                 // The elite are the lucky draws of this generation's starting states; the refitted mean is what is kept, so
                 // it is the one judged, on every cart at once from starting states no generation was selected on.
                 double[][] judged = Enumerable.Repeat(mean, Population).ToArray();
-                double score = Evaluate(envs, judged, seed: JudgeSeed + generation).Average();
+                var judgedReturns = new double[Population];
+                Evaluate(envs, judged, seed: JudgeSeed + generation, judgedReturns);
+                double score = judgedReturns.Average();
                 Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
                     $"generation {generation,2}: population {returns.Average(),6:F1}, elite {elite.Average(i => returns[i]),6:F1}, learned policy {score,6:F1}"));
                 if (score >= threshold)
@@ -162,53 +165,52 @@ namespace Gym.Examples.CartPole {
         }
 
         /// <summary>
-        ///     Plays one episode with every candidate at once, cart <c>i</c> following candidate <c>i</c>, and returns each
-        ///     episode's return.
+        ///     Plays one episode with every candidate at once, cart <c>i</c> following candidate <c>i</c>, and writes each
+        ///     episode's return into <paramref name="returns"/>.
         /// </summary>
         /// <param name="envs">The vector env, with one cart per candidate.</param>
         /// <param name="candidates">The policies.</param>
         /// <param name="seed">The reset seed, which draws every cart's starting state.</param>
-        /// <returns>The return of each candidate's episode: 1 per step the pole stayed up, at most 500.</returns>
+        /// <param name="returns">
+        ///     Receives the return of each candidate's episode (1 per step the pole stayed up, at most 500); one slot per
+        ///     candidate, zeros on entry.
+        /// </param>
         /// <remarks>
+        ///     <para>
         ///     A vector env never waits: in its default autoreset mode (<c>NEXT_STEP</c>) a cart whose episode ended is reset
         ///     by the following step, which ignores that cart's action and rewards 0. So the loop keeps stepping until every
         ///     cart has finished its first episode and stops adding a cart's rewards once it has.
+        ///     </para>
+        ///     <para>
+        ///     The arrays a vector env returns belong to the caller. The method is <c>[NDScoped]</c> (DR-80): NumSharp.Build
+        ///     releases every batch and action the generation creates when it returns, at most 500 steps' worth; the vector
+        ///     env is built outside it, the guides' rule. It fills the caller's array rather than returning one because
+        ///     NumSharp.Build refuses an <c>[NDScoped]</c> method that returns a collection (NDW003), whatever it holds.
+        ///     </para>
         /// </remarks>
-        private static double[] Evaluate(VectorEnv<NDArray, NDArray> envs, double[][] candidates, long seed) {
-            var returns = new double[candidates.Length];
+        [NDScoped]
+        private static void Evaluate(VectorEnv<NDArray, NDArray> envs, double[][] candidates, long seed, double[] returns) {
             var finished = new bool[candidates.Length];
-            // A vector env returns new arrays the caller owns: each batch is disposed once the next one replaces it.
             NDArray observations = envs.Reset(seed: seed).Observations;
-            try {
-                while (finished.Contains(false)) {
-                    // (Population, 4) float32 observations, one row per cart.
-                    float[] rows = observations.ToArray<float>();
-                    var actions = new long[candidates.Length];
-                    for (int i = 0; i < candidates.Length; i++)
-                        actions[i] = Act(candidates[i], rows.AsSpan(i * ObservationSize, ObservationSize));
+            while (finished.Contains(false)) {
+                // (Population, 4) float32 observations, one row per cart.
+                float[] rows = observations.ToArray<float>();
+                var actions = new long[candidates.Length];
+                for (int i = 0; i < candidates.Length; i++)
+                    actions[i] = Act(candidates[i], rows.AsSpan(i * ObservationSize, ObservationSize));
 
-                    VectorStepResult<NDArray> step;
-                    using (NDArray batch = np.array(actions))
-                        step = envs.Step(batch);
-                    observations.Dispose();
-                    observations = step.Observations;
-
-                    using NDArray rewards = step.Rewards, terminations = step.Terminations, truncations = step.Truncations;
-                    double[] reward = rewards.ToArray<double>();
-                    bool[] terminated = terminations.ToArray<bool>(), truncated = truncations.ToArray<bool>();
-                    for (int i = 0; i < candidates.Length; i++) {
-                        if (finished[i])
-                            continue;
-                        returns[i] += reward[i];
-                        // Terminated: the pole fell or the cart left the track. Truncated: the 500-step limit ran out.
-                        finished[i] = terminated[i] || truncated[i];
-                    }
+                VectorStepResult<NDArray> step = envs.Step(np.array(actions));
+                observations = step.Observations;
+                double[] reward = step.Rewards.ToArray<double>();
+                bool[] terminated = step.Terminations.ToArray<bool>(), truncated = step.Truncations.ToArray<bool>();
+                for (int i = 0; i < candidates.Length; i++) {
+                    if (finished[i])
+                        continue;
+                    returns[i] += reward[i];
+                    // Terminated: the pole fell or the cart left the track. Truncated: the 500-step limit ran out.
+                    finished[i] = terminated[i] || truncated[i];
                 }
-            } finally {
-                observations.Dispose();
             }
-
-            return returns;
         }
 
         /// <summary>Refits the Gaussian to the elite: each parameter's mean and standard deviation, plus <see cref="ExtraNoise"/>.</summary>
@@ -243,6 +245,12 @@ namespace Gym.Examples.CartPole {
         /// <exception cref="Gym.Exceptions.DependencyNotInstalled">
         ///     Thrown at the first human frame when no viewer is set; <paramref name="render"/> sets Avalonia's first.
         /// </exception>
+        /// <remarks>
+        ///     The method is <c>[NDScoped]</c> (DR-80): NumSharp.Build releases every array the episode creates (the results,
+        ///     the actions) when it returns. The env is built and disposed inside it, the guides' rule for an env in a
+        ///     scoped method.
+        /// </remarks>
+        [NDScoped]
         private static double Play(double[] policy, bool render) {
             // Human mode renders inside every reset and step into the app-wide viewer (DR-20); without one it raises
             // DependencyNotInstalled at the first frame, as Gymnasium does without pygame.
@@ -254,19 +262,13 @@ namespace Gym.Examples.CartPole {
             using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("CartPole-v1", kwargs: render ? new { render_mode = "human" } : null);
             NDArray observation = env.Reset(seed: PlaySeed).Observation;
             double total = 0;
-            try {
-                while (true) {
-                    // A discrete action is a 0-d int64 array, the type Discrete(2).Sample() returns.
-                    using NDArray action = NDArray.Scalar(Act(policy, observation.ToArray<float>()));
-                    StepResult<NDArray> step = env.Step(action);
-                    observation.Dispose();
-                    observation = step.Observation;
-                    total += step.Reward;
-                    if (step.Terminated || step.Truncated)
-                        return total;
-                }
-            } finally {
-                observation.Dispose();
+            while (true) {
+                // A discrete action is a 0-d int64 array, the type Discrete(2).Sample() returns.
+                StepResult<NDArray> step = env.Step(NDArray.Scalar(Act(policy, observation.ToArray<float>())));
+                observation = step.Observation;
+                total += step.Reward;
+                if (step.Terminated || step.Truncated)
+                    return total;
             }
         }
 
@@ -285,6 +287,7 @@ namespace Gym.Examples.CartPole {
         /// <exception cref="Gym.Exceptions.DependencyNotInstalled">
         ///     Not thrown in practice: <paramref name="render"/> sets Avalonia's viewer first.
         /// </exception>
+        [NDScoped]   // NumSharp.Build releases every array the episode creates when it returns (DR-80); the env is disposed inside
         private static (int Steps, double Return, string Ending) PlayController(bool render) {
             if (render)
                 Gymnasium.HumanViewerFactory = AvaloniaEnvViewer.Factory;
@@ -292,23 +295,17 @@ namespace Gym.Examples.CartPole {
             NDArray observation = env.Reset(seed: ControllerSeed).Observation;
             int steps = 0;
             double total = 0;
-            try {
-                while (true) {
-                    float[] s = observation.ToArray<float>();
-                    // The set point's phase is the step count, which is what TimeLimit's _elapsed_steps holds at this point.
-                    double target = 1.2 * Math.Sin(steps * 2 * Math.PI / 250.0);
-                    double u = 0.6 * (s[0] - target) + 1.2 * s[1] + 12.0 * s[2] + 2.0 * s[3];
-                    using NDArray action = NDArray.Scalar(u > 0 ? 1L : 0L);
-                    StepResult<NDArray> step = env.Step(action);
-                    observation.Dispose();
-                    observation = step.Observation;
-                    steps++;
-                    total += step.Reward;
-                    if (step.Terminated || step.Truncated)
-                        return (steps, total, step.Terminated ? "the pole fell" : "truncated by the time limit");
-                }
-            } finally {
-                observation.Dispose();
+            while (true) {
+                float[] s = observation.ToArray<float>();
+                // The set point's phase is the step count, which is what TimeLimit's _elapsed_steps holds at this point.
+                double target = 1.2 * Math.Sin(steps * 2 * Math.PI / 250.0);
+                double u = 0.6 * (s[0] - target) + 1.2 * s[1] + 12.0 * s[2] + 2.0 * s[3];
+                StepResult<NDArray> step = env.Step(NDArray.Scalar(u > 0 ? 1L : 0L));
+                observation = step.Observation;
+                steps++;
+                total += step.Reward;
+                if (step.Terminated || step.Truncated)
+                    return (steps, total, step.Terminated ? "the pole fell" : "truncated by the time limit");
             }
         }
 

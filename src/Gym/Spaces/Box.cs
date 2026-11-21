@@ -298,6 +298,25 @@ namespace Gym.Spaces {
         }
 
         /// <summary>
+        ///     Draws one element, typed (DR-86, DR-97): Gymnasium's box takes no mask or probability (it raises for either), so
+        ///     its typed form takes nothing. A call <c>box.Sample()</c> on a <see cref="Box"/> reference binds this overload; it
+        ///     draws exactly what <see cref="Sample(object, object)"/> draws without masks.
+        /// </summary>
+        /// <returns>A new array of <see cref="Shape"/> and <see cref="DType"/>, owned by the caller.</returns>
+        public NDArray Sample() => Sample((object?)null, (object?)null);
+
+        /// <summary>
+        ///     Reseeds the space's generator (Gymnasium's <c>seed</c>), typed (DR-86): a simple space's seed is one integer, so
+        ///     it comes back as a <see cref="BigInteger"/> where <see cref="Space.Seed(BigInteger?)"/> returns it boxed.
+        /// </summary>
+        /// <param name="seed">Any non-negative integer, or <see langword="null"/> for a fresh generator from OS entropy.</param>
+        /// <returns>The seed used: <paramref name="seed"/> itself, or the 128-bit entropy of an unseeded call, which reproduces it.</returns>
+        /// <exception cref="Error">Thrown when <paramref name="seed"/> is negative, with Gymnasium's message.</exception>
+        /// <exception cref="InvalidCastException">Thrown by a subclass whose seeding returns something other than one integer.</exception>
+        /// <remarks>Footgun: a call through a <see cref="Space"/> reference binds the untyped base method, which returns the same seed as an <see langword="object"/>.</remarks>
+        public new BigInteger Seed(BigInteger? seed = null) => (BigInteger)base.Seed(seed);
+
+        /// <summary>
         ///     Whether <paramref name="x"/> is an element (Gymnasium's <c>contains</c>): an array whose dtype casts safely to the
         ///     box's, of the box's shape, inside the bounds. Anything else is converted to an array of the box's dtype first,
         ///     with Gymnasium's warning, and is not an element when it cannot be.

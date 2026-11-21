@@ -39,7 +39,7 @@ namespace Gym.Tests.Spaces {
         }
 
         /// <summary>
-        ///     0-d arrays of any integer dtype convert, including the 0-d int64 array <see cref="Discrete.Sample"/> returns, which
+        ///     0-d arrays of any integer dtype convert, including the 0-d int64 array <see cref="Discrete.Sample(object, object)"/> returns, which
         ///     is what an env receives when it steps with a sampled action.
         /// </summary>
         [TestMethod]
@@ -125,7 +125,7 @@ namespace Gym.Tests.Spaces {
         }
 
         /// <summary>
-        ///     Defects B-01 and B-03's dtype: <see cref="Discrete.Sample"/> works and returns a 0-d int64 array inside
+        ///     Defects B-01 and B-03's dtype: <see cref="Discrete.Sample(object, object)"/> works and returns a 0-d int64 array inside
         ///     <c>[Start, Start + N)</c>; the space's default dtype is int64.
         /// </summary>
         [TestMethod]

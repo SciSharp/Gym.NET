@@ -81,7 +81,11 @@ Gym.NET keeps Gymnasium's dynamic behavior and adds static types where they hold
 
 - **Spaces** are `Space<T>` over an untyped `Space` (DR-07). An array space holds `NDArray`s, and a discrete sample is a
   0-d int64 array, the shape NumPy gives it (DR-08). A `Tuple` holds `object?[]` (Python's tuple), a `Dict` holds
-  `Info` (Python's dict), `Text` holds strings (DR-13).
+  `Info` (Python's dict), `Text` holds strings (DR-13). Beside Python's dynamic `Sample(object? mask, object?
+  probability)`, the spaces whose masks have a fixed shape take them typed (DR-97: `Discrete` and `MultiBinary` take
+  `NDArray`s, `MultiDiscrete` one array per entry, `Box.Sample()` none), and the simple spaces' `Seed` returns a
+  `BigInteger` (DR-86); both bind on the space's own type, the untyped forms through `Space`. The static class
+  `Gym.Spaces.Spaces` is the module itself, factories and flattening functions (DR-79, DR-86).
 - **`Make` and `MakeVec`** come typed (`Make<TObs, TAct>`, which raises `TypeError` for other types) and untyped
   (`IEnv`, `IVectorEnv`) (DR-10, DR-21). A vector env is typed by its batched types: `VectorEnv<NDArray, NDArray>` for
   CartPole.

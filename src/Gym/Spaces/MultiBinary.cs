@@ -119,6 +119,29 @@ namespace Gym.Spaces {
         }
 
         /// <summary>
+        ///     Draws one element, typed (DR-86, DR-97): Gymnasium's <c>sample(mask, probability)</c> with both masks as arrays.
+        ///     A call on a <see cref="MultiBinary"/> reference binds this overload unless an argument is typed
+        ///     <see langword="object"/>; it draws exactly what <see cref="Sample(object, object)"/> draws.
+        /// </summary>
+        /// <param name="mask"><see langword="null"/>, or an int8 array of the space's shape holding 0 or 1 (that value) or 2 (a coin toss).</param>
+        /// <param name="probability"><see langword="null"/>, or a float64 array of the space's shape with each value's probability of 1.</param>
+        /// <returns>A new int8 array, owned by the caller.</returns>
+        /// <exception cref="NumSharp.ValueError">Thrown when both masks are given.</exception>
+        /// <exception cref="NumSharp.AssertionError">Thrown for a mask or probability of the wrong dtype, shape or values, with Gymnasium's messages.</exception>
+        public NDArray Sample(NDArray? mask = null, NDArray? probability = null) => Sample((object?)mask, (object?)probability);
+
+        /// <summary>
+        ///     Reseeds the space's generator (Gymnasium's <c>seed</c>), typed (DR-86): a simple space's seed is one integer, so
+        ///     it comes back as a <see cref="System.Numerics.BigInteger"/> where <see cref="Space.Seed(System.Numerics.BigInteger?)"/> returns it boxed.
+        /// </summary>
+        /// <param name="seed">Any non-negative integer, or <see langword="null"/> for a fresh generator from OS entropy.</param>
+        /// <returns>The seed used: <paramref name="seed"/> itself, or the 128-bit entropy of an unseeded call, which reproduces it.</returns>
+        /// <exception cref="Gym.Exceptions.Error">Thrown when <paramref name="seed"/> is negative, with Gymnasium's message.</exception>
+        /// <exception cref="InvalidCastException">Thrown by a subclass whose seeding returns something other than one integer.</exception>
+        /// <remarks>Footgun: a call through a <see cref="Space"/> reference binds the untyped base method, which returns the same seed as an <see langword="object"/>.</remarks>
+        public new System.Numerics.BigInteger Seed(System.Numerics.BigInteger? seed = null) => (System.Numerics.BigInteger)base.Seed(seed);
+
+        /// <summary>
         ///     Whether <paramref name="x"/> is an element (Gymnasium's <c>contains</c>): an array (a .NET array or list is
         ///     converted first) of the space's shape whose values are all 0 or 1. The dtype is not checked, as in Gymnasium.
         /// </summary>
