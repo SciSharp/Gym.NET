@@ -8,7 +8,10 @@
     <LangVersion>latest</LangVersion>
     <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
     <PackageId>Gym.NET.Rendering.Avalonia</PackageId>
-    <Version>1.0.0</Version>
+    <!-- Release candidate 1 of 1.0 (decision D25). NuGet ignores the +rc1 build metadata when it matches versions,
+         so this is the stable 1.0.0 to every client; the label stays in the package's version and the assemblies'
+         informational version. The next release, a fix or the final, is 1.0.1: nuget.org cannot hold a second 1.0.0. -->
+    <Version>1.0.0+rc1</Version>
     <Authors>Eli Belash</Authors>
     <Company>SciSharp STACK</Company>
     <Product>Gym.NET.Rendering.Avalonia</Product>

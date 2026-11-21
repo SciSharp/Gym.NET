@@ -1,7 +1,13 @@
-# Gym.NET 1.0.0
+# Gym.NET 1.0.0 (release candidate 1: `1.0.0+rc1`)
 
 > **Prepared, not published yet.** Verified on 2026-11-21 on the working branch `journey1`; it ships when the
 > maintainer merges it into `master`, tags it and publishes the packages (completion plan P10.5). Remove this note then.
+
+**The version is `1.0.0+rc1`**, release candidate 1 of 1.0 (decision D25). The `+rc1` is SemVer build metadata, which
+NuGet ignores when it matches versions, so to every NuGet client these are the stable 1.0.0 packages:
+`dotnet add package Gym.NET` installs them, and a reference to `Version="1.0.0"` resolves to them. The `rc1` label stays
+in each package's own version and in the assemblies' product version (their assembly and file versions are 1.0.0.0).
+Whatever follows this candidate, a fix or the final, ships as 1.0.1, because nuget.org cannot hold a second 1.0.0.
 
 Gym.NET 1.0 gives .NET reinforcement-learning environments with Farama Gymnasium's API and behavior. For the same seed
 and actions, its environments return the same observations, rewards, flags and infos as Gymnasium v1.4.0's, bit for
@@ -291,19 +297,27 @@ A new advisory against 2.1.13 gets the same review before Gym.NET suppresses it.
 On 2026-11-21, on Windows x64, in Release, on net8.0, net10.0 and net11.0 alike (built with the .NET 11 SDK, 11.0.100,
 against NumSharp 0.81.0):
 
-- **The unit suite** (Gymnasium's own tests rewritten in C#, and Gym.NET's): 3,904 of 3,904 pass (24 data rows skip
-  where Gymnasium's own tests call `pytest.skip`); none is open since NumSharp 0.81.0 closed N-1 to N-4.
+- **The unit suite** (Gymnasium's own tests rewritten in C#, and Gym.NET's): 4,097 of 4,097 pass (24 data rows skip
+  where Gymnasium's own tests call `pytest.skip`); none is open since NumSharp 0.81.0 closed N-1 to N-4. Among them,
+  141 cases step every registered id, render mode, wrapper and vector env inside a caller's NumSharp scope (DR-96).
 - **The live parity suite**, against Gymnasium v1.4.0 on Python 3.12, NumPy 2.4.2, pygame-ce 2.5.8, Box2D 2.3.10,
   OpenCV 4.13.0 and MuJoCo 4.0.0: 2,922 of 2,922 gated cells pass, every registered id at every layer. The one open cell
   fails only at its documented divergence, Intel IPP's float32 bilinear (DR-46). The gate includes:
   - Gymnasium's own `check_env` and `check_environments_match`, run through the reverse bridge on the 38 ids that build;
   - the 40 golden trajectories, replayed without Python;
   - the MuJoCo frame and window cells, on the reference GPU (NVIDIA GeForce RTX 4060 Ti, driver 616.56).
-- **The five packages** (checked on 2026-11-12, with NumSharp 0.80.0; redone at the release), packed with a build for
-  each framework, and restored from a local feed into apps of their own on .NET 10 and on .NET 11:
+- **The five packages at `1.0.0+rc1`** (2026-11-21), packed with `-p:ContinuousIntegrationBuild=true` on SDK 11.0.100:
+  each manifest carries `1.0.0+rc1`, the files are named `<id>.1.0.0.nupkg` (NuGet drops the metadata from file names),
+  the packages depend on each other at 1.0.0, and the assemblies are 1.0.0.0 with the product version `1.0.0+rc1`.
+  Restored from a local feed into an app on .NET 10 that references `Version="1.0.0"`, they resolve to this candidate,
+  and the guides' samples of the 1.0 review (rendering, typed infos, `[NDScoped]`, the spaces module, the id constants)
+  run against them.
+- **The packages' earlier check** (2026-11-12, at 1.0.0 with NumSharp 0.80.0), restored into apps on .NET 10 and .NET 11:
   - 12 ids from every family, MuJoCo's HalfCheetah, Humanoid, Pusher and Ant among them, made, stepped and rendered,
     the same frames on both runtimes;
   - installed all together, every type of the five assemblies loads, both viewers implement the window and input
     contracts, and 0.2's common lines compile and run through the shims.
-- **The rest** (2026-11-12): the CartPole example solves CartPole-v1 in seven generations, and the documentation site
-  builds.
+- **Windows and examples** (2026-11-21): the 11 cells that open windows pass in a Windows 11 desktop (both toolkits,
+  the viewer contract's exact pixels, sync and async); each of the 24 examples runs headless and prints the same steps
+  and returns as before its `[NDScoped]` conversion, and CartPole's cross-entropy method solves CartPole-v1.
+- **The rest** (2026-11-12): the documentation site builds.
