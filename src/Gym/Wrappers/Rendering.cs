@@ -447,9 +447,9 @@ namespace Gym.Wrappers {
     /// <typeparam name="TAct">The action type, passed through.</typeparam>
     /// <remarks>
     ///     <para>
-    ///     The window is a viewer from <c>Gymnasium.HumanViewerFactory</c> (DR-20), opened at the first frame's size; without
-    ///     a factory the first frame raises <see cref="Gym.Exceptions.DependencyNotInstalled"/>, as Gymnasium does without
-    ///     pygame. Frames are paced by <see cref="Gym.Rendering.Clock"/>, which sleeps to hold the frame rate. A frame of
+    ///     The window is a viewer from the wrapper's own factory, else <c>Gymnasium.HumanViewerFactory</c> (DR-20, DR-89),
+    ///     opened at the first frame's size; without either the first frame raises
+    ///     <see cref="Gym.Exceptions.DependencyNotInstalled"/>, as Gymnasium does without pygame. Frames are paced by <see cref="Gym.Rendering.Clock"/>, which sleeps to hold the frame rate. A frame of
     ///     another size than the first fails the assertion Gymnasium makes; frames of another dtype than uint8 are cast.
     ///     </para>
     ///     <para>
@@ -459,7 +459,7 @@ namespace Gym.Wrappers {
     ///     <para>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/wrappers/rendering.py#L446">gymnasium/wrappers/rendering.py</see>.</para>
     /// </remarks>
     [GymOptions]
-    public partial class HumanRendering<TObs, TAct> : Wrapper<TObs, TAct>, IRecordConstructorArgs {
+    public partial class HumanRendering<TObs, TAct> : Wrapper<TObs, TAct>, IRecordConstructorArgs, IHumanViewerFactoryHolder {
         /// <summary>The render modes the wrapper can show (<c>ACCEPTED_RENDER_MODES</c>).</summary>
         public static readonly IReadOnlyList<string> AcceptedRenderModes = new[] { "rgb_array", "rgb_array_list", "depth_array", "depth_array_list" };
 
@@ -494,6 +494,16 @@ namespace Gym.Wrappers {
         /// <summary>The recorded constructor arguments, <c>{}</c> (Python's <c>_saved_kwargs</c>).</summary>
         [PyName("_saved_kwargs")]
         public Info SavedKwargs { get; }
+
+        /// <summary>
+        ///     Gym.NET's viewer factory for this wrapper's window (DR-20, DR-89): set it before the first frame, as
+        ///     <c>new HumanRendering&lt;TObs, TAct&gt;(env) { ViewerFactory = factory }</c> or as <c>make</c> does with the factory
+        ///     its render-mode overloads were given; <see langword="null"/> (the default) uses <c>Gymnasium.HumanViewerFactory</c>,
+        ///     read when the window opens. A property, not a constructor argument, so the constructor and the arguments it
+        ///     records stay Gymnasium's: a spec never carries the delegate.
+        /// </summary>
+        /// <remarks>Set after the window opened, it takes effect only if the window is closed and opens again.</remarks>
+        public EnvViewerFactory? ViewerFactory { get; set; }
 
         /// <summary>The window's size, the first frame's <c>(width, height)</c> (<c>screen_size</c>), or <see langword="null"/> before it.</summary>
         public (int Width, int Height)? ScreenSize { get; private set; }
@@ -534,7 +544,7 @@ namespace Gym.Wrappers {
         /// <summary>Closes the window, then the env.</summary>
         public override void Close() {
             if (_window is not null) {
-                _window.CloseEnvironment();
+                _window.Close();
                 _window = null;
             }
 
@@ -576,17 +586,26 @@ namespace Gym.Wrappers {
                 throw new AssertionError($"The shape of the rgb array has changed from ({ScreenSize.Value.Width}, {ScreenSize.Value.Height}) to ({size.Width}, {size.Height})");
 
             if (_window is null) {
-                IEnvironmentViewerFactoryDelegate factory = global::Gym.Gymnasium.ResolveHumanViewerFactory(null);
-                // The factory may start a UI thread and complete asynchronously; frames are shown synchronously, as pygame's.
-                // TODO(async viewer path, DR-53): blocks on the factory; see IEnvironmentViewerFactoryDelegate.
-                _window = factory(size.Width, size.Height, "HumanRendering").GetAwaiter().GetResult();
+                EnvViewerFactory factory = global::Gym.Gymnasium.ResolveHumanViewerFactory(ViewerFactory);
+                // The factory returns once its window is up (DR-85); frames are then shown synchronously, as pygame's.
+                _window = factory(size.Width, size.Height, "HumanRendering");
             }
 
             _clock ??= new Gym.Rendering.Clock();
             _clock.Tick(PyBuiltins.Float(Metadata[Metadata.RenderFpsKey]));
-            using SixLabors.ImageSharp.Image image = VideoFrames.ToImage(frame);
-            _window.Render(image);
+            // The viewer contract's frame is uint8 (DR-85): another dtype is cast, as pygame's make_surface reads it as bytes.
+            using NDArray? cast = frame.typecode == NPTypeCode.Byte ? null : frame.astype(np.uint8);
+            _window.Render(cast ?? frame);
         }
+    }
+
+    /// <summary>
+    ///     A wrapper that opens a human window from a viewer factory make can hand it (DR-89): both <c>HumanRendering</c>
+    ///     wrappers, whose generic types make cannot name when it applies one.
+    /// </summary>
+    internal interface IHumanViewerFactoryHolder {
+        /// <summary>The factory the window opens from; <see langword="null"/> for the app-wide one.</summary>
+        EnvViewerFactory? ViewerFactory { get; set; }
     }
 
     /// <summary>

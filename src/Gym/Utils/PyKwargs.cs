@@ -48,7 +48,9 @@ namespace Gym.Utils {
         /// <summary>
         ///     Python's <c>**kwargs</c> of a .NET value, as a new dict of Python names: a dictionary's entries as they are
         ///     (keys are already Python names), an <see cref="IGymOptions"/> record's set properties, or any other object's
-        ///     public properties (an anonymous object), named by <see cref="PyNameAttribute"/> or snake_case.
+        ///     public properties (an anonymous object), named by <see cref="PyNameAttribute"/> or snake_case. A value that is a
+        ///     string-valued <see cref="PyEnumAttribute"/> member becomes the string it stands for (<c>RenderMode.Human</c> is
+        ///     <c>"human"</c>, DR-84), so a spec records Gymnasium's value.
         /// </summary>
         /// <param name="kwargs">The arguments, or <see langword="null"/> for none.</param>
         /// <returns>A new dict the caller owns; the values are shared, not copied.</returns>
@@ -56,7 +58,14 @@ namespace Gym.Utils {
         ///     Thrown for a value that is no mapping (a number, a string, a list): <c>argument after ** must be a mapping, not
         ///     int</c>, Python's text; or for a dictionary key that is not a string: <c>keywords must be strings</c>.
         /// </exception>
-        public static Info From(object? kwargs) {
+        /// <exception cref="ArgumentOutOfRangeException">Thrown for a string-valued enum's value it does not declare (<c>(RenderMode)99</c>).</exception>
+        public static Info From(object? kwargs) => ToPythonValues(Collect(kwargs));
+
+        /// <summary>The dict <see cref="From"/> returns, before its values are made Python's.</summary>
+        /// <param name="kwargs">The arguments, or <see langword="null"/> for none.</param>
+        /// <returns>A new dict the caller owns; the values are shared, not copied.</returns>
+        /// <exception cref="TypeError">Thrown for a value that is no mapping, or a dictionary key that is not a string.</exception>
+        private static Info Collect(object? kwargs) {
             switch (kwargs) {
                 case null:
                     return new Info();
@@ -98,6 +107,29 @@ namespace Gym.Utils {
         }
 
         /// <summary>
+        ///     Replaces, in place, every value that is a string-valued <see cref="PyEnumAttribute"/> member by the string it
+        ///     stands for: the kwargs are Python's, which hold <c>render_mode="human"</c>, never an enum (DR-84).
+        /// </summary>
+        /// <param name="kwargs">The dict, which <see cref="Collect"/> made and the caller owns.</param>
+        /// <returns><paramref name="kwargs"/>.</returns>
+        /// <exception cref="ArgumentOutOfRangeException">Thrown for a string enum's value it does not declare (<c>(RenderMode)99</c>).</exception>
+        private static Info ToPythonValues(Info kwargs) {
+            // Collected first: assigning to an existing key while enumerating the dict would invalidate the enumerator.
+            List<string>? keys = null;
+            foreach (KeyValuePair<string, object?> entry in kwargs) {
+                if (entry.Value is Enum member && PyEnums.IsStringEnum(member.GetType()))
+                    (keys ??= new List<string>()).Add(entry.Key);
+            }
+
+            if (keys is not null) {
+                foreach (string key in keys)
+                    kwargs[key] = PyEnums.ToPython(kwargs[key]);
+            }
+
+            return kwargs;
+        }
+
+        /// <summary>
         ///     Python's <c>cls(**kwargs)</c>: constructs <paramref name="type"/> with each keyword bound to the constructor
         ///     parameter of that Python name, defaults filling the rest. An open generic type (a wrapper's
         ///     <c>TimeLimit&lt;,&gt;</c>) is closed over the types its arguments imply: <c>env</c>'s <c>Env&lt;TObs, TAct&gt;</c>
@@ -125,10 +157,13 @@ namespace Gym.Utils {
                 throw new TypeError($"Can't instantiate abstract class {owner}");
 
             // The constructors kwargs can call (no ref, out or params), the fullest first; OrderBy is stable, so equal
-            // counts keep their declaration order.
+            // counts keep their declaration order. An env's twin that takes the RenderMode enum (DR-84, DR-93) comes after
+            // every other: make's kwargs hold the mode as Gymnasium's string, which the canonical constructor takes, and its
+            // errors are the ones Python would raise.
             ConstructorInfo[] constructors = type.GetConstructors(BindingFlags.Public | BindingFlags.Instance)
                 .Where(c => c.GetParameters().All(p => !p.ParameterType.IsByRef && !p.IsDefined(typeof(ParamArrayAttribute))))
-                .OrderByDescending(c => c.GetParameters().Length)
+                .OrderBy(c => c.GetParameters().Any(p => (Nullable.GetUnderlyingType(p.ParameterType) ?? p.ParameterType) == typeof(RenderMode)) ? 1 : 0)
+                .ThenByDescending(c => c.GetParameters().Length)
                 .ToArray();
             if (constructors.Length == 0)
                 throw new TypeError(kwargs.Count == 0 ? $"cannot create '{owner}' instances" : $"{owner}() takes no arguments");
@@ -374,6 +409,13 @@ namespace Gym.Utils {
                 return !type.IsValueType || target != type;
             if (target.IsInstanceOfType(value)) {
                 fitted = value;
+                return true;
+            }
+
+            // A string-valued [PyEnum] member (RenderMode.Human) is the string it stands for, which a string parameter takes;
+            // make's kwargs are already strings (From), so this serves dicts built by hand and passed to Construct directly.
+            if (target == typeof(string) && value is Enum member && PyEnums.IsStringEnum(member.GetType())) {
+                fitted = PyEnums.Value(member);
                 return true;
             }
 

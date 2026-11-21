@@ -11,6 +11,7 @@ using Gym.Rendering;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using NumSharp;
 using SixLabors.ImageSharp;
+using Gym.Tests.Helpers;
 
 namespace Gym.Tests.Envs.Classic {
     /// <summary>
@@ -52,9 +53,9 @@ namespace Gym.Tests.Envs.Classic {
         [TestMethod]
         public void OptionsRecords_CarryThePythonKwargs() {
             // In constructor order: goal_velocity, then continuous.
-            Assert.AreEqual(new Info { ["goal_velocity"] = 0.01, ["continuous"] = true }, new MountainCarEnvOptions { Continuous = true, GoalVelocity = 0.01 }.ToKwargs());
-            Assert.AreEqual(new Info { ["g"] = 9.81 }, new PendulumEnvOptions { G = 9.81 }.ToKwargs());
-            Assert.AreEqual(new Info { ["render_mode"] = "rgb_array" }, new AcrobotEnvOptions { RenderMode = "rgb_array" }.ToKwargs());
+            PyAssert.AreEqual(new Info { ["goal_velocity"] = 0.01, ["continuous"] = true }, new MountainCarEnvOptions { Continuous = true, GoalVelocity = 0.01 }.ToKwargs());
+            PyAssert.AreEqual(new Info { ["g"] = 9.81 }, new PendulumEnvOptions { G = 9.81 }.ToKwargs());
+            PyAssert.AreEqual(new Info { ["render_mode"] = "rgb_array" }, new AcrobotEnvOptions { RenderMode = "rgb_array" }.ToKwargs());
 
             using IEnv pendulum = Make("Pendulum-v1", new PendulumEnvOptions { G = 9.81 });
             Assert.AreEqual(9.81, ((PendulumEnv)pendulum.Unwrapped).Gravity);
@@ -142,13 +143,13 @@ namespace Gym.Tests.Envs.Classic {
         /// </summary>
         [TestMethod]
         public void Render_Human_RendersIntoTheFactorysViewer() {
-            foreach (Func<IEnvironmentViewerFactoryDelegate, IEnv> create in new Func<IEnvironmentViewerFactoryDelegate, IEnv>[] {
+            foreach (Func<EnvViewerFactory, IEnv> create in new Func<EnvViewerFactory, IEnv>[] {
                          factory => new MountainCarEnv(renderMode: "human", viewerFactory: factory),
                          factory => new PendulumEnv(renderMode: "human", viewerFactory: factory),
                          factory => new AcrobotEnv(renderMode: "human", viewerFactory: factory),
                      }) {
                 var viewer = new CountingViewer();
-                IEnv env = create((_, _, _) => System.Threading.Tasks.Task.FromResult<IEnvViewer>(viewer));
+                IEnv env = create((_, _, _) => viewer);
                 // A high rate keeps the pacing short; Gymnasium's tests raise render_fps the same way.
                 env.Metadata[Metadata.RenderFpsKey] = 1000L;
                 (env.Reset(seed: 0).Observation as IDisposable)?.Dispose();
@@ -164,7 +165,7 @@ namespace Gym.Tests.Envs.Classic {
         /// <summary>A human render with no viewer factory anywhere raises Gymnasium's missing-pygame error (DR-20).</summary>
         [TestMethod]
         public void Render_HumanWithoutFactory_RaisesDependencyNotInstalled() {
-            IEnvironmentViewerFactoryDelegate? previous = HumanViewerFactory;
+            EnvViewerFactory? previous = HumanViewerFactory;
             HumanViewerFactory = null;
             try {
                 Assert.ThrowsExactly<DependencyNotInstalled>(() => new MountainCarEnv(renderMode: "human").Reset(seed: 0));
@@ -288,15 +289,15 @@ namespace Gym.Tests.Envs.Classic {
             /// <summary>The frames rendered so far.</summary>
             public int Frames { get; private set; }
 
-            /// <summary>Whether <see cref="CloseEnvironment"/> ran.</summary>
+            /// <summary>Whether <see cref="Close"/> ran.</summary>
             public bool Closed { get; private set; }
 
             /// <summary>Counts the frame.</summary>
-            /// <param name="img">The frame; not kept.</param>
-            public void Render(Image img) => Frames++;
+            /// <param name="frame">The frame; not kept.</param>
+            public void Render(NDArray frame) => Frames++;
 
             /// <summary>Records the close.</summary>
-            public void CloseEnvironment() => Closed = true;
+            public void Close() => Closed = true;
 
             /// <summary>Nothing to release.</summary>
             public void Dispose() { }

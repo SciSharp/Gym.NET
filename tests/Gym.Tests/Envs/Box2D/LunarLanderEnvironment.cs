@@ -54,7 +54,7 @@ namespace Gym.Tests.Envs.Box2D {
         /// <param name="continuous">Selects the continuous variant.</param>
         /// <param name="assertBaseline">Whether to assert the recorded baseline (only meaningful for the seeds it lists).</param>
         /// <exception cref="AssertFailedException">Thrown when the episode does not end within <see cref="MaxSteps"/> or misses its baseline.</exception>
-        private static void Run(string? renderMode, IEnvironmentViewerFactoryDelegate? factory, int seed, bool continuous, bool assertBaseline) {
+        private static void Run(string? renderMode, EnvViewerFactory? factory, int seed, bool continuous, bool assertBaseline) {
             using var env = new LunarLanderEnv(renderMode: renderMode, continuous: continuous, viewerFactory: factory);
             try {
                 double total = 0;

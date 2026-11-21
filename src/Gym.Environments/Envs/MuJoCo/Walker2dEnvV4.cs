@@ -21,6 +21,7 @@ namespace Gym.Environments.Envs.MuJoCo {
     ///     <para>
     ///         Not thread-safe. Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/envs/mujoco/walker2d_v4.py#L15">gymnasium/envs/mujoco/walker2d_v4.py</see>.
     ///     </para>
+    ///     <para>Its info reads typed (DR-91): <c>Walker2dInfoV4 info = step.Info;</c> (<see cref="Walker2dInfoV4"/>), with the dict's own values still behind the indexer.</para>
     /// </remarks>
     [GymOptions]
     [PyName("Walker2dEnv")]
@@ -50,7 +51,7 @@ namespace Gym.Environments.Envs.MuJoCo {
                              (double Low, double High)? healthyAngleRange = null, double resetNoiseScale = 5e-3,
                              bool excludeCurrentPositionsFromObservation = true, string? renderMode = null, int width = DefaultSize,
                              int height = DefaultSize, int? cameraId = null, string? cameraName = null, int maxGeom = 1000,
-                             IReadOnlyDictionary<int, bool>? visualOptions = null, IEnvironmentViewerFactoryDelegate? viewerFactory = null)
+                             IReadOnlyDictionary<int, bool>? visualOptions = null, EnvViewerFactory? viewerFactory = null)
             : base("walker2d.xml", 4, UnboundedBox(excludeCurrentPositionsFromObservation ? 17 : 18), ClassMetadata, renderMode, width,
                    height, cameraId, cameraName, DefaultCameraConfig, maxGeom, visualOptions, viewerFactory) {
             ForwardRewardWeight = forwardRewardWeight;
@@ -62,6 +63,50 @@ namespace Gym.Environments.Envs.MuJoCo {
             ResetNoiseScale = resetNoiseScale;
             ExcludeCurrentPositionsFromObservation = excludeCurrentPositionsFromObservation;
         }
+
+        /// <summary>
+        ///     Builds the env with the render mode given as the <see cref="Gym.Envs.RenderMode"/> enum (DR-84, DR-93), as
+        ///     <see cref="Walker2dEnvV4(double, double, double, bool, Nullable{ValueTuple{double,double}}, Nullable{ValueTuple{double,double}}, double, bool, string, int, int, int?, string, int, IReadOnlyDictionary{int,bool}, EnvViewerFactory)"/>
+        ///     builds it from the mode's string: <c>new Walker2dEnvV4(RenderMode.RgbArray)</c> builds what
+        ///     <c>new Walker2dEnvV4(renderMode: "rgb_array")</c> builds, the member reaching the env as Gymnasium's string
+        ///     (<see cref="RenderModes.Name"/>), which its <c>RenderMode</c> property then holds.
+        /// </summary>
+        /// <remarks>
+        ///     The mode is required and comes first, so <c>new Walker2dEnvV4()</c> keeps meaning the other constructor, without a
+        ///     mode; leave the mode out there for no rendering. Every other parameter means what it means there.
+        /// </remarks>
+        /// <param name="renderMode">
+        ///     The render mode, which the env must list in its <c>metadata["render_modes"]</c> as for the string; it behaves
+        ///     exactly as its Gymnasium string does in the other constructor.
+        /// </param>
+        /// <param name="forwardRewardWeight">The weight of the forward velocity (<c>forward_reward_weight</c>).</param>
+        /// <param name="ctrlCostWeight">The weight of the squared torques (<c>ctrl_cost_weight</c>).</param>
+        /// <param name="healthyReward">The healthy reward per step (<c>healthy_reward</c>).</param>
+        /// <param name="terminateWhenUnhealthy">Whether an unhealthy state ends the episode (<c>terminate_when_unhealthy</c>).</param>
+        /// <param name="healthyZRange">The exclusive range of a healthy height (<c>healthy_z_range</c>); <see langword="null"/> is (0.8, 2.0).</param>
+        /// <param name="healthyAngleRange">The exclusive range of a healthy torso angle (<c>healthy_angle_range</c>); <see langword="null"/> is (-1.0, 1.0).</param>
+        /// <param name="resetNoiseScale">The scale of the reset's noise (<c>reset_noise_scale</c>).</param>
+        /// <param name="excludeCurrentPositionsFromObservation">
+        ///     Whether the root's x leaves the observation (<c>exclude_current_positions_from_observation</c>).
+        /// </param>
+        /// <param name="width">The rendered frame's width (<c>width</c>).</param>
+        /// <param name="height">The rendered frame's height (<c>height</c>).</param>
+        /// <param name="cameraId">The camera to render from (<c>camera_id</c>).</param>
+        /// <param name="cameraName">The camera to render from by name (<c>camera_name</c>).</param>
+        /// <param name="maxGeom">The most geoms a frame draws (<c>max_geom</c>).</param>
+        /// <param name="visualOptions">MuJoCo visual flags to switch (<c>visual_options</c>).</param>
+        /// <param name="viewerFactory">Gym.NET's <c>viewer_factory</c> (DR-20) for <c>human</c> mode.</param>
+        /// <exception cref="ArgumentOutOfRangeException">Thrown for a value <see cref="Gym.Envs.RenderMode"/> does not declare (a cast integer such as <c>(RenderMode)99</c>).</exception>
+        /// <exception cref="ValueError">Both a camera id and a camera name.</exception>
+        public Walker2dEnvV4(RenderMode renderMode, double forwardRewardWeight = 1.0, double ctrlCostWeight = 1e-3, double healthyReward = 1.0,
+                             bool terminateWhenUnhealthy = true, (double Low, double High)? healthyZRange = null,
+                             (double Low, double High)? healthyAngleRange = null, double resetNoiseScale = 5e-3,
+                             bool excludeCurrentPositionsFromObservation = true, int width = DefaultSize, int height = DefaultSize,
+                             int? cameraId = null, string? cameraName = null, int maxGeom = 1000,
+                             IReadOnlyDictionary<int, bool>? visualOptions = null, EnvViewerFactory? viewerFactory = null)
+            : this(forwardRewardWeight, ctrlCostWeight, healthyReward, terminateWhenUnhealthy, healthyZRange, healthyAngleRange, resetNoiseScale,
+                   excludeCurrentPositionsFromObservation, RenderModes.Name(renderMode), width, height, cameraId, cameraName, maxGeom, visualOptions,
+                   viewerFactory) { }
 
         /// <summary>Gymnasium's class attribute <c>metadata</c>: the four render modes at 125 frames per second. A new dict on every read.</summary>
         public static new Metadata ClassMetadata => MetadataFor(125);

@@ -6,6 +6,7 @@ using Gym.Observations;
 using Gym.Utils;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using NumSharp;
+using Gym.Tests.Helpers;
 
 namespace Gym.Tests.Gymnasium.Utils {
     /// <summary>
@@ -98,7 +99,7 @@ namespace Gym.Tests.Gymnasium.Utils {
         public void TestEdgeCase() {
             (_, _, bool done, Info info) = StepApiCompatibility.ConvertToDoneStepApi(new StepResult<object?>(0L, 0.0, true, true, new Info()));
             Assert.IsTrue(done);
-            Assert.AreEqual(new Info { ["TimeLimit.truncated"] = false }, info);
+            PyAssert.AreEqual(new Info { ["TimeLimit.truncated"] = false }, info);
 
             // Test with vector dict info
             object?[] vectorDict = StepApiCompatibility.ConvertToDoneStepApi(new object?[] { 0L, 0L, np.array(new[] { true }), np.array(new[] { true }), new Info() }, isVectorEnv: true);

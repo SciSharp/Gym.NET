@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Threading;
+using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
@@ -11,6 +12,7 @@ using Avalonia.Markup.Xaml;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using Gym.Environments;
+using NumSharp;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using Image = SixLabors.ImageSharp.Image;
@@ -41,8 +43,14 @@ namespace Gym.Rendering.Avalonia {
     ///     Before <see cref="BeginInput"/> nothing changes: the close button closes the window, as it always has for the
     ///     human-mode windows of envs.
     ///     </para>
+    ///     <para>
+    ///     It renders both ways the viewer contract offers (DR-85): <see cref="Render"/> waits for the UI thread to take the
+    ///     frame, <see cref="RenderAsync"/> awaits it. Closing through the contract (<see cref="IEnvViewer.Close"/>) hides the
+    ///     window; footgun: <see cref="Window.Close()"/>, which a variable typed <c>AvaloniaEnvViewer</c> calls as
+    ///     <c>viewer.Close()</c>, is Avalonia's own and destroys it instead.
+    ///     </para>
     /// </remarks>
-    public class AvaloniaEnvViewer : Window, IInteractiveEnvViewer {
+    public class AvaloniaEnvViewer : Window, IInteractiveEnvViewer, IAsyncEnvViewer {
 
         /// <summary>Set once the window has opened (<see cref="OnOpened"/>).</summary>
         private readonly ManualResetEventSlim ReadyResetEvent = new ManualResetEventSlim();
@@ -83,7 +91,7 @@ namespace Gym.Rendering.Avalonia {
         }
 
         /// <summary>
-        ///     Closes the window as <see cref="CloseEnvironment"/> does (it is hidden, not destroyed: the Avalonia app is
+        ///     Closes the window as <see cref="IEnvViewer.Close"/> does (it is hidden, not destroyed: the Avalonia app is
         ///     shared by every viewer of the process). From another thread the close is posted to the UI thread and this
         ///     returns at once.
         /// </summary>
@@ -94,41 +102,84 @@ namespace Gym.Rendering.Avalonia {
                 return;
             }
 
-            CloseEnvironment();
+            Hide();
         }
 
         /// <summary>
-        ///     A delegate that creates a <see cref="AvaloniaEnvViewer"/> based on given parameters.
+        ///     The factory envs open this window with (DR-20, DR-85): <see cref="StaticAvaloniaApp.Open"/>, which starts the
+        ///     shared Avalonia application on its own UI thread the first time and returns once the window is shown.
         /// </summary>
-        public static IEnvironmentViewerFactoryDelegate Factory => StaticAvaloniaApp.Run;
+        public static EnvViewerFactory Factory => StaticAvaloniaApp.Open;
 
         /// <summary>
-        ///     Shows a frame, replacing the previous one; the image stays the caller's (it is copied through a BMP stream
+        ///     Shows a frame, replacing the previous one; the frame stays the caller's (it is copied through a BMP stream
         ///     first). From another thread it waits up to 4 seconds for the UI thread to take the frame.
         /// </summary>
-        /// <param name="img">The frame.</param>
-        /// <exception cref="Exception">Thrown when the UI thread did not take the frame within 4 seconds (<c>Rendering timed out.</c>).</exception>
-        public void Render(Image img) {
-            using (var ms = new MemoryStream(img.Height * img.Width * img.PixelType.BitsPerPixel / 8)) {
-                img.SaveAsBmp(ms);
-                ms.Seek(0, SeekOrigin.Begin);
-                var bitmap = new Bitmap(ms);
-                if (Dispatcher.UIThread.CheckAccess()) {
+        /// <param name="frame">The frame, <c>(H, W, 3)</c>; another dtype is cast to uint8.</param>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="frame"/> is <see langword="null"/>.</exception>
+        /// <exception cref="ArgumentException">Thrown for a frame that is not <c>(H, W, 3)</c>.</exception>
+        /// <exception cref="TimeoutException">Thrown when the UI thread did not take the frame within 4 seconds (<c>Rendering timed out.</c>).</exception>
+        public void Render(NDArray frame) {
+            Bitmap bitmap = ToBitmap(frame);
+            if (Dispatcher.UIThread.CheckAccess()) {
+                Content = new AVImage {
+                    Source = bitmap
+                };
+            } else {
+                RenderResetEvent.Reset();
+                Dispatcher.UIThread.InvokeAsync(() => {
                     Content = new AVImage {
                         Source = bitmap
                     };
-                } else {
-                    RenderResetEvent.Reset();
-                    Dispatcher.UIThread.InvokeAsync(() => {
-                        Content = new AVImage {
-                            Source = bitmap
-                        };
-                        RenderResetEvent.Set();
-                    }, DispatcherPriority.MaxValue);
-                    if (!RenderResetEvent.Wait(4_000))
-                        throw new Exception("Rendering timed out.");
-                }
+                    RenderResetEvent.Set();
+                }, DispatcherPriority.MaxValue);
+                // The synchronous path (DR-85) waits on an event, not a task: the UI thread never waits on this one, so the
+                // two cannot deadlock, and a stalled UI is reported instead of hanging the env.
+                if (!RenderResetEvent.Wait(4_000))
+                    throw new TimeoutException("Rendering timed out.");
             }
+        }
+
+        /// <summary>
+        ///     Shows a frame without blocking (DR-85): the bitmap is made on the caller's thread, then handed to the UI thread,
+        ///     and the task completes once the UI has taken it. On the UI thread itself it completes at once.
+        /// </summary>
+        /// <param name="frame">The frame, <c>(H, W, 3)</c>; it stays the caller's, copied before this returns its task.</param>
+        /// <param name="cancellationToken">Cancels the wait for the UI thread; the frame may still be shown.</param>
+        /// <returns>The pending render.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="frame"/> is <see langword="null"/>.</exception>
+        /// <exception cref="ArgumentException">Thrown for a frame that is not <c>(H, W, 3)</c>.</exception>
+        /// <exception cref="OperationCanceledException">Thrown, or through the task, when <paramref name="cancellationToken"/> is cancelled first.</exception>
+        public ValueTask RenderAsync(NDArray frame, CancellationToken cancellationToken = default) {
+            cancellationToken.ThrowIfCancellationRequested();
+            Bitmap bitmap = ToBitmap(frame);
+            if (Dispatcher.UIThread.CheckAccess()) {
+                Content = new AVImage {
+                    Source = bitmap
+                };
+                return default;
+            }
+
+            Task shown = Dispatcher.UIThread.InvokeAsync(() => {
+                Content = new AVImage {
+                    Source = bitmap
+                };
+            }, DispatcherPriority.MaxValue).GetTask();
+            return new ValueTask(shown.WaitAsync(cancellationToken));
+        }
+
+        /// <summary>A frame as an Avalonia bitmap, through ImageSharp's BMP encoder (the viewers' own conversion, shared by both packages).</summary>
+        /// <param name="frame">The frame, <c>(H, W, 3)</c>.</param>
+        /// <returns>A new bitmap the window takes over.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="frame"/> is <see langword="null"/>.</exception>
+        /// <exception cref="ArgumentException">Thrown for a frame that is not <c>(H, W, 3)</c>.</exception>
+        private static Bitmap ToBitmap(NDArray frame) {
+            using Image<Rgb24> image = ViewerFrames.ToImage(frame);
+            // A 24-bit BMP is its 54-byte header and rows padded to 4 bytes: room for that, so the stream does not regrow.
+            using var stream = new MemoryStream(image.Height * (image.Width * 3 + 3) + 54);
+            image.SaveAsBmp(stream);
+            stream.Seek(0, SeekOrigin.Begin);
+            return new Bitmap(stream);
         }
 
         /// <summary>Marks the window as open, after Avalonia's own handling.</summary>
@@ -139,19 +190,34 @@ namespace Gym.Rendering.Avalonia {
         }
 
         /// <summary>
-        ///     Hides the window: the Avalonia app is shared by every viewer of the process, so the window is not destroyed.
-        ///     From another thread the hide is posted to the UI thread and this returns at once.
+        ///     Hides the window (the contract's <see cref="IEnvViewer.Close"/>): the Avalonia app is shared by every viewer of
+        ///     the process, so the window is not destroyed. From another thread the hide is posted to the UI thread and this
+        ///     returns at once.
         /// </summary>
-        public void CloseEnvironment() {
+        void IEnvViewer.Close() {
             //invoke if required
             if (!Dispatcher.UIThread.CheckAccess()) {
-                Dispatcher.UIThread.InvokeAsync(CloseEnvironment, DispatcherPriority.MaxValue);
+                Dispatcher.UIThread.InvokeAsync(Hide, DispatcherPriority.MaxValue);
                 return;
             }
 
             Hide();
-            //Dispose();
         }
+
+        /// <summary>Hides the window without blocking (DR-85); completes once the UI thread has hidden it.</summary>
+        /// <returns>The pending close.</returns>
+        public ValueTask CloseAsync() {
+            if (Dispatcher.UIThread.CheckAccess()) {
+                Hide();
+                return default;
+            }
+
+            return new ValueTask(Dispatcher.UIThread.InvokeAsync(Hide, DispatcherPriority.MaxValue).GetTask());
+        }
+
+        /// <summary>0.2's name for closing: hides the window as <see cref="IEnvViewer.Close"/> does, kept so 0.2 code compiles until 2.0 (DR-58, DR-85).</summary>
+        [Obsolete("0.2's name: close through IEnvViewer.Close() (hides the window). Removed in 2.0.")]
+        public void CloseEnvironment() => ((IEnvViewer)this).Close();
 
         /// <summary>
         ///     Starts reporting input: keys, the close button (which from now on only reports and no longer closes), the

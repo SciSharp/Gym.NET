@@ -79,7 +79,7 @@ namespace Gym.Environments.Envs.MuJoCo {
                             string? renderMode = null, int width = DefaultSize, int height = DefaultSize, int? cameraId = null,
                             string? cameraName = null, IReadOnlyDictionary<string, object?>? defaultCameraConfig = null,
                             int maxGeom = 1000, IReadOnlyDictionary<int, bool>? visualOptions = null,
-                            IEnvironmentViewerFactoryDelegate? viewerFactory = null) {
+                            EnvViewerFactory? viewerFactory = null) {
             Metadata = classMetadata;
             Fullpath = ExpandModelPath(modelPath);
             Width = width;

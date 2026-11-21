@@ -7,8 +7,6 @@ using Gym.Envs;
 using Gym.Exceptions;
 using Gym.Rendering;
 using NumSharp;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
 using Color = Gym.Rendering.Color;
 
 namespace Gym.Utils {
@@ -213,7 +211,7 @@ namespace Gym.Utils {
         public const int Height = 480;
 
         /// <summary>The window's factory, resolved when the figure was made.</summary>
-        private readonly IEnvironmentViewerFactoryDelegate _factory;
+        private readonly EnvViewerFactory _factory;
 
         /// <summary>The axes, top to bottom.</summary>
         private readonly PlotAxes[] _axes;
@@ -226,7 +224,7 @@ namespace Gym.Utils {
         /// <param name="viewerFactory">The window's factory; <see langword="null"/> reads <c>Gymnasium.HumanViewerFactory</c>.</param>
         /// <exception cref="ValueError">Thrown for fewer than one row, with matplotlib's message: <c>Number of rows must be a positive integer, not 0</c>.</exception>
         /// <exception cref="DependencyNotInstalled">Thrown when no viewer factory is given or set.</exception>
-        public PlotFigure(int rows, IEnvironmentViewerFactoryDelegate? viewerFactory = null) {
+        public PlotFigure(int rows, EnvViewerFactory? viewerFactory = null) {
             if (rows < 1)
                 throw new ValueError($"Number of rows must be a positive integer, not {rows}");
             _factory = Gymnasium.ResolveHumanViewerFactory(viewerFactory);
@@ -242,7 +240,7 @@ namespace Gym.Utils {
         /// <summary>The maker <see cref="PlayPlot"/> takes, with a viewer factory of the caller's.</summary>
         /// <param name="viewerFactory">The windows' factory; <see langword="null"/> reads <c>Gymnasium.HumanViewerFactory</c> when a figure is made.</param>
         /// <returns>The maker.</returns>
-        public static PlayPlot.PlotSubplots Subplots(IEnvironmentViewerFactoryDelegate? viewerFactory = null) => rows => new PlotFigure(rows, viewerFactory);
+        public static PlayPlot.PlotSubplots Subplots(EnvViewerFactory? viewerFactory = null) => rows => new PlotFigure(rows, viewerFactory);
 
         /// <inheritdoc />
         public IReadOnlyList<IPlotAxes> Axes => _axes;
@@ -258,10 +256,10 @@ namespace Gym.Utils {
             foreach (PlotAxes axes in _axes)
                 axes.Draw(figure);
 
-            // The factory may start a UI thread; the window is needed synchronously, as matplotlib's show is.
-            // TODO(async viewer path, DR-53): blocks on the factory; see IEnvironmentViewerFactoryDelegate.
-            _window ??= _factory(Width, Height, string.Join(" | ", _axes.Select(a => a.Title ?? ""))).GetAwaiter().GetResult();
-            using (Image<Rgb24> frame = Image.LoadPixelData<Rgb24>(figure.ToRgbBytes(), Width, Height))
+            // The window is needed synchronously, as matplotlib's show is; the factory returns once it is up (DR-85).
+            _window ??= _factory(Width, Height, string.Join(" | ", _axes.Select(a => a.Title ?? "")));
+            // The viewer contract's (H, W, 3) uint8 frame, copied by the viewer before Render returns.
+            using (NDArray frame = SurfArray.ToRgbArray(figure))
                 _window.Render(frame);
             Thread.Sleep(TimeSpan.FromSeconds(interval));
         }

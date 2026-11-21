@@ -49,7 +49,8 @@ public static class StaticAvaloniaApp {
 
     /// <summary>
     ///     Opens an <see cref="AvaloniaEnvViewer"/> window on the shared UI thread, starting the application first if no
-    ///     window has yet, and completes once the window is shown.
+    ///     window has yet, and completes once the window is shown: the asynchronous way to open one for an app that awaits.
+    ///     Envs use the synchronous <see cref="Open"/> (DR-85).
     /// </summary>
     /// <remarks>
     ///     Footgun: the viewer is built and shown on the UI thread, so an exception there is raised on that thread, not
@@ -74,6 +75,38 @@ public static class StaticAvaloniaApp {
             }, DispatcherPriority.MaxValue);
 
             return await resultCallback.Task;
+        } finally {
+            _syncRoot.Release();
+        }
+    }
+
+    /// <summary>
+    ///     Opens an <see cref="AvaloniaEnvViewer"/> window on the shared UI thread and returns it once shown, starting the
+    ///     application first if no window has yet: the synchronous factory envs call (<see cref="AvaloniaEnvViewer.Factory"/>,
+    ///     DR-85).
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///     The window is built and shown through Avalonia's synchronous <c>Dispatcher.Invoke</c>: from another thread this
+    ///     waits for the UI thread to run it, on the UI thread itself it runs inline, so no task is blocked on and the UI
+    ///     thread never waits for the caller (R8).
+    ///     </para>
+    ///     <para>An exception the window raises while being built or shown is raised here, unlike <see cref="Run"/>'s.</para>
+    /// </remarks>
+    /// <param name="width">The window's width in pixels.</param>
+    /// <param name="height">The window's height in pixels.</param>
+    /// <param name="title">The window's title, which also names the UI thread when this call starts it; <see langword="null"/> for none.</param>
+    /// <returns>The shown viewer.</returns>
+    public static IEnvViewer Open(int width, int height, string title = null) {
+        // Serialized with Run and InvokeAsync: two first windows must not start two applications.
+        _syncRoot.Wait();
+        try {
+            EnsureStarted(title);
+            return Dispatcher.UIThread.Invoke(() => {
+                var viewer = new AvaloniaEnvViewer(width, height, title);
+                viewer.Show();
+                return (IEnvViewer)viewer;
+            }, DispatcherPriority.MaxValue);
         } finally {
             _syncRoot.Release();
         }

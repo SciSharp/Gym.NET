@@ -4,7 +4,7 @@
 
 How Gym.NET 1.0 is put together, and how it is held to Gymnasium's behavior. The reasons behind each choice are recorded
 in the [completion plan](plans/COMPLETION_PLAN.md) (decisions D1–D22) and the [design review](plans/DESIGN_REVIEW.md)
-(designs DR-01…DR-92); the references in parentheses point there.
+(designs DR-01…DR-95); the references in parentheses point there.
 
 ## What Gym.NET is
 
@@ -52,9 +52,22 @@ Gymnasium's modules map to namespaces by area, with Gymnasium's class names kept
 - `Step(TAct)` → `StepResult<TObs>(Observation, Reward, Terminated, Truncated, Info)`; rewards are `double` everywhere.
 - `StepAsync` is a `ValueTask` that runs `Step` on the calling thread; an env with real asynchronous work overrides it.
   Wrappers do not forward it, so a wrapper's `Step` always applies.
-- `Render()` renders in the mode fixed at construction; `human` mode draws inside `Reset` and `Step`.
+- `Render()` renders in the mode fixed at construction; `human` mode draws inside `Reset` and `Step`. A single frame
+  converts explicitly: `(NDArray)env.Render()` is the result's own frame, `(Image)env.Render()` a new ImageSharp image
+  (DR-84).
+- `RenderMode` is Gymnasium's string (`"rgb_array"`), any string Gymnasium accepts, a custom env's own modes included
+  (DR-93). The `RenderMode` enum is how a mode is passed: each built-in env has its constructor taking the string and a
+  hand-written twin taking the enum first (`new CartPoleEnv(RenderMode.RgbArray)`, DR-84); `RenderModes` names the strings
+  and converts (`Name`, `Parse`, `TryParse`).
 - `NpRandom` is the env's generator, created lazily from entropy, `NpRandomSeed` its seed (-1 once a generator is
   assigned); `Metadata`, `Spec`, `Unwrapped`, `Close()`/`Dispose()`.
+- `Info` is Python's dict. `InfoExtensions.Get<T>` reads a value as a .NET type, converting NumPy scalars (0-d arrays)
+  and numbers without losing them (DR-78). Its `Equals`, `==` and hash are by reference, as for any .NET collection, and
+  Python's `==` is `PyEquals` (DR-92). Each built-in env class that sends info keys has a generated typed record,
+  deriving from `EnvInfo` as the env classes derive from `Env` (`MujocoInfo`, `ToyTextInfo`; DR-91, DR-95): `double`
+  members for scalars, `bool` for flags, `NDArray` for arrays, nullable where a reset or a step leaves the key out, the
+  dict kept inside for its indexer, and value equality over the members (DR-94). The results' `Information` is 0.2's
+  name for `Info`, obsolete until 2.0.
 - Python attributes by Python name: `GetWrapperAttr`/`SetWrapperAttr`/`HasWrapperAttr`, through `PyAttributes`
   (`[PyName]`, or the snake_case of the property).
 
@@ -89,6 +102,10 @@ Matching Gymnasium byte for byte means matching Python and NumPy where Gymnasium
   `PyMath` (`//`, `%`, `divmod`, `round`, `np.clip`, `np.sign`), `PyKwargs` (binding keyword arguments to constructor
   parameters by Python name), `PyJson` (`json.dumps`/`loads` for `EnvSpec`), `Difflib` (the registry's "Did you mean"),
   `Warnings` and `Logger` (warnings as `gymnasium.logger` issues them).
+- **Enums**: Gymnasium's `AutoresetMode` and `VectorizeMode` are C# enums marked `[PyEnum]` (DR-84); `AutoresetModes` and
+  `VectorizeModes` give a member's Python name, value, `str` and `repr` and parse `AutoresetMode("NextStep")` by value, and
+  `PyBuiltins` and `PyEquality` treat a member as Python treats its counterpart (equal only to itself). The `RenderMode`
+  enum is marked as standing for strings: `make`'s kwargs and the specs hold `"rgb_array"`, never the member.
 - **Errors**: every Gymnasium error type and message. Every Python and NumPy exception is NumSharp 0.81.0's own class
   (`ValueError`, `TypeError`, `KeyError`, `AssertionError`, `OverflowError`, `ZeroDivisionError`, `NotImplementedError`,
   `ImportError`, ...; DR-76), each under its .NET twin where .NET has one (`ValueError` is an `ArgumentException`,
@@ -116,7 +133,17 @@ draw are Gymnasium's own, embedded in Gym.NET.Environments (DR-19).
 
 `human` mode renders into a viewer: the env's own `viewerFactory`, else the app-wide `Gymnasium.HumanViewerFactory`, else
 `DependencyNotInstalled` at the first frame, as Gymnasium does without pygame (DR-20). Frames are paced by
-`Gym.Rendering.Clock` at the env's `render_fps`.
+`Gym.Rendering.Clock` at the env's `render_fps`. `Gymnasium.Make` and `MakeVec` take the render mode and a viewer factory
+(DR-89): the factory reaches the env, or the `HumanRendering` wrapper `make` applies to an env that only renders images,
+and is never recorded in the spec.
+
+The viewer contract is synchronous where the envs use it (DR-85): `EnvViewerFactory` returns the viewer once its window
+is up, `IEnvViewer.Render(NDArray frame)` shows the `(H, W, 3)` uint8 frame (copied before it returns) and `Close()`
+closes the window. A viewer that can also render without blocking implements `IAsyncEnvViewer` (`RenderAsync`,
+`CloseAsync`), which an inherently asynchronous env awaits (`EnvViewerExtensions` falls back to the synchronous path for
+any other viewer). Nothing blocks on a task, and ImageSharp is not part of the contract: the Avalonia and WinForms viewers
+convert frames themselves (`src/Shared/ViewerFrames.cs`, compiled into both). 0.2's `CloseEnvironment()` is `[Obsolete]`
+until 2.0.
 
 The MuJoCo envs draw their frames with a renderer of their own (`Envs/MuJoCo/Rendering`, DR-62, DR-69): MuJoCo's classic
 renderer in software, with the reference GPU's measured rounding, measured against Gymnasium's frames (DR-71). Their

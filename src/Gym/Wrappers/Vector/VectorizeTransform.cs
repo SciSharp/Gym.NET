@@ -93,7 +93,7 @@ namespace Gym.Wrappers.Vector {
                 return AutoresetMode.NextStep;
             }
 
-            return mode as AutoresetMode ?? throw new TypeError($"Expected env.metadata['autoreset_mode'] to be an AutoresetMode, got {PyBuiltins.TypeRepr(mode)}");
+            return mode is AutoresetMode member ? member : throw new TypeError($"Expected env.metadata['autoreset_mode'] to be an AutoresetMode, got {PyBuiltins.TypeRepr(mode)}");
         }
 
         /// <summary>
@@ -234,7 +234,7 @@ namespace Gym.Wrappers.Vector {
         public override VectorStepResult<TWObs> Step(TAct actions) {
             VectorStepResult<TObs> result = Env.Step(actions);
             TWObs observations = Observations(result.Observations);
-            if (ReferenceEquals(AutoresetMode, AutoresetMode.SameStep) && result.Infos.TryGetValue("final_obs", out object? finalObs)
+            if (AutoresetMode == AutoresetMode.SameStep && result.Infos.TryGetValue("final_obs", out object? finalObs)
                 && finalObs is object?[] finals && result.Infos.TryGetValue("_final_obs", out object? hasFinal) && hasFinal is NDArray mask) {
                 bool[] present = mask.ToArray<bool>();
                 for (int i = 0; i < finals.Length; i++) {

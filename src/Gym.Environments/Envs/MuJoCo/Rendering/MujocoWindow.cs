@@ -118,7 +118,7 @@ namespace Gym.Environments.Envs.MuJoCo.Rendering {
         /// <exception cref="DependencyNotInstalled">No viewer factory is set, where Gymnasium would lack GLFW.</exception>
         /// <exception cref="ArgumentOutOfRangeException">A width or height that is not positive.</exception>
         internal MujocoWindow(MjModel model, MjData data, int? width, int? height, int maxGeom, IReadOnlyDictionary<int, bool> visualOptions,
-                              IEnvironmentViewerFactoryDelegate? viewerFactory) {
+                              EnvViewerFactory? viewerFactory) {
             _model = model;
             _data = data;
             _fbWidth = width ?? FallbackWidth;
@@ -136,10 +136,9 @@ namespace Gym.Environments.Envs.MuJoCo.Rendering {
             }
 
             _frame = new MujocoFrame(model);
-            IEnvironmentViewerFactoryDelegate factory = global::Gym.Gymnasium.ResolveHumanViewerFactory(viewerFactory);
-            // The factory may start a UI thread and complete asynchronously; render calls are synchronous, as GLFW's are.
-            // TODO(async viewer path, DR-53): blocks on the factory; see IEnvironmentViewerFactoryDelegate.
-            _viewer = factory(_fbWidth, _fbHeight, Title).GetAwaiter().GetResult();
+            EnvViewerFactory factory = global::Gym.Gymnasium.ResolveHumanViewerFactory(viewerFactory);
+            // The factory returns once its window exists (DR-85); frames are then shown synchronously, as GLFW swaps buffers.
+            _viewer = factory(_fbWidth, _fbHeight, Title);
             if (_viewer is IInteractiveEnvViewer interactive)
                 interactive.BeginInput();
         }
@@ -304,8 +303,10 @@ namespace Gym.Environments.Envs.MuJoCo.Rendering {
             _lastRgb = rgb;
             _lastWidth = width;
             _lastHeight = height;
-            using (Image<Rgb24> image = Image.LoadPixelData<Rgb24>(rgb, width, height))
-                _viewer.Render(image);
+            // The viewer contract's (H, W, 3) uint8 frame (DR-85); the viewer copies it before Render returns, and the bytes
+            // stay in _lastRgb for T's capture.
+            using (var frame = new NDArray(rgb, new Shape(height, width, 3)))
+                _viewer.Render(frame);
             _clock.Tick(RefreshRate);
 
             PollEvents();
@@ -551,7 +552,7 @@ namespace Gym.Environments.Envs.MuJoCo.Rendering {
         private void CloseViewer() {
             IEnvViewer? viewer = _viewer;
             _viewer = null;
-            viewer?.CloseEnvironment();
+            viewer?.Close();
         }
 
         /// <summary>

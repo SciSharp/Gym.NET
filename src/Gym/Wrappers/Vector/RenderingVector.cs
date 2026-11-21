@@ -21,15 +21,16 @@ namespace Gym.Wrappers.Vector {
     /// <typeparam name="TAct">The batched action type, passed through.</typeparam>
     /// <remarks>
     ///     <para>
-    ///     The window is a viewer from <c>Gymnasium.HumanViewerFactory</c> (DR-20), opened at the screen size (by default a
-    ///     sub-env's frame size), with the grid's rows and columns chosen once, as Gymnasium chooses them. Frames are paced by
+    ///     The window is a viewer from the wrapper's own factory, else <c>Gymnasium.HumanViewerFactory</c> (DR-20, DR-89),
+    ///     opened at the screen size (by default a sub-env's frame size), with the grid's rows and columns chosen once, as
+    ///     Gymnasium chooses them. Frames are paced by
     ///     <see cref="Gym.Rendering.Clock"/>. <see cref="LastMosaic"/> keeps the last mosaic shown, <c>(width, height, 3)</c>
     ///     as pygame's surfaces are laid out.
     ///     </para>
     ///     <para>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/wrappers/vector/rendering.py#L21">gymnasium/wrappers/vector/rendering.py</see>.</para>
     /// </remarks>
     [PyName("HumanRendering")]
-    public class HumanRenderingVector<TObs, TAct> : VectorWrapper<TObs, TAct>, IRecordConstructorArgs {
+    public class HumanRenderingVector<TObs, TAct> : VectorWrapper<TObs, TAct>, IRecordConstructorArgs, IHumanViewerFactoryHolder {
         /// <summary>The render modes the wrapper can show (<c>ACCEPTED_RENDER_MODES</c>).</summary>
         public static readonly IReadOnlyList<string> AcceptedRenderModes = new[] { "rgb_array", "rgb_array_list", "depth_array", "depth_array_list" };
 
@@ -68,6 +69,15 @@ namespace Gym.Wrappers.Vector {
 
         /// <summary>The window's <c>(width, height)</c> (<c>screen_size</c>), a sub-env frame's size once the first frame came when none was given.</summary>
         public (int Width, int Height)? ScreenSize { get; private set; }
+
+        /// <summary>
+        ///     Gym.NET's viewer factory for this wrapper's window (DR-20, DR-89): set it before the first frame
+        ///     (<c>new HumanRenderingVector&lt;TObs, TAct&gt;(env) { ViewerFactory = factory }</c>); <see langword="null"/> (the
+        ///     default) uses <c>Gymnasium.HumanViewerFactory</c>, read when the window opens. A property, not a constructor
+        ///     argument, so the constructor and the arguments it records stay Gymnasium's.
+        /// </summary>
+        /// <remarks>Set after the window opened, it takes effect only if the window is closed and opens again.</remarks>
+        public EnvViewerFactory? ViewerFactory { get; set; }
 
         /// <summary>The size each sub-env's frame is scaled to, <c>(width, height)</c> (<c>scaled_subenv_size</c>), or <see langword="null"/> before the first frame.</summary>
         public (int Width, int Height)? ScaledSubenvSize { get; private set; }
@@ -123,7 +133,7 @@ namespace Gym.Wrappers.Vector {
         /// <summary>Closes the window, then the env.</summary>
         public override void Close() {
             if (_window is not null) {
-                _window.CloseEnvironment();
+                _window.Close();
                 _window = null;
             }
 
@@ -184,9 +194,9 @@ namespace Gym.Wrappers.Vector {
                 LastMosaic?.Dispose();
                 LastMosaic = merged;
                 if (_window is null) {
-                    IEnvironmentViewerFactoryDelegate factory = global::Gym.Gymnasium.ResolveHumanViewerFactory(null);
-                    // TODO(async viewer path, DR-53): blocks on the factory; see IEnvironmentViewerFactoryDelegate.
-                    _window = factory(ScreenSize.Value.Width, ScreenSize.Value.Height, "HumanRendering").GetAwaiter().GetResult();
+                    EnvViewerFactory factory = global::Gym.Gymnasium.ResolveHumanViewerFactory(ViewerFactory);
+                    // The factory returns once its window is up (DR-85: synchronous, no task to block on).
+                    _window = factory(ScreenSize.Value.Width, ScreenSize.Value.Height, "HumanRendering");
                 }
 
                 _clock ??= new Gym.Rendering.Clock();
@@ -194,8 +204,8 @@ namespace Gym.Wrappers.Vector {
                 // The viewer takes (height, width, 3) pixels: pygame's make_surface reads the (width, height) array transposed.
                 using NDArray image = np.transpose(merged, new[] { 1, 0, 2 });
                 using NDArray contiguous = image.copy();
-                using SixLabors.ImageSharp.Image frame = VideoFrames.ToImage(contiguous);
-                _window.Render(frame);
+                // Already the viewer contract's (H, W, 3) uint8 frame (DR-85); the viewer copies it before Render returns.
+                _window.Render(contiguous);
             } finally {
                 foreach (RenderResult render in renders)
                     render.Dispose();
@@ -285,13 +295,14 @@ namespace Gym.Wrappers.Vector {
                 episodeTrigger = Video.CappedCubicVideoSchedule;
 
             if (env.Metadata.TryGetValue("autoreset_mode", out object? mode) && mode is not null) {
-                AutoresetMode = mode as AutoresetMode ?? AutoresetMode.NextStep;
+                // A value of another kind than a member falls back to NEXT_STEP, as Gymnasium's comparisons with members do.
+                AutoresetMode = mode is AutoresetMode member ? member : AutoresetMode.NextStep;
             } else {
                 Logger.Warn($"{env} metadata doesn't specify its autoreset mode ({PyBuiltins.Repr(env.Metadata)}), therefore, defaulting to next step.");
                 AutoresetMode = AutoresetMode.NextStep;
             }
 
-            if (ReferenceEquals(AutoresetMode, AutoresetMode.SameStep))
+            if (AutoresetMode == AutoresetMode.SameStep)
                 Logger.Warn("Vector environment's autoreset mode is same-step (https://farama.org/Vector-Autoreset-Mode). Recorded episodes will not contain the last frame of the episode.");
 
             EpisodeTrigger = episodeTrigger;
@@ -407,11 +418,11 @@ namespace Gym.Wrappers.Vector {
             StepId += 1;
 
             bool firstEnded = result.Terminations.GetBoolean(0) || result.Truncations.GetBoolean(0);
-            if (ReferenceEquals(AutoresetMode, AutoresetMode.NextStep)) {
+            if (AutoresetMode == AutoresetMode.NextStep) {
                 if (HasAutoreset)
                     StartEpisode();
                 HasAutoreset = firstEnded;
-            } else if (ReferenceEquals(AutoresetMode, AutoresetMode.SameStep) && firstEnded) {
+            } else if (AutoresetMode == AutoresetMode.SameStep && firstEnded) {
                 StartEpisode();
             }
 

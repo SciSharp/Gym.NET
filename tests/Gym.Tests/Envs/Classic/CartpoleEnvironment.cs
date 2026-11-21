@@ -21,7 +21,7 @@ namespace Gym.Tests.Envs.Classic {
         ///     from CartPole's 50 fps so the pacing clock does not stretch the test to 20 seconds.
         /// </summary>
         /// <param name="viewer">The viewer backend to render into.</param>
-        public void Run(IEnvironmentViewerFactoryDelegate viewer) {
+        public void Run(EnvViewerFactory viewer) {
             var cp = new CartPoleEnv(renderMode: "human", viewerFactory: viewer); //or AvaloniaEnvViewer.Factory
             cp.Metadata[Metadata.RenderFpsKey] = 1000L;
             var done = true;

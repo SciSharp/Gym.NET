@@ -421,7 +421,7 @@ namespace Gym.Tests.Gymnasium.Utils {
         /// </summary>
         private sealed class HeadlessHumanMode : IDisposable {
             /// <summary>The factory before the test.</summary>
-            private readonly IEnvironmentViewerFactoryDelegate? _previous;
+            private readonly EnvViewerFactory? _previous;
 
             /// <summary>Installs the headless viewer.</summary>
             public HeadlessHumanMode() {

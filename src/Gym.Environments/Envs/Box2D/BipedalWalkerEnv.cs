@@ -63,6 +63,7 @@ namespace Gym.Environments.Envs.Box2D {
     ///     Not thread-safe; each env owns its world, so envs on different threads do not interfere. Reference:
     ///     <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/envs/box2d/bipedal_walker.py#L103">gymnasium/envs/box2d/bipedal_walker.py</see>.
     ///     </para>
+    ///     <para>Its info is always <c>{}</c>, as Gymnasium's, so it has no typed info record (DR-95).</para>
     /// </remarks>
     [GymOptions]
     [PyName("BipedalWalker")]
@@ -191,7 +192,7 @@ namespace Gym.Environments.Envs.Box2D {
         /// </param>
         /// <param name="hardcore">Gymnasium's <c>hardcore</c>: stumps, stairs and pits in the terrain (BipedalWalkerHardcore-v3); read by every reset.</param>
         /// <param name="viewerFactory">Gym.NET's <c>viewer_factory</c> (DR-20) for human mode; <see langword="null"/> uses <c>Gymnasium.HumanViewerFactory</c>.</param>
-        public BipedalWalkerEnv(string? renderMode = null, bool hardcore = false, IEnvironmentViewerFactoryDelegate? viewerFactory = null) {
+        public BipedalWalkerEnv(string? renderMode = null, bool hardcore = false, EnvViewerFactory? viewerFactory = null) {
             Metadata = ClassMetadata;
             World = new b2World();
             Hardcore = hardcore;
@@ -231,6 +232,27 @@ namespace Gym.Environments.Envs.Box2D {
             RenderMode = renderMode;
             _window = new HumanWindow(hardcore ? "bipedalwalkerhardcore-v3" : "bipedalwalker-v3", viewerFactory);
         }
+
+        /// <summary>
+        ///     Builds the env with the render mode given as the <see cref="Gym.Envs.RenderMode"/> enum (DR-84, DR-93), as
+        ///     <see cref="BipedalWalkerEnv(string, bool, EnvViewerFactory)"/>
+        ///     builds it from the mode's string: <c>new BipedalWalkerEnv(RenderMode.RgbArray)</c> builds what
+        ///     <c>new BipedalWalkerEnv(renderMode: "rgb_array")</c> builds, the member reaching the env as Gymnasium's string
+        ///     (<see cref="RenderModes.Name"/>), which its <c>RenderMode</c> property then holds.
+        /// </summary>
+        /// <remarks>
+        ///     The mode is required and comes first, so <c>new BipedalWalkerEnv()</c> keeps meaning the other constructor, without a
+        ///     mode; leave the mode out there for no rendering. Every other parameter means what it means there.
+        /// </remarks>
+        /// <param name="renderMode">
+        ///     The render mode, which the env must list in its <c>metadata["render_modes"]</c> as for the string; it behaves
+        ///     exactly as its Gymnasium string does in the other constructor.
+        /// </param>
+        /// <param name="hardcore">Gymnasium's <c>hardcore</c>: stumps, stairs and pits in the terrain (BipedalWalkerHardcore-v3); read by every reset.</param>
+        /// <param name="viewerFactory">Gym.NET's <c>viewer_factory</c> (DR-20) for human mode; <see langword="null"/> uses <c>Gymnasium.HumanViewerFactory</c>.</param>
+        /// <exception cref="ArgumentOutOfRangeException">Thrown for a value <see cref="Gym.Envs.RenderMode"/> does not declare (a cast integer such as <c>(RenderMode)99</c>).</exception>
+        public BipedalWalkerEnv(RenderMode renderMode, bool hardcore = false, EnvViewerFactory? viewerFactory = null)
+            : this(RenderModes.Name(renderMode), hardcore, viewerFactory) { }
 
         /// <summary>
         ///     Gymnasium's class attribute <c>metadata</c>: <c>{"render_modes": ["human", "rgb_array"], "render_fps": 50}</c>.

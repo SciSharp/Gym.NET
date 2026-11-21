@@ -93,7 +93,7 @@ namespace Gym.Tests.Gymnasium.Wrappers.Vector {
         [DataRow("Disabled")]
         public void TestEpisodeStatisticsWithAutoresetMode(string autoresetMode) {
             const int numEnvs = 2, episodeLength = 3, numSteps = 25;
-            AutoresetMode mode = AutoresetMode.From(autoresetMode);
+            AutoresetMode mode = AutoresetModes.From(autoresetMode);
 
             using var envs = new RecordEpisodeStatisticsVector<object?, object?>(new SyncVectorEnv(
                 Enumerable.Range(0, numEnvs).Select(_ => (Func<IEnv>)(() => FixedLengthEnv(episodeLength))), autoresetMode: mode));
@@ -119,7 +119,7 @@ namespace Gym.Tests.Gymnasium.Wrappers.Vector {
                     Assert.AreEqual(episodeLength, l[j], $"length of sub-env {j} after step {i}");
                 }
 
-                if (ReferenceEquals(mode, AutoresetMode.Disabled)) {
+                if (mode == AutoresetMode.Disabled) {
                     using NDArray resetMask = np.array(dones);
                     envs.Reset(options: new Info { ["reset_mask"] = resetMask });
                 }

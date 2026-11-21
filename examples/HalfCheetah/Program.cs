@@ -173,7 +173,8 @@ internal static class Program {
         var view = new SideView();
         using var game = new CheetahGame(model);
         game.Reset(seed);
-        IEnvViewer viewer = AvaloniaEnvViewer.Factory(view.Width, view.Height, Title).GetAwaiter().GetResult();
+        // The factory returns once the window is up (DR-85).
+        IEnvViewer viewer = AvaloniaEnvViewer.Factory(view.Width, view.Height, Title);
         var input = viewer as IInteractiveEnvViewer ?? throw new InvalidOperationException("the viewer reports no keys");
         input.BeginInput();
         Console.WriteLine("Window open. Tab: autopilot on/off; keys Q/A W/S E/D drive the back leg, U/J I/K O/L the front; " +
@@ -191,8 +192,9 @@ internal static class Program {
             double now = clock.Elapsed.TotalSeconds;
             Hud hud = new(autopilot ? "AUTOPILOT" : "YOU", paused, speed, lastScore, now < bannerUntil ? banner : null);
             Surface frame = view.Render(game, hud);
-            using Image<Rgb24> image = Image.LoadPixelData<Rgb24>(frame.ToRgbBytes(), frame.Width, frame.Height);
-            viewer.Render(image);
+            // The viewer contract's (H, W, 3) uint8 frame, copied by the viewer before Render returns.
+            using NDArray pixels = SurfArray.ToRgbArray(frame);
+            viewer.Render(pixels);
             lastFrame = now;
         }
 
@@ -264,7 +266,7 @@ internal static class Program {
                 game.Reset(nextSeed++);
             }
         }
-        viewer.CloseEnvironment();
+        viewer.Close();
         return 0;
     }
 

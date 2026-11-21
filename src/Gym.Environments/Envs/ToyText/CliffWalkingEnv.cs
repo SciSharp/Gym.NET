@@ -36,6 +36,7 @@ namespace Gym.Environments.Envs.ToyText {
     ///     Not thread-safe.
     ///     </para>
     ///     <para>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/envs/toy_text/cliffwalking.py#L28">gymnasium/envs/toy_text/cliffwalking.py</see>.</para>
+    ///     <para>Its info reads typed (DR-91): <c>CliffWalkingInfo info = step.Info;</c> (<see cref="CliffWalkingInfo"/>), with the dict's own values still behind the indexer.</para>
     /// </remarks>
     [GymOptions]
     public partial class CliffWalkingEnv : Env<NDArray, NDArray> {
@@ -79,7 +80,7 @@ namespace Gym.Environments.Envs.ToyText {
         /// <param name="renderMode">Gymnasium's <c>render_mode</c>: <see langword="null"/>, <c>"human"</c>, <c>"rgb_array"</c> or <c>"ansi"</c>.</param>
         /// <param name="isSlippery">Gymnasium's <c>is_slippery</c>: each move goes as intended or to either side, with probability 1/3 each.</param>
         /// <param name="viewerFactory">Gym.NET's <c>viewer_factory</c> (DR-20) for human mode; <see langword="null"/> uses <c>Gymnasium.HumanViewerFactory</c>.</param>
-        public CliffWalkingEnv(string? renderMode = null, bool isSlippery = false, IEnvironmentViewerFactoryDelegate? viewerFactory = null) {
+        public CliffWalkingEnv(string? renderMode = null, bool isSlippery = false, EnvViewerFactory? viewerFactory = null) {
             Metadata = ClassMetadata;
             IsSlippery = isSlippery;
 
@@ -108,6 +109,27 @@ namespace Gym.Environments.Envs.ToyText {
             RenderMode = renderMode;
             _window = new HumanWindow("CliffWalking", viewerFactory);
         }
+
+        /// <summary>
+        ///     Builds the env with the render mode given as the <see cref="Gym.Envs.RenderMode"/> enum (DR-84, DR-93), as
+        ///     <see cref="CliffWalkingEnv(string, bool, EnvViewerFactory)"/>
+        ///     builds it from the mode's string: <c>new CliffWalkingEnv(RenderMode.RgbArray)</c> builds what
+        ///     <c>new CliffWalkingEnv(renderMode: "rgb_array")</c> builds, the member reaching the env as Gymnasium's string
+        ///     (<see cref="RenderModes.Name"/>), which its <c>RenderMode</c> property then holds.
+        /// </summary>
+        /// <remarks>
+        ///     The mode is required and comes first, so <c>new CliffWalkingEnv()</c> keeps meaning the other constructor, without a
+        ///     mode; leave the mode out there for no rendering. Every other parameter means what it means there.
+        /// </remarks>
+        /// <param name="renderMode">
+        ///     The render mode, which the env must list in its <c>metadata["render_modes"]</c> as for the string; it behaves
+        ///     exactly as its Gymnasium string does in the other constructor.
+        /// </param>
+        /// <param name="isSlippery">Gymnasium's <c>is_slippery</c>: each move goes as intended or to either side, with probability 1/3 each.</param>
+        /// <param name="viewerFactory">Gym.NET's <c>viewer_factory</c> (DR-20) for human mode; <see langword="null"/> uses <c>Gymnasium.HumanViewerFactory</c>.</param>
+        /// <exception cref="ArgumentOutOfRangeException">Thrown for a value <see cref="Gym.Envs.RenderMode"/> does not declare (a cast integer such as <c>(RenderMode)99</c>).</exception>
+        public CliffWalkingEnv(RenderMode renderMode, bool isSlippery = false, EnvViewerFactory? viewerFactory = null)
+            : this(RenderModes.Name(renderMode), isSlippery, viewerFactory) { }
 
         /// <summary>
         ///     Gymnasium's class attribute <c>metadata</c>: <c>{"render_modes": ["human", "rgb_array", "ansi"], "render_fps": 4}</c>.

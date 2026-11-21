@@ -118,7 +118,7 @@ namespace Gym.Utils {
         [PyName("play")]
         public static void Run(IEnv env, bool? transpose = true, double? fps = null, double? zoom = null, PlayCallback? callback = null,
             object? keysToAction = null, BigInteger? seed = null, object? noop = null, bool waitOnPlayer = false,
-            IEnvironmentViewerFactoryDelegate? viewerFactory = null, PygameContext? context = null) {
+            EnvViewerFactory? viewerFactory = null, PygameContext? context = null) {
             if (env is null)
                 throw new ArgumentNullException(nameof(env));
             // The one loop body (DR-44) with blocking pacing: every await in it completes synchronously for an env whose steps
@@ -166,7 +166,7 @@ namespace Gym.Utils {
         /// </remarks>
         public static Task RunAsync(IEnv env, bool? transpose = true, double? fps = null, double? zoom = null, PlayCallback? callback = null,
             object? keysToAction = null, BigInteger? seed = null, object? noop = null, bool waitOnPlayer = false,
-            IEnvironmentViewerFactoryDelegate? viewerFactory = null, PygameContext? context = null, CancellationToken cancellationToken = default) {
+            EnvViewerFactory? viewerFactory = null, PygameContext? context = null, CancellationToken cancellationToken = default) {
             if (env is null)
                 throw new ArgumentNullException(nameof(env));
             PygameContext game = context ?? PygameContext.Default;
@@ -200,7 +200,7 @@ namespace Gym.Utils {
         /// <returns>A task that completes when the game ends.</returns>
         /// <exception cref="Exception">Every exception <see cref="Run"/> documents, through the task.</exception>
         private static async Task RunLoopAsync(IEnv env, bool? transpose, double? fps, double? zoom, PlayCallback? callback, object? keysToAction,
-            BigInteger? seed, object? noop, bool waitOnPlayer, IEnvironmentViewerFactoryDelegate? viewerFactory, PygameContext context, bool awaitPacing,
+            BigInteger? seed, object? noop, bool waitOnPlayer, EnvViewerFactory? viewerFactory, PygameContext context, bool awaitPacing,
             CancellationToken cancellationToken) {
             object noopAction = noop ?? 0;
             Release(env.Reset(seed));

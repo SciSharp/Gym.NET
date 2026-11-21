@@ -44,6 +44,7 @@ namespace Gym.Environments.Envs.ToyText {
     ///     action given). Not thread-safe. Reference:
     ///     <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/envs/toy_text/frozen_lake.py#L83">gymnasium/envs/toy_text/frozen_lake.py</see>.
     ///     </para>
+    ///     <para>Its info reads typed (DR-91): <c>FrozenLakeInfo info = step.Info;</c> (<see cref="FrozenLakeInfo"/>), with the dict's own values still behind the indexer.</para>
     /// </remarks>
     [GymOptions]
     public partial class FrozenLakeEnv : Env<NDArray, NDArray> {
@@ -113,7 +114,7 @@ namespace Gym.Environments.Envs.ToyText {
         /// <exception cref="ValueError">Thrown for rows of different lengths, with NumPy's message, or an empty <paramref name="rewardSchedule"/> (<c>min() arg is an empty sequence</c>).</exception>
         /// <exception cref="ZeroDivisionError">Thrown, as Python's <c>ZeroDivisionError</c>, for a map without rows or columns (the cell size divides by them).</exception>
         public FrozenLakeEnv(string? renderMode = null, IReadOnlyList<string>? desc = null, string? mapName = "4x4", bool isSlippery = true, double successRate = 1.0 / 3.0,
-            IReadOnlyList<double>? rewardSchedule = null, IEnvironmentViewerFactoryDelegate? viewerFactory = null) {
+            IReadOnlyList<double>? rewardSchedule = null, EnvViewerFactory? viewerFactory = null) {
             Metadata = ClassMetadata;
             IReadOnlyList<string> rows;
             if (desc is null && mapName is null)
@@ -190,6 +191,40 @@ namespace Gym.Environments.Envs.ToyText {
             CellSize = (WindowSize.Width / Ncol, WindowSize.Height / Nrow);
             _window = new HumanWindow("Frozen Lake", viewerFactory);
         }
+
+        /// <summary>
+        ///     Builds the env with the render mode given as the <see cref="Gym.Envs.RenderMode"/> enum (DR-84, DR-93), as
+        ///     <see cref="FrozenLakeEnv(string, IReadOnlyList{string}, string, bool, double, IReadOnlyList{double}, EnvViewerFactory)"/>
+        ///     builds it from the mode's string: <c>new FrozenLakeEnv(RenderMode.RgbArray)</c> builds what
+        ///     <c>new FrozenLakeEnv(renderMode: "rgb_array")</c> builds, the member reaching the env as Gymnasium's string
+        ///     (<see cref="RenderModes.Name"/>), which its <c>RenderMode</c> property then holds.
+        /// </summary>
+        /// <remarks>
+        ///     The mode is required and comes first, so <c>new FrozenLakeEnv()</c> keeps meaning the other constructor, without a
+        ///     mode; leave the mode out there for no rendering. Every other parameter means what it means there.
+        /// </remarks>
+        /// <param name="renderMode">
+        ///     The render mode, which the env must list in its <c>metadata["render_modes"]</c> as for the string; it behaves
+        ///     exactly as its Gymnasium string does in the other constructor.
+        /// </param>
+        /// <param name="desc">Gymnasium's <c>desc</c>: the map's rows (<c>S</c> start, <c>F</c> frozen, <c>H</c> hole, <c>G</c> goal), all of one length.</param>
+        /// <param name="mapName">
+        ///     Gymnasium's <c>map_name</c>: <c>"4x4"</c> or <c>"8x8"</c> (<see cref="Maps"/>), used when <paramref name="desc"/> is
+        ///     <see langword="null"/>; with both <see langword="null"/>, <see cref="GenerateRandomMap"/> makes an 8x8 map from
+        ///     fresh entropy (not reproducible).
+        /// </param>
+        /// <param name="isSlippery">Gymnasium's <c>is_slippery</c>: moves may slide perpendicular, each with probability <c>(1 - success_rate) / 2</c>.</param>
+        /// <param name="successRate">Gymnasium's <c>success_rate</c>: the probability of moving as intended on slippery ice, 1/3 by default.</param>
+        /// <param name="rewardSchedule">Gymnasium's <c>reward_schedule</c>: the rewards for reaching the goal, a hole and any other tile; <see langword="null"/> is <c>(1, 0, 0)</c>.</param>
+        /// <param name="viewerFactory">Gym.NET's <c>viewer_factory</c> (DR-20) for human mode; <see langword="null"/> uses <c>Gymnasium.HumanViewerFactory</c>.</param>
+        /// <exception cref="ArgumentOutOfRangeException">Thrown for a value <see cref="Gym.Envs.RenderMode"/> does not declare (a cast integer such as <c>(RenderMode)99</c>).</exception>
+        /// <exception cref="KeyError">Thrown for a <paramref name="mapName"/> <see cref="Maps"/> does not hold, with Python's message (<c>'5x5'</c>).</exception>
+        /// <exception cref="ValueError">Thrown for rows of different lengths, with NumPy's message, or an empty <paramref name="rewardSchedule"/> (<c>min() arg is an empty sequence</c>).</exception>
+        /// <exception cref="ZeroDivisionError">Thrown, as Python's <c>ZeroDivisionError</c>, for a map without rows or columns (the cell size divides by them).</exception>
+        public FrozenLakeEnv(RenderMode renderMode, IReadOnlyList<string>? desc = null, string? mapName = "4x4", bool isSlippery = true,
+                             double successRate = 1.0 / 3.0, IReadOnlyList<double>? rewardSchedule = null,
+                             EnvViewerFactory? viewerFactory = null)
+            : this(RenderModes.Name(renderMode), desc, mapName, isSlippery, successRate, rewardSchedule, viewerFactory) { }
 
         /// <summary>Gymnasium's <c>MAPS</c>: the named maps, <c>"4x4"</c> and <c>"8x8"</c>, row by row.</summary>
         public static IReadOnlyDictionary<string, IReadOnlyList<string>> Maps { get; } = new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal) {

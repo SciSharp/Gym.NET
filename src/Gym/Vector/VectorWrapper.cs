@@ -281,9 +281,10 @@ namespace Gym.Vector {
         protected VectorObservationWrapper(VectorEnv<TObs, TAct> env) : base(env) {
             if (!env.Metadata.TryGetValue("autoreset_mode", out object? mode)) {
                 Logger.Warn($"Vector environment ({env}) is missing `autoreset_mode` metadata key.");
-            } else if (!ReferenceEquals(mode, AutoresetMode.NextStep) && !ReferenceEquals(mode, AutoresetMode.Disabled)) {
-                // An f-string shows the member's str, AutoresetMode.SAME_STEP.
-                throw new ValueError($"Expected autoreset_mode to be NEXT_STEP or DISABLED, got {(mode is AutoresetMode member ? member.Str : PyBuiltins.Str(mode))}");
+            } else if (mode is not (AutoresetMode.NextStep or AutoresetMode.Disabled)) {
+                // A boxed member matches only its own constant (Python's ==, a string "NextStep" included, is false), and an
+                // f-string shows the member's str, AutoresetMode.SAME_STEP, which PyBuiltins.Str gives for a member.
+                throw new ValueError($"Expected autoreset_mode to be NEXT_STEP or DISABLED, got {PyBuiltins.Str(mode)}");
             }
         }
 

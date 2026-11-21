@@ -1,5 +1,6 @@
 using System;
 using Gym.Tests.Parity.Oracle;
+using NumSharp;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 
@@ -49,6 +50,22 @@ namespace Gym.Tests.Parity.Frames {
             var bytes = new byte[rgb.Width * rgb.Height * 3];
             rgb.CopyPixelDataTo(bytes);
             return new Frame(rgb.Height, rgb.Width, bytes);
+        }
+
+        /// <summary>
+        ///     Reads a Gym.NET frame as the viewer contract carries it (DR-85): a uint8 <c>(H, W, 3)</c> array, its bytes copied
+        ///     in C order, so the frame stays the caller's.
+        /// </summary>
+        /// <param name="frame">The frame; only read.</param>
+        /// <returns>The frame.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="frame"/> is <see langword="null"/>.</exception>
+        /// <exception cref="ArgumentException">Thrown when the array is not a uint8 <c>(H, W, 3)</c> array.</exception>
+        public static Frame FromArray(NDArray frame) {
+            if (frame is null)
+                throw new ArgumentNullException(nameof(frame));
+            if (frame.typecode != NPTypeCode.Byte || frame.ndim != 3 || frame.shape[2] != 3)
+                throw new ArgumentException($"A frame is a uint8 (H, W, 3) array; got {frame.dtype.name} ({string.Join(", ", frame.shape)}).", nameof(frame));
+            return new Frame(checked((int)frame.shape[0]), checked((int)frame.shape[1]), frame.ToArray<byte>());
         }
 
         /// <summary>Writes the frame as a PNG, for the artifacts of a failed comparison.</summary>

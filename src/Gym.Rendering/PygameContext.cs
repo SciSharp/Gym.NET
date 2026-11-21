@@ -33,7 +33,7 @@ namespace Gym.Rendering {
         ///     or <see langword="null"/> to read <c>Gymnasium.HumanViewerFactory</c> each time a window opens. A factory passed
         ///     to <see cref="PygameDisplay.SetMode"/> itself still wins.
         /// </param>
-        public PygameContext(IEnvironmentViewerFactoryDelegate? viewerFactory = null) {
+        public PygameContext(EnvViewerFactory? viewerFactory = null) {
             ViewerFactory = viewerFactory;
             // The two halves refer to each other: a quit empties the queue, and a pump moves the window's input into it.
             Events = new PygameEventQueue(this);
@@ -50,7 +50,7 @@ namespace Gym.Rendering {
         ///     The factory this context opens windows with, or <see langword="null"/> to read <c>Gymnasium.HumanViewerFactory</c>
         ///     at each <see cref="PygameDisplay.SetMode"/>.
         /// </summary>
-        public IEnvironmentViewerFactoryDelegate? ViewerFactory { get; }
+        public EnvViewerFactory? ViewerFactory { get; }
 
         /// <summary>The context's display: its one window and surface (<c>pygame.display</c>).</summary>
         public PygameDisplay Display { get; }
@@ -71,7 +71,7 @@ namespace Gym.Rendering {
         /// <param name="given">The factory passed to the call, or <see langword="null"/>.</param>
         /// <returns>The factory.</returns>
         /// <exception cref="DependencyNotInstalled">Thrown when none of the three is set, where pygame would be missing.</exception>
-        internal IEnvironmentViewerFactoryDelegate ResolveViewerFactory(IEnvironmentViewerFactoryDelegate? given) =>
+        internal EnvViewerFactory ResolveViewerFactory(EnvViewerFactory? given) =>
             Gymnasium.ResolveHumanViewerFactory(given ?? ViewerFactory);
 
         /// <summary>
@@ -80,8 +80,8 @@ namespace Gym.Rendering {
         /// </summary>
         /// <param name="given">The factory passed to the call, or <see langword="null"/>.</param>
         /// <returns><see langword="true"/> for a viewer that shows a window; <see langword="false"/> headless or when no factory is set.</returns>
-        internal bool OpensRealWindow(IEnvironmentViewerFactoryDelegate? given) {
-            IEnvironmentViewerFactoryDelegate? factory = given ?? ViewerFactory ?? Gymnasium.HumanViewerFactory;
+        internal bool OpensRealWindow(EnvViewerFactory? given) {
+            EnvViewerFactory? factory = given ?? ViewerFactory ?? Gymnasium.HumanViewerFactory;
             // Reference equality: NullEnvViewer.Factory is one delegate instance, the one its docs tell callers to pass.
             return factory is not null && !ReferenceEquals(factory, NullEnvViewer.Factory);
         }

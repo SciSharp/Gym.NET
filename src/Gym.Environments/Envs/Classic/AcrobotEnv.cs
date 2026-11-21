@@ -42,6 +42,7 @@ namespace Gym.Environments.Envs.Classic {
     ///     <para>
     ///     Not thread-safe. Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/envs/classic_control/acrobot.py#L26">gymnasium/envs/classic_control/acrobot.py</see>.
     ///     </para>
+    ///     <para>Its info is always <c>{}</c>, as Gymnasium's, so it has no typed info record (DR-95).</para>
     /// </remarks>
     [GymOptions]
     public partial class AcrobotEnv : Env<NDArray, NDArray> {
@@ -63,7 +64,7 @@ namespace Gym.Environments.Envs.Classic {
         ///     Gymnasium (<c>make</c> checks it against the metadata).
         /// </param>
         /// <param name="viewerFactory">Gym.NET's <c>viewer_factory</c> (DR-20) for human mode; <see langword="null"/> uses <c>Gymnasium.HumanViewerFactory</c>.</param>
-        public AcrobotEnv(string? renderMode = null, IEnvironmentViewerFactoryDelegate? viewerFactory = null) {
+        public AcrobotEnv(string? renderMode = null, EnvViewerFactory? viewerFactory = null) {
             Metadata = ClassMetadata;
 
             // np.array([1.0, 1.0, 1.0, 1.0, MAX_VEL_1, MAX_VEL_2], dtype=np.float32), and low = -high.
@@ -77,6 +78,26 @@ namespace Gym.Environments.Envs.Classic {
             RenderMode = renderMode;
             _window = new HumanWindow("acrobot-v1", viewerFactory);
         }
+
+        /// <summary>
+        ///     Builds the env with the render mode given as the <see cref="Gym.Envs.RenderMode"/> enum (DR-84, DR-93), as
+        ///     <see cref="AcrobotEnv(string, EnvViewerFactory)"/>
+        ///     builds it from the mode's string: <c>new AcrobotEnv(RenderMode.RgbArray)</c> builds what
+        ///     <c>new AcrobotEnv(renderMode: "rgb_array")</c> builds, the member reaching the env as Gymnasium's string
+        ///     (<see cref="RenderModes.Name"/>), which its <c>RenderMode</c> property then holds.
+        /// </summary>
+        /// <remarks>
+        ///     The mode is required and comes first, so <c>new AcrobotEnv()</c> keeps meaning the other constructor, without a
+        ///     mode; leave the mode out there for no rendering. Every other parameter means what it means there.
+        /// </remarks>
+        /// <param name="renderMode">
+        ///     The render mode, which the env must list in its <c>metadata["render_modes"]</c> as for the string; it behaves
+        ///     exactly as its Gymnasium string does in the other constructor.
+        /// </param>
+        /// <param name="viewerFactory">Gym.NET's <c>viewer_factory</c> (DR-20) for human mode; <see langword="null"/> uses <c>Gymnasium.HumanViewerFactory</c>.</param>
+        /// <exception cref="ArgumentOutOfRangeException">Thrown for a value <see cref="Gym.Envs.RenderMode"/> does not declare (a cast integer such as <c>(RenderMode)99</c>).</exception>
+        public AcrobotEnv(RenderMode renderMode, EnvViewerFactory? viewerFactory = null)
+            : this(RenderModes.Name(renderMode), viewerFactory) { }
 
         /// <summary>
         ///     Gymnasium's class attribute <c>metadata</c>: <c>{"render_modes": ["human", "rgb_array"], "render_fps": 15}</c>.

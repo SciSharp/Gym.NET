@@ -49,6 +49,7 @@ namespace Gym.Environments.Envs.Box2D {
     ///     Not thread-safe; each env owns its world, so envs on different threads do not interfere. Reference:
     ///     <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/envs/box2d/lunar_lander.py#L79">gymnasium/envs/box2d/lunar_lander.py</see>.
     ///     </para>
+    ///     <para>Its info is always <c>{}</c>, as Gymnasium's, so it has no typed info record (DR-95).</para>
     /// </remarks>
     [GymOptions]
     [PyName("LunarLander")]
@@ -168,7 +169,7 @@ namespace Gym.Environments.Envs.Box2D {
         ///     int passed as such (<c>-13</c>), since the parameter is a <see langword="double"/>.
         /// </remarks>
         public LunarLanderEnv(string? renderMode = null, bool continuous = false, double gravity = -10.0, bool enableWind = false, double windPower = 15.0,
-                              double turbulencePower = 1.5, IEnvironmentViewerFactoryDelegate? viewerFactory = null) {
+                              double turbulencePower = 1.5, EnvViewerFactory? viewerFactory = null) {
             Metadata = ClassMetadata;
             if (!(-12.0 < gravity && gravity < 0.0))
                 throw new AssertionError($"gravity (current value: {PyBuiltins.FloatRepr(gravity)}) must be between -12 and 0");
@@ -198,6 +199,33 @@ namespace Gym.Environments.Envs.Box2D {
             RenderMode = renderMode;
             _window = new HumanWindow(continuous ? "lunarlandercontinuous-v3" : "lunarlander-v3", viewerFactory);
         }
+
+        /// <summary>
+        ///     Builds the env with the render mode given as the <see cref="Gym.Envs.RenderMode"/> enum (DR-84, DR-93), as
+        ///     <see cref="LunarLanderEnv(string, bool, double, bool, double, double, EnvViewerFactory)"/>
+        ///     builds it from the mode's string: <c>new LunarLanderEnv(RenderMode.RgbArray)</c> builds what
+        ///     <c>new LunarLanderEnv(renderMode: "rgb_array")</c> builds, the member reaching the env as Gymnasium's string
+        ///     (<see cref="RenderModes.Name"/>), which its <c>RenderMode</c> property then holds.
+        /// </summary>
+        /// <remarks>
+        ///     The mode is required and comes first, so <c>new LunarLanderEnv()</c> keeps meaning the other constructor, without a
+        ///     mode; leave the mode out there for no rendering. Every other parameter means what it means there.
+        /// </remarks>
+        /// <param name="renderMode">
+        ///     The render mode, which the env must list in its <c>metadata["render_modes"]</c> as for the string; it behaves
+        ///     exactly as its Gymnasium string does in the other constructor.
+        /// </param>
+        /// <param name="continuous">Gymnasium's <c>continuous</c>: two throttles (LunarLanderContinuous-v3) instead of four discrete actions.</param>
+        /// <param name="gravity">Gymnasium's <c>gravity</c>, in (-12, 0) m/s².</param>
+        /// <param name="enableWind">Gymnasium's <c>enable_wind</c>: a non-periodic sideways force and torque while no leg touches the ground.</param>
+        /// <param name="windPower">Gymnasium's <c>wind_power</c>: the wind force's magnitude (0 to 20 recommended).</param>
+        /// <param name="turbulencePower">Gymnasium's <c>turbulence_power</c>: the wind torque's magnitude (0 to 2 recommended).</param>
+        /// <param name="viewerFactory">Gym.NET's <c>viewer_factory</c> (DR-20) for human mode; <see langword="null"/> uses <c>Gymnasium.HumanViewerFactory</c>.</param>
+        /// <exception cref="ArgumentOutOfRangeException">Thrown for a value <see cref="Gym.Envs.RenderMode"/> does not declare (a cast integer such as <c>(RenderMode)99</c>).</exception>
+        /// <exception cref="AssertionError">Thrown for a gravity outside (-12, 0), with Gymnasium's message.</exception>
+        public LunarLanderEnv(RenderMode renderMode, bool continuous = false, double gravity = -10.0, bool enableWind = false,
+                              double windPower = 15.0, double turbulencePower = 1.5, EnvViewerFactory? viewerFactory = null)
+            : this(RenderModes.Name(renderMode), continuous, gravity, enableWind, windPower, turbulencePower, viewerFactory) { }
 
         /// <summary>
         ///     Gymnasium's class attribute <c>metadata</c>: <c>{"render_modes": ["human", "rgb_array"], "render_fps": 50}</c>.

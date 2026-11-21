@@ -39,6 +39,7 @@ namespace Gym.Environments.Envs.ToyText {
     ///     other mode returns the frame. Not thread-safe.
     ///     </para>
     ///     <para>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/envs/toy_text/blackjack.py#L124">gymnasium/envs/toy_text/blackjack.py</see>.</para>
+    ///     <para>Its info is always <c>{}</c>, as Gymnasium's, so it has no typed info record (DR-95).</para>
     /// </remarks>
     [GymOptions]
     public partial class BlackjackEnv : Env<object?[], NDArray> {
@@ -74,7 +75,7 @@ namespace Gym.Environments.Envs.ToyText {
         /// <param name="natural">Gymnasium's <c>natural</c>: a winning natural blackjack pays 1.5 (ignored when <paramref name="sab"/> is set).</param>
         /// <param name="sab">Gymnasium's <c>sab</c>: Sutton and Barto's rules, where a natural against a dealer without one wins outright.</param>
         /// <param name="viewerFactory">Gym.NET's <c>viewer_factory</c> (DR-20) for human mode; <see langword="null"/> uses <c>Gymnasium.HumanViewerFactory</c>.</param>
-        public BlackjackEnv(string? renderMode = null, bool natural = false, bool sab = false, IEnvironmentViewerFactoryDelegate? viewerFactory = null) {
+        public BlackjackEnv(string? renderMode = null, bool natural = false, bool sab = false, EnvViewerFactory? viewerFactory = null) {
             Metadata = ClassMetadata;
             ActionSpace = new Discrete(2);
             ObservationSpace = new Tuple(new Discrete(32), new Discrete(11), new Discrete(2));
@@ -85,6 +86,28 @@ namespace Gym.Environments.Envs.ToyText {
             RenderMode = renderMode;
             _window = new HumanWindow("Blackjack", viewerFactory);
         }
+
+        /// <summary>
+        ///     Builds the env with the render mode given as the <see cref="Gym.Envs.RenderMode"/> enum (DR-84, DR-93), as
+        ///     <see cref="BlackjackEnv(string, bool, bool, EnvViewerFactory)"/>
+        ///     builds it from the mode's string: <c>new BlackjackEnv(RenderMode.RgbArray)</c> builds what
+        ///     <c>new BlackjackEnv(renderMode: "rgb_array")</c> builds, the member reaching the env as Gymnasium's string
+        ///     (<see cref="RenderModes.Name"/>), which its <c>RenderMode</c> property then holds.
+        /// </summary>
+        /// <remarks>
+        ///     The mode is required and comes first, so <c>new BlackjackEnv()</c> keeps meaning the other constructor, without a
+        ///     mode; leave the mode out there for no rendering. Every other parameter means what it means there.
+        /// </remarks>
+        /// <param name="renderMode">
+        ///     The render mode, which the env must list in its <c>metadata["render_modes"]</c> as for the string; it behaves
+        ///     exactly as its Gymnasium string does in the other constructor.
+        /// </param>
+        /// <param name="natural">Gymnasium's <c>natural</c>: a winning natural blackjack pays 1.5 (ignored when <paramref name="sab"/> is set).</param>
+        /// <param name="sab">Gymnasium's <c>sab</c>: Sutton and Barto's rules, where a natural against a dealer without one wins outright.</param>
+        /// <param name="viewerFactory">Gym.NET's <c>viewer_factory</c> (DR-20) for human mode; <see langword="null"/> uses <c>Gymnasium.HumanViewerFactory</c>.</param>
+        /// <exception cref="System.ArgumentOutOfRangeException">Thrown for a value <see cref="Gym.Envs.RenderMode"/> does not declare (a cast integer such as <c>(RenderMode)99</c>).</exception>
+        public BlackjackEnv(RenderMode renderMode, bool natural = false, bool sab = false, EnvViewerFactory? viewerFactory = null)
+            : this(RenderModes.Name(renderMode), natural, sab, viewerFactory) { }
 
         /// <summary>
         ///     Gymnasium's class attribute <c>metadata</c>: <c>{"render_modes": ["human", "rgb_array"], "render_fps": 4}</c>. Every

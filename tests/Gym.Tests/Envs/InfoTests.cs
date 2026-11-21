@@ -77,35 +77,44 @@ namespace Gym.Tests.Envs {
             array.SetDouble(10, 0);
             Assert.AreEqual(2, ((List<object?>)deep["list"]!).Count);
             Assert.AreEqual(1.0, ((NDArray)deep["array"]!).GetDouble(0));
-            Assert.AreEqual(metadata, shallow);
+            Assert.IsTrue(metadata.PyEquals(shallow), "The shallow copy shares every value, so it equals the original as a dict.");
+            Assert.AreNotEqual(metadata, shallow, "Equals is by reference (DR-92): a copy is another dict.");
         }
 
         /// <summary>
-        ///     Python's dict <c>==</c>: order does not matter, numbers compare by value across types (<c>1 == 1.0 == True</c>),
-        ///     lists and tuples compare element-wise and never equal each other (an <see langword="object"/>?[] is Gym.NET's
-        ///     tuple, DR-13; a typed array or a <see cref="List{T}"/> is a list), and arrays compare by value.
+        ///     Python's dict <c>==</c> is <see cref="Info.PyEquals"/> (DR-92): order does not matter, numbers compare by value
+        ///     across types (<c>1 == 1.0 == True</c>), lists and tuples compare element-wise and never equal each other (an
+        ///     <see langword="object"/>?[] is Gym.NET's tuple, DR-13; a typed array or a <see cref="List{T}"/> is a list), and
+        ///     arrays compare by value. <c>==</c>, <see cref="object.Equals(object)"/> and the hash are by reference.
         /// </summary>
         [TestMethod]
-        public void Equality_IsPythons() {
-            Assert.AreEqual(new Info { ["a"] = 1, ["b"] = 2 }, new Info { ["b"] = 2L, ["a"] = 1.0 });
-            Assert.AreEqual(new Info { ["t"] = true }, new Info { ["t"] = 1 });
-            Assert.AreNotEqual(new Info { ["a"] = 1 }, new Info { ["a"] = 1, ["b"] = 2 });
-            Assert.AreNotEqual(new Info { ["a"] = 1 }, new Info { ["a"] = "1" });
-            Assert.AreEqual(new Info { ["l"] = new List<object?> { 1, "x" } }, new Info { ["l"] = new List<object?> { 1.0, "x" } });
-            Assert.AreEqual(new Info { ["l"] = new List<object?> { 1, 2 } }, new Info { ["l"] = new long[] { 1, 2 } }, "A typed array is a list.");
-            Assert.AreNotEqual(new Info { ["l"] = new List<object?> { 1 } }, new Info { ["l"] = ValueTuple.Create(1) });
-            Assert.AreNotEqual(new Info { ["l"] = new List<object?> { 1.0, "x" } }, new Info { ["l"] = new object?[] { 1.0, "x" } }, "An object?[] is a tuple (DR-13).");
-            Assert.AreEqual(new Info { ["t"] = new object?[] { 1, "x" } }, new Info { ["t"] = (1L, "x") }, "Both are tuples.");
-            Assert.AreEqual(new Info { ["n"] = new Info { ["x"] = 1 } }, new Info { ["n"] = new Dictionary<string, object?> { ["x"] = 1 } });
-            Assert.IsTrue(new Info { ["a"] = 1 }.Equals(new Dictionary<string, int> { ["a"] = 1 }), "Any .NET dictionary is a dict.");
+        public void Equality_PyEqualsIsPythons_EqualsIsReference() {
+            Assert.IsTrue(new Info { ["a"] = 1, ["b"] = 2 }.PyEquals(new Info { ["b"] = 2L, ["a"] = 1.0 }));
+            Assert.IsTrue(new Info { ["t"] = true }.PyEquals(new Info { ["t"] = 1 }));
+            Assert.IsFalse(new Info { ["a"] = 1 }.PyEquals(new Info { ["a"] = 1, ["b"] = 2 }));
+            Assert.IsFalse(new Info { ["a"] = 1 }.PyEquals(new Info { ["a"] = "1" }));
+            Assert.IsTrue(new Info { ["l"] = new List<object?> { 1, "x" } }.PyEquals(new Info { ["l"] = new List<object?> { 1.0, "x" } }));
+            Assert.IsTrue(new Info { ["l"] = new List<object?> { 1, 2 } }.PyEquals(new Info { ["l"] = new long[] { 1, 2 } }), "A typed array is a list.");
+            Assert.IsFalse(new Info { ["l"] = new List<object?> { 1 } }.PyEquals(new Info { ["l"] = ValueTuple.Create(1) }));
+            Assert.IsFalse(new Info { ["l"] = new List<object?> { 1.0, "x" } }.PyEquals(new Info { ["l"] = new object?[] { 1.0, "x" } }), "An object?[] is a tuple (DR-13).");
+            Assert.IsTrue(new Info { ["t"] = new object?[] { 1, "x" } }.PyEquals(new Info { ["t"] = (1L, "x") }), "Both are tuples.");
+            Assert.IsTrue(new Info { ["n"] = new Info { ["x"] = 1 } }.PyEquals(new Info { ["n"] = new Dictionary<string, object?> { ["x"] = 1 } }));
+            Assert.IsTrue(new Info { ["a"] = 1 }.PyEquals(new Dictionary<string, int> { ["a"] = 1 }), "Any .NET dictionary is a dict.");
+            Assert.IsFalse(new Info().PyEquals(null), "None is no dict.");
 
             using var left = np.array(new[] { 1.0, 2.0 });
             using var right = np.array(new long[] { 1, 2 });
             using var other = np.array(new[] { 1.0, 3.0 });
-            Assert.AreEqual(new Info { ["a"] = left }, new Info { ["a"] = right }, "np.array_equal ignores the dtype.");
-            Assert.AreNotEqual(new Info { ["a"] = left }, new Info { ["a"] = other });
-            Assert.IsTrue(new Info() == new Info());
-            Assert.IsTrue(new Info { ["a"] = 1 } != new Info());
+            Assert.IsTrue(new Info { ["a"] = left }.PyEquals(new Info { ["a"] = right }), "np.array_equal ignores the dtype.");
+            Assert.IsFalse(new Info { ["a"] = left }.PyEquals(new Info { ["a"] = other }));
+
+            // .NET's equality is by reference (DR-92): a mutable dict hashed by value would change its hash under a key.
+            var info = new Info { ["a"] = 1 };
+            Info same = info; // a second reference to the same dict: == is true for it alone
+            Assert.IsFalse(new Info() == new Info());
+            Assert.IsTrue(info == same);
+            Assert.IsFalse(info.Equals(new Info { ["a"] = 1 }));
+            Assert.AreEqual(System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(info), info.GetHashCode(), "The hash is the reference's.");
         }
 
         /// <summary>The exact comparisons of <see cref="PyEquality"/>: no rounding between integers and floats, NaN never equal, identity first.</summary>

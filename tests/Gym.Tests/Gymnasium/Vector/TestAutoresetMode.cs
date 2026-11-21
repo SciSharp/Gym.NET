@@ -49,7 +49,7 @@ namespace Gym.Tests.Gymnasium.Vector {
         [DynamicData(nameof(Vectorisers))]
         public void TestAutoresetNextStep(string vectoriser) {
             using IVectorEnv envs = Vectorise(vectoriser, Enumerable.Range(0, 3).Select(_ => CountingEnv()), AutoresetMode.NextStep);
-            Assert.AreSame(AutoresetMode.NextStep, envs.Metadata["autoreset_mode"]);
+            Assert.AreEqual((object)AutoresetMode.NextStep, envs.Metadata["autoreset_mode"]);
             SetAttr(envs, "max_count", new List<object?> { 2L, 3L, 3L });
 
             (object? obs, Info info) = envs.Reset();
@@ -74,7 +74,7 @@ namespace Gym.Tests.Gymnasium.Vector {
         [DynamicData(nameof(Vectorisers))]
         public void TestAutoresetWithinStep(string vectoriser) {
             using IVectorEnv envs = Vectorise(vectoriser, Enumerable.Range(0, 3).Select(_ => CountingEnv()), AutoresetMode.SameStep);
-            Assert.AreSame(AutoresetMode.SameStep, envs.Metadata["autoreset_mode"]);
+            Assert.AreEqual((object)AutoresetMode.SameStep, envs.Metadata["autoreset_mode"]);
             SetAttr(envs, "max_count", new List<object?> { 2L, 3L, 3L });
 
             (object? obs, Info info) = envs.Reset();
@@ -96,7 +96,7 @@ namespace Gym.Tests.Gymnasium.Vector {
         [DynamicData(nameof(Vectorisers))]
         public void TestAutoresetDisabled(string vectoriser) {
             using IVectorEnv envs = Vectorise(vectoriser, Enumerable.Range(0, 3).Select(_ => CountingEnv()), AutoresetMode.Disabled);
-            Assert.AreSame(AutoresetMode.Disabled, envs.Metadata["autoreset_mode"]);
+            Assert.AreEqual((object)AutoresetMode.Disabled, envs.Metadata["autoreset_mode"]);
             SetAttr(envs, "max_count", new List<object?> { 2L, 3L, 3L });
 
             (object? obs, Info info) = envs.Reset();
@@ -128,14 +128,14 @@ namespace Gym.Tests.Gymnasium.Vector {
         [TestMethod]
         [DynamicData(nameof(VectorisersAndModes))]
         public void TestAutoresetMetadata(string vectoriser, string autoresetMode) {
-            AutoresetMode mode = AutoresetMode.Of(autoresetMode);
+            AutoresetMode mode = AutoresetModes.Of(autoresetMode);
             using (IVectorEnv envs = Vectorise(vectoriser, new Func<IEnv>[] { () => new GenericTestEnv(), () => new GenericTestEnv() }, mode)) {
-                Assert.AreSame(mode, envs.Metadata["autoreset_mode"]);
+                Assert.AreEqual((object)mode, envs.Metadata["autoreset_mode"]);
                 envs.Close();
             }
 
-            using (IVectorEnv envs = Vectorise(vectoriser, new Func<IEnv>[] { () => new GenericTestEnv(), () => new GenericTestEnv() }, mode.Value)) {
-                Assert.AreSame(mode, envs.Metadata["autoreset_mode"]);
+            using (IVectorEnv envs = Vectorise(vectoriser, new Func<IEnv>[] { () => new GenericTestEnv(), () => new GenericTestEnv() }, AutoresetModes.Value(mode))) {
+                Assert.AreEqual((object)mode, envs.Metadata["autoreset_mode"]);
                 envs.Close();
             }
         }
@@ -150,13 +150,13 @@ namespace Gym.Tests.Gymnasium.Vector {
         [TestMethod]
         [DynamicData(nameof(VectorizationModesAndAutoresetModes))]
         public void TestMakeVecAutoreset(string vectorizationMode, string autoresetMode) {
-            AutoresetMode mode = AutoresetMode.Of(autoresetMode);
+            AutoresetMode mode = AutoresetModes.Of(autoresetMode);
             using (IVectorEnv envs = MakeVec("CartPole-v1", vectorizationMode: vectorizationMode, vectorKwargs: new Info { ["autoreset_mode"] = mode })) {
                 envs.Metadata["autoreset_mode"] = mode;
                 envs.Close();
             }
 
-            using (IVectorEnv envs = MakeVec("CartPole-v1", vectorizationMode: vectorizationMode, vectorKwargs: new Info { ["autoreset_mode"] = mode.Value })) {
+            using (IVectorEnv envs = MakeVec("CartPole-v1", vectorizationMode: vectorizationMode, vectorKwargs: new Info { ["autoreset_mode"] = AutoresetModes.Value(mode) })) {
                 envs.Metadata["autoreset_mode"] = mode;
                 envs.Close();
             }
@@ -174,7 +174,7 @@ namespace Gym.Tests.Gymnasium.Vector {
             // A space per sub-env: an env owns and disposes its spaces (D19), where Gymnasium's lambdas share one.
             Func<IEnv> make = () => new GenericTestEnv(actionSpace: new Discrete(5), observationSpace: TestingSpaces.All[index](), resetFunc: CountResetObs, stepFunc: CountStepObs);
             using var envs = new SyncVectorEnv(Enumerable.Range(0, 3).Select(_ => make), autoresetMode: AutoresetMode.SameStep);
-            Assert.AreSame(AutoresetMode.SameStep, envs.Metadata["autoreset_mode"]);
+            Assert.AreEqual((object)AutoresetMode.SameStep, envs.Metadata["autoreset_mode"]);
             envs.SetAttr("max_count", new List<object?> { 2L, 3L, 3L });
 
             envs.Reset();

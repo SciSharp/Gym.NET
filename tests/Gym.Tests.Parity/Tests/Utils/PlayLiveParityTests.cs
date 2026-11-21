@@ -38,7 +38,7 @@ namespace Gym.Tests.Parity.Tests.Utils {
     [TestClass]
     public sealed class PlayLiveParityTests : ParityTestBase {
         /// <summary>The viewer factory before the cell, restored by <see cref="Cleanup"/>.</summary>
-        private IEnvironmentViewerFactoryDelegate? _previousFactory;
+        private EnvViewerFactory? _previousFactory;
 
         /// <summary>Headless windows on the .NET side, an empty queue, and pygame's display initialized on the Python side.</summary>
         [TestInitialize]

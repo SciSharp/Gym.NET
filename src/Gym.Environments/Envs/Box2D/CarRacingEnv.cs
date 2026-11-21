@@ -45,6 +45,7 @@ namespace Gym.Environments.Envs.Box2D {
     ///     Not thread-safe; each env owns its world. Reference:
     ///     <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/envs/box2d/car_racing.py#L106">gymnasium/envs/box2d/car_racing.py</see>.
     ///     </para>
+    ///     <para>Its info reads typed (DR-91): <c>CarRacingInfo info = step.Info;</c> (<see cref="CarRacingInfo"/>), with the dict's own values still behind the indexer.</para>
     /// </remarks>
     [GymOptions]
     [PyName("CarRacing")]
@@ -154,7 +155,7 @@ namespace Gym.Environments.Envs.Box2D {
         ///     has reached yet (it is entropy-seeded), as Gymnasium's does; a reset draws them again unless told not to.
         /// </remarks>
         public CarRacingEnv(string? renderMode = null, bool verbose = false, double lapCompletePercent = 0.95, bool domainRandomize = false,
-                            bool continuous = true, IEnvironmentViewerFactoryDelegate? viewerFactory = null) {
+                            bool continuous = true, EnvViewerFactory? viewerFactory = null) {
             Metadata = ClassMetadata;
             Continuous = continuous;
             DomainRandomize = domainRandomize;
@@ -185,6 +186,31 @@ namespace Gym.Environments.Envs.Box2D {
             RenderMode = renderMode;
             _window = new HumanWindow("carracing-v3", viewerFactory);
         }
+
+        /// <summary>
+        ///     Builds the env with the render mode given as the <see cref="Gym.Envs.RenderMode"/> enum (DR-84, DR-93), as
+        ///     <see cref="CarRacingEnv(string, bool, double, bool, bool, EnvViewerFactory)"/>
+        ///     builds it from the mode's string: <c>new CarRacingEnv(RenderMode.RgbArray)</c> builds what
+        ///     <c>new CarRacingEnv(renderMode: "rgb_array")</c> builds, the member reaching the env as Gymnasium's string
+        ///     (<see cref="RenderModes.Name"/>), which its <c>RenderMode</c> property then holds.
+        /// </summary>
+        /// <remarks>
+        ///     The mode is required and comes first, so <c>new CarRacingEnv()</c> keeps meaning the other constructor, without a
+        ///     mode; leave the mode out there for no rendering. Every other parameter means what it means there.
+        /// </remarks>
+        /// <param name="renderMode">
+        ///     The render mode, which the env must list in its <c>metadata["render_modes"]</c> as for the string; it behaves
+        ///     exactly as its Gymnasium string does in the other constructor.
+        /// </param>
+        /// <param name="verbose">Gymnasium's <c>verbose</c>: print the track generation's progress.</param>
+        /// <param name="lapCompletePercent">Gymnasium's <c>lap_complete_percent</c>: the share of tiles visited that, back at the start tile, completes the lap.</param>
+        /// <param name="domainRandomize">Gymnasium's <c>domain_randomize</c>: random road, background and grass colours, drawn now and at resets.</param>
+        /// <param name="continuous">Gymnasium's <c>continuous</c>: three continuous controls instead of five discrete actions.</param>
+        /// <param name="viewerFactory">Gym.NET's <c>viewer_factory</c> (DR-20) for human mode; <see langword="null"/> uses <c>Gymnasium.HumanViewerFactory</c>.</param>
+        /// <exception cref="ArgumentOutOfRangeException">Thrown for a value <see cref="Gym.Envs.RenderMode"/> does not declare (a cast integer such as <c>(RenderMode)99</c>).</exception>
+        public CarRacingEnv(RenderMode renderMode, bool verbose = false, double lapCompletePercent = 0.95, bool domainRandomize = false,
+                            bool continuous = true, EnvViewerFactory? viewerFactory = null)
+            : this(RenderModes.Name(renderMode), verbose, lapCompletePercent, domainRandomize, continuous, viewerFactory) { }
 
         /// <summary>
         ///     Gymnasium's class attribute <c>metadata</c>:

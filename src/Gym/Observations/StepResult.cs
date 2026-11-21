@@ -1,6 +1,7 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
+using System.Text;
 using Gym.Envs;
 using Gym.Utils;
 using NumSharp;
@@ -50,6 +51,26 @@ namespace Gym.Observations {
         ///     and the info; keep anything needed longer with <c>.copy()</c>. Disposing again does nothing more.
         /// </remarks>
         public void Dispose() => ResultEquality.Release(Observation, Info);
+
+        /// <summary>
+        ///     0.2's name for <see cref="Info"/> (0.2's <c>Step.Information</c>), kept so 0.2 code compiles until 2.0 (DR-78):
+        ///     the same dict, never <see langword="null"/> from Gym's own envs where 0.2's could be.
+        /// </summary>
+        [Obsolete("0.2's name: read Info (or deconstruct the info). Removed in 2.0.")]
+        public Info Information => Info;
+
+        /// <summary>
+        ///     The members the record's <c>ToString</c> prints, the compiler's own five: written out so the obsolete
+        ///     <see cref="Information"/>, the same dict as <see cref="Info"/>, is not printed twice.
+        /// </summary>
+        /// <param name="builder">The text so far.</param>
+        /// <returns><see langword="true"/>: members were printed.</returns>
+        private bool PrintMembers(StringBuilder builder) {
+            builder.Append("Observation = ").Append((object?)Observation).Append(", Reward = ").Append(Reward.ToString())
+                   .Append(", Terminated = ").Append(Terminated.ToString()).Append(", Truncated = ").Append(Truncated.ToString())
+                   .Append(", Info = ").Append((object?)Info);
+            return true;
+        }
 
         /// <summary>
         ///     0.2's four-element deconstruction, <c>var (obs, reward, done, info) = env.Step(action);</c>, kept so 0.2 code
@@ -113,6 +134,21 @@ namespace Gym.Observations {
         /// </summary>
         /// <remarks>Footgun: copies share the arrays; dispose once, after their last use.</remarks>
         public void Dispose() => ResultEquality.Release(Observation, Info);
+
+        /// <summary>0.2's name for <see cref="Info"/>, kept beside <see cref="StepResult{TObs}.Information"/> so 0.2-style reads compile until 2.0 (DR-78).</summary>
+        [Obsolete("0.2's name: read Info (or deconstruct the info). Removed in 2.0.")]
+        public Info Information => Info;
+
+        /// <summary>
+        ///     The members the record's <c>ToString</c> prints, the compiler's own two: written out so the obsolete
+        ///     <see cref="Information"/> is not printed twice.
+        /// </summary>
+        /// <param name="builder">The text so far.</param>
+        /// <returns><see langword="true"/>: members were printed.</returns>
+        private bool PrintMembers(StringBuilder builder) {
+            builder.Append("Observation = ").Append((object?)Observation).Append(", Info = ").Append((object?)Info);
+            return true;
+        }
 
         /// <summary>
         ///     The reset's observation, so 0.2's <c>NDArray obs = env.Reset();</c> compiles until 2.0 (DR-58); 1.0 code reads

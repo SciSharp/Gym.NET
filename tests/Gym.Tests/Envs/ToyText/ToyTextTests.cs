@@ -14,6 +14,7 @@ using Gym.Spaces;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using NumSharp;
 using SixLabors.ImageSharp;
+using Gym.Tests.Helpers;
 
 namespace Gym.Tests.Envs.ToyText {
     /// <summary>
@@ -45,7 +46,8 @@ namespace Gym.Tests.Envs.ToyText {
                 Assert.AreEqual(steps, spec.MaxEpisodeSteps, $"{id} max_episode_steps");
                 Assert.AreEqual(threshold, spec.RewardThreshold, $"{id} reward_threshold");
                 CollectionAssert.AreEqual(kwargs.Keys.ToList(), spec.Kwargs.Keys.ToList(), $"{id} kwargs keys, in order");
-                Assert.AreEqual(kwargs, spec.Kwargs, $"{id} kwargs");
+                // Python's dict ==: an Info's Equals compares references (DR-92).
+                PyAssert.AreEqual(kwargs, spec.Kwargs, $"{id} kwargs");
                 using IEnv env = Make(id);
                 Assert.IsInstanceOfType(env.Unwrapped, type, $"{id} builds a {type.Name}");
             }
@@ -58,10 +60,10 @@ namespace Gym.Tests.Envs.ToyText {
         /// <summary>The generated options records carry each constructor's Python kwargs in constructor order, and <c>make</c> takes them.</summary>
         [TestMethod]
         public void OptionsRecords_CarryThePythonKwargs() {
-            Assert.AreEqual(new Info { ["natural"] = true, ["sab"] = false }, new BlackjackEnvOptions { Sab = false, Natural = true }.ToKwargs());
-            Assert.AreEqual(new Info { ["map_name"] = "8x8", ["is_slippery"] = false }, new FrozenLakeEnvOptions { IsSlippery = false, MapName = "8x8" }.ToKwargs());
-            Assert.AreEqual(new Info { ["is_slippery"] = true }, new CliffWalkingEnvOptions { IsSlippery = true }.ToKwargs());
-            Assert.AreEqual(new Info { ["is_rainy"] = true, ["fickle_passenger"] = true, ["fickle_probability"] = 1.0 },
+            PyAssert.AreEqual(new Info { ["natural"] = true, ["sab"] = false }, new BlackjackEnvOptions { Sab = false, Natural = true }.ToKwargs());
+            PyAssert.AreEqual(new Info { ["map_name"] = "8x8", ["is_slippery"] = false }, new FrozenLakeEnvOptions { IsSlippery = false, MapName = "8x8" }.ToKwargs());
+            PyAssert.AreEqual(new Info { ["is_slippery"] = true }, new CliffWalkingEnvOptions { IsSlippery = true }.ToKwargs());
+            PyAssert.AreEqual(new Info { ["is_rainy"] = true, ["fickle_passenger"] = true, ["fickle_probability"] = 1.0 },
                 new TaxiEnvOptions { FicklePassenger = true, IsRainy = true, FickleProbability = 1.0 }.ToKwargs());
 
             using IEnv taxi = Make("Taxi-v4", new TaxiEnvOptions { IsRainy = true, RainyProbability = 0.6 });
@@ -197,14 +199,14 @@ namespace Gym.Tests.Envs.ToyText {
         /// </summary>
         [TestMethod]
         public void Render_Human_RendersIntoTheFactorysViewer() {
-            foreach (Func<IEnvironmentViewerFactoryDelegate, IEnv> create in new Func<IEnvironmentViewerFactoryDelegate, IEnv>[] {
+            foreach (Func<EnvViewerFactory, IEnv> create in new Func<EnvViewerFactory, IEnv>[] {
                          factory => new FrozenLakeEnv(renderMode: "human", viewerFactory: factory),
                          factory => new CliffWalkingEnv(renderMode: "human", viewerFactory: factory),
                          factory => new TaxiEnv(renderMode: "human", viewerFactory: factory),
                          factory => new BlackjackEnv(renderMode: "human", viewerFactory: factory),
                      }) {
                 var viewer = new CountingViewer();
-                IEnv env = create((_, _, _) => System.Threading.Tasks.Task.FromResult<IEnvViewer>(viewer));
+                IEnv env = create((_, _, _) => viewer);
                 // A high rate keeps the pacing short; Gymnasium's tests raise render_fps the same way.
                 env.Metadata[Metadata.RenderFpsKey] = 1000L;
                 ResetAndRelease(env, 0);
@@ -215,7 +217,7 @@ namespace Gym.Tests.Envs.ToyText {
                 Assert.IsTrue(viewer.Closed, $"{env}: close shuts the window.");
             }
 
-            IEnvironmentViewerFactoryDelegate? previous = HumanViewerFactory;
+            EnvViewerFactory? previous = HumanViewerFactory;
             HumanViewerFactory = null;
             try {
                 Assert.ThrowsExactly<DependencyNotInstalled>(() => new FrozenLakeEnv(renderMode: "human").Reset(seed: 0));
@@ -319,15 +321,15 @@ namespace Gym.Tests.Envs.ToyText {
             /// <summary>The frames rendered so far.</summary>
             public int Frames { get; private set; }
 
-            /// <summary>Whether <see cref="CloseEnvironment"/> ran.</summary>
+            /// <summary>Whether <see cref="Close"/> ran.</summary>
             public bool Closed { get; private set; }
 
             /// <summary>Counts the frame.</summary>
-            /// <param name="img">The frame; not kept.</param>
-            public void Render(Image img) => Frames++;
+            /// <param name="frame">The frame; not kept.</param>
+            public void Render(NDArray frame) => Frames++;
 
             /// <summary>Records the close.</summary>
-            public void CloseEnvironment() => Closed = true;
+            public void Close() => Closed = true;
 
             /// <summary>Nothing to release.</summary>
             public void Dispose() { }

@@ -1,8 +1,7 @@
 #nullable enable
 using System;
 using Gym.Rendering;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
+using NumSharp;
 
 namespace Gym.Environments.Envs {
     /// <summary>
@@ -15,7 +14,7 @@ namespace Gym.Environments.Envs {
     ///     first human render, not at construction. Creation takes a lock, since a viewer factory may start a UI thread and
     ///     two renders must not open two windows. A window that <see cref="Close"/> shut is reopened by the next
     ///     <see cref="Show"/>; pygame would raise <c>display Surface quit</c> there instead. CartPole keeps the same logic
-    ///     inline.
+    ///     inline. The window is shown frames synchronously (DR-85), as pygame's <c>flip</c> is synchronous.
     /// </remarks>
     internal sealed class HumanWindow {
         /// <summary>Guards <see cref="_viewer"/>'s creation.</summary>
@@ -25,7 +24,7 @@ namespace Gym.Environments.Envs {
         private readonly string _title;
 
         /// <summary>The env's own factory, or <see langword="null"/> to read <c>Gymnasium.HumanViewerFactory</c> when the window opens.</summary>
-        private IEnvironmentViewerFactoryDelegate? _factory;
+        private EnvViewerFactory? _factory;
 
         /// <summary>The open window, or <see langword="null"/>.</summary>
         private IEnvViewer? _viewer;
@@ -33,7 +32,7 @@ namespace Gym.Environments.Envs {
         /// <summary>A window with a title, not opened yet.</summary>
         /// <param name="title">The title.</param>
         /// <param name="factory">The env's <c>viewer_factory</c>, or <see langword="null"/>.</param>
-        public HumanWindow(string title, IEnvironmentViewerFactoryDelegate? factory) {
+        public HumanWindow(string title, EnvViewerFactory? factory) {
             _title = title;
             _factory = factory;
         }
@@ -49,9 +48,8 @@ namespace Gym.Environments.Envs {
                 if (_viewer != null)
                     return;
                 _factory = global::Gym.Gymnasium.ResolveHumanViewerFactory(_factory);
-                // The factory may start a UI thread and complete asynchronously; render calls are synchronous, as pygame's are.
-                // TODO(async viewer path, DR-53): blocks on the factory; see IEnvironmentViewerFactoryDelegate.
-                _viewer = _factory(width, height, _title).GetAwaiter().GetResult();
+                // The factory returns once its window exists (DR-85: a synchronous factory, no task to block on).
+                _viewer = _factory(width, height, _title);
             }
         }
 
@@ -60,8 +58,9 @@ namespace Gym.Environments.Envs {
         /// <exception cref="Exceptions.DependencyNotInstalled">Thrown when the window must open and no factory is set.</exception>
         public void Show(Surface screen) {
             Ensure(screen.Width, screen.Height);
-            // The viewer copies the frame before Render returns, so the image is released right after.
-            using Image<Rgb24> frame = Image.LoadPixelData<Rgb24>(screen.ToRgbBytes(), screen.Width, screen.Height);
+            // The (H, W, 3) uint8 frame rgb_array mode returns; the viewer copies it before Render returns, so it is released
+            // right after.
+            using NDArray frame = SurfArray.ToRgbArray(screen);
             _viewer!.Render(frame);
         }
 
@@ -70,7 +69,7 @@ namespace Gym.Environments.Envs {
             lock (_gate) {
                 if (_viewer is null)
                     return;
-                _viewer.CloseEnvironment();
+                _viewer.Close();
                 _viewer = null;
             }
         }

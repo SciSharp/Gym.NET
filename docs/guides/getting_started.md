@@ -56,7 +56,13 @@ The later samples also use `System.Collections.Generic`, `Gym.Observations`, `Gy
   means the task reached a terminal state (the pole fell); `Truncated` means something outside the task cut the
   episode short (`TimeLimit`'s step limit). Reset when either is set.
 - Rewards are `double` everywhere, also where Gymnasium returns an `int` or a float32.
-- `Info` is a Python dict: insertion-ordered, keyed by strings, compared and printed as Python does.
+- `Info` is a Python dict: insertion-ordered, keyed by strings, printed as Python prints it. `info.Get<double>("x")`
+  reads a value as a .NET type (a NumPy scalar arrives as a 0-d array, which a plain cast refuses), `info.PyEquals(other)`
+  is Python's `==`, and `==` compares references, as for any .NET collection.
+- The built-in envs that send info keys have a typed record of their info, in their env class's namespace
+  (`Gym.Environments.Envs.MuJoCo` for HalfCheetah): `HalfCheetahInfoV5 info = step.Info;` then `info.XPosition` (a
+  `double`), `info.XVelocity` (a `double?`, `null` on a reset's info, which lacks it); the record keeps the dict's own
+  values behind its indexer, `info["reward_ctrl"]`. CartPole and the other envs whose info is always `{}` have none.
 
 ### Releasing what an env returns
 
@@ -155,18 +161,24 @@ generators): dispose the ones you build yourself; an env disposes its own.
 
 ## Rendering
 
-The render mode is a constructor argument, fixed for the env's life, as in Gymnasium. `Gym.Envs.RenderModes` names
-them as constants (`RenderModes.RgbArray` is `"rgb_array"`), so either form works:
+The render mode is a constructor argument, fixed for the env's life, as in Gymnasium. Pass it as the `RenderMode`
+enum or as Gymnasium's string: `Gymnasium.Make("CartPole-v1", RenderMode.RgbArray)`, `Gymnasium.Make("CartPole-v1",
+"rgb_array")` and `Gymnasium.Make("CartPole-v1", new { render_mode = "rgb_array" })` build the same env, as do
+`new CartPoleEnv(RenderMode.RgbArray)` and `new CartPoleEnv(renderMode: "rgb_array")`. The env's `RenderMode` is
+Gymnasium's string, since Gymnasium accepts modes no enum lists (a custom env's own); `Gym.Envs.RenderModes` names the
+strings as constants (`RenderModes.RgbArray` is `"rgb_array"`) and converts (`RenderModes.TryParse(env.RenderMode)` is
+`RenderMode.RgbArray`, or `null` for a mode the enum does not list).
 
 - `rgb_array`: `Render()` returns `RenderResult.Rgb`, whose `Frame` is a `(height, width, 3)` uint8 array with the
-  pixels Gymnasium's env draws.
+  pixels Gymnasium's env draws. `(NDArray)result` reads that frame directly (the result's own array: it lives until
+  the result is disposed), and `(Image)result` gives a new ImageSharp image to save or show.
 
   ```csharp
-  using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("CartPole-v1", new { render_mode = "rgb_array" });
+  using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("CartPole-v1", RenderMode.RgbArray);
   using NDArray observation = env.Reset(seed: 0).Observation;
   using RenderResult result = env.Render();
-  if (result is RenderResult.Rgb rgb)
-      Console.WriteLine(rgb.Frame.Shape);   // (400, 600, 3), uint8, the pixels Gymnasium's CartPole draws
+  NDArray frame = (NDArray)result;     // the result's own frame; disposed with the result
+  Console.WriteLine(frame.Shape);      // (400, 600, 3), uint8, the pixels Gymnasium's CartPole draws
   ```
 
 - `ansi` (toy_text): `Render()` returns `RenderResult.Ansi` with the text Gymnasium prints, escape codes included.
@@ -179,17 +191,26 @@ them as constants (`RenderModes.RgbArray` is `"rgb_array"`), so either form work
   ```
 
 - `human`: every `Reset` and `Step` draws into a window, paced at `Metadata["render_fps"]`, and `Render()` returns
-  `RenderResult.None`. Set the window type once, at start-up; without one, the first frame raises
-  `DependencyNotInstalled`, as Gymnasium does without pygame.
+  `RenderResult.None`. Set the window type once, at start-up, or pass it to `Make`; without either, the first frame
+  raises `DependencyNotInstalled`, as Gymnasium does without pygame.
 
   ```csharp
   Gymnasium.HumanViewerFactory = AvaloniaEnvViewer.Factory;   // once, at start-up (WinFormEnvViewer.Factory on Windows)
-  using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("CartPole-v1", new { render_mode = "human" });
+  using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("CartPole-v1", RenderMode.Human);
   using NDArray observation = env.Reset(seed: 0).Observation; // the window opens and shows the first frame
   // Every Step draws the next frame, paced at metadata["render_fps"] (50 for CartPole); Render() returns None.
   ```
 
-An env class also takes its own viewer: `new CartPoleEnv(renderMode: "human", viewerFactory: WinFormEnvViewer.Factory)`.
+  `Make` also takes the window for one env: `Gymnasium.Make("CartPole-v1", RenderMode.Human, WinFormEnvViewer.Factory)`.
+  The factory reaches the env (or the `HumanRendering` wrapper `make` puts around an env that only renders images), and
+  the spec does not record it.
+
+An env class also takes its own viewer: `new CartPoleEnv(RenderMode.Human, viewerFactory: WinFormEnvViewer.Factory)`.
+
+A viewer of your own implements `IEnvViewer`: `Render(NDArray frame)` receives the `(H, W, 3)` uint8 frame, which stays
+the caller's (copy what you keep), and `Close()` closes the window; its factory is an `EnvViewerFactory` that returns the
+viewer once its window is up. A viewer that can also render without blocking implements `IAsyncEnvViewer`
+(`RenderAsync`, `CloseAsync`) as well.
 
 A MuJoCo env's `human` window is Gymnasium's MuJoCo viewer, with its controls (DR-70): drag with the left button to orbit
 the camera and with the right one to pan it (Shift: horizontally), scroll to zoom; Space pauses (each `Step` then waits

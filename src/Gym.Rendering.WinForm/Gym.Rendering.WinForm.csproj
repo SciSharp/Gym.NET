@@ -46,6 +46,8 @@
   <ItemGroup>
     <!-- The ScottPlot axes adapter both viewer packages compile, so their figures draw alike (DR-39). -->
     <Compile Include="..\Shared\ScottPlotAxes.cs" Link="Plotting\ScottPlotAxes.cs" />
+    <!-- The (H, W, 3) frame conversion both viewers share (DR-85): compiled into each, like the axes above. -->
+    <Compile Include="..\Shared\ViewerFrames.cs" Link="Rendering\ViewerFrames.cs" />
   </ItemGroup>
 
   <!-- The package's icon and readme, packed at its root (NuGet's PackageIcon / PackageReadmeFile). They replace the

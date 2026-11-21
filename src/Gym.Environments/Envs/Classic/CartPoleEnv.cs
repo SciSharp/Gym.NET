@@ -10,8 +10,6 @@ using Gym.Rendering;
 using Gym.Spaces;
 using Gym.Utils;
 using NumSharp;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
 using Color = Gym.Rendering.Color;
 using Vector2 = Gym.Rendering.Vector2;
 
@@ -43,6 +41,7 @@ namespace Gym.Environments.Envs.Classic {
     ///     Not thread-safe: step, reset and render an instance from one thread at a time.
     ///     </para>
     ///     <para>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/envs/classic_control/cartpole.py#L21">gymnasium/envs/classic_control/cartpole.py</see>.</para>
+    ///     <para>Its info is always <c>{}</c>, as Gymnasium's, so it has no typed info record (DR-95).</para>
     /// </remarks>
     [GymOptions]
     public partial class CartPoleEnv : Env<NDArray, NDArray> {
@@ -56,7 +55,7 @@ namespace Gym.Environments.Envs.Classic {
         ///     Creates the human-mode viewer on the first human render; <see langword="null"/> defers to
         ///     <c>Gymnasium.HumanViewerFactory</c> at that render (DR-20).
         /// </summary>
-        private IEnvironmentViewerFactoryDelegate? _viewerFactory;
+        private EnvViewerFactory? _viewerFactory;
 
         /// <summary>The human-mode viewer, Gymnasium's display window, created on the first human render.</summary>
         private IEnvViewer? _viewer;
@@ -82,7 +81,7 @@ namespace Gym.Environments.Envs.Classic {
         ///     Gym.NET's <c>viewer_factory</c> (DR-20): creates the human-mode window on the first human render;
         ///     <see langword="null"/> uses <c>Gymnasium.HumanViewerFactory</c>, read at that render.
         /// </param>
-        public CartPoleEnv(bool suttonBartoReward = false, string? renderMode = null, IEnvironmentViewerFactoryDelegate? viewerFactory = null) {
+        public CartPoleEnv(bool suttonBartoReward = false, string? renderMode = null, EnvViewerFactory? viewerFactory = null) {
             Metadata = ClassMetadata;
 
             SuttonBartoReward = suttonBartoReward;
@@ -104,9 +103,36 @@ namespace Gym.Environments.Envs.Classic {
             _viewerFactory = viewerFactory;
         }
 
+        /// <summary>
+        ///     Builds the env with the render mode given as the <see cref="Gym.Envs.RenderMode"/> enum (DR-84, DR-93), as
+        ///     <see cref="CartPoleEnv(bool, string, EnvViewerFactory)"/>
+        ///     builds it from the mode's string: <c>new CartPoleEnv(RenderMode.RgbArray)</c> builds what
+        ///     <c>new CartPoleEnv(renderMode: "rgb_array")</c> builds, the member reaching the env as Gymnasium's string
+        ///     (<see cref="RenderModes.Name"/>), which its <c>RenderMode</c> property then holds.
+        /// </summary>
+        /// <remarks>
+        ///     The mode is required and comes first, so <c>new CartPoleEnv()</c> keeps meaning the other constructor, without a
+        ///     mode; leave the mode out there for no rendering. Every other parameter means what it means there.
+        /// </remarks>
+        /// <param name="renderMode">
+        ///     The render mode, which the env must list in its <c>metadata["render_modes"]</c> as for the string; it behaves
+        ///     exactly as its Gymnasium string does in the other constructor.
+        /// </param>
+        /// <param name="suttonBartoReward">
+        ///     Gymnasium's <c>sutton_barto_reward</c>: <see langword="true"/> rewards 0 per surviving step and -1 on and after
+        ///     termination (Sutton and Barto's original), instead of 1 per step including the terminating one.
+        /// </param>
+        /// <param name="viewerFactory">
+        ///     Gym.NET's <c>viewer_factory</c> (DR-20): creates the human-mode window on the first human render;
+        ///     <see langword="null"/> uses <c>Gymnasium.HumanViewerFactory</c>, read at that render.
+        /// </param>
+        /// <exception cref="ArgumentOutOfRangeException">Thrown for a value <see cref="Gym.Envs.RenderMode"/> does not declare (a cast integer such as <c>(RenderMode)99</c>).</exception>
+        public CartPoleEnv(RenderMode renderMode, bool suttonBartoReward = false, EnvViewerFactory? viewerFactory = null)
+            : this(suttonBartoReward, RenderModes.Name(renderMode), viewerFactory) { }
+
         /// <summary>Creates a <c>human</c>-mode env rendering into an existing viewer.</summary>
         /// <param name="viewer">The viewer, Gymnasium's display window.</param>
-        /// <param name="suttonBartoReward">Gymnasium's <c>sutton_barto_reward</c> (see <see cref="CartPoleEnv(bool, string, IEnvironmentViewerFactoryDelegate)"/>).</param>
+        /// <param name="suttonBartoReward">Gymnasium's <c>sutton_barto_reward</c> (see <see cref="CartPoleEnv(bool, string, EnvViewerFactory)"/>).</param>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="viewer"/> is <see langword="null"/>.</exception>
         public CartPoleEnv(IEnvViewer viewer, bool suttonBartoReward = false) : this(suttonBartoReward, "human") {
             _viewer = viewer ?? throw new ArgumentNullException(nameof(viewer));
@@ -126,13 +152,13 @@ namespace Gym.Environments.Envs.Classic {
         ///     next to the <see cref="IEnvViewer"/> constructor; cast the <see langword="null"/>.
         /// </remarks>
         [Obsolete("0.2's constructor: write new CartPoleEnv(renderMode: \"human\", viewerFactory: factory), or new CartPoleEnv() headless. Removed in 2.0 with Gym.Legacy.")]
-        public CartPoleEnv(IEnvironmentViewerFactoryDelegate? viewerFactory)
+        public CartPoleEnv(EnvViewerFactory? viewerFactory)
             : this(false, IsHeadless(viewerFactory) ? null : "human", IsHeadless(viewerFactory) ? null : viewerFactory) { }
 
         /// <summary>Whether a 0.2 viewer factory meant a headless run: no factory, or <see cref="NullEnvViewer.Factory"/>.</summary>
         /// <param name="viewerFactory">The factory 0.2 code passed.</param>
         /// <returns><see langword="true"/> for <see langword="null"/> or a delegate equal to <see cref="NullEnvViewer.Factory"/> (same method and target).</returns>
-        private static bool IsHeadless(IEnvironmentViewerFactoryDelegate? viewerFactory) =>
+        private static bool IsHeadless(EnvViewerFactory? viewerFactory) =>
             viewerFactory is null || viewerFactory == NullEnvViewer.Factory;
 
         /// <summary>
@@ -437,7 +463,8 @@ namespace Gym.Environments.Envs.Classic {
                 // pygame.display.flip(): the viewer copies the frame synchronously, so it is released right after. A window
                 // closed by Close() is reopened from the factory (pygame would raise "display Surface quit" instead).
                 EnsureViewer();
-                using Image<Rgb24> frame = Image.LoadPixelData<Rgb24>(Screen.ToRgbBytes(), Screen.Width, Screen.Height);
+                // The (H, W, 3) uint8 frame rgb_array mode returns, the viewer contract's frame (DR-85).
+                using NDArray frame = SurfArray.ToRgbArray(Screen);
                 _viewer!.Render(frame);
             } else if (RenderMode == "rgb_array") {
                 // np.transpose(np.array(pygame.surfarray.pixels3d(self.screen)), axes=(1, 0, 2)): rows of RGB.
@@ -458,7 +485,7 @@ namespace Gym.Environments.Envs.Classic {
                 // pygame.display.quit(); pygame.quit()
                 lock (_viewerGate) {
                     if (_viewer != null) {
-                        _viewer.CloseEnvironment();
+                        _viewer.Close();
                         _viewer = null;
                     }
                 }
@@ -529,8 +556,8 @@ namespace Gym.Environments.Envs.Classic {
                 if (_viewer != null)
                     return;
                 _viewerFactory = global::Gym.Gymnasium.ResolveHumanViewerFactory(_viewerFactory);
-                // TODO(async viewer path, DR-53): blocks on the factory; see IEnvironmentViewerFactoryDelegate.
-                _viewer = _viewerFactory(ScreenWidth, ScreenHeight, "cartpole-v1").GetAwaiter().GetResult();
+                // The factory returns once its window exists (DR-85: a synchronous factory, no task to block on).
+                _viewer = _viewerFactory(ScreenWidth, ScreenHeight, "cartpole-v1");
             }
         }
     }

@@ -65,8 +65,9 @@ namespace Gym.Envs.Registration {
                 return false;
             if (ReferenceEquals(this, other))
                 return true;
+            // PyEquals, not Equals: an Info's Equals compares references (DR-92), and the dataclass compares the dicts' contents.
             return string.Equals(Name, other.Name, StringComparison.Ordinal) && string.Equals(EntryPoint, other.EntryPoint, StringComparison.Ordinal)
-                   && (Kwargs is null ? other.Kwargs is null : other.Kwargs is not null && Kwargs.Equals(other.Kwargs));
+                   && (Kwargs is null ? other.Kwargs is null : other.Kwargs is not null && Kwargs.PyEquals(other.Kwargs));
         }
 
         /// <summary>A hash consistent with <see cref="Equals(WrapperSpec)"/> (the kwargs contribute their count).</summary>
@@ -351,9 +352,10 @@ namespace Gym.Envs.Registration {
                 return false;
             if (ReferenceEquals(this, other))
                 return true;
+            // The kwargs compare by PyEquals: an Info's Equals compares references (DR-92), and the dataclass compares contents.
             if (!string.Equals(Id, other.Id, StringComparison.Ordinal) || !EntryPointsEqual(EntryPoint, other.EntryPoint) || RewardThreshold != other.RewardThreshold
                 || Nondeterministic != other.Nondeterministic || MaxEpisodeSteps != other.MaxEpisodeSteps || OrderEnforce != other.OrderEnforce
-                || DisableEnvChecker != other.DisableEnvChecker || !Kwargs.Equals(other.Kwargs) || !string.Equals(Namespace, other.Namespace, StringComparison.Ordinal)
+                || DisableEnvChecker != other.DisableEnvChecker || !Kwargs.PyEquals(other.Kwargs) || !string.Equals(Namespace, other.Namespace, StringComparison.Ordinal)
                 || !string.Equals(Name, other.Name, StringComparison.Ordinal) || Version != other.Version || AdditionalWrappers.Count != other.AdditionalWrappers.Count
                 || !EntryPointsEqual(VectorEntryPoint, other.VectorEntryPoint))
                 return false;

@@ -7,9 +7,11 @@ using Gym.Environments.Envs.Classic;
 using Gym.Envs;
 using Gym.Envs.Registration;
 using Gym.Exceptions;
+using Gym.Utils;
 using Gym.Vector;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using NumSharp;
+using Gym.Tests.Helpers;
 
 namespace Gym.Tests.Vector {
     /// <summary>
@@ -21,22 +23,76 @@ namespace Gym.Tests.Vector {
     [TestClass]
     public class VectorEnvTests {
         /// <summary>
-        ///     <see cref="AutoresetMode"/> and <see cref="VectorizeMode"/> behave as Python's enums: parsed from their values only,
-        ///     compared by identity, printed with Python's <c>repr</c> and <c>str</c>.
+        ///     <see cref="AutoresetMode"/> and <see cref="VectorizeMode"/> are C# enums that behave as Python's enums where
+        ///     Python sees them (DR-84): parsed from their values only (never a member name), named and valued as Gymnasium's,
+        ///     printed with Python's <c>repr</c> and <c>str</c>, read from a member, its string or nothing (the default), and
+        ///     equal only to themselves under Python's <c>==</c>.
         /// </summary>
         [TestMethod]
         public void Enums_ParsePrintAndCompare_AsPythons() {
-            Assert.AreSame(AutoresetMode.SameStep, AutoresetMode.Of("SameStep"));
-            AutoresetMode converted = "Disabled";
-            Assert.AreSame(AutoresetMode.Disabled, converted);
-            Assert.AreEqual("'SAME_STEP' is not a valid AutoresetMode", Assert.ThrowsExactly<ValueError>(() => AutoresetMode.Of("SAME_STEP")).Message);
-            Assert.AreEqual("<AutoresetMode.NEXT_STEP: 'NextStep'>", AutoresetMode.NextStep.ToString());
-            Assert.AreEqual("AutoresetMode.NEXT_STEP", AutoresetMode.NextStep.Str);
-            Assert.AreSame(AutoresetMode.NextStep, AutoresetMode.From(null), "No mode is NEXT_STEP, Gymnasium's default.");
+            Assert.AreEqual(AutoresetMode.SameStep, AutoresetModes.Of("SameStep"));
+            Assert.AreEqual("'SAME_STEP' is not a valid AutoresetMode", Assert.ThrowsExactly<ValueError>(() => AutoresetModes.Of("SAME_STEP")).Message);
+            Assert.AreEqual("'SameStep ' is not a valid AutoresetMode", Assert.ThrowsExactly<ValueError>(() => AutoresetModes.Of("SameStep ")).Message);
+            Assert.AreEqual("<AutoresetMode.NEXT_STEP: 'NextStep'>", AutoresetModes.Repr(AutoresetMode.NextStep));
+            Assert.AreEqual("<AutoresetMode.NEXT_STEP: 'NextStep'>", PyBuiltins.Repr(AutoresetMode.NextStep), "A boxed member prints as Python's repr.");
+            Assert.AreEqual("AutoresetMode.NEXT_STEP", AutoresetModes.Str(AutoresetMode.NextStep));
+            Assert.AreEqual("AutoresetMode.SAME_STEP", PyBuiltins.Str(AutoresetMode.SameStep), "An f-string shows the member's str.");
+            Assert.AreEqual("DISABLED", AutoresetModes.Name(AutoresetMode.Disabled));
+            Assert.AreEqual("Disabled", AutoresetModes.Value(AutoresetMode.Disabled));
+            CollectionAssert.AreEqual(new[] { AutoresetMode.NextStep, AutoresetMode.SameStep, AutoresetMode.Disabled }, AutoresetModes.All.ToArray(), "Gymnasium's order.");
 
-            Assert.AreSame(VectorizeMode.VectorEntryPoint, VectorizeMode.Of("vector_entry_point"));
-            Assert.AreEqual("<VectorizeMode.SYNC: 'sync'>", VectorizeMode.Sync.ToString());
-            Assert.AreEqual("'SYNC' is not a valid VectorizeMode", Assert.ThrowsExactly<ValueError>(() => VectorizeMode.Of("SYNC")).Message);
+            Assert.AreEqual(AutoresetMode.NextStep, AutoresetModes.From(null), "No mode is NEXT_STEP, Gymnasium's default.");
+            Assert.AreEqual(AutoresetMode.Disabled, AutoresetModes.From("Disabled"), "A string reads as Python's AutoresetMode(value).");
+            Assert.AreEqual(AutoresetMode.SameStep, AutoresetModes.From(AutoresetMode.SameStep));
+            Assert.AreEqual("7 is not a valid AutoresetMode", Assert.ThrowsExactly<ValueError>(() => AutoresetModes.From((AutoresetMode)7)).Message, "A cast integer is no member.");
+            Assert.AreEqual("1 is not a valid AutoresetMode", Assert.ThrowsExactly<ValueError>(() => AutoresetModes.From(1L)).Message);
+
+            // Python's ==: a member equals itself only, never its value nor its index (AutoresetMode is a plain Enum).
+            Assert.IsTrue(PyEquality.AreEqual(AutoresetMode.SameStep, AutoresetMode.SameStep));
+            Assert.IsFalse(PyEquality.AreEqual(AutoresetMode.SameStep, "SameStep"));
+            Assert.IsFalse(PyEquality.AreEqual(AutoresetMode.NextStep, 0L));
+            Assert.AreEqual("Gym.Vector.AutoresetMode", PyBuiltins.TypeName(AutoresetMode.NextStep));
+
+            Assert.AreEqual(VectorizeMode.VectorEntryPoint, VectorizeModes.Of("vector_entry_point"));
+            Assert.AreEqual("<VectorizeMode.SYNC: 'sync'>", VectorizeModes.Repr(VectorizeMode.Sync));
+            Assert.AreEqual("VectorizeMode.ASYNC", VectorizeModes.Str(VectorizeMode.Async));
+            Assert.AreEqual("sync", VectorizeModes.Value(VectorizeMode.Sync));
+            Assert.AreEqual("'SYNC' is not a valid VectorizeMode", Assert.ThrowsExactly<ValueError>(() => VectorizeModes.Of("SYNC")).Message);
+            CollectionAssert.AreEqual(new[] { VectorizeMode.Async, VectorizeMode.Sync, VectorizeMode.VectorEntryPoint }, VectorizeModes.All.ToArray(), "Gymnasium's order.");
+        }
+
+        /// <summary>
+        ///     <see cref="RenderMode"/> stands for Gymnasium's render-mode strings (DR-84, DR-93): each member's string, parsed back
+        ///     by value only, <see langword="null"/> from <c>TryParse</c> for a mode no member names (Gymnasium accepts those),
+        ///     printed and compared as the Python <c>str</c> it is, and turned into its string in <c>make</c>'s kwargs.
+        /// </summary>
+        [TestMethod]
+        public void RenderMode_StandsForGymnasiumsStrings() {
+            Assert.AreEqual(RenderModes.RgbArray, RenderModes.Name(RenderMode.RgbArray));
+            Assert.AreEqual("state_pixels_list", RenderModes.Name(RenderMode.StatePixelsList));
+            Assert.AreEqual(11, RenderModes.All.Count);
+            foreach (RenderMode mode in RenderModes.All)
+                Assert.AreEqual(mode, RenderModes.Parse(RenderModes.Name(mode)), $"{mode} round-trips through its string.");
+
+            Assert.AreEqual(RenderMode.Human, RenderModes.Parse("human"));
+            Assert.AreEqual("'RgbArray' is not a valid RenderMode", Assert.ThrowsExactly<ValueError>(() => RenderModes.Parse("RgbArray")).Message, "C# names are not values.");
+            Assert.IsNull(RenderModes.TryParse("no-render-mode"), "A mode Gymnasium accepts but no member names.");
+            Assert.IsNull(RenderModes.TryParse(null));
+            Assert.IsTrue(RenderModes.TryParse("ansi", out RenderMode ansi));
+            Assert.AreEqual(RenderMode.Ansi, ansi);
+            Assert.IsFalse(RenderModes.TryParse("Testing mode", out _));
+            Assert.ThrowsExactly<ArgumentOutOfRangeException>(() => RenderModes.Name((RenderMode)99));
+
+            Assert.AreEqual("'rgb_array'", PyBuiltins.Repr(RenderMode.RgbArray), "A member is the Python str it stands for.");
+            Assert.AreEqual("rgb_array", PyBuiltins.Str(RenderMode.RgbArray));
+            Assert.AreEqual("str", PyBuiltins.TypeName(RenderMode.RgbArray));
+            Assert.IsTrue(PyEquality.AreEqual(RenderMode.Human, "human"));
+            Assert.IsFalse(PyEquality.AreEqual(RenderMode.Human, 0L), "Not an integer to Python.");
+
+            Info kwargs = PyKwargs.From(new { render_mode = RenderMode.RgbArray, sutton_barto_reward = true });
+            Assert.AreEqual("rgb_array", kwargs["render_mode"], "make's kwargs hold Gymnasium's string.");
+            Assert.AreEqual(true, kwargs["sutton_barto_reward"]);
+            Assert.AreEqual("human", PyKwargs.From(new Info { ["render_mode"] = RenderMode.Human })["render_mode"]);
         }
 
         /// <summary>
@@ -52,7 +108,7 @@ namespace Gym.Tests.Vector {
             using (VectorEnv<NDArray, NDArray> typed = MakeVec<NDArray, NDArray>("CartPole-v1", numEnvs: 2, vectorizationMode: VectorizeMode.Sync)) {
                 Assert.IsInstanceOfType(typed, typeof(SyncVectorEnv<NDArray, NDArray>));
                 Assert.AreEqual("SyncVectorEnv(CartPole-v1, num_envs=2)", typed.ToString());
-                Assert.AreEqual(new Info { ["num_envs"] = 2L, ["vectorization_mode"] = "sync" }, typed.Spec!.Kwargs);
+                PyAssert.AreEqual(new Info { ["num_envs"] = 2L, ["vectorization_mode"] = "sync" }, typed.Spec!.Kwargs);
             }
 
             Assert.ThrowsExactly<TypeError>(() => MakeVec<object?[], NDArray>("CartPole-v1", numEnvs: 2, vectorizationMode: "sync"));

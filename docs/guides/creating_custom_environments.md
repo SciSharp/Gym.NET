@@ -101,6 +101,11 @@ Notes on the choices:
   `CorridorEnvOptions`, a record with one property per constructor parameter, so
   `Gymnasium.Make("Corridor-v0", new CorridorEnvOptions { Size = 8, RenderMode = "ansi" })` is checked by the
   compiler.
+- **Render modes.** `RenderMode` holds Gymnasium's string, so an env may list modes of its own in `render_modes`. The
+  built-in envs also take the `RenderMode` enum through a second, hand-written constructor; an env of your own can add
+  one the same way, the mode first and required, so `new CorridorEnv()` keeps meaning the constructor above:
+  `public CorridorEnv(RenderMode renderMode, long size = 10) : this(size, RenderModes.Name(renderMode)) { }`. Inside an
+  env class the simple name `RenderMode` is the inherited property: write `Gym.Envs.RenderMode.Ansi` there for the enum.
 - **Errors.** Gymnasium's exception types are in `Gym.Exceptions` (`ResetNeeded`, `DependencyNotInstalled`, ...);
   Python's built-in ones (`ValueError`, `TypeError`, `KeyError`) come from NumSharp.
 

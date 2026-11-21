@@ -124,6 +124,10 @@ namespace Gym.Utils {
                     // A function, an EnvCreator entry point: <function make_env at 0x...>. Python prints the object's address,
                     // which no two runs share; the identity hash stands in for it.
                     return $"<function {function.Method.Name} at 0x{RuntimeHelpers.GetHashCode(function).ToString("X16", CultureInfo.InvariantCulture)}>";
+                case Enum member when PyEnums.IsPyEnum(member.GetType()) && Enum.IsDefined(member.GetType(), member):
+                    // A [PyEnum] member prints as its Python counterpart (<AutoresetMode.NEXT_STEP: 'NextStep'>, 'rgb_array'),
+                    // where any other enum, and a cast integer such an enum does not declare, is an int (IntegerText below).
+                    return PyEnums.Repr(member);
                 default:
                     return IntegerText(value) ?? ContainerRepr(value) ?? value.ToString() ?? "";
             }
@@ -250,6 +254,9 @@ namespace Gym.Utils {
                     return NumpyScalarStr(array);
                 case NDArray array:
                     return np.array_str(array);
+                case Enum member when PyEnums.IsPyEnum(member.GetType()) && Enum.IsDefined(member.GetType(), member):
+                    // Python's str of an Enum member (AutoresetMode.SAME_STEP) differs from its repr; a string member is its text.
+                    return PyEnums.Str(member);
                 default:
                     return Repr(value);
             }
@@ -404,6 +411,12 @@ namespace Gym.Utils {
                 case not null when IsSet(value.GetType()):
                     // HashSet<T> and any other ISet<T>/IReadOnlySet<T>: Python's set, which messages name by type.
                     return "set";
+                case Enum member when PyEnums.IsStringEnum(member.GetType()) && Enum.IsDefined(member.GetType(), member):
+                    // A string member (RenderMode) is a str to Python.
+                    return "str";
+                case Enum member when PyEnums.IsPyEnum(member.GetType()) && Enum.IsDefined(member.GetType(), member):
+                    // An Enum member is of its own class, named as any other .NET class is.
+                    return ClassName(member.GetType());
                 default:
                     return IntegerText(value) != null ? "int" : ClassName(value.GetType());
             }

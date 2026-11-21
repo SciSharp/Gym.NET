@@ -11,6 +11,7 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
+using Gym.Environments;
 using Gym.Exceptions;
 using Gym.Utils;
 using Gym.Wrappers;
@@ -439,12 +440,19 @@ namespace Gym.Envs.Registration {
         /// <param name="maxEpisodeSteps">The call's step limit.</param>
         /// <param name="disableEnvChecker">The call's checker switch.</param>
         /// <param name="expected">The <c>Env&lt;TObs, TAct&gt;</c> type arguments the typed form requires, or <see langword="null"/>.</param>
+        /// <param name="viewerFactory">
+        ///     The viewer factory the facade's render-mode overloads were given (DR-89), or <see langword="null"/>: passed as
+        ///     <c>viewer_factory</c> to the env's constructor, or to the <c>HumanRendering</c> wrapper when make applies one (the
+        ///     env then renders <c>rgb_array</c> and opens no window). It is never recorded in the spec: a delegate is no
+        ///     Gymnasium kwarg, and <c>Make(env.Spec)</c> then opens its window from the app-wide factory.
+        /// </param>
         /// <returns>The wrapped env.</returns>
         /// <exception cref="Error">Thrown when the spec has no entry point.</exception>
         /// <exception cref="TypeError">Thrown when the env cannot be built from the kwargs, or is not of the expected types.</exception>
         /// <exception cref="InvalidMetadata">Thrown when the env class's metadata is not a dict.</exception>
         /// <exception cref="ValueError">Thrown when a recorded wrapper cannot be re-created.</exception>
-        private static IEnv MakeCore(EnvSpec envSpec, object? kwargs, long? maxEpisodeSteps, bool? disableEnvChecker, (Type Obs, Type Act)? expected) {
+        private static IEnv MakeCore(EnvSpec envSpec, object? kwargs, long? maxEpisodeSteps, bool? disableEnvChecker, (Type Obs, Type Act)? expected,
+            EnvViewerFactory? viewerFactory = null) {
             // Update the env spec kwargs with the make kwargs.
             Info envSpecKwargs = envSpec.Kwargs.DeepCopy();
             envSpecKwargs.Update(PyKwargs.From(kwargs));
@@ -491,9 +499,15 @@ namespace Gym.Envs.Registration {
                 }
             }
 
+            // The viewer factory reaches the constructor only (DR-89): envSpecKwargs is what the spec records below. When make
+            // applies HumanRendering, the wrapper opens the window instead, so the env, rendering rgb_array, does not get it.
+            Info constructorKwargs = envSpecKwargs;
+            if (viewerFactory is not null && !applyHumanRendering)
+                constructorKwargs = new Info(envSpecKwargs) { ["viewer_factory"] = viewerFactory };
+
             object created;
             try {
-                created = envCreator is Type type ? PyKwargs.Construct(type, envSpecKwargs) : ((EnvCreator)envCreator)(envSpecKwargs);
+                created = envCreator is Type type ? PyKwargs.Construct(type, constructorKwargs) : ((EnvCreator)envCreator)(constructorKwargs);
             } catch (TypeError e) {
                 if (e.Message.Contains("got an unexpected keyword argument 'render_mode'", StringComparison.Ordinal) && applyHumanRendering)
                     throw new Error($"You passed render_mode='human' although {envSpec.Id} doesn't implement human-rendering natively. Gym tried to apply the HumanRendering wrapper but it looks like your environment is using the old rendering API, which is not supported by the HumanRendering wrapper.", e);
@@ -541,9 +555,13 @@ namespace Gym.Envs.Registration {
                     env = Wrap(LoadEnvCreator(wrapperSpec.EntryPoint), env, wrapperSpec.Kwargs);
                 }
 
-                // Add the human rendering wrapper.
-                if (applyHumanRendering)
+                // Add the human rendering wrapper, with the call's viewer factory (DR-89) when it was given one: a property, so
+                // the wrapper's recorded kwargs stay Gymnasium's {}.
+                if (applyHumanRendering) {
                     env = Wrap(typeof(HumanRendering<,>), env, null);
+                    if (viewerFactory is not null && env is IHumanViewerFactoryHolder holder)
+                        holder.ViewerFactory = viewerFactory;
+                }
                 if (applyRenderCollection)
                     env = Wrap(typeof(RenderCollection<,>), env, null);
 
@@ -560,6 +578,38 @@ namespace Gym.Envs.Registration {
 
                 throw;
             }
+        }
+
+        /// <summary>
+        ///     <c>make</c> with a viewer factory (DR-89): what the <c>Gymnasium</c> facade's render-mode overloads call, the
+        ///     spec found from an id or given, the factory handed to whoever opens the human window (see
+        ///     <see cref="MakeCore"/>).
+        /// </summary>
+        /// <param name="idOrSpec">The id (a string) or the spec.</param>
+        /// <param name="kwargs">The env's constructor arguments by Python name, over the spec's.</param>
+        /// <param name="maxEpisodeSteps">The step limit instead of the spec's; <c>-1</c> adds no <c>TimeLimit</c>.</param>
+        /// <param name="disableEnvChecker">Whether to leave out <c>PassiveEnvChecker</c>; <see langword="null"/> follows the spec.</param>
+        /// <param name="viewerFactory">The viewer factory, or <see langword="null"/> for the app-wide one.</param>
+        /// <param name="expected">The <c>Env&lt;TObs, TAct&gt;</c> type arguments the typed form requires, or <see langword="null"/>.</param>
+        /// <returns>The env; the caller owns it.</returns>
+        /// <exception cref="TypeError">Thrown when <paramref name="idOrSpec"/> is neither, or as <see cref="Make(string, object, long?, bool?)"/> does.</exception>
+        /// <exception cref="Error">Thrown when the id is not registered or has no entry point.</exception>
+        /// <exception cref="NamespaceNotFound">Thrown when the id's namespace is unknown.</exception>
+        /// <exception cref="NameNotFound">Thrown when the name is unknown.</exception>
+        /// <exception cref="VersionNotFound">Thrown when the version is newer than any registered.</exception>
+        /// <exception cref="DeprecatedEnv">Thrown when the version is older than the latest.</exception>
+        /// <exception cref="ModuleNotFoundError">Thrown when a module named by the id or the entry point does not exist.</exception>
+        /// <exception cref="AttributeError">Thrown when a string entry point's namespace has no such class.</exception>
+        /// <exception cref="InvalidMetadata">Thrown when the env class's <c>ClassMetadata</c> is not a dict.</exception>
+        /// <exception cref="ValueError">Thrown when a recorded wrapper cannot be re-created.</exception>
+        internal static IEnv MakeWithViewer(object idOrSpec, object? kwargs, long? maxEpisodeSteps, bool? disableEnvChecker, EnvViewerFactory? viewerFactory,
+            (Type Obs, Type Act)? expected) {
+            EnvSpec spec = idOrSpec switch {
+                string id => FindSpec(id),
+                EnvSpec given => given,
+                _ => throw new TypeError($"Expected id to be a string or EnvSpec, got {PyBuiltins.TypeRepr(idOrSpec)}"),
+            };
+            return MakeCore(spec, kwargs, maxEpisodeSteps, disableEnvChecker, expected, viewerFactory);
         }
 
         /// <summary>

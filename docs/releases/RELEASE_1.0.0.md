@@ -72,10 +72,19 @@ In short:
 
 - `Reset(seed, options)` returns `(observation, info)`; `Seed(s)` is gone, `Reset(seed: s)` replaces it.
 - `Step` returns `(observation, reward, terminated, truncated, info)` instead of `(observation, reward, done, info)`.
-- The render mode is a constructor argument (`render_mode`), and `Render()` returns a `RenderResult` (a frame as a
-  uint8 array, or text) instead of an ImageSharp `Image`; `human` mode draws inside `Reset` and `Step`.
+- The render mode is a constructor argument (`render_mode`, Gymnasium's string, or the `RenderMode` enum through each
+  env's twin constructor and `Gymnasium.Make`'s overloads), and `Render()` returns a `RenderResult` (a frame as a uint8
+  array, or text) instead of an ImageSharp `Image`; `(Image)env.Render()` converts a frame when an image is wanted.
+  `human` mode draws inside `Reset` and `Step`.
+- The viewer contract (DR-85): `IEnvViewer.Render(NDArray frame)` takes the `(H, W, 3)` uint8 frame instead of an
+  `Image`, `Close()` replaces `CloseEnvironment()` (obsolete until 2.0), and the factory, `EnvViewerFactory`, is
+  synchronous where 0.2's `IEnvironmentViewerFactoryDelegate` returned a task; a viewer that can render without blocking
+  also implements `IAsyncEnvViewer`. Code that only passes `AvaloniaEnvViewer.Factory` or `WinFormEnvViewer.Factory`
+  is unaffected; a viewer of your own changes its signatures.
 - Envs are `Env<TObs, TAct>`; `Env`, `Env<TAction>` and `GoalEnv` are gone; `Gymnasium.Make` builds registered envs.
-- Rewards are `double`; infos are `Info` dicts; metadata keys are `render_modes` and `render_fps`.
+- Rewards are `double`; infos are `Info` dicts, compared by reference with Python's `==` as `PyEquals` (DR-92), read
+  typed through `info.Get<T>(key)`, which converts NumPy scalars (DR-78); metadata keys are `render_modes` and
+  `render_fps`. 0.2's `step.Information` still compiles, obsolete, until 2.0.
 - Seeds select Gymnasium's random streams, so seeded runs give Gymnasium's numbers, not 0.2's.
 - NumSharp 0.81.0 replaces NumSharp.Lite 0.1.12; `Discrete` samples are 0-d int64 arrays.
 - The baselines-style vector types (`IVecEnv`, `VecEnv`, `DummyVecEnv`, `VecEnvWrapper`) moved to `Gym.Legacy`.
@@ -154,7 +163,16 @@ In short:
 - **Rendering**: `Gym.Rendering`, a rasterizer with pygame's semantics (SDL_gfx's `gfxdraw` primitives, `draw.line`,
   `draw.rect`, `draw.polygon`, `draw.circle`, `draw.lines`, alpha blitting, `transform.flip`/`scale`/`smoothscale`,
   `image.load`), MuJoCo's scene drawn in software as its classic renderer draws it, and the `human` viewers, chosen once
-  with `Gymnasium.HumanViewerFactory`.
+  with `Gymnasium.HumanViewerFactory` or per env (`Gymnasium.Make("CartPole-v1", RenderMode.Human, factory)`, DR-89).
+  The viewers render synchronously, and the Avalonia and WinForms ones asynchronously too (`IAsyncEnvViewer`, DR-85).
+- **Typed infos**: every built-in env class that sends info keys has a record of its info (DR-91):
+  `HalfCheetahInfoV5 info = step.Info;` gives `info.XPosition` as a `double` and `info.XVelocity` as a `double?` (`null`
+  on a reset's info), while `info["reward_ctrl"]` keeps the value as the env sent it. 23 records, named like their env
+  classes and inheriting as they do (`MujocoInfo`, `ToyTextInfo`).
+- **.NET-typed modes**: `RenderMode`, `AutoresetMode` and `VectorizeMode` are C# enums that parse from and print as
+  Gymnasium's strings (DR-84); every env takes its render mode as the enum or the string, `MakeVec` takes the
+  vectorization and autoreset modes as enums (`MakeVec("CartPole-v1", 4, VectorizeMode.Async, AutoresetMode.SameStep)`),
+  and the strings keep working everywhere Gymnasium takes them, specs and kwargs included.
 
 ## Differences from Gymnasium, by design
 

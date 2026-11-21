@@ -1,7 +1,9 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
+using Gym.Utils;
 using NumSharp;
+using SixLabors.ImageSharp;
 
 namespace Gym.Envs {
     /// <summary>
@@ -21,6 +23,12 @@ namespace Gym.Envs {
     ///     with <see cref="NDArray"/>'s broadcasting <c>==</c>). Python has no such union, the distinction between an RGB and
     ///     a depth frame (both <c>ndarray</c>) is the render mode's; it is kept here so consumers need not look it up.
     ///     </para>
+    ///     <para>
+    ///     A single frame converts explicitly (DR-77, DR-84): <c>(NDArray)env.Render()</c> is the <see cref="Rgb"/> or
+    ///     <see cref="Depth"/> frame itself, still owned by the result, and <c>(Image)env.Render()</c> a new ImageSharp image
+    ///     of an <see cref="Rgb"/> frame that the caller disposes. Every other case refuses with
+    ///     <see cref="InvalidCastException"/>, since it holds no single frame.
+    ///     </para>
     /// </remarks>
     public abstract class RenderResult : IEquatable<RenderResult>, IDisposable {
         /// <summary>Only the nested cases derive from this class, so a switch over them is exhaustive.</summary>
@@ -38,6 +46,46 @@ namespace Gym.Envs {
 
         /// <summary>Whether this is <see cref="None"/>, what <c>render()</c> returns in <c>human</c> mode or without a render mode.</summary>
         public bool IsNone => this is NoneResult;
+
+        /// <summary>
+        ///     The single frame of an <see cref="Rgb"/> or <see cref="Depth"/> result: <c>NDArray frame = (NDArray)env.Render();</c>
+        ///     in <c>rgb_array</c> or <c>depth_array</c> mode.
+        /// </summary>
+        /// <param name="result">The result.</param>
+        /// <returns>
+        ///     The result's own frame, not a copy: disposing the result disposes it, so keep the result alive (or undisposed)
+        ///     while the frame is used, and dispose one of the two, not both.
+        /// </returns>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="result"/> is <see langword="null"/>.</exception>
+        /// <exception cref="InvalidCastException">
+        ///     Thrown for a result without a single frame: <see cref="None"/> (<c>human</c> mode, or no render mode),
+        ///     <see cref="Ansi"/> text, an <see cref="RgbDepth"/> pair (read <see cref="RgbDepth.RgbFrame"/> or
+        ///     <see cref="RgbDepth.DepthFrame"/>), or the <see cref="Frames"/> of a <c>*_list</c> mode.
+        /// </exception>
+        public static explicit operator NDArray(RenderResult result) => result switch {
+            null => throw new ArgumentNullException(nameof(result)),
+            Rgb rgb => rgb.Frame,
+            Depth depth => depth.Frame,
+            _ => throw new InvalidCastException($"A {result.GetType().Name} render result ({result}) holds no single frame to convert to an NDArray; only rgb_array (Rgb) and depth_array (Depth) results do."),
+        };
+
+        /// <summary>
+        ///     An ImageSharp image of an <see cref="Rgb"/> frame: <c>using Image image = (Image)env.Render();</c> in
+        ///     <c>rgb_array</c> mode, an <c>Image&lt;Rgb24&gt;</c> of the frame's size (a frame of another dtype is cast to uint8).
+        /// </summary>
+        /// <param name="result">The result.</param>
+        /// <returns>A new image the caller owns and disposes; the result keeps its frame.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="result"/> is <see langword="null"/>.</exception>
+        /// <exception cref="InvalidCastException">
+        ///     Thrown for any case but <see cref="Rgb"/>: a depth frame has no colors to show, and <see cref="None"/>,
+        ///     <see cref="Ansi"/>, <see cref="RgbDepth"/> and <see cref="Frames"/> hold no single RGB frame.
+        /// </exception>
+        /// <exception cref="ArgumentException">Thrown when the <see cref="Rgb"/> frame is not <c>(H, W)</c>, <c>(H, W, 3)</c> or <c>(H, W, 4)</c>.</exception>
+        public static explicit operator Image(RenderResult result) => result switch {
+            null => throw new ArgumentNullException(nameof(result)),
+            Rgb rgb => VideoFrames.ToImage(rgb.Frame),
+            _ => throw new InvalidCastException($"A {result.GetType().Name} render result ({result}) holds no RGB frame to convert to an Image; only rgb_array (Rgb) results do."),
+        };
 
         /// <summary>Structural equality (see the class remarks).</summary>
         /// <param name="other">The other result; may be <see langword="null"/>.</param>

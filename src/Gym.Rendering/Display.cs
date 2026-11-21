@@ -31,7 +31,7 @@ namespace Gym.Rendering {
         /// <exception cref="ArgumentOutOfRangeException">Thrown for a size that is not positive (0 would be a desktop-sized window in pygame, not modelled).</exception>
         /// <exception cref="Gym.Exceptions.DependencyNotInstalled">Thrown when no factory is given or set, where pygame would be missing.</exception>
         /// <remarks>An interactive window reports input from here on, so its close button posts <see cref="EventType.Quit"/> instead of closing it until <see cref="Quit"/>.</remarks>
-        public static Surface SetMode(int width, int height, bool resizable = false, IEnvironmentViewerFactoryDelegate? viewerFactory = null, string? title = null) =>
+        public static Surface SetMode(int width, int height, bool resizable = false, EnvViewerFactory? viewerFactory = null, string? title = null) =>
             PygameContext.Default.Display.SetMode(width, height, resizable, viewerFactory, title);
 
         /// <summary><c>pygame.display.get_surface()</c> on the default context: the display surface, or <see langword="null"/> when no mode is set.</summary>

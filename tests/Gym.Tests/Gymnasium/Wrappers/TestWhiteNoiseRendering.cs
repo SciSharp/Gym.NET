@@ -17,7 +17,7 @@ namespace Gym.Tests.Gymnasium.Wrappers {
         /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/tests/wrappers/test_white_noise_rendering.py#L7">tests/wrappers/test_white_noise_rendering.py (test_white_noise_rendering)</see>.</remarks>
         [TestMethod]
         public void TestWhiteNoiseRenderingWrappers() {
-            IEnvironmentViewerFactoryDelegate? previous = HumanViewerFactory;
+            EnvViewerFactory? previous = HumanViewerFactory;
             HumanViewerFactory = NullEnvViewer.Factory;
             try {
                 foreach (string mode in new[] { "rgb_array" }) {

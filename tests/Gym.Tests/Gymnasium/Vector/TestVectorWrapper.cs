@@ -6,6 +6,7 @@ using Gym.Envs;
 using Gym.Vector;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using NumSharp;
+using Gym.Tests.Helpers;
 
 namespace Gym.Tests.Gymnasium.Vector {
     /// <summary>Gymnasium's vector wrapper tests (<c>test_vector_wrapper.py</c>), run against <see cref="VectorWrapper{TObs, TAct}"/>.</summary>
@@ -48,9 +49,9 @@ namespace Gym.Tests.Gymnasium.Vector {
             using VectorEnv<NDArray, NDArray> env = MakeVec<NDArray, NDArray>("CartPole-v1", numEnvs: 3, vectorizationMode: "sync");
             var wrapped = new DummyVectorWrapper(MakeVec<NDArray, NDArray>("CartPole-v1", numEnvs: 3, vectorizationMode: "sync"));
 
-            Assert.AreEqual(env.Metadata, wrapped.Metadata);
+            PyAssert.AreEqual(env.Metadata, wrapped.Metadata);
             env.Metadata = new Metadata { [Metadata.RenderModesKey] = new List<string> { "rgb_array" } };
-            Assert.AreNotEqual(env.Metadata, wrapped.Metadata);
+            PyAssert.AreNotEqual(env.Metadata, wrapped.Metadata);
 
             env.Close();
             wrapped.Close();

@@ -8,9 +8,10 @@ using NumSharp;
 namespace Gym.Envs {
     /// <summary>
     ///     The <c>info</c> dict of resets and steps (and the base of <see cref="Metadata"/>): a <c>string → object</c> map that behaves like
-    ///     a Python <c>dict</c>. Iteration follows insertion order, re-assigning a key keeps its place, and equality ignores
-    ///     order and compares values as Python's <c>==</c> does (<see cref="PyEquality"/>). Keys keep Gymnasium's spelling
-    ///     byte for byte (<c>"TimeLimit.truncated"</c>, <c>"episode"</c>).
+    ///     a Python <c>dict</c>. Iteration follows insertion order and re-assigning a key keeps its place. Keys keep
+    ///     Gymnasium's spelling byte for byte (<c>"TimeLimit.truncated"</c>, <c>"episode"</c>). Typed reads go through
+    ///     <see cref="InfoExtensions.Get{T}"/> (<c>info.Get&lt;double&gt;("x_position")</c>), and the built-in envs' infos
+    ///     convert to typed records (<see cref="EnvInfo"/>, DR-91).
     /// </summary>
     /// <remarks>
     ///     <para>
@@ -19,11 +20,14 @@ namespace Gym.Envs {
     ///     <see cref="Pop(string, object)"/> are the defaulting forms, as on a Python dict.
     ///     </para>
     ///     <para>
-    ///     Mutable and not synchronized, like a Python dict. It hashes by its count only, so it stays usable as a key while
-    ///     equal instances hash alike; Python refuses to hash a dict at all (<c>unhashable type: 'dict'</c>).
+    ///     Mutable and not synchronized, like a Python dict. <see cref="object.Equals(object)"/>, <c>==</c> and
+    ///     <see cref="object.GetHashCode"/> are by reference, as for any .NET collection (DR-92): a mutable dict hashed by
+    ///     value would change its hash under a key, and Python refuses to hash a dict at all (<c>unhashable type: 'dict'</c>).
+    ///     Python's <c>==</c>, which ignores order and compares values as <see cref="PyEquality"/> does, is
+    ///     <see cref="PyEquals"/>.
     ///     </para>
     /// </remarks>
-    public class Info : IDictionary<string, object?>, IReadOnlyDictionary<string, object?>, IEquatable<Info> {
+    public class Info : IDictionary<string, object?>, IReadOnlyDictionary<string, object?> {
         /// <summary>The entries in insertion order; removal shifts the ones after it, which keeps the order.</summary>
         private readonly List<KeyValuePair<string, object?>> _entries;
 
@@ -159,29 +163,10 @@ namespace Gym.Envs {
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="key"/> is <see langword="null"/>.</exception>
         public object? Get(string key, object? @default = null) => TryGetValue(key, out object? value) ? value : @default;
 
-        /// <summary>
-        ///     The value under <paramref name="key"/> read as <typeparamref name="T"/>, or <c>default(T)</c> when the key is
-        ///     missing: the legacy <c>Gym.Collections.Dict.Get&lt;T&gt;</c>, kept so code moving from <c>Gym.Legacy</c>'s info to
-        ///     <see cref="Info"/> compiles unchanged (DR-58). Python's dict has no such method.
-        /// </summary>
-        /// <typeparam name="T">
-        ///     The type to read as. A boxed value casts only to its own type: a <see cref="long"/> stored, as NumPy integers
-        ///     are, is not an <see cref="int"/>.
-        /// </typeparam>
-        /// <param name="key">The key.</param>
-        /// <returns>
-        ///     The value as <typeparamref name="T"/>, or <c>default(T)</c> when the key is missing. Footgun: a missing key and a
-        ///     stored default read the same; <see cref="TryGetValue"/> tells them apart.
-        /// </returns>
-        /// <exception cref="ArgumentNullException">Thrown when <paramref name="key"/> is <see langword="null"/>.</exception>
-        /// <exception cref="InvalidCastException">Thrown when the stored value is not a <typeparamref name="T"/>.</exception>
-        /// <exception cref="NullReferenceException">Thrown when the stored value is <see langword="null"/> and <typeparamref name="T"/> is a non-nullable value type.</exception>
-        /// <remarks>
-        ///     There is deliberately no <c>Get&lt;T&gt;(key, T fallback)</c>: next to <see cref="Get(string, object?)"/>,
-        ///     overload resolution would prefer it for existing calls such as <c>Get("k", 5)</c> (an identity conversion beats
-        ///     boxing), which would then cast a stored <see cref="long"/> to <see cref="int"/> and throw (measured, DR-58).
-        /// </remarks>
-        public T? Get<T>(string key) => TryGetValue(key, out object? value) ? (T?)value : default;
+        // The typed Get<T>(key), 0.2's Dict.Get<T> (DR-58), is InfoExtensions.Get<T> since DR-78: an extension that converts
+        // NumPy scalars where the cast it replaced threw. There is deliberately no Get<T>(key, T fallback) either way: next to
+        // Get(string, object?), overload resolution would prefer it for existing calls such as Get("k", 5) (an identity
+        // conversion beats boxing), which would then read a stored long as an int (measured, DR-58).
 
         /// <summary>
         ///     A shallow copy, the same as <see cref="Copy"/>: the legacy <c>Gym.Collections.Dict.Clone</c>, kept so code moving
@@ -317,38 +302,18 @@ namespace Gym.Envs {
         }
 
         /// <summary>
-        ///     Python's <c>==</c> between dicts: the same keys, each with an equal value (<see cref="PyEquality.AreEqual"/>),
+        ///     Python's <c>==</c> between dicts (DR-92): the same keys, each with an equal value (<see cref="PyEquality.AreEqual"/>),
         ///     regardless of insertion order and of the concrete type (an <see cref="Info"/> equals a <see cref="Metadata"/>
-        ///     with the same entries, as two dicts compare).
+        ///     with the same entries, or a <see cref="Dictionary{TKey, TValue}"/>, as two dicts compare). <c>==</c> and
+        ///     <see cref="object.Equals(object)"/> compare references instead.
         /// </summary>
-        /// <param name="other">The other info; may be <see langword="null"/>.</param>
-        /// <returns><see langword="true"/> when the two are equal.</returns>
-        public bool Equals(Info? other) => other is not null && PyEquality.AreEqual(this, other);
-
-        /// <summary>Python's <c>==</c> with any dict-like value (an <see cref="Info"/>, or a <see cref="Dictionary{TKey, TValue}"/>).</summary>
-        /// <param name="obj">The other value.</param>
+        /// <param name="other">The other value; <see langword="null"/> (Python's <c>None</c>) never equals a dict.</param>
         /// <returns><see langword="true"/> when the two are equal dicts.</returns>
-        public override bool Equals(object? obj) => obj is not null && PyEquality.AreEqual(this, obj);
-
-        /// <summary>The number of keys: equal infos always have equal counts, so this is consistent with <see cref="Equals(Info)"/>.</summary>
-        /// <returns>The hash.</returns>
-        public override int GetHashCode() => _entries.Count;
+        public bool PyEquals(object? other) => other is not null && PyEquality.AreEqual(this, other);
 
         /// <summary>Python's <c>repr(info)</c>: <c>{'render_modes': ['human', 'rgb_array'], 'render_fps': 50}</c>.</summary>
         /// <returns>The text.</returns>
         public override string ToString() => PyBuiltins.Repr(this);
-
-        /// <summary>Python's <c>==</c> between two infos (see <see cref="Equals(Info)"/>); two <see langword="null"/>s are equal.</summary>
-        /// <param name="left">The first info.</param>
-        /// <param name="right">The second info.</param>
-        /// <returns><see langword="true"/> when they are equal.</returns>
-        public static bool operator ==(Info? left, Info? right) => left is null ? right is null : left.Equals(right);
-
-        /// <summary>Python's <c>!=</c> between two infos.</summary>
-        /// <param name="left">The first info.</param>
-        /// <param name="right">The second info.</param>
-        /// <returns><see langword="true"/> when they differ.</returns>
-        public static bool operator !=(Info? left, Info? right) => !(left == right);
 
         /// <summary>
         ///     Creates an empty instance of this info's own type for <see cref="Copy"/> and <see cref="DeepCopy"/>, so copying a

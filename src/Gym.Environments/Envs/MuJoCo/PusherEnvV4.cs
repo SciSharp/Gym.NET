@@ -39,9 +39,38 @@ namespace Gym.Environments.Envs.MuJoCo {
         /// <exception cref="ImportError">Always, with Gymnasium's message.</exception>
         public PusherEnvV4(string? renderMode = null, int width = DefaultSize, int height = DefaultSize, int? cameraId = null,
                            string? cameraName = null, int maxGeom = 1000, IReadOnlyDictionary<int, bool>? visualOptions = null,
-                           IEnvironmentViewerFactoryDelegate? viewerFactory = null)
+                           EnvViewerFactory? viewerFactory = null)
             : base(Refuse(), 5, null, ClassMetadata, renderMode, width, height, cameraId, cameraName, null, maxGeom, visualOptions,
                    viewerFactory) { }
+
+        /// <summary>
+        ///     Builds the env with the render mode given as the <see cref="Gym.Envs.RenderMode"/> enum (DR-84, DR-93), as
+        ///     <see cref="PusherEnvV4(string, int, int, int?, string, int, IReadOnlyDictionary{int,bool}, EnvViewerFactory)"/>
+        ///     builds it from the mode's string: <c>new PusherEnvV4(RenderMode.RgbArray)</c> builds what
+        ///     <c>new PusherEnvV4(renderMode: "rgb_array")</c> builds, the member reaching the env as Gymnasium's string
+        ///     (<see cref="RenderModes.Name"/>), which its <c>RenderMode</c> property then holds.
+        /// </summary>
+        /// <remarks>
+        ///     The mode is required and comes first, so <c>new PusherEnvV4()</c> keeps meaning the other constructor, without a
+        ///     mode; leave the mode out there for no rendering. Every other parameter means what it means there.
+        /// </remarks>
+        /// <param name="renderMode">
+        ///     The render mode, which the env must list in its <c>metadata["render_modes"]</c> as for the string; it behaves
+        ///     exactly as its Gymnasium string does in the other constructor.
+        /// </param>
+        /// <param name="width">The rendered frame's width; never used.</param>
+        /// <param name="height">The rendered frame's height; never used.</param>
+        /// <param name="cameraId">The camera id; never used.</param>
+        /// <param name="cameraName">The camera name; never used.</param>
+        /// <param name="maxGeom">The most geoms a frame draws; never used.</param>
+        /// <param name="visualOptions">MuJoCo visual flags; never used.</param>
+        /// <param name="viewerFactory">Gym.NET's <c>viewer_factory</c>; never used.</param>
+        /// <exception cref="System.ArgumentOutOfRangeException">Thrown for a value <see cref="Gym.Envs.RenderMode"/> does not declare (a cast integer such as <c>(RenderMode)99</c>).</exception>
+        /// <exception cref="ImportError">Always, with Gymnasium's message.</exception>
+        public PusherEnvV4(RenderMode renderMode, int width = DefaultSize, int height = DefaultSize, int? cameraId = null, string? cameraName = null,
+                           int maxGeom = 1000, IReadOnlyDictionary<int, bool>? visualOptions = null,
+                           EnvViewerFactory? viewerFactory = null)
+            : this(RenderModes.Name(renderMode), width, height, cameraId, cameraName, maxGeom, visualOptions, viewerFactory) { }
 
         /// <summary>Gymnasium's class attribute <c>metadata</c>: the four render modes at 20 frames per second. A new dict on every read.</summary>
         public static new Metadata ClassMetadata => MetadataFor(20);

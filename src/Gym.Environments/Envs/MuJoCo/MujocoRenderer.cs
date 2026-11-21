@@ -44,7 +44,7 @@ namespace Gym.Environments.Envs.MuJoCo {
         /// </remarks>
         public MujocoRenderer(MjModel model, MjData data, IReadOnlyDictionary<string, object?>? defaultCamConfig = null, int? width = null,
                               int? height = null, int maxGeom = 1000, int? cameraId = null, string? cameraName = null,
-                              IReadOnlyDictionary<int, bool>? visualOptions = null, IEnvironmentViewerFactoryDelegate? viewerFactory = null) {
+                              IReadOnlyDictionary<int, bool>? visualOptions = null, EnvViewerFactory? viewerFactory = null) {
             Model = model ?? throw new ArgumentNullException(nameof(model));
             Data = data ?? throw new ArgumentNullException(nameof(data));
             DefaultCamConfig = defaultCamConfig;
@@ -96,7 +96,7 @@ namespace Gym.Environments.Envs.MuJoCo {
         internal IReadOnlyDictionary<int, bool> VisualOptions { get; }
 
         /// <summary>The window factory <c>human</c> mode uses (DR-20), or <see langword="null"/> for the app-wide one.</summary>
-        internal IEnvironmentViewerFactoryDelegate? ViewerFactory { get; }
+        internal EnvViewerFactory? ViewerFactory { get; }
 
         /// <summary>
         ///     One render mode's viewer (Gymnasium's <c>OffScreenViewer</c>, inlined per DR-69): its own scene, camera and

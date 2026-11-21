@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using Gym.Environments;
 using Gym.Exceptions;
 using Gym.Utils;
 using Gym.Vector;
@@ -101,6 +102,31 @@ namespace Gym.Envs.Registration {
         }
 
         /// <summary>
+        ///     <c>make_vec</c> with a viewer factory (DR-89): what the <c>Gymnasium</c> facade's overloads call, the spec found
+        ///     from an id or given, the factory handed to every sub-env's window (see <see cref="MakeVecCore"/>).
+        /// </summary>
+        /// <param name="idOrSpec">The id (a string) or the spec.</param>
+        /// <param name="numEnvs">The number of sub-envs.</param>
+        /// <param name="vectorizationMode">The vectorization mode (a <see cref="VectorizeMode"/> or its value), or <see langword="null"/> for the spec's default.</param>
+        /// <param name="vectorKwargs">The vector env's constructor arguments by Python name.</param>
+        /// <param name="wrappers">Wrappers applied to every sub-env, innermost first.</param>
+        /// <param name="kwargs">The env's constructor arguments by Python name.</param>
+        /// <param name="viewerFactory">The viewer factory, or <see langword="null"/> for the app-wide one.</param>
+        /// <param name="typed">The batched types of the typed form, or <see langword="null"/>.</param>
+        /// <returns>The vector env; the caller owns it.</returns>
+        /// <exception cref="TypeError">Thrown when <paramref name="idOrSpec"/> is neither, the env cannot be built, or the typed form's types differ.</exception>
+        /// <exception cref="ValueError">Thrown for an unknown vectorization mode.</exception>
+        /// <exception cref="Error">Thrown when the id is not registered, has no (vector) entry point, or the vector entry point is asked for with vector kwargs or wrappers.</exception>
+        /// <exception cref="RuntimeError">Thrown when a sub-env's spaces do not fit the batch (sync and async modes).</exception>
+        internal static IVectorEnv MakeVecWithViewer(object idOrSpec, int numEnvs, object? vectorizationMode, object? vectorKwargs, IEnumerable<Func<IEnv, IEnv>>? wrappers,
+            object? kwargs, EnvViewerFactory? viewerFactory, (Type Obs, Type Act)? typed) =>
+            idOrSpec switch {
+                string id => MakeVecCore(FindSpec(id), id, numEnvs, vectorizationMode, vectorKwargs, wrappers, kwargs, typed, viewerFactory),
+                EnvSpec spec => MakeVecCore(spec, spec, numEnvs, vectorizationMode, vectorKwargs, wrappers, kwargs, typed, viewerFactory),
+                _ => throw new TypeError($"Invalid id type: {PyBuiltins.TypeRepr(idOrSpec)}. Expected `str` or `EnvSpec`"),
+            };
+
+        /// <summary>
         ///     <c>make_vec</c>'s body: the spec copied with its kwargs taken out (a recorded <c>num_envs</c>, mode, vector kwargs
         ///     and wrappers among them win over the arguments), the mode resolved, the vector env built, and a spec recording
         ///     how attached to it.
@@ -113,13 +139,18 @@ namespace Gym.Envs.Registration {
         /// <param name="wrappers">The wrappers asked for.</param>
         /// <param name="kwargs">The env kwargs asked for.</param>
         /// <param name="typed">The batched types of the typed form, or <see langword="null"/>.</param>
+        /// <param name="viewerFactory">
+        ///     The viewer factory the facade's overloads were given (DR-89), or <see langword="null"/>: each sub-env's
+        ///     <c>make</c> gets it (sync and async modes), or the vector entry point's constructor as <c>viewer_factory</c>; the
+        ///     spec never records it.
+        /// </param>
         /// <returns>The vector env.</returns>
         /// <exception cref="ValueError">Thrown for an unknown vectorization mode.</exception>
         /// <exception cref="Error">Thrown for the entry-point and argument conflicts Gymnasium refuses.</exception>
         /// <exception cref="RuntimeError">Thrown when a sub-env's spaces do not fit the batch (sync and async modes).</exception>
         /// <exception cref="TypeError">Thrown when the typed form's types do not fit, or the vector entry point builds no vector env.</exception>
         private static IVectorEnv MakeVecCore(EnvSpec registered, object id, int numEnvs, object? vectorizationMode, object? vectorKwargs, IEnumerable<Func<IEnv, IEnv>>? wrappers,
-            object? kwargs, (Type Obs, Type Act)? typed) {
+            object? kwargs, (Type Obs, Type Act)? typed, EnvViewerFactory? viewerFactory = null) {
             Info vectorArguments = vectorKwargs as Info ?? PyKwargs.From(vectorKwargs);
             IReadOnlyList<Func<IEnv, IEnv>> wrapperList = wrappers?.ToArray() ?? Array.Empty<Func<IEnv, IEnv>>();
 
@@ -147,30 +178,37 @@ namespace Gym.Envs.Registration {
                 mode = envSpec.VectorEntryPoint is not null ? VectorizeMode.VectorEntryPoint : VectorizeMode.Sync;
             } else {
                 try {
-                    mode = vectorizationMode as VectorizeMode ?? VectorizeMode.Of(vectorizationMode as string ?? throw new ValueError($"{PyBuiltins.Repr(vectorizationMode)} is not a valid VectorizeMode"));
+                    // VectorizeMode(vectorization_mode): a member as it is (a cast integer the enum does not declare is no
+                    // member, as Python's lookup refuses any non-member), a string by its value, anything else refused.
+                    mode = vectorizationMode switch {
+                        VectorizeMode member when Enum.IsDefined(member) => member,
+                        string value => VectorizeModes.Of(value),
+                        _ => throw new ValueError($"{PyBuiltins.Repr(vectorizationMode)} is not a valid VectorizeMode"),
+                    };
                 } catch (ValueError e) {
-                    throw new ValueError($"Invalid vectorization mode: {PyBuiltins.Repr(vectorizationMode)}, valid modes: {PyBuiltins.Repr(VectorizeMode.All.Select(m => (object?)m.Value).ToList())}", e);
+                    throw new ValueError($"Invalid vectorization mode: {PyBuiltins.Repr(vectorizationMode)}, valid modes: {PyBuiltins.Repr(VectorizeModes.All.Select(m => (object?)VectorizeModes.Value(m)).ToList())}", e);
                 }
             }
 
             // One Make stack per sub-env, each wrapped by the wrappers in order (the sync and async modes' create_single_env).
             IEnv CreateSingleEnv() {
-                // make(env_spec, **env_spec_kwargs.copy()): a shallow copy per sub-env, the values shared as in Python.
-                IEnv singleEnv = Make(envSpec, new Info(envSpecKwargs));
+                // make(env_spec, **env_spec_kwargs.copy()): a shallow copy per sub-env, the values shared as in Python; the
+                // viewer factory (DR-89) goes to each sub-env's window, never into its spec.
+                IEnv singleEnv = MakeCore(envSpec, new Info(envSpecKwargs), null, null, null, viewerFactory);
                 foreach (Func<IEnv, IEnv> wrapper in wrapperList)
                     singleEnv = wrapper(singleEnv);
                 return singleEnv;
             }
 
             IVectorEnv env;
-            if (ReferenceEquals(mode, VectorizeMode.Sync)) {
+            if (mode == VectorizeMode.Sync) {
                 if (envSpec.EntryPoint is null)
                     throw new Error($"Cannot create vectorized environment for {envSpec.Id} because it doesn't have an entry point defined.");
                 Type syncType = typed is { } types ? typeof(SyncVectorEnv<,>).MakeGenericType(types.Obs, types.Act) : typeof(SyncVectorEnv);
                 var arguments = new Info { ["env_fns"] = Enumerable.Repeat<Func<IEnv>>(CreateSingleEnv, numEnvs).ToList() };
                 arguments.Update(vectorArguments);
                 env = (IVectorEnv)PyKwargs.Construct(syncType, arguments);
-            } else if (ReferenceEquals(mode, VectorizeMode.Async)) {
+            } else if (mode == VectorizeMode.Async) {
                 if (envSpec.EntryPoint is null)
                     throw new Error($"Cannot create vectorized environment for {envSpec.Id} because it doesn't have an entry point defined.");
                 // The workers call create_single_env on their own threads (DR-22), as Gymnasium's processes do.
@@ -197,6 +235,9 @@ namespace Gym.Envs.Registration {
                     envSpecKwargs["max_episode_steps"] = envSpec.MaxEpisodeSteps;
                 var arguments = new Info { ["num_envs"] = numEnvs };
                 arguments.Update(envSpecKwargs);
+                // The constructor's arguments only: the spec below records envSpecKwargs, without the delegate (DR-89).
+                if (viewerFactory is not null)
+                    arguments["viewer_factory"] = viewerFactory;
                 object created = PyKwargs.Construct(envCreator, arguments);
                 env = created as IVectorEnv ?? throw new TypeError($"The vector entry point of {envSpec.Id} built {PyBuiltins.TypeRepr(created)}, not a vector env");
             }
@@ -207,7 +248,7 @@ namespace Gym.Envs.Registration {
                 copiedIdSpec.Kwargs = new Info(envSpecKwargs);
                 if (numEnvs != 1)
                     copiedIdSpec.Kwargs["num_envs"] = (long)numEnvs;
-                copiedIdSpec.Kwargs["vectorization_mode"] = mode.Value;
+                copiedIdSpec.Kwargs["vectorization_mode"] = VectorizeModes.Value(mode);
                 if (vectorArguments.Count > 0)
                     copiedIdSpec.Kwargs["vector_kwargs"] = vectorArguments;
                 if (wrapperList.Count > 0)

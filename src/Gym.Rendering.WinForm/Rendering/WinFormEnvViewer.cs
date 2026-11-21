@@ -9,13 +9,15 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using Gym.Environments;
+using NumSharp;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using Image = SixLabors.ImageSharp.Image;
 
 namespace Gym.Rendering.WinForm {
     /// <summary>
-    ///     A form with PictureBox that accepts <see cref="IImageCanvas"/> and renders it on it. Start <see cref="Viewer"/> by calling <see cref="Run"/>
+    ///     A Windows Forms window that shows an env's frames in a picture box, on a UI thread of its own: envs open it through
+    ///     <see cref="Factory"/> (<see cref="Open"/>), an app that awaits through <see cref="Run"/>.
     /// </summary>
     /// <remarks>
     ///     <para>
@@ -30,8 +32,15 @@ namespace Gym.Rendering.WinForm {
     ///     wheel, in the client area's pixels, for a MuJoCo env's camera controls). Before <see cref="BeginInput"/> nothing
     ///     changes.
     ///     </para>
+    ///     <para>
+    ///     It renders both ways the viewer contract offers (DR-85): <see cref="Render"/> waits for the form's thread to show
+    ///     the frame, <see cref="RenderAsync"/> awaits it. Closing through the contract (<see cref="IEnvViewer.Close"/>)
+    ///     closes and disposes the form and ends its thread; footgun: <see cref="Form.Close"/>, which a variable typed
+    ///     <c>WinFormEnvViewer</c> calls as <c>viewer.Close()</c>, is WinForms' own: it leaves the thread running and, with
+    ///     input on, is reported as the user's close.
+    ///     </para>
     /// </remarks>
-    public partial class WinFormEnvViewer : Form, IInteractiveEnvViewer {
+    public partial class WinFormEnvViewer : Form, IInteractiveEnvViewer, IAsyncEnvViewer {
         /// <summary>The size of the last frame's BMP stream, to size the next one's buffer.</summary>
         private int _lastSize = 0;
 
@@ -47,38 +56,83 @@ namespace Gym.Rendering.WinForm {
         /// <summary>Whether input is reported (<see cref="BeginInput"/> ran); read on the form's thread, set on any.</summary>
         private volatile bool _inputEnabled;
 
-        /// <summary>Set by <see cref="CloseEnvironment"/>, whose <see cref="Form.Close"/> WinForms reports as a user's close too.</summary>
+        /// <summary>Set by <see cref="IEnvViewer.Close"/>, whose <see cref="Form.Close"/> WinForms reports as a user's close too.</summary>
         private volatile bool _closingByCode;
 
         /// <summary>Set once the form is shown (<see cref="OnShown"/>), so the sizes of its first layout are not reported as resizes.</summary>
         private volatile bool _shown;
 
         /// <summary>
-        ///     A delegate that creates a <see cref="WinFormEnvViewer"/> based on given parameters.
+        ///     The factory envs open this window with (DR-20, DR-85): <see cref="Open"/>, which starts the form on its own UI
+        ///     thread and returns once it exists.
         /// </summary>
-        public static IEnvironmentViewerFactoryDelegate Factory => Run;
+        public static EnvViewerFactory Factory => Open;
+
+        /// <summary>
+        ///     Opens a <see cref="WinFormEnvViewer"/> on a UI thread of its own and returns it once the form exists (the
+        ///     synchronous factory envs call, DR-85), its client area the frame's size, so a frame of that size shows whole at
+        ///     one screen pixel per pixel.
+        /// </summary>
+        /// <param name="width">The width of the frames, the form's client width.</param>
+        /// <param name="height">The height of the frames, the form's client height.</param>
+        /// <param name="title">The title of the form, also mentioned in the thread name.</param>
+        /// <returns>The viewer; its STA thread then runs the form's message loop until the form closes.</returns>
+        /// <exception cref="TimeoutException">Thrown when the form did not come up within 10 seconds.</exception>
+        /// <remarks>It waits on an event the form's thread sets, never on a task, and the form's thread never waits for the caller (R8).</remarks>
+        public static IEnvViewer Open(int width, int height, string title = null) {
+            WinFormEnvViewer created = null;
+            using var ready = new ManualResetEventSlim();
+            Start(width, height, title, viewer => {
+                created = viewer;
+                ready.Set();
+            });
+            if (!ready.Wait(10_000))
+                throw new TimeoutException("Starting viewer timed out.");
+            return created;
+        }
 
         /// <summary>
         ///     Starts a <see cref="WinFormEnvViewer"/> in seperate thread, its client area the frame's size, so a frame of that
-        ///     size shows whole at one screen pixel per pixel.
+        ///     size shows whole at one screen pixel per pixel: the asynchronous way to open one for an app that awaits. Envs
+        ///     use the synchronous <see cref="Open"/> (DR-85).
         /// </summary>
         /// <param name="height">The height of the frames, the form's client height</param>
         /// <param name="width">The width of the frames, the form's client width</param>
         /// <param name="title">The title of the form, also mentioned in the thread name.</param>
         /// <returns>
         ///     A task of the viewer, completed once the form exists on its own STA thread (which then runs its message loop
-        ///     until the form closes); the env blocks on it, so it must not need the calling thread.
+        ///     until the form closes).
         /// </returns>
-        /// <exception cref="Exception">Thrown (through the task) when the form did not come up within 10 seconds.</exception>
+        /// <exception cref="TimeoutException">Thrown (through the task) when the form did not come up within 10 seconds.</exception>
         public static async Task<IEnvViewer> Run(int width, int height, string title = null) {
-            var taskResult = new TaskCompletionSource<IEnvViewer>();
+            var taskResult = new TaskCompletionSource<IEnvViewer>(TaskCreationOptions.RunContinuationsAsynchronously);
+            Start(width, height, title, viewer => taskResult.SetResult(viewer));
+
+            var timeout = Task.Delay(10_000);
+            if (await Task.WhenAny(taskResult.Task, timeout) == timeout)
+                throw new TimeoutException("Starting viewer timed out.");
+
+            Debug.Assert(taskResult.Task.Result != null, "At this point viewer shouldn't be null.");
+
+            return taskResult.Task.Result;
+        }
+
+        /// <summary>
+        ///     Creates the form on a new STA thread, hands it to <paramref name="created"/> from that thread, then runs the
+        ///     form's message loop there until the form closes: what <see cref="Open"/> and <see cref="Run"/> share.
+        /// </summary>
+        /// <param name="width">The frames' width, the form's client width.</param>
+        /// <param name="height">The frames' height, the form's client height.</param>
+        /// <param name="title">The form's title, also in the thread's name.</param>
+        /// <param name="created">Called on the form's thread once the form exists, before its message loop starts.</param>
+        private static void Start(int width, int height, string title, Action<WinFormEnvViewer> created) {
             var thread = new Thread(() => {
                 var v = new WinFormEnvViewer(width + 12, height + 12, title);
                 // The picture shows a frame at its own size from the top-left corner (it does not scale), so the client
                 // area takes the frame's size; the outer size above only seeds the form. A title bar and borders take more
                 // than 12 pixels on Windows 10 and 11, which cropped about 27 rows off every frame's bottom before.
                 v.ClientSize = new System.Drawing.Size(width, height);
-                taskResult.SetResult(v);
+                created(v);
                 if (SystemInformation.UserInteractive) {
                     Application.Run(v);
                 } else {
@@ -91,14 +145,6 @@ namespace Gym.Rendering.WinForm {
             thread.IsBackground = true;
             thread.Start();
             thread.Name = $"Viewer{(string.IsNullOrEmpty(title) ? "" : $"-{title}")}";
-
-            var timeout = Task.Delay(10_000);
-            if (await Task.WhenAny(taskResult.Task, timeout) == timeout)
-                throw new Exception("Starting viewer timed out.");
-
-            Debug.Assert(taskResult.Task.Result != null, "At this point viewer shouldn't be null.");
-
-            return taskResult.Task.Result;
         }
 
         /// <summary>A form of the given outer size; create it on the thread that will run it, as <see cref="Run"/> does.</summary>
@@ -122,35 +168,59 @@ namespace Gym.Rendering.WinForm {
         }
 
         /// <summary>
-        ///     Renders this canvas onto <see cref="PictureFrame"/>.
+        ///     Shows a frame in <see cref="PictureFrame"/>, replacing the previous one; from another thread it waits for the
+        ///     form's thread to show it. The frame stays the caller's: it is copied into an image first.
         /// </summary>
-        /// <param name="canvas">Canvas painted from <see cref="NGraphics"/></param>
-        public void Render(Image canvas) {
+        /// <param name="frame">The frame, <c>(H, W, 3)</c>; another dtype is cast to uint8.</param>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="frame"/> is <see langword="null"/>.</exception>
+        /// <exception cref="ArgumentException">Thrown for a frame that is not <c>(H, W, 3)</c>.</exception>
+        public void Render(NDArray frame) {
+            // Copied on the caller's thread, so the caller may reuse the frame however the form's thread is scheduled.
+            Image<Rgb24> image = ViewerFrames.ToImage(frame);
             if (InvokeRequired) {
-                Invoke(new Action(() => Render(canvas)));
+                Invoke(new Action(() => Show(image)));
                 return;
             }
 
-            using (var ms = new MemoryStream(_lastSize)) {
-                canvas.SaveAsBmp(ms);
-                _lastSize = (int) ms.Length;
-                Clear();
-                PictureFrame.Image = new Bitmap(ms);
-            }
+            Show(image);
         }
 
         /// <summary>
-        ///     Renders this canvas onto <see cref="PictureFrame"/>.
+        ///     Shows a frame without blocking (DR-85): the frame is copied on the caller's thread, then handed to the form's
+        ///     thread, and the task completes once it is shown. On the form's thread itself it completes at once.
         /// </summary>
-        /// <param name="canvas">Canvas painted from <see cref="NGraphics"/></param>
-        public void RenderAsync(Image canvas) {
-            if (InvokeRequired) {
-                BeginInvoke(new Action(() => RenderAsync(canvas)));
-                return;
+        /// <param name="frame">The frame, <c>(H, W, 3)</c>; it stays the caller's, copied before this returns its task.</param>
+        /// <param name="cancellationToken">Cancels the wait for the form's thread; the frame may still be shown.</param>
+        /// <returns>The pending render.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="frame"/> is <see langword="null"/>.</exception>
+        /// <exception cref="ArgumentException">Thrown for a frame that is not <c>(H, W, 3)</c>.</exception>
+        /// <exception cref="OperationCanceledException">Thrown, or through the task, when <paramref name="cancellationToken"/> is cancelled first.</exception>
+        public ValueTask RenderAsync(NDArray frame, CancellationToken cancellationToken = default) {
+            cancellationToken.ThrowIfCancellationRequested();
+            Image<Rgb24> image = ViewerFrames.ToImage(frame);
+            if (!InvokeRequired) {
+                Show(image);
+                return default;
             }
 
+            var shown = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            BeginInvoke(new Action(() => {
+                try {
+                    Show(image);
+                    shown.SetResult();
+                } catch (Exception e) {
+                    shown.SetException(e);
+                }
+            }));
+            return new ValueTask(shown.Task.WaitAsync(cancellationToken));
+        }
+
+        /// <summary>Puts an image into <see cref="PictureFrame"/> as a bitmap, disposing the image and the frame it replaces; on the form's thread.</summary>
+        /// <param name="image">The frame's image, which this disposes.</param>
+        private void Show(Image<Rgb24> image) {
+            using (image)
             using (var ms = new MemoryStream(_lastSize)) {
-                canvas.SaveAsBmp(ms);
+                image.SaveAsBmp(ms);
                 _lastSize = (int) ms.Length;
                 Clear();
                 PictureFrame.Image = new Bitmap(ms);
@@ -175,15 +245,46 @@ namespace Gym.Rendering.WinForm {
         }
 
         /// <summary>
-        ///     Closes and disposes the form and ends its message loop's thread; from another thread it waits for the form's
-        ///     thread to do it. A close made here is never turned into a <see cref="ViewerInputKind.Close"/> report.
+        ///     Closes and disposes the form and ends its message loop's thread (the contract's <see cref="IEnvViewer.Close"/>);
+        ///     from another thread it waits for the form's thread to do it. A close made here is never turned into a
+        ///     <see cref="ViewerInputKind.Close"/> report.
         /// </summary>
-        public void CloseEnvironment() {
+        void IEnvViewer.Close() {
             if (InvokeRequired) {
-                Invoke(new Action(CloseEnvironment));
+                Invoke(new Action(CloseOnOwnThread));
                 return;
             }
 
+            CloseOnOwnThread();
+        }
+
+        /// <summary>Closes the form without blocking (DR-85); completes once the form's thread has closed it.</summary>
+        /// <returns>The pending close.</returns>
+        public ValueTask CloseAsync() {
+            if (!InvokeRequired) {
+                CloseOnOwnThread();
+                return default;
+            }
+
+            var closed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            BeginInvoke(new Action(() => {
+                try {
+                    CloseOnOwnThread();
+                    closed.SetResult();
+                } catch (Exception e) {
+                    closed.SetException(e);
+                }
+            }));
+            return new ValueTask(closed.Task);
+        }
+
+        /// <summary>0.2's name for closing: closes the form as <see cref="IEnvViewer.Close"/> does, kept so 0.2 code compiles until 2.0 (DR-58, DR-85).</summary>
+        [Obsolete("0.2's name: close through IEnvViewer.Close(). Removed in 2.0.")]
+        public void CloseEnvironment() => ((IEnvViewer)this).Close();
+
+        /// <summary>Closes and disposes the form and ends its thread's message loop; on the form's thread.</summary>
+        private void CloseOnOwnThread() {
+            // Marked first: WinForms reports Form.Close as a user's close too, which input mode would turn into a report.
             _closingByCode = true;
             Close();
             Dispose();

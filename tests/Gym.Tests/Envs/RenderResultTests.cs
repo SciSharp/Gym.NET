@@ -36,5 +36,51 @@ namespace Gym.Tests.Envs {
             Assert.AreEqual("Rgb((2, 2, 3), uint8)", new RenderResult.Rgb(a).ToString());
             Assert.ThrowsExactly<ArgumentNullException>(() => new RenderResult.Ansi(null!));
         }
+
+        /// <summary>
+        ///     A single frame converts explicitly (DR-84): <c>(NDArray)</c> is the result's own <see cref="RenderResult.Rgb"/> or
+        ///     <see cref="RenderResult.Depth"/> frame, not a copy; every other case refuses with <see cref="InvalidCastException"/>.
+        /// </summary>
+        [TestMethod]
+        public void ToNDArray_IsTheFrameItself() {
+            NDArray frame = np.zeros(new Shape(2, 2, 3), np.uint8);
+            using RenderResult rgb = new RenderResult.Rgb(frame);
+            Assert.AreSame(frame, (NDArray)rgb, "The result's own frame: disposing the result disposes it.");
+
+            NDArray depthFrame = np.zeros(new Shape(2, 2), np.float32);
+            using RenderResult depth = new RenderResult.Depth(depthFrame);
+            Assert.AreSame(depthFrame, (NDArray)depth);
+
+            Assert.ThrowsExactly<InvalidCastException>(() => (NDArray)RenderResult.None, "human mode returns no frame.");
+            Assert.ThrowsExactly<InvalidCastException>(() => (NDArray)new RenderResult.Ansi("x"));
+            using RenderResult pair = new RenderResult.RgbDepth(np.zeros(new Shape(1, 1, 3), np.uint8), np.zeros(new Shape(1, 1), np.float32));
+            Assert.ThrowsExactly<InvalidCastException>(() => (NDArray)pair, "Two frames are no single frame.");
+            using RenderResult frames = new RenderResult.Frames(new RenderResult[0]);
+            Assert.ThrowsExactly<InvalidCastException>(() => (NDArray)frames);
+            Assert.ThrowsExactly<ArgumentNullException>(() => (NDArray)(RenderResult)null!);
+        }
+
+        /// <summary>
+        ///     An <see cref="RenderResult.Rgb"/> frame converts to a new ImageSharp image of its size and pixels (DR-84), which the
+        ///     caller owns; a depth frame and the cases without a single RGB frame refuse.
+        /// </summary>
+        [TestMethod]
+        public void ToImage_CopiesTheRgbFrame() {
+            // A 2x3 frame (height 2, width 3) whose pixel (row 1, column 2) is (10, 20, 30).
+            using NDArray frame = np.zeros(new Shape(2, 3, 3), np.uint8);
+            frame[1, 2] = np.array(new byte[] { 10, 20, 30 });
+            using RenderResult rgb = new RenderResult.Rgb(frame);
+            using (var image = (SixLabors.ImageSharp.Image)rgb) {
+                Assert.AreEqual(3, image.Width);
+                Assert.AreEqual(2, image.Height);
+                var pixels = (SixLabors.ImageSharp.Image<SixLabors.ImageSharp.PixelFormats.Rgb24>)image;
+                Assert.AreEqual(new SixLabors.ImageSharp.PixelFormats.Rgb24(10, 20, 30), pixels[2, 1], "ImageSharp indexes (x, y).");
+            }
+
+            Assert.AreEqual((byte)10, (byte)frame[1, 2, 0], "The result keeps its frame after the image is disposed.");
+            using RenderResult depth = new RenderResult.Depth(np.zeros(new Shape(2, 2), np.float32));
+            Assert.ThrowsExactly<InvalidCastException>(() => (SixLabors.ImageSharp.Image)depth, "A depth frame has no colors.");
+            Assert.ThrowsExactly<InvalidCastException>(() => (SixLabors.ImageSharp.Image)RenderResult.None);
+        }
     }
 }

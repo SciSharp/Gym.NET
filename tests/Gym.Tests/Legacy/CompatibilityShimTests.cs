@@ -23,17 +23,37 @@ namespace Gym.Tests.Legacy {
     /// </summary>
     [TestClass]
     public class CompatibilityShimTests {
-        /// <summary><c>Info.Get&lt;T&gt;</c> reads as the legacy <c>Dict.Get&lt;T&gt;</c> did: the value cast, <c>default(T)</c> when missing, and only the exact boxed type.</summary>
+        /// <summary>
+        ///     <c>info.Get&lt;T&gt;</c> reads as the legacy <c>Dict.Get&lt;T&gt;</c> did, the value when present and
+        ///     <c>default(T)</c> when missing, and since DR-78 it converts where the legacy cast threw: a stored long reads as an
+        ///     int, a NumPy scalar (a 0-d array) as a number; a value that would lose something is still refused.
+        /// </summary>
         [TestMethod]
-        public void InfoGetT_ReadsLikeTheLegacyDict() {
-            var info = new Info { ["steps"] = 5L, ["name"] = "cart" };
+        public void InfoGetT_ReadsLikeTheLegacyDict_AndConverts() {
+            using NDArray position = NDArray.Scalar(0.25);
+            using NDArray cost = NDArray.Scalar(-1.5f);
+            using NDArray mask = np.array(new sbyte[] { 1, 0, 1 });
+            var info = new Info { ["steps"] = 5L, ["name"] = "cart", ["x_position"] = position, ["reward_ctrl"] = cost, ["mask"] = mask, ["half"] = 0.5, ["none"] = null };
 
             Assert.AreEqual(5L, info.Get<long>("steps"));
             Assert.AreEqual("cart", info.Get<string>("name"));
             Assert.AreEqual(0L, info.Get<long>("missing"));
             Assert.IsNull(info.Get<string>("missing"));
-            // A boxed long is not an int, as NumPy's integers arrive: the documented cast failure.
-            Assert.ThrowsExactly<InvalidCastException>(() => info.Get<int>("steps"));
+            Assert.AreEqual(5, info.Get<int>("steps"), "A stored long reads as an int (the legacy cast threw).");
+            Assert.AreEqual(5.0, info.Get<double>("steps"));
+            Assert.AreEqual(0.25, info.Get<double>("x_position"), "A NumPy float64 scalar reads as a double.");
+            Assert.AreEqual(-1.5, info.Get<double>("reward_ctrl"), "A float32 scalar widens exactly.");
+            Assert.AreEqual(-1.5f, info.Get<float>("reward_ctrl"));
+            Assert.AreSame(mask, info.Get<NDArray>("mask"), "An array reads as itself, the info's own.");
+            Assert.IsNull(info.Get<double?>("missing"), "A nullable read tells a missing key from a stored 0.");
+            Assert.AreEqual(0.25, info.Get<double?>("x_position"));
+            Assert.IsNull(info.Get<double?>("none"));
+
+            Assert.ThrowsExactly<InvalidCastException>(() => info.Get<int>("half"), "A fraction is never dropped.");
+            Assert.ThrowsExactly<InvalidCastException>(() => info.Get<double>("mask"), "An array of three is no number.");
+            Assert.ThrowsExactly<InvalidCastException>(() => info.Get<double>("name"));
+            Assert.ThrowsExactly<InvalidCastException>(() => info.Get<double>("none"), "None has no double.");
+            Assert.ThrowsExactly<OverflowException>(() => new Info { ["big"] = long.MaxValue }.Get<int>("big"));
         }
 
         /// <summary>
@@ -220,10 +240,10 @@ namespace Gym.Tests.Legacy {
         public void CartPoleEnvWithFactory_IsHeadlessForNullViewer_HumanOtherwise() {
             using (var headless = new CartPoleEnv(NullEnvViewer.Factory))
                 Assert.IsNull(headless.RenderMode);
-            using (var none = new CartPoleEnv((IEnvironmentViewerFactoryDelegate?)null))
+            using (var none = new CartPoleEnv((EnvViewerFactory?)null))
                 Assert.IsNull(none.RenderMode);
 
-            IEnvironmentViewerFactoryDelegate window = (width, height, title) => NullEnvViewer.Run(width, height, title);
+            EnvViewerFactory window = (width, height, title) => NullEnvViewer.Open(width, height, title);
             using var human = new CartPoleEnv(window);
             Assert.AreEqual("human", human.RenderMode);
         }

@@ -11,6 +11,7 @@ using Gym.Utils;
 using Gym.Wrappers;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using NumSharp;
+using Gym.Tests.Helpers;
 
 namespace Gym.Tests.Gymnasium {
     /// <summary>
@@ -45,7 +46,8 @@ namespace Gym.Tests.Gymnasium {
         public void TestExampleEnv() {
             var exampleEnv = CreateExampleEnv();
 
-            Assert.IsTrue(exampleEnv.Metadata.Equals(new Info { ["render_modes"] = new List<object>() }));
+            // example_env.metadata == {"render_modes": []}: Python's ==, which PyEquals is (Equals compares references, DR-92).
+            Assert.IsTrue(exampleEnv.Metadata.PyEquals(new Info { ["render_modes"] = new List<object>() }));
             Assert.IsNull(exampleEnv.RenderMode);
             Assert.IsNull(exampleEnv.Spec);
             Assert.IsNull(PyAttributes.GetAttr(exampleEnv, "_np_random"));
@@ -58,9 +60,9 @@ namespace Gym.Tests.Gymnasium {
             var env = CreateExampleEnv();
             var wrapperEnv = new ExampleWrapper(env);
 
-            Assert.AreEqual(env.Metadata, wrapperEnv.Metadata);
+            PyAssert.AreEqual(env.Metadata, wrapperEnv.Metadata);
             wrapperEnv.Metadata = new Metadata { ["render_modes"] = new List<string> { "rgb_array" } };
-            Assert.AreNotEqual(env.Metadata, wrapperEnv.Metadata);
+            PyAssert.AreNotEqual(env.Metadata, wrapperEnv.Metadata);
 
             Assert.AreEqual(env.RenderMode, wrapperEnv.RenderMode);
 

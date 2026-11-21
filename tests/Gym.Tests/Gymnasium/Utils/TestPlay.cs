@@ -37,7 +37,7 @@ namespace Gym.Tests.Gymnasium.Utils {
         private const int IrrelevantKey = 1;
 
         /// <summary>The viewer factory before the test, restored by <see cref="Cleanup"/>.</summary>
-        private IEnvironmentViewerFactoryDelegate? _previousFactory;
+        private EnvViewerFactory? _previousFactory;
 
         /// <summary>Points the process-wide viewer factory at <see cref="NullEnvViewer"/>, so no window opens.</summary>
         [TestInitialize]

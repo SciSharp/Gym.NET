@@ -18,6 +18,7 @@ using Gym.Tests.Parity.Pair;
 using Gym.Tests.Parity.Session;
 using Gym.Utils;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using NumSharp;
 using Python.Runtime;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
@@ -820,7 +821,7 @@ result = (kinds, floats)
             /// <param name="height">The height.</param>
             /// <param name="title">The title.</param>
             /// <returns>This viewer.</returns>
-            public Task<IEnvViewer> Factory(int width, int height, string? title = null) => Task.FromResult<IEnvViewer>(this);
+            public IEnvViewer Factory(int width, int height, string? title = null) => this;
 
             /// <summary>Starts a render call: its batches, and no frames yet; batches a call leaves unread are dropped with the next.</summary>
             /// <param name="batches">One batch per expected frame.</param>
@@ -832,11 +833,11 @@ result = (kinds, floats)
             }
 
             /// <summary>Records the frame's menu.</summary>
-            /// <param name="img">The frame; not kept.</param>
-            public void Render(Image img) => Menus.Add(Capture!());
+            /// <param name="frame">The frame; not kept.</param>
+            public void Render(NDArray frame) => Menus.Add(Capture!());
 
             /// <summary>Nothing to close.</summary>
-            public void CloseEnvironment() { }
+            public void Close() { }
 
             /// <summary>Nothing to start.</summary>
             public void BeginInput() { }

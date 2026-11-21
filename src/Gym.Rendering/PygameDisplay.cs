@@ -2,8 +2,6 @@ using System;
 using System.Collections.Generic;
 using Gym.Environments;
 using Gym.Envs;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
 
 namespace Gym.Rendering {
     /// <summary>
@@ -76,19 +74,18 @@ namespace Gym.Rendering {
         /// <exception cref="Gym.Exceptions.DependencyNotInstalled">Thrown when no factory is given or set, where pygame would be missing.</exception>
         /// <remarks>
         ///     An interactive window starts reporting input here (<see cref="IInteractiveEnvViewer.BeginInput"/>), so its
-        ///     close button posts <see cref="EventType.Quit"/> instead of closing it until <see cref="Quit"/>. The factory may
-        ///     start a UI thread and complete asynchronously; this call blocks until the window is up.
+        ///     close button posts <see cref="EventType.Quit"/> instead of closing it until <see cref="Quit"/>. The factory
+        ///     returns once its window is up (DR-85), so this call returns with the window up, as <c>set_mode</c> does.
         /// </remarks>
-        public Surface SetMode(int width, int height, bool resizable = false, IEnvironmentViewerFactoryDelegate? viewerFactory = null, string? title = null) {
+        public Surface SetMode(int width, int height, bool resizable = false, EnvViewerFactory? viewerFactory = null, string? title = null) {
             if (width <= 0)
                 throw new ArgumentOutOfRangeException(nameof(width), width, "The display's width must be positive.");
             if (height <= 0)
                 throw new ArgumentOutOfRangeException(nameof(height), height, "The display's height must be positive.");
             // The new window opens before the old one closes, so a missing or failing factory leaves the display as it was.
-            // The factory may start a UI thread and complete asynchronously; set_mode returns with the window up.
-            IEnvironmentViewerFactoryDelegate factory = Context.ResolveViewerFactory(viewerFactory);
-            // TODO(async viewer path, DR-53): blocks on the factory; see IEnvironmentViewerFactoryDelegate.
-            IEnvViewer window = factory(width, height, title).GetAwaiter().GetResult();
+            // The factory returns once its window is up (DR-85: synchronous, no task to block on).
+            EnvViewerFactory factory = Context.ResolveViewerFactory(viewerFactory);
+            IEnvViewer window = factory(width, height, title);
             if (window is IInteractiveEnvViewer interactive)
                 interactive.BeginInput();
             lock (_gate) {
@@ -121,7 +118,8 @@ namespace Gym.Rendering {
             lock (_gate) {
                 if (_surface is null || _window is null)
                     throw new SdlError("Display mode not set");
-                using Image<Rgb24> frame = Image.LoadPixelData<Rgb24>(_surface.ToRgbBytes(), _surface.Width, _surface.Height);
+                // The viewer contract's (H, W, 3) uint8 frame (DR-85), copied by the viewer before Render returns.
+                using NumSharp.NDArray frame = SurfArray.ToRgbArray(_surface);
                 _window.Render(frame);
             }
         }
@@ -187,7 +185,7 @@ namespace Gym.Rendering {
                 return;
             IEnvViewer window = _window;
             _window = null;
-            window.CloseEnvironment();
+            window.Close();
         }
     }
 }

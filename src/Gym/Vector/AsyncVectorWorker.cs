@@ -287,7 +287,7 @@ namespace Gym.Vector {
             double reward;
             bool terminated, truncated;
             Info info;
-            if (ReferenceEquals(autoresetMode, AutoresetMode.NextStep)) {
+            if (autoresetMode == AutoresetMode.NextStep) {
                 if (worker.Autoreset) {
                     // The episode ended at the previous step: reset now, ignoring the action, with a reward of 0.
                     (observation, info) = env.Reset();
@@ -299,7 +299,7 @@ namespace Gym.Vector {
                 }
 
                 worker.Autoreset = terminated || truncated;
-            } else if (ReferenceEquals(autoresetMode, AutoresetMode.SameStep)) {
+            } else if (autoresetMode == AutoresetMode.SameStep) {
                 (observation, reward, terminated, truncated, info) = env.Step(action);
                 if (terminated || truncated) {
                     (object? resetObservation, Info resetInfo) = env.Reset();

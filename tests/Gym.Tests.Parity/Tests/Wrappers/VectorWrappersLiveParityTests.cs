@@ -285,7 +285,7 @@ namespace Gym.Tests.Parity.Tests.Wrappers {
         [DataRow(3, 0, 0)]
         [DataRow(4, 1200, 800)]
         public void HumanRenderingVector_MatchesGymnasium(int numEnvs, int screenWidth, int screenHeight) {
-            IEnvironmentViewerFactoryDelegate? previous = Gymnasium.HumanViewerFactory;
+            EnvViewerFactory? previous = Gymnasium.HumanViewerFactory;
             Gymnasium.HumanViewerFactory = NullEnvViewer.Factory;
             try {
                 long[]? screen = screenWidth == 0 ? null : new long[] { screenWidth, screenHeight };

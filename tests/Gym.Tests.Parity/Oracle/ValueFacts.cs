@@ -224,7 +224,7 @@ namespace Gym.Tests.Parity.Oracle {
             }
 
             // An enum member (a vector env's AutoresetMode) is compared by its repr, <AutoresetMode.NEXT_STEP: 'NextStep'>, as
-            // Gym.NET's AutoresetMode and VectorizeMode print themselves.
+            // Gym.NET's [PyEnum] enums AutoresetMode and VectorizeMode print themselves (PyEnums.Repr).
             if (IsInstance(value, Interop.PythonRuntime.Import("enum"), "Enum"))
                 return FromOther("enum", value.Repr() ?? "");
 
@@ -401,9 +401,13 @@ namespace Gym.Tests.Parity.Oracle {
                 case DType dtype:
                     // As FromPython describes numpy.dtype: by the array-interface string, '<f4', '|b1'.
                     return FromText(dtype.str, "DType");
-                case Gym.Vector.AutoresetMode or Gym.Envs.Registration.VectorizeMode:
-                    // Gym.NET's Python-style enums print Python's repr, which is how FromPython describes an enum member.
-                    return FromOther("enum", value.ToString() ?? "");
+                case Enum member when Gym.Utils.PyEnums.IsStringEnum(member.GetType()):
+                    // A string-valued [PyEnum] member (RenderMode) is the Python str it stands for.
+                    return FromText(Gym.Utils.PyEnums.Value(member), "string");
+                case Enum member when Gym.Utils.PyEnums.IsPyEnum(member.GetType()):
+                    // A member of a Python Enum class (AutoresetMode, VectorizeMode) is described by Python's repr, which is how
+                    // FromPython describes an enum member.
+                    return FromOther("enum", Gym.Utils.PyEnums.Repr(member));
                 case Enum e:
                     return Of(Convert.ChangeType(e, Enum.GetUnderlyingType(e.GetType()), CultureInfo.InvariantCulture));
                 case IDictionary dictionary: {

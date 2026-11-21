@@ -195,7 +195,7 @@ namespace Gym.Vector {
             SharedMemory = sharedMemory;
             Copy = copy;
             ObservationMode = observationMode ?? "same";
-            AutoresetMode = Gym.Vector.AutoresetMode.From(autoresetMode);
+            AutoresetMode = AutoresetModes.From(autoresetMode);
             MaxConcurrency = CheckMaxConcurrency(maxConcurrency);
             ExecutionMode = executionMode;
             ThreadCount = CheckThreadCount(executionMode, threadCount);

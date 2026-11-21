@@ -14,6 +14,7 @@ using Gym.Tests.Parity.Tests.Vector;
 using Gym.Utils;
 using Gym.Vector;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
+using NumSharp;
 using Python.Runtime;
 using SixLabors.ImageSharp;
 
@@ -236,7 +237,7 @@ namespace Gym.Tests.Parity.Tests.Envs {
                 frames.Add(viewer.Last ?? throw new AssertFailedException($"{id}: Gym.NET showed no frame by {made}."));
             }
 
-            var kwargs = new Dictionary<string, object?> { ["render_mode"] = "human", ["viewer_factory"] = (IEnvironmentViewerFactoryDelegate)viewer.Factory };
+            var kwargs = new Dictionary<string, object?> { ["render_mode"] = "human", ["viewer_factory"] = (EnvViewerFactory)viewer.Factory };
             using (IEnv env = Gymnasium.Make(id, kwargs)) {
                 Release(env.Reset(seed));
                 Grab($"reset(seed={seed})");
@@ -373,18 +374,18 @@ namespace Gym.Tests.Parity.Tests.Envs {
             /// <param name="width">The window's width; the frames carry their own size, which the comparison checks.</param>
             /// <param name="height">The window's height.</param>
             /// <param name="title">The window's title; not compared (pygame's caption is cosmetic).</param>
-            /// <returns>This viewer, already completed.</returns>
-            public Task<IEnvViewer> Factory(int width, int height, string? title = null) => Task.FromResult<IEnvViewer>(this);
+            /// <returns>This viewer.</returns>
+            public IEnvViewer Factory(int width, int height, string? title = null) => this;
 
-            /// <summary>Keeps a copy of the frame (the env releases its image right after) and counts it.</summary>
-            /// <param name="img">The frame.</param>
-            public void Render(Image img) {
-                Last = Frame.FromImage(img);
+            /// <summary>Keeps a copy of the frame (the env releases it right after) and counts it.</summary>
+            /// <param name="frame">The frame, <c>(H, W, 3)</c> uint8.</param>
+            public void Render(NDArray frame) {
+                Last = Frame.FromArray(frame);
                 Shown++;
             }
 
             /// <summary>Does nothing: there is no window to close.</summary>
-            public void CloseEnvironment() { }
+            public void Close() { }
 
             /// <summary>Does nothing: the viewer holds no resources.</summary>
             public void Dispose() { }

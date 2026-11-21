@@ -197,7 +197,7 @@ namespace Gym.Tests.Parity.Tests.Bridge {
         /// </summary>
         [TestMethod]
         public void CheckEnv_PassesGymNetsCartPole_AsGymnasiumsOwn() {
-            IEnvironmentViewerFactoryDelegate? previous = Gymnasium.HumanViewerFactory;
+            EnvViewerFactory? previous = Gymnasium.HumanViewerFactory;
             // check_env makes the env in human mode too; Gym.NET's renders into a headless viewer, as pygame does under SDL's dummy driver.
             Gymnasium.HumanViewerFactory = NullEnvViewer.Factory;
             try {
@@ -276,7 +276,7 @@ namespace Gym.Tests.Parity.Tests.Bridge {
         [DataRow("Acrobot-v1")]
         public void CheckEnv_PassesGymNetsClassicEnvs_AsGymnasiumsOwn(string id) {
             SkipOffReferencePlatform("the classic envs' cos/sin");
-            IEnvironmentViewerFactoryDelegate? previous = Gymnasium.HumanViewerFactory;
+            EnvViewerFactory? previous = Gymnasium.HumanViewerFactory;
             // check_env makes the env in human mode too; Gym.NET's renders into a headless viewer, as pygame does under SDL's dummy driver.
             Gymnasium.HumanViewerFactory = NullEnvViewer.Factory;
             try {
@@ -348,7 +348,7 @@ namespace Gym.Tests.Parity.Tests.Bridge {
         [DataRow("CliffWalkingSlippery-v1")]
         [DataRow("Taxi-v4")]
         public void CheckEnv_PassesGymNetsToyTextEnvs_AsGymnasiumsOwn(string id) {
-            IEnvironmentViewerFactoryDelegate? previous = Gymnasium.HumanViewerFactory;
+            EnvViewerFactory? previous = Gymnasium.HumanViewerFactory;
             // check_env makes the env in human mode too; Gym.NET's renders into a headless viewer, as pygame does under SDL's dummy driver.
             Gymnasium.HumanViewerFactory = NullEnvViewer.Factory;
             try {
@@ -416,7 +416,7 @@ namespace Gym.Tests.Parity.Tests.Bridge {
         [DataRow("CarRacing-v3")]
         public void CheckEnv_PassesGymNetsBox2DEnvs_AsGymnasiumsOwn(string id) {
             SkipOffReferencePlatform("Box2D's sinf/cosf");
-            IEnvironmentViewerFactoryDelegate? previous = Gymnasium.HumanViewerFactory;
+            EnvViewerFactory? previous = Gymnasium.HumanViewerFactory;
             // check_env makes the env in human mode too; Gym.NET's renders into a headless viewer, as pygame does under SDL's dummy driver.
             Gymnasium.HumanViewerFactory = NullEnvViewer.Factory;
             try {

@@ -88,7 +88,7 @@ namespace Gym.Vector {
             EnvFns = envFns.ToArray();
             Copy = copy;
             ObservationMode = observationMode ?? "same";
-            AutoresetMode = Gym.Vector.AutoresetMode.From(autoresetMode);
+            AutoresetMode = AutoresetModes.From(autoresetMode);
 
             // Initialise all sub-environments
             var envs = new List<IEnv>(EnvFns.Count);
@@ -335,7 +335,7 @@ namespace Gym.Vector {
         private void StepOne(int i, object? action, Info infos) {
             IEnv env = Envs[i];
             Info envInfo;
-            if (ReferenceEquals(AutoresetMode, Gym.Vector.AutoresetMode.NextStep)) {
+            if (AutoresetMode == Gym.Vector.AutoresetMode.NextStep) {
                 if (_autoresetEnvs.GetBoolean(i)) {
                     // The episode ended at the previous step: reset now, ignoring the action, with a reward of 0.
                     (object? observation, Info resetInfo) = env.Reset();
@@ -347,7 +347,7 @@ namespace Gym.Vector {
                 } else {
                     envInfo = Store(i, env.Step(action));
                 }
-            } else if (ReferenceEquals(AutoresetMode, Gym.Vector.AutoresetMode.Disabled)) {
+            } else if (AutoresetMode == Gym.Vector.AutoresetMode.Disabled) {
                 // assumes that the user has correctly autoreset
                 if (_autoresetEnvs.GetBoolean(i))
                     throw new AssertionError($"self._autoreset_envs={PyBuiltins.Repr(_autoresetEnvs)}");

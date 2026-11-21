@@ -43,6 +43,11 @@ namespace Gym.Utils {
             if (left is null || right is null)
                 return false;
 
+            // A string-valued [PyEnum] member (RenderMode) is the Python str it stands for; a Python Enum member
+            // (AutoresetMode) stays a member, equal only to itself through Equals at the end, as Python's Enum == is.
+            left = PythonValue(left);
+            right = PythonValue(right);
+
             // Numbers first: bool, every integer width, BigInteger, the floats, and 0-d numeric arrays (NumPy scalars).
             if (TryNumber(left, out Number a) && TryNumber(right, out Number b))
                 return NumbersEqual(a, b);
@@ -87,6 +92,15 @@ namespace Gym.Utils {
 
             return left.Equals(right);
         }
+
+        /// <summary>
+        ///     The value Python compares for <paramref name="value"/>: a declared string-valued <see cref="PyEnumAttribute"/>
+        ///     member is its string; anything else, a cast integer such an enum does not declare included, is itself.
+        /// </summary>
+        /// <param name="value">The value, not <see langword="null"/>.</param>
+        /// <returns>The value to compare.</returns>
+        private static object PythonValue(object value) =>
+            value is Enum member && Enum.IsDefined(member.GetType(), member) ? PyEnums.ToPython(member)! : value;
 
         /// <summary>The items of a Python tuple's counterpart: an <see cref="ITuple"/> or an exact <see langword="object"/>[] (DR-13).</summary>
         /// <param name="value">The value.</param>
@@ -243,7 +257,8 @@ namespace Gym.Utils {
                 case BigInteger big:
                     number = new Number(true, big, 0);
                     return true;
-                case Enum e:
+                case Enum e when !PyEnums.IsPyEnum(e.GetType()):
+                    // A plain enum is an int to Python (an IntEnum, a Discrete value); a [PyEnum] member is not a number.
                     return TryNumber(Convert.ChangeType(e, Enum.GetUnderlyingType(e.GetType()), System.Globalization.CultureInfo.InvariantCulture), out number);
                 case double d:
                     number = new Number(false, BigInteger.Zero, d);

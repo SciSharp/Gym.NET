@@ -4,6 +4,7 @@ using Gym.Observations;
 using Gym.Wrappers;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using NumSharp;
+using Gym.Tests.Helpers;
 
 namespace Gym.Tests.Gymnasium.Wrappers {
     /// <summary>
@@ -36,31 +37,31 @@ namespace Gym.Tests.Gymnasium.Wrappers {
 
             (object? obs, Info info) = env.Reset();
             AssertObs(0, obs);
-            Assert.AreEqual(new Info { ["count"] = 0L }, info);
+            PyAssert.AreEqual(new Info { ["count"] = 0L }, info);
 
             StepResult<object?> step = env.Step(action);
             AssertObs(1, step.Observation);
             Assert.AreEqual(0.0, step.Reward);
             Assert.IsFalse(step.Terminated || step.Truncated);
-            Assert.AreEqual(new Info { ["count"] = 1L }, step.Info);
+            PyAssert.AreEqual(new Info { ["count"] = 1L }, step.Info);
 
             step = env.Step(action);
             AssertObs(2, step.Observation);
             Assert.IsFalse(step.Terminated || step.Truncated);
             Assert.AreEqual(0.0, step.Reward);
-            Assert.AreEqual(new Info { ["count"] = 2L }, step.Info);
+            PyAssert.AreEqual(new Info { ["count"] = 2L }, step.Info);
 
             step = env.Step(action);
             AssertObs(3, step.Observation);
             Assert.IsTrue(step.Terminated || step.Truncated);
             Assert.AreEqual(1.0, step.Reward);
-            Assert.AreEqual(new Info { ["count"] = 3L }, step.Info);
+            PyAssert.AreEqual(new Info { ["count"] = 3L }, step.Info);
 
             step = env.Step(action);
             AssertObs(0, step.Observation);
             Assert.AreEqual(0.0, step.Reward);
             Assert.IsFalse(step.Terminated || step.Truncated);
-            Assert.AreEqual(new Info { ["count"] = 0L }, step.Info);
+            PyAssert.AreEqual(new Info { ["count"] = 0L }, step.Info);
 
             env.Close();
         }

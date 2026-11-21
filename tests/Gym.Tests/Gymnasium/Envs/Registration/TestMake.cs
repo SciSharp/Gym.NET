@@ -11,6 +11,7 @@ using Gym.Utils;
 using Gym.Wrappers;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using NumSharp;
+using Gym.Tests.Helpers;
 
 namespace Gym.Tests.Gymnasium.Envs.Registration {
     /// <summary>
@@ -251,7 +252,7 @@ namespace Gym.Tests.Gymnasium.Envs.Registration {
                 using IEnv env = Make("test.ArgumentEnv-v0", new { arg2 = "override_arg2", arg3 = "override_arg3" });
                 Assert.IsNotNull(env.Spec);
                 Assert.AreEqual("test.ArgumentEnv-v0", env.Spec.Id);
-                Assert.AreEqual(new Info { ["arg1"] = "arg1", ["arg2"] = "override_arg2", ["arg3"] = "override_arg3" }, env.Spec.Kwargs);
+                PyAssert.AreEqual(new Info { ["arg1"] = "arg1", ["arg2"] = "override_arg2", ["arg3"] = "override_arg3" }, env.Spec.Kwargs);
 
                 var unwrapped = (ArgumentEnv)env.Unwrapped;
                 Assert.AreEqual("arg1", unwrapped.Arg1);

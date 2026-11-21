@@ -36,8 +36,9 @@ namespace Gym.Wrappers.Vector {
             SavedKwargs = RecordConstructorArgs.Record(new Info { ["epsilon"] = epsilon });
             if (!env.Metadata.TryGetValue("autoreset_mode", out object? mode)) {
                 Logger.Warn($"{this} is missing `autoreset_mode` data. Assuming that the vector environment it follows the `NextStep` autoreset api or autoreset is disabled. Read https://farama.org/Vector-Autoreset-Mode for more details.");
-            } else if (!ReferenceEquals(mode, AutoresetMode.NextStep)) {
-                throw new ValueError($"Expected env.metadata['autoreset_mode'] to be AutoresetMode.NEXT_STEP, got {(mode is AutoresetMode member ? member.Str : PyBuiltins.Str(mode))}");
+            } else if (mode is not AutoresetMode.NextStep) {
+                // PyBuiltins.Str of a member is its Python str, AutoresetMode.SAME_STEP, as Gymnasium's f-string shows it.
+                throw new ValueError($"Expected env.metadata['autoreset_mode'] to be AutoresetMode.NEXT_STEP, got {PyBuiltins.Str(mode)}");
             }
 
             Shape shape = ObjectSpace.Unview(env.SingleObservationSpace)!.Shape ?? throw new ValueError("NormalizeObservation requires the observation space to have a shape.");
@@ -209,7 +210,7 @@ namespace Gym.Wrappers.Vector {
             VectorStepResult<TObs> result = base.Step(actions);
             // SAME_STEP resets inside the terminating step, so every step counts; NEXT_STEP and DISABLED skip the step after a done.
             using NDArray previous = _prevDones.astype(np.@bool);
-            using NDArray active = ReferenceEquals(_autoresetMode, AutoresetMode.SameStep)
+            using NDArray active = _autoresetMode == AutoresetMode.SameStep
                 ? np.ones(new Shape(NumEnvs), np.@bool)
                 : np.logical_not(previous);
             using (NDArray accumulated = AccumulatedReward[active])
@@ -232,7 +233,7 @@ namespace Gym.Wrappers.Vector {
                 _prevDones = ended.astype(np.float32);
             }
 
-            if (ReferenceEquals(_autoresetMode, AutoresetMode.SameStep)) {
+            if (_autoresetMode == AutoresetMode.SameStep) {
                 // The done sub-envs have already been reset: their returns restart at once.
                 using NDArray done = _prevDones.astype(np.@bool);
                 AccumulatedReward[done] = 0;

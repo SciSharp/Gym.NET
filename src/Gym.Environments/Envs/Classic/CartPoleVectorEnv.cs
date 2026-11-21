@@ -73,6 +73,28 @@ namespace Gym.Environments.Envs.Classic {
         }
 
         /// <summary>
+        ///     Builds the env with the render mode given as the <see cref="Gym.Envs.RenderMode"/> enum (DR-84, DR-93), as
+        ///     <see cref="CartPoleVectorEnv(int, long, string, bool)"/>
+        ///     builds it from the mode's string: <c>new CartPoleVectorEnv(RenderMode.RgbArray)</c> builds what
+        ///     <c>new CartPoleVectorEnv(renderMode: "rgb_array")</c> builds, the member reaching the env as Gymnasium's string
+        ///     (<see cref="RenderModes.Name"/>), which its <c>RenderMode</c> property then holds.
+        /// </summary>
+        /// <remarks>
+        ///     The mode is required and comes first, so <c>new CartPoleVectorEnv()</c> keeps meaning the other constructor, without a
+        ///     mode; leave the mode out there for no rendering. Every other parameter means what it means there.
+        /// </remarks>
+        /// <param name="renderMode">
+        ///     The render mode, which the env must list in its <c>metadata["render_modes"]</c> as for the string; it behaves
+        ///     exactly as its Gymnasium string does in the other constructor.
+        /// </param>
+        /// <param name="numEnvs">Gymnasium's <c>num_envs</c>: the number of carts.</param>
+        /// <param name="maxEpisodeSteps">Gymnasium's <c>max_episode_steps</c>: the steps after which a cart's episode is truncated (<c>MakeVec</c> passes the spec's, 500 for CartPole-v1).</param>
+        /// <param name="suttonBartoReward">Gymnasium's <c>sutton_barto_reward</c>: reward -1 at termination and 0 otherwise, instead of 1 per step.</param>
+        /// <exception cref="ArgumentOutOfRangeException">Thrown for a value <see cref="Gym.Envs.RenderMode"/> does not declare (a cast integer such as <c>(RenderMode)99</c>).</exception>
+        public CartPoleVectorEnv(RenderMode renderMode, int numEnvs = 1, long maxEpisodeSteps = 500, bool suttonBartoReward = false)
+            : this(numEnvs, maxEpisodeSteps, RenderModes.Name(renderMode), suttonBartoReward) { }
+
+        /// <summary>
         ///     Gymnasium's class attribute <c>metadata</c>: <c>{"render_modes": ["rgb_array"], "render_fps": 50,
         ///     "autoreset_mode": AutoresetMode.NEXT_STEP}</c>. A new dict on every read.
         /// </summary>

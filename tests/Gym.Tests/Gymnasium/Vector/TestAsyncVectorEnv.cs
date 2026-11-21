@@ -62,8 +62,8 @@ namespace Gym.Tests.Gymnasium.Vector {
             using var envs1 = new AsyncVectorEnv(new[] { TestingUtils.MakeEnv("CartPole-v1", 0) }, autoresetMode: AutoresetMode.NextStep, executionMode: mode);
             using var envs2 = new AsyncVectorEnv(new[] { TestingUtils.MakeEnv("CartPole-v1", 1) }, autoresetMode: AutoresetMode.SameStep, executionMode: mode);
 
-            Assert.AreSame(AutoresetMode.NextStep, envs1.Metadata["autoreset_mode"]);
-            Assert.AreSame(AutoresetMode.SameStep, envs2.Metadata["autoreset_mode"]);
+            Assert.AreEqual((object)AutoresetMode.NextStep, envs1.Metadata["autoreset_mode"]);
+            Assert.AreEqual((object)AutoresetMode.SameStep, envs2.Metadata["autoreset_mode"]);
 
             using IEnv env = TestingUtils.MakeEnv("CartPole-v1", 0)();
             Assert.IsFalse(env.Metadata.ContainsKey("autoreset_mode"));

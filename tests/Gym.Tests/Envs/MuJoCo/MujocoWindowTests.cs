@@ -409,7 +409,7 @@ namespace Gym.Tests.Envs.MuJoCo {
         /// </summary>
         [TestMethod]
         public void Human_WithoutAViewerOrWithABadOption_OpensNothing() {
-            IEnvironmentViewerFactoryDelegate? previous = HumanViewerFactory;
+            EnvViewerFactory? previous = HumanViewerFactory;
             HumanViewerFactory = null;
             try {
                 using var env = new ReacherEnvV5(renderMode: "human");
@@ -506,35 +506,30 @@ namespace Gym.Tests.Envs.MuJoCo {
             /// <summary>Whether <see cref="BeginInput"/> ran.</summary>
             public bool InputStarted { get; private set; }
 
-            /// <summary>Whether <see cref="CloseEnvironment"/> ran since the last opening.</summary>
+            /// <summary>Whether <see cref="Close"/> ran since the last opening.</summary>
             public bool Closed { get; private set; }
 
             /// <summary>A factory handing out this viewer, recording the size and title.</summary>
             /// <param name="width">The width.</param>
             /// <param name="height">The height.</param>
             /// <param name="title">The title.</param>
-            /// <returns>This viewer, completed.</returns>
-            public Task<IEnvViewer> Factory(int width, int height, string? title = null) {
+            /// <returns>This viewer.</returns>
+            public IEnvViewer Factory(int width, int height, string? title = null) {
                 (Width, Height, Title, Closed) = (width, height, title, false);
                 Opened++;
-                return Task.FromResult<IEnvViewer>(this);
+                return this;
             }
 
             /// <summary>Queues the input the window's next event poll reads (none for an empty call).</summary>
             /// <param name="batch">The inputs, in order.</param>
             public void Queue(params ViewerInput[] batch) => _batches.Enqueue(batch);
 
-            /// <summary>Records the frame.</summary>
-            /// <param name="img">The frame.</param>
-            public void Render(Image img) {
-                using Image<Rgb24> rgb = img.CloneAs<Rgb24>();
-                var bytes = new byte[3 * rgb.Width * rgb.Height];
-                rgb.CopyPixelDataTo(bytes);
-                Frames.Add((rgb.Width, rgb.Height, bytes));
-            }
+            /// <summary>Records the frame: its size and a copy of its bytes (the window reuses nothing, but the frame is the caller's).</summary>
+            /// <param name="frame">The frame, <c>(H, W, 3)</c> uint8.</param>
+            public void Render(NDArray frame) => Frames.Add(((int)frame.shape[1], (int)frame.shape[0], frame.ToArray<byte>()));
 
             /// <summary>Marks the viewer closed.</summary>
-            public void CloseEnvironment() => Closed = true;
+            public void Close() => Closed = true;
 
             /// <summary>Marks input started.</summary>
             public void BeginInput() => InputStarted = true;

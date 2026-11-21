@@ -13,6 +13,7 @@ using Gym.Utils;
 using Gym.Vector;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using NumSharp;
+using Gym.Tests.Helpers;
 
 namespace Gym.Tests.Gymnasium.Envs {
     /// <summary>
@@ -318,7 +319,7 @@ namespace Gym.Tests.Gymnasium.Envs {
             Assert.IsTrue(envs.ObservationSpace.Contains(vecObs));
             using (NDArray first = vecObs[0])
                 Assert.IsTrue(np.array_equal(obs, first));
-            Assert.AreEqual(info, vecReset.Infos);
+            PyAssert.AreEqual(info, vecReset.Infos);
             AssertStatesEqual(env, vector);
 
             // step
@@ -340,7 +341,7 @@ namespace Gym.Tests.Gymnasium.Envs {
                 Assert.AreEqual(step.Reward, vecStep.Rewards.GetAtIndex<double>(0));
                 Assert.AreEqual(term, vecStep.Terminations.GetAtIndex<bool>(0));
                 Assert.AreEqual(trunc, vecStep.Truncations.GetAtIndex<bool>(0));
-                Assert.AreEqual(step.Info, vecStep.Infos);
+                PyAssert.AreEqual(step.Info, vecStep.Infos);
                 AssertStatesEqual(env, vector);
                 if (term || trunc)
                     break;
@@ -362,7 +363,7 @@ namespace Gym.Tests.Gymnasium.Envs {
                 Assert.AreEqual(0.0, vecStep.Rewards.GetAtIndex<double>(0));
                 Assert.IsFalse(vecStep.Terminations.GetAtIndex<bool>(0));
                 Assert.IsFalse(vecStep.Truncations.GetAtIndex<bool>(0));
-                Assert.AreEqual(info, vecStep.Infos);
+                PyAssert.AreEqual(info, vecStep.Infos);
                 AssertStatesEqual(env, vector);
             }
         }

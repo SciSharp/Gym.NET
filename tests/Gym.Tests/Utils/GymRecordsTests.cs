@@ -6,6 +6,7 @@ using Gym.Utils;
 using Gym.Wrappers;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using NumSharp;
+using Gym.Tests.Helpers;
 
 namespace Gym.Tests.Utils {
     /// <summary>A tuple record for <see cref="GymRecordsTests"/>: an array and an int, Gym.NET's <c>(np.ndarray, int)</c>.</summary>
@@ -31,13 +32,13 @@ namespace Gym.Tests.Utils {
         [TestMethod]
         public void OptionsRecord_PassesOnlySetProperties() {
             Assert.AreEqual(0, new CartPoleEnvOptions().ToKwargs().Count);
-            Assert.AreEqual(new Info { ["render_mode"] = "rgb_array" }, new CartPoleEnvOptions { RenderMode = "rgb_array" }.ToKwargs());
+            PyAssert.AreEqual(new Info { ["render_mode"] = "rgb_array" }, new CartPoleEnvOptions { RenderMode = "rgb_array" }.ToKwargs());
             // Setting a value equal to the default still passes it: it was set.
-            Assert.AreEqual(new Info { ["sutton_barto_reward"] = false }, new CartPoleEnvOptions { SuttonBartoReward = false }.ToKwargs());
+            PyAssert.AreEqual(new Info { ["sutton_barto_reward"] = false }, new CartPoleEnvOptions { SuttonBartoReward = false }.ToKwargs());
 
             using IEnv env = Make("CartPole-v1", new CartPoleEnvOptions { RenderMode = "rgb_array" });
             Assert.AreEqual("rgb_array", env.RenderMode);
-            Assert.AreEqual(new Info { ["render_mode"] = "rgb_array" }, env.Spec!.Kwargs);
+            PyAssert.AreEqual(new Info { ["render_mode"] = "rgb_array" }, env.Spec!.Kwargs);
         }
 
         /// <summary>The generated constructor builds the class from the record, defaults standing for unset properties.</summary>

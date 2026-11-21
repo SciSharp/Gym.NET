@@ -63,7 +63,7 @@ namespace Gym.Utils {
         /// <exception cref="OverflowError">Thrown, as Python's <c>OverflowError</c>, for an infinite zoom.</exception>
         /// <exception cref="ArgumentOutOfRangeException">Thrown when the window's size comes out zero, which pygame would turn into a desktop-sized window (not modelled).</exception>
         /// <exception cref="DependencyNotInstalled">Thrown when no viewer factory is given or set.</exception>
-        public PlayableGame(IEnv env, object? keysToAction = null, double? zoom = null, IEnvironmentViewerFactoryDelegate? viewerFactory = null,
+        public PlayableGame(IEnv env, object? keysToAction = null, double? zoom = null, EnvViewerFactory? viewerFactory = null,
             PygameContext? context = null) {
             if (env is null)
                 throw new ArgumentNullException(nameof(env));

@@ -34,7 +34,7 @@ namespace Gym.Tests.Gymnasium.Wrappers.Vector {
         /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/tests/wrappers/vector/test_human_rendering.py#L26">tests/wrappers/vector/test_human_rendering.py (test_render_modes)</see>.</remarks>
         [TestMethod]
         public void TestRenderModes() {
-            IEnvironmentViewerFactoryDelegate? previous = HumanViewerFactory;
+            EnvViewerFactory? previous = HumanViewerFactory;
             HumanViewerFactory = NullEnvViewer.Factory;
             try {
                 // make_vec's default for CartPole-v1 is its vector entry point, CartPoleVectorEnv, whose batches are arrays.
@@ -58,7 +58,7 @@ namespace Gym.Tests.Gymnasium.Wrappers.Vector {
         /// <param name="envId">The env id.</param>
         /// <exception cref="AssertFailedException">Thrown when the wrapper does not read <c>human</c>.</exception>
         private static void RunScreenSizes(string envId) {
-            IEnvironmentViewerFactoryDelegate? previous = HumanViewerFactory;
+            EnvViewerFactory? previous = HumanViewerFactory;
             HumanViewerFactory = NullEnvViewer.Factory;
             try {
                 foreach (int numEnvs in new[] { 1, 3, 9 }) {

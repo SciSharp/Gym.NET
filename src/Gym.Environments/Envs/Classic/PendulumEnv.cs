@@ -36,6 +36,7 @@ namespace Gym.Environments.Envs.Classic {
     ///     <para>
     ///     Not thread-safe. Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/envs/classic_control/pendulum.py#L16">gymnasium/envs/classic_control/pendulum.py</see>.
     ///     </para>
+    ///     <para>Its info is always <c>{}</c>, as Gymnasium's, so it has no typed info record (DR-95).</para>
     /// </remarks>
     [GymOptions]
     public partial class PendulumEnv : Env<NDArray, NDArray> {
@@ -67,7 +68,7 @@ namespace Gym.Environments.Envs.Classic {
         /// </param>
         /// <param name="g">Gymnasium's <c>g</c>: the gravitational acceleration, 10.0 by default (<see cref="Gravity"/>).</param>
         /// <param name="viewerFactory">Gym.NET's <c>viewer_factory</c> (DR-20) for human mode; <see langword="null"/> uses <c>Gymnasium.HumanViewerFactory</c>.</param>
-        public PendulumEnv(string? renderMode = null, double g = 10.0, IEnvironmentViewerFactoryDelegate? viewerFactory = null) {
+        public PendulumEnv(string? renderMode = null, double g = 10.0, EnvViewerFactory? viewerFactory = null) {
             Metadata = ClassMetadata;
             Gravity = g;
 
@@ -84,6 +85,27 @@ namespace Gym.Environments.Envs.Classic {
             RenderMode = renderMode;
             _window = new HumanWindow("pendulum-v1", viewerFactory);
         }
+
+        /// <summary>
+        ///     Builds the env with the render mode given as the <see cref="Gym.Envs.RenderMode"/> enum (DR-84, DR-93), as
+        ///     <see cref="PendulumEnv(string, double, EnvViewerFactory)"/>
+        ///     builds it from the mode's string: <c>new PendulumEnv(RenderMode.RgbArray)</c> builds what
+        ///     <c>new PendulumEnv(renderMode: "rgb_array")</c> builds, the member reaching the env as Gymnasium's string
+        ///     (<see cref="RenderModes.Name"/>), which its <c>RenderMode</c> property then holds.
+        /// </summary>
+        /// <remarks>
+        ///     The mode is required and comes first, so <c>new PendulumEnv()</c> keeps meaning the other constructor, without a
+        ///     mode; leave the mode out there for no rendering. Every other parameter means what it means there.
+        /// </remarks>
+        /// <param name="renderMode">
+        ///     The render mode, which the env must list in its <c>metadata["render_modes"]</c> as for the string; it behaves
+        ///     exactly as its Gymnasium string does in the other constructor.
+        /// </param>
+        /// <param name="g">Gymnasium's <c>g</c>: the gravitational acceleration, 10.0 by default (<see cref="Gravity"/>).</param>
+        /// <param name="viewerFactory">Gym.NET's <c>viewer_factory</c> (DR-20) for human mode; <see langword="null"/> uses <c>Gymnasium.HumanViewerFactory</c>.</param>
+        /// <exception cref="ArgumentOutOfRangeException">Thrown for a value <see cref="Gym.Envs.RenderMode"/> does not declare (a cast integer such as <c>(RenderMode)99</c>).</exception>
+        public PendulumEnv(RenderMode renderMode, double g = 10.0, EnvViewerFactory? viewerFactory = null)
+            : this(RenderModes.Name(renderMode), g, viewerFactory) { }
 
         /// <summary>
         ///     Gymnasium's class attribute <c>metadata</c>: <c>{"render_modes": ["human", "rgb_array"], "render_fps": 30}</c>.

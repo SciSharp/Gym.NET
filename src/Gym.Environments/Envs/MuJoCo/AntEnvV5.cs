@@ -27,6 +27,7 @@ namespace Gym.Environments.Envs.MuJoCo {
     ///     <para>
     ///         Not thread-safe. Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/envs/mujoco/ant_v5.py#L14">gymnasium/envs/mujoco/ant_v5.py</see>.
     ///     </para>
+    ///     <para>Its info reads typed (DR-91): <c>AntInfoV5 info = step.Info;</c> (<see cref="AntInfoV5"/>), with the dict's own values still behind the indexer.</para>
     /// </remarks>
     [GymOptions]
     [PyName("AntEnv")]
@@ -73,7 +74,7 @@ namespace Gym.Environments.Envs.MuJoCo {
                         double resetNoiseScale = 0.1, bool excludeCurrentPositionsFromObservation = true,
                         bool includeCfrcExtInObservation = true, string? renderMode = null, int width = DefaultSize, int height = DefaultSize,
                         int? cameraId = null, string? cameraName = null, int maxGeom = 1000, IReadOnlyDictionary<int, bool>? visualOptions = null,
-                        IEnvironmentViewerFactoryDelegate? viewerFactory = null)
+                        EnvViewerFactory? viewerFactory = null)
             : base(xmlFile, frameSkip, null, ClassMetadata, renderMode, width, height, cameraId, cameraName,
                    defaultCameraConfig ?? DefaultCameraConfig, maxGeom, visualOptions, viewerFactory) {
             ForwardRewardWeight = forwardRewardWeight;
@@ -98,6 +99,67 @@ namespace Gym.Environments.Envs.MuJoCo {
                 ["cfrc_ext"] = (long)contacts,
             };
         }
+
+        /// <summary>
+        ///     Builds the env with the render mode given as the <see cref="Gym.Envs.RenderMode"/> enum (DR-84, DR-93), as
+        ///     <see cref="AntEnvV5(string, int, IReadOnlyDictionary{string,object}, double, double, double, double, object, bool, Nullable{ValueTuple{double,double}}, Nullable{ValueTuple{double,double}}, double, bool, bool, string, int, int, int?, string, int, IReadOnlyDictionary{int,bool}, EnvViewerFactory)"/>
+        ///     builds it from the mode's string: <c>new AntEnvV5(RenderMode.RgbArray)</c> builds what
+        ///     <c>new AntEnvV5(renderMode: "rgb_array")</c> builds, the member reaching the env as Gymnasium's string
+        ///     (<see cref="RenderModes.Name"/>), which its <c>RenderMode</c> property then holds.
+        /// </summary>
+        /// <remarks>
+        ///     The mode is required and comes first, so <c>new AntEnvV5()</c> keeps meaning the other constructor, without a
+        ///     mode; leave the mode out there for no rendering. Every other parameter means what it means there.
+        /// </remarks>
+        /// <param name="renderMode">
+        ///     The render mode, which the env must list in its <c>metadata["render_modes"]</c> as for the string; it behaves
+        ///     exactly as its Gymnasium string does in the other constructor.
+        /// </param>
+        /// <param name="xmlFile">The model: a bundled file name (<c>xml_file</c>, DR-63).</param>
+        /// <param name="frameSkip">Physics steps per env step (<c>frame_skip</c>).</param>
+        /// <param name="defaultCameraConfig">
+        ///     The free camera's settings (<c>default_camera_config</c>); <see langword="null"/> is Gymnasium's default,
+        ///     <c>{"distance": 4.0}</c>, and an empty dictionary leaves MuJoCo's camera as it is.
+        /// </param>
+        /// <param name="forwardRewardWeight">The weight of the forward velocity (<c>forward_reward_weight</c>; Gymnasium's default is the int 1).</param>
+        /// <param name="ctrlCostWeight">The weight of the squared torques (<c>ctrl_cost_weight</c>).</param>
+        /// <param name="contactCostWeight">The weight of the squared clipped contact forces (<c>contact_cost_weight</c>).</param>
+        /// <param name="healthyReward">The reward for each healthy step (<c>healthy_reward</c>).</param>
+        /// <param name="mainBody">
+        ///     The body whose motion is the forward velocity (<c>main_body</c>): its index (an integer, a <see langword="bool"/>
+        ///     or a 0-d integer array) or its name; <see langword="null"/> is Gymnasium's default, body 1 (the torso). Resolved
+        ///     at each step, as Gymnasium resolves it, so a bad one fails at the first step with MuJoCo's error.
+        /// </param>
+        /// <param name="terminateWhenUnhealthy">Whether an unhealthy state ends the episode (<c>terminate_when_unhealthy</c>).</param>
+        /// <param name="healthyZRange">The inclusive range of a healthy torso height (<c>healthy_z_range</c>); <see langword="null"/> is (0.2, 1.0).</param>
+        /// <param name="contactForceRange">The range the contact forces are clipped to (<c>contact_force_range</c>); <see langword="null"/> is (-1.0, 1.0).</param>
+        /// <param name="resetNoiseScale">The scale of the reset's noise (<c>reset_noise_scale</c>).</param>
+        /// <param name="excludeCurrentPositionsFromObservation">
+        ///     Whether the root's x and y leave the observation (<c>exclude_current_positions_from_observation</c>).
+        /// </param>
+        /// <param name="includeCfrcExtInObservation">Whether the clipped contact forces join the observation (<c>include_cfrc_ext_in_observation</c>).</param>
+        /// <param name="width">The rendered frame's width (<c>width</c>).</param>
+        /// <param name="height">The rendered frame's height (<c>height</c>).</param>
+        /// <param name="cameraId">The camera to render from (<c>camera_id</c>).</param>
+        /// <param name="cameraName">The camera to render from by name (<c>camera_name</c>).</param>
+        /// <param name="maxGeom">The most geoms a frame draws (<c>max_geom</c>).</param>
+        /// <param name="visualOptions">MuJoCo visual flags to switch (<c>visual_options</c>).</param>
+        /// <param name="viewerFactory">Gym.NET's <c>viewer_factory</c> (DR-20) for <c>human</c> mode.</param>
+        /// <exception cref="ArgumentOutOfRangeException">Thrown for a value <see cref="Gym.Envs.RenderMode"/> does not declare (a cast integer such as <c>(RenderMode)99</c>).</exception>
+        /// <exception cref="NotSupportedException"><paramref name="xmlFile"/> is not a bundled model.</exception>
+        /// <exception cref="OverflowError">A frame skip of 0 (Python's <c>OverflowError</c> deriving the frame rate).</exception>
+        /// <exception cref="ValueError">Both a camera id and a camera name.</exception>
+        public AntEnvV5(RenderMode renderMode, string xmlFile = "ant.xml", int frameSkip = 5,
+                        IReadOnlyDictionary<string, object?>? defaultCameraConfig = null, double forwardRewardWeight = 1, double ctrlCostWeight = 0.5,
+                        double contactCostWeight = 5e-4, double healthyReward = 1.0, object? mainBody = null, bool terminateWhenUnhealthy = true,
+                        (double Low, double High)? healthyZRange = null, (double Low, double High)? contactForceRange = null,
+                        double resetNoiseScale = 0.1, bool excludeCurrentPositionsFromObservation = true, bool includeCfrcExtInObservation = true,
+                        int width = DefaultSize, int height = DefaultSize, int? cameraId = null, string? cameraName = null, int maxGeom = 1000,
+                        IReadOnlyDictionary<int, bool>? visualOptions = null, EnvViewerFactory? viewerFactory = null)
+            : this(xmlFile, frameSkip, defaultCameraConfig, forwardRewardWeight, ctrlCostWeight, contactCostWeight, healthyReward, mainBody,
+                   terminateWhenUnhealthy, healthyZRange, contactForceRange, resetNoiseScale, excludeCurrentPositionsFromObservation,
+                   includeCfrcExtInObservation, RenderModes.Name(renderMode), width, height, cameraId, cameraName, maxGeom, visualOptions,
+                   viewerFactory) { }
 
         /// <summary>Gymnasium's class attribute <c>metadata</c>: the four render modes, the frame rate set per instance. A new dict on every read.</summary>
         public static new Metadata ClassMetadata => MetadataFor(null);

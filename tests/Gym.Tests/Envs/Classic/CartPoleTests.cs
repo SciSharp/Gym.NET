@@ -288,15 +288,15 @@ namespace Gym.Tests.Envs.Classic {
             /// <summary>The frames rendered so far.</summary>
             public int Frames { get; private set; }
 
-            /// <summary>Whether <see cref="CloseEnvironment"/> ran.</summary>
+            /// <summary>Whether <see cref="Close"/> ran.</summary>
             public bool Closed { get; private set; }
 
             /// <summary>Counts the frame.</summary>
-            /// <param name="img">The frame; not kept.</param>
-            public void Render(Image img) => Frames++;
+            /// <param name="frame">The frame; not kept.</param>
+            public void Render(NDArray frame) => Frames++;
 
             /// <summary>Records the close.</summary>
-            public void CloseEnvironment() => Closed = true;
+            public void Close() => Closed = true;
 
             /// <summary>Nothing to release.</summary>
             public void Dispose() { }

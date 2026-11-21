@@ -112,7 +112,7 @@ namespace Gym.Wrappers.Vector {
             VectorStepResult<TObs> result = base.Step(actions);
             Info infos = result.Infos;
 
-            if (ReferenceEquals(_autoresetMode, AutoresetMode.SameStep)) {
+            if (_autoresetMode == AutoresetMode.SameStep) {
                 // Sub-envs reset within the step that ends them, so every step counts towards an episode.
                 using (NDArray returns = EpisodeReturns + result.Rewards)
                     Replace(EpisodeReturns, returns);
@@ -165,7 +165,7 @@ namespace Gym.Wrappers.Vector {
                     LengthQueue.Append(lengthsNow[i]);
                 }
 
-                if (ReferenceEquals(_autoresetMode, AutoresetMode.SameStep)) {
+                if (_autoresetMode == AutoresetMode.SameStep) {
                     // The done sub-envs have already been reset: their statistics restart now, not at the next step.
                     EpisodeReturns[dones] = 0;
                     EpisodeLengths[dones] = 0;

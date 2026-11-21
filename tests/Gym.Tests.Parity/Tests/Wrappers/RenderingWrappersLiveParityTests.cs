@@ -200,7 +200,7 @@ namespace Gym.Tests.Parity.Tests.Wrappers {
         [DataRow("rgb_array")]
         [DataRow("rgb_array_list")]
         public void HumanRendering_Episodes_MatchGymnasium(string mode) {
-            IEnvironmentViewerFactoryDelegate? previous = Gymnasium.HumanViewerFactory;
+            EnvViewerFactory? previous = Gymnasium.HumanViewerFactory;
             Gymnasium.HumanViewerFactory = NullEnvViewer.Factory;
             try {
                 using var pair = new GymPair(PyGymEnv.Wrap($"HumanRendering(make('CartPole-v1', render_mode='{mode}'))", () => {

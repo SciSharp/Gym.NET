@@ -39,9 +39,11 @@ will be removed in 2.0.
 | `Step step = env.Step(a)` | `var (obs, reward, terminated, truncated, info) = env.Step(a)` (a `StepResult<TObs>`) |
 | `step.Done` | `terminated \|\| truncated`: `terminated` when the task ended (the pole fell), `truncated` when a limit cut the episode short |
 | `step.Reward` (`float`) | `reward` (`double`) |
-| `step.Information` (`Gym.Collections.Dict`, or `null`) | `info` (`Gym.Envs.Info`, never `null`) |
-| `env.Render("rgb_array")` returning an ImageSharp `Image` | build the env with `render_mode = "rgb_array"`; `env.Render()` returns `RenderResult.Rgb`, whose `Frame` is a `(height, width, 3)` uint8 array |
-| `env.Render("human")` after each step | build the env with `render_mode = "human"`; every `Reset` and `Step` draws the frame itself, paced at the env's frame rate |
+| `step.Information` (`Gym.Collections.Dict`, or `null`) | `info` (`Gym.Envs.Info`, never `null`); `step.Information` still compiles, obsolete, until 2.0 (DR-78). `info.Get<T>(key)` reads a value as `T`, converting NumPy scalars, and a built-in env's info also reads as a typed record (`HalfCheetahInfoV5 typed = step.Info;`) |
+| `dict1.Equals(dict2)` (0.2's `Dict` compared by value) | `info1.PyEquals(info2)`: Python's dict `==`; an `Info`'s `Equals` and `==` compare references (DR-92) |
+| `env.Render("rgb_array")` returning an ImageSharp `Image` | build the env with `render_mode = "rgb_array"` (or `RenderMode.RgbArray`); `env.Render()` returns `RenderResult.Rgb`, whose `Frame` is a `(height, width, 3)` uint8 array; `(Image)env.Render()` makes an ImageSharp image of it |
+| `env.Render("human")` after each step | build the env with `render_mode = "human"` (or `RenderMode.Human`); every `Reset` and `Step` draws the frame itself, paced at the env's frame rate |
+| A viewer of your own: `IEnvViewer.Render(Image img)`, `CloseEnvironment()`, a factory returning `Task<IEnvViewer>` (`IEnvironmentViewerFactoryDelegate`) | `IEnvViewer.Render(NDArray frame)` (the `(H, W, 3)` uint8 frame, the caller's), `Close()`, and an `EnvViewerFactory` that returns the viewer once its window is up; `IAsyncEnvViewer` adds `RenderAsync`/`CloseAsync` (DR-85). `CloseEnvironment()` stays, obsolete, until 2.0 |
 | `env.CloseEnvironment()` | `env.Close()`, or `Dispose()` (`using`) |
 | `Task<Step> env.StepAsync(a)` | `ValueTask<StepResult<TObs>> env.StepAsync(a, cancellationToken)`, which runs the step on the calling thread |
 | `env.Metadata` (`Dict`, keys `render.modes`, `video.frames_per_second`) | `env.Metadata` (`Gym.Envs.Metadata`, keys `render_modes`, `render_fps`) |
@@ -112,14 +114,15 @@ What behaves differently, beyond the spelling:
 
 ## Rendering to an image
 
-0.2 returned an ImageSharp `Image`; 1.0 returns the frame as an array, the way Gymnasium does. To get an image:
+0.2 returned an ImageSharp `Image`; 1.0 returns the frame as an array, the way Gymnasium does, and converts it to an
+image on request:
 
 ```csharp
-using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("CartPole-v1", new { render_mode = "rgb_array" });
+using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("CartPole-v1", RenderMode.RgbArray);
 using NDArray observation = env.Reset(seed: 0).Observation;
 using RenderResult result = env.Render();
-var frame = ((RenderResult.Rgb)result).Frame;                       // (400, 600, 3) uint8
-using Image<Rgb24> image = Image.LoadPixelData<Rgb24>(frame.ToArray<byte>(), (int)frame.shape[1], (int)frame.shape[0]);
+NDArray frame = (NDArray)result;                                     // (400, 600, 3) uint8, the result's own array
+using Image image = (Image)result;                                   // a new Image<Rgb24> of the frame, yours to dispose
 ```
 
 ## Keeping 0.2 code running: Gym.Legacy
@@ -168,7 +171,7 @@ Moving code from `Dict` to `Info`, member by member:
 |---|---|
 | `new Dict("key", value, ...)`, `Dict.Empty` | `new Info { ["key"] = value, ... }`, `new Info()` |
 | `d["key"]`, `ContainsKey`, `TryGetValue`, `Remove`, `foreach` | the same |
-| `d.Get<T>("key")` (`default(T)` when missing) | `(T)info["key"]!`, or `info.Get("key") is T value` (Python's `get`: `null` when missing) |
+| `d.Get<T>("key")` (`default(T)` when missing) | `info.Get<T>("key")`, the same read (`default(T)` when missing), which also converts NumPy scalars and numbers (DR-78); or `(T)info["key"]!`, or `info.Get("key") is T value` (Python's `get`: `null` when missing) |
 | `d.Get<T>("key", fallback)` | `info.Get("key", fallback)`, which returns `object?` |
 | `d.Update(other)`, `Append(other)`, `Override(other)` | `info.Update(other)` |
 | `d.Merge(other, MergePrefer.New)` | `info.Update(other)`, one level deep; nothing replaces the deep merge |
@@ -179,8 +182,11 @@ Moving code from `Dict` to `Info`, member by member:
 `Info` keeps Python's insertion order through removals, which `Dict` (a `Dictionary`) does not promise.
 
 `Info` also takes `Dict`'s two reads (DR-58): `info.Get<T>("key")` (`default(T)` when missing) and `info.Clone()`
-(the same as `Copy()`). There is no `Get<T>("key", fallback)`: it would capture `Get("key", fallback)` calls, which
-must keep returning Python's `object`.
+(the same as `Copy()`). `Get<T>` is an extension in `Gym.Envs` (`InfoExtensions`, DR-78), so it reads any string-keyed
+dict and converts what Gymnasium's envs store: `info.Get<double>("x_position")` reads a NumPy scalar (a 0-d array),
+which a plain cast refuses; an integer is range-checked, and a float reads as an integer only when it is whole. There
+is no `Get<T>("key", fallback)`: it would capture `Get("key", fallback)` calls, which must keep returning Python's
+`object`.
 
 ### 0.2 lines that still compile
 

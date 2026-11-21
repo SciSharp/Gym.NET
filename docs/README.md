@@ -30,7 +30,7 @@ why the code is the way it is; the pages above describe what it does.
 | Plan | Holds |
 |---|---|
 | [Completion plan](plans/COMPLETION_PLAN.md) | The phases to 1.0, each with its status, scope and deferrals; the decisions D2–D23 |
-| [Design review](plans/DESIGN_REVIEW.md) | The approved implementation designs DR-01…DR-92, and the consequences found while implementing them |
+| [Design review](plans/DESIGN_REVIEW.md) | The approved implementation designs DR-01…DR-95, and the consequences found while implementing them |
 | [Gymnasium port plan](plans/GYMNASIUM_PORT_PLAN.md) | The per-area specifications, the name map, the defect register |
 | [Parity testing](plans/GYM_PARITY_INTEROP_TESTING.md) | The design of the live parity suite |
 | [NumSharp migration](plans/NUMSHARP_MIGRATION_PLAN.md) | The move from NumSharp.Lite to NumSharp |

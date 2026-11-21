@@ -38,6 +38,7 @@ namespace Gym.Environments.Envs.ToyText {
     ///     <c>viewer_factory</c> or <c>Gymnasium.HumanViewerFactory</c> (DR-20) at 4 frames per second. Not thread-safe.
     ///     </para>
     ///     <para>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/envs/toy_text/taxi.py#L35">gymnasium/envs/toy_text/taxi.py</see>.</para>
+    ///     <para>Its info reads typed (DR-91): <c>TaxiInfo info = step.Info;</c> (<see cref="TaxiInfo"/>), with the dict's own values still behind the indexer.</para>
     /// </remarks>
     [GymOptions]
     public partial class TaxiEnv : Env<NDArray, NDArray> {
@@ -112,7 +113,7 @@ namespace Gym.Environments.Envs.ToyText {
         /// <param name="fickleProbability">Gymnasium's <c>fickle_probability</c>, 0.3 by default: the chance, drawn at each reset, that the passenger is fickle this episode.</param>
         /// <param name="viewerFactory">Gym.NET's <c>viewer_factory</c> (DR-20) for human mode; <see langword="null"/> uses <c>Gymnasium.HumanViewerFactory</c>.</param>
         public TaxiEnv(string? renderMode = null, bool isRainy = false, bool ficklePassenger = false, double rainyProbability = 0.8, double fickleProbability = 0.3,
-            IEnvironmentViewerFactoryDelegate? viewerFactory = null) {
+            EnvViewerFactory? viewerFactory = null) {
             Metadata = ClassMetadata;
             _cells = new char[Map.Count, Map[0].Length];
             for (int row = 0; row < Map.Count; row++)
@@ -173,6 +174,31 @@ namespace Gym.Environments.Envs.ToyText {
             FicklePassenger = ficklePassenger;
             _window = new HumanWindow("Taxi", viewerFactory);
         }
+
+        /// <summary>
+        ///     Builds the env with the render mode given as the <see cref="Gym.Envs.RenderMode"/> enum (DR-84, DR-93), as
+        ///     <see cref="TaxiEnv(string, bool, bool, double, double, EnvViewerFactory)"/>
+        ///     builds it from the mode's string: <c>new TaxiEnv(RenderMode.RgbArray)</c> builds what
+        ///     <c>new TaxiEnv(renderMode: "rgb_array")</c> builds, the member reaching the env as Gymnasium's string
+        ///     (<see cref="RenderModes.Name"/>), which its <c>RenderMode</c> property then holds.
+        /// </summary>
+        /// <remarks>
+        ///     The mode is required and comes first, so <c>new TaxiEnv()</c> keeps meaning the other constructor, without a
+        ///     mode; leave the mode out there for no rendering. Every other parameter means what it means there.
+        /// </remarks>
+        /// <param name="renderMode">
+        ///     The render mode, which the env must list in its <c>metadata["render_modes"]</c> as for the string; it behaves
+        ///     exactly as its Gymnasium string does in the other constructor.
+        /// </param>
+        /// <param name="isRainy">Gymnasium's <c>is_rainy</c>: a move goes as intended with <paramref name="rainyProbability"/>, else to either side.</param>
+        /// <param name="ficklePassenger">Gymnasium's <c>fickle_passenger</c>: the passenger may change their destination after the first move with them aboard.</param>
+        /// <param name="rainyProbability">Gymnasium's <c>rainy_probability</c>, 0.8 by default.</param>
+        /// <param name="fickleProbability">Gymnasium's <c>fickle_probability</c>, 0.3 by default: the chance, drawn at each reset, that the passenger is fickle this episode.</param>
+        /// <param name="viewerFactory">Gym.NET's <c>viewer_factory</c> (DR-20) for human mode; <see langword="null"/> uses <c>Gymnasium.HumanViewerFactory</c>.</param>
+        /// <exception cref="ArgumentOutOfRangeException">Thrown for a value <see cref="Gym.Envs.RenderMode"/> does not declare (a cast integer such as <c>(RenderMode)99</c>).</exception>
+        public TaxiEnv(RenderMode renderMode, bool isRainy = false, bool ficklePassenger = false, double rainyProbability = 0.8,
+                       double fickleProbability = 0.3, EnvViewerFactory? viewerFactory = null)
+            : this(RenderModes.Name(renderMode), isRainy, ficklePassenger, rainyProbability, fickleProbability, viewerFactory) { }
 
         /// <summary>
         ///     Gymnasium's class attribute <c>metadata</c>: <c>{"render_modes": ["human", "ansi", "rgb_array"], "render_fps": 4}</c>.

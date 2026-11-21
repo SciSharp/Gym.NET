@@ -34,7 +34,7 @@ namespace Gym.Tests.Utils {
     [DoNotParallelize]
     public class PlayTests {
         /// <summary>The viewer factory before the test, restored by <see cref="Cleanup"/>.</summary>
-        private IEnvironmentViewerFactoryDelegate? _previousFactory;
+        private EnvViewerFactory? _previousFactory;
 
         /// <summary>Points the process-wide viewer factory at <see cref="NullEnvViewer"/> and empties the queue.</summary>
         [TestInitialize]
@@ -582,36 +582,32 @@ namespace Gym.Tests.Utils {
             /// <summary>Whether <see cref="BeginInput"/> ran.</summary>
             public bool InputStarted { get; private set; }
 
-            /// <summary>Whether <see cref="CloseEnvironment"/> ran.</summary>
+            /// <summary>Whether <see cref="Close"/> ran.</summary>
             public bool Closed { get; private set; }
 
             /// <summary>A factory that hands out this viewer, recording the size and title.</summary>
             /// <param name="width">The width.</param>
             /// <param name="height">The height.</param>
             /// <param name="title">The title.</param>
-            /// <returns>This viewer, completed.</returns>
-            public Task<IEnvViewer> Factory(int width, int height, string? title = null) {
+            /// <returns>This viewer.</returns>
+            public IEnvViewer Factory(int width, int height, string? title = null) {
                 (Width, Height, Title, Closed) = (width, height, title, false);
-                return Task.FromResult<IEnvViewer>(this);
+                return this;
             }
 
             /// <summary>Records the frame's size and pixels.</summary>
-            /// <param name="img">The frame.</param>
-            public void Render(SixLabors.ImageSharp.Image img) {
-                using var rgb = img.CloneAs<SixLabors.ImageSharp.PixelFormats.Rgb24>();
-                var pixels = new (byte, byte, byte)[rgb.Width * rgb.Height];
-                for (int y = 0; y < rgb.Height; y++) {
-                    for (int x = 0; x < rgb.Width; x++) {
-                        var pixel = rgb[x, y];
-                        pixels[y * rgb.Width + x] = (pixel.R, pixel.G, pixel.B);
-                    }
-                }
-
-                Frames.Add(((rgb.Width, rgb.Height), pixels));
+            /// <param name="frame">The frame, <c>(H, W, 3)</c> uint8, rows top to bottom.</param>
+            public void Render(NDArray frame) {
+                int height = (int)frame.shape[0], width = (int)frame.shape[1];
+                byte[] bytes = frame.ToArray<byte>();
+                var pixels = new (byte, byte, byte)[width * height];
+                for (int i = 0; i < pixels.Length; i++)
+                    pixels[i] = (bytes[3 * i], bytes[3 * i + 1], bytes[3 * i + 2]);
+                Frames.Add(((width, height), pixels));
             }
 
             /// <summary>Marks the viewer closed.</summary>
-            public void CloseEnvironment() => Closed = true;
+            public void Close() => Closed = true;
 
             /// <summary>Marks input started.</summary>
             public void BeginInput() => InputStarted = true;

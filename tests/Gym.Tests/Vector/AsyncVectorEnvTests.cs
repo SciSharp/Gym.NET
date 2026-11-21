@@ -142,7 +142,7 @@ namespace Gym.Tests.Vector {
         /// </summary>
         [TestMethod]
         public void ThreadPoolMode_GivesAWindowItsOwnThread() {
-            IEnvironmentViewerFactoryDelegate? previous = HumanViewerFactory;
+            EnvViewerFactory? previous = HumanViewerFactory;
             HumanViewerFactory = NullEnvViewer.Factory;
             try {
                 var threads = new ConcurrentDictionary<int, ConcurrentBag<int>>();
