@@ -239,7 +239,7 @@ namespace Gym {
         /// <param name="excludeNamespaces">Namespaces to leave out, or <see langword="null"/>.</param>
         /// <param name="disablePrint">Return the text instead of writing it to the console.</param>
         /// <returns>The text when <paramref name="disablePrint"/> is set, otherwise <see langword="null"/>.</returns>
-        /// <exception cref="System.DivideByZeroException">Thrown when <paramref name="numCols"/> is 0.</exception>
+        /// <exception cref="ZeroDivisionError">Thrown when <paramref name="numCols"/> is 0.</exception>
         public static string? PprintRegistry(IReadOnlyDictionary<string, EnvSpec>? printRegistry = null, int numCols = 3, IEnumerable<string?>? excludeNamespaces = null,
             bool disablePrint = false) =>
             EnvRegistry.PprintRegistry(printRegistry, numCols, excludeNamespaces, disablePrint);

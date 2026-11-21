@@ -53,7 +53,7 @@ namespace Gym.Box2D {
         /// <param name="box">The half-extents of an axis-aligned box centered on the origin, applied after <paramref name="vertices"/>.</param>
         /// <exception cref="ValueError">Thrown for a vertex count outside 2..16.</exception>
         /// <exception cref="AssertionError">Thrown for fewer than 3 vertices, a degenerate edge, or no area.</exception>
-        /// <exception cref="OverflowException">Thrown for a half-extent beyond the float32 range.</exception>
+        /// <exception cref="OverflowError">Thrown for a half-extent beyond the float32 range.</exception>
         public b2PolygonShape(IReadOnlyList<b2Vec2>? vertices, (double hx, double hy)? box = null) : this() {
             if (vertices != null)
                 Box2DConvert.Kwarg("b2PolygonShape", "vertices", () => Vertices = vertices);
@@ -111,7 +111,7 @@ namespace Gym.Box2D {
         public b2Vec2 Centroid => m_centroid;
 
         /// <summary>Makes the polygon an axis-aligned box of the given half-extents (pybox2d's write-only <c>box</c>).</summary>
-        /// <exception cref="OverflowException">Thrown for a half-extent beyond the float32 range.</exception>
+        /// <exception cref="OverflowError">Thrown for a half-extent beyond the float32 range.</exception>
         public (double hx, double hy) Box {
             set => SetAsBox(Box2DConvert.ToFloat32(value.hx, "b2PolygonShape_SetAsBox", 2), Box2DConvert.ToFloat32(value.hy, "b2PolygonShape_SetAsBox", 3));
         }
@@ -121,7 +121,7 @@ namespace Gym.Box2D {
         /// <param name="hy">The half-height.</param>
         /// <param name="center">The box's center in local coordinates.</param>
         /// <param name="angle">The box's rotation in radians.</param>
-        /// <exception cref="OverflowException">Thrown for a scalar beyond the float32 range.</exception>
+        /// <exception cref="OverflowError">Thrown for a scalar beyond the float32 range.</exception>
         public void SetAsBox(double hx, double hy, b2Vec2 center, double angle) =>
             SetAsBox(Box2DConvert.ToFloat32(hx, "b2PolygonShape_SetAsBox", 2), Box2DConvert.ToFloat32(hy, "b2PolygonShape_SetAsBox", 3), center,
                      Box2DConvert.ToFloat32(angle, "b2PolygonShape_SetAsBox", 5));
@@ -220,7 +220,7 @@ namespace Gym.Box2D {
         /// </summary>
         /// <param name="radius">The radius (stored as float32).</param>
         /// <param name="pos">The center in the body's frame (origin when null).</param>
-        /// <exception cref="OverflowException">Thrown for a radius beyond the float32 range.</exception>
+        /// <exception cref="OverflowError">Thrown for a radius beyond the float32 range.</exception>
         public b2CircleShape(double radius, b2Vec2? pos = null) : this() {
             Box2DConvert.Kwarg("b2CircleShape", "radius", () => m_radius = Box2DConvert.ToFloat32(radius, "b2Shape_radius_set", 2));
             if (pos.HasValue)

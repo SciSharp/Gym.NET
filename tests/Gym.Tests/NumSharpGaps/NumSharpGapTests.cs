@@ -8,8 +8,9 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 namespace Gym.Tests.NumSharpGaps {
     /// <summary>
     ///     The NumSharp gaps Gym.NET depends on, each proven by a test that asserts what NumPy or Python does (decision DR-01,
-    ///     docs/plans/DESIGN_REVIEW.md). Every test here is <see cref="OpenBugsAttribute"/>: it fails until NumSharp ships the
-    ///     fix, then passes unchanged, and the attribute comes off so it guards the fix.
+    ///     docs/plans/DESIGN_REVIEW.md). Each test was <see cref="OpenBugsAttribute"/> while it failed; NumSharp 0.81.0 shipped
+    ///     the fixes for N-1 to N-4, the tests passed unchanged, and the attributes came off, so each now guards its fix
+    ///     (DR-76).
     /// </summary>
     /// <remarks>
     ///     The items are listed in docs/plans/COMPLETION_PLAN.md §7. A gap that only a live comparison can show (a value
@@ -19,10 +20,9 @@ namespace Gym.Tests.NumSharpGaps {
     public class NumSharpGapTests {
         /// <summary>
         ///     N-1: Python's <c>str(AssertionError())</c> is <c>""</c>, so a bare <c>assert</c>'s message is empty. NumSharp
-        ///     0.80.0's parameterless constructor uses the type name instead.
+        ///     0.80.0's parameterless constructor used the type name instead; 0.81.0 has Python's text.
         /// </summary>
         [TestMethod]
-        [OpenBugs("N-1")]
         public void N1_ParameterlessAssertionError_HasPythonsEmptyMessage() {
             Assert.AreEqual("", new AssertionError().Message);
         }
@@ -30,11 +30,10 @@ namespace Gym.Tests.NumSharpGaps {
         /// <summary>
         ///     N-2: NumPy's <c>'c'</c> code splits each string into its characters: <c>np.asarray(["SFFF", "FHFH", "FFFH",
         ///     "HFFG"], dtype="c")</c> is a <c>(4, 4)</c> <c>|S1</c> array whose bytes are the map's letters. NumSharp 0.80.0
-        ///     keeps one element per string, so the toy_text envs build their maps through <c>ToyTextUtils.CharMap</c> until
-        ///     this passes (P5.1).
+        ///     kept one element per string, so <c>ToyTextUtils.CharMap</c> builds the toy_text maps from a two-dimensional
+        ///     grid; 0.81.0 splits the strings itself, which this test guards.
         /// </summary>
         [TestMethod]
-        [OpenBugs("N-2")]
         public void N2_CharCode_SplitsStringsIntoCharacters() {
             string[] rows = { "SFFF", "FHFH", "FFFH", "HFFG" };
             using NDArray map = np.array(rows, np.dtype("c"));
@@ -44,12 +43,12 @@ namespace Gym.Tests.NumSharpGaps {
         }
 
         /// <summary>
-        ///     N-3: NumSharp owns every Python built-in exception Gym.NET throws (decision DR-02). NumSharp 0.80.0 lacks
-        ///     <c>NotImplementedError</c> and <c>ImportError</c>, so <c>Gym.Exceptions</c> still defines them.
+        ///     N-3: NumSharp owns every Python built-in exception Gym.NET throws (decision DR-02). NumSharp 0.80.0 lacked
+        ///     <c>NotImplementedError</c> and <c>ImportError</c>, so <c>Gym.Exceptions</c> defined stop-gaps; 0.81.0 has every
+        ///     Python exception, and the stop-gaps are gone.
         /// </summary>
         /// <param name="name">The Python exception name, which NumSharp spells as its class name in namespace NumSharp.</param>
         [TestMethod]
-        [OpenBugs("N-3")]
         [DataRow("NotImplementedError")]
         [DataRow("ImportError")]
         public void N3_NumSharp_DefinesThePythonException(string name) {
@@ -61,11 +60,10 @@ namespace Gym.Tests.NumSharpGaps {
         /// <summary>
         ///     N-3: every NumSharp Python exception takes an inner exception, so a port can keep Python's
         ///     <c>raise ... from e</c> chain (found in P1: <c>get_wrapper_attr</c> loses it with <c>AttributeError</c>). These
-        ///     four lack the constructor in NumSharp 0.80.0 (measured from its source).
+        ///     four lacked the constructor in NumSharp 0.80.0 (measured from its source); 0.81.0 has it.
         /// </summary>
         /// <param name="name">The Python exception name, NumSharp's class name.</param>
         [TestMethod]
-        [OpenBugs("N-3")]
         [DataRow("AttributeError")]
         [DataRow("KeyError")]
         [DataRow("RuntimeError")]
@@ -91,13 +89,13 @@ namespace Gym.Tests.NumSharpGaps {
         /// <summary>
         ///     N-4: NumPy's <c>np.linspace</c> takes array bounds and computes in their result dtype, so
         ///     <c>np.linspace(np.float32(0.1), np.float32(0.7), 11)</c> is float32 arithmetic, and four of its eleven samples
-        ///     differ from the float64 samples cast to float32. NumSharp 0.80.0 has only scalar overloads, whose C#
-        ///     <see cref="float"/> stands for a Python float (float64), so the discretizing wrappers compute NumPy's edges
-        ///     through <c>WrapperFunctions.Linspace</c> until this passes (P6.3).
+        ///     differ from the float64 samples cast to float32. NumSharp 0.80.0 had only scalar overloads, whose C#
+        ///     <see cref="float"/> stands for a Python float (float64), so the discretizing wrappers computed NumPy's edges
+        ///     through a workaround; 0.81.0 takes array ends and computes float32 ends in float32, and the wrappers call
+        ///     <c>np.linspace</c> themselves.
         /// </summary>
-        /// <exception cref="AssertFailedException">Thrown while NumSharp lacks the overload, or when it returns other bits.</exception>
+        /// <exception cref="AssertFailedException">Thrown when NumSharp returns other bits than NumPy's.</exception>
         [TestMethod]
-        [OpenBugs("N-4")]
         public void N4_Linspace_TakesArrayBoundsAndKeepsTheirDtype() {
             MethodInfo? linspace = typeof(np).GetMethods(BindingFlags.Public | BindingFlags.Static)
                 .FirstOrDefault(method => method.Name == "linspace" && method.GetParameters() is { Length: >= 3 } parameters &&

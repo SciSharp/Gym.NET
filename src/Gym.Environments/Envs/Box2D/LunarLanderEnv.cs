@@ -435,8 +435,8 @@ namespace Gym.Environments.Envs.Box2D {
         ///     <c>{}</c>.
         /// </returns>
         /// <exception cref="AssertionError">
-        ///     Thrown before the first reset (Python's bare <c>assert</c>, whose empty message NumSharp's <c>AssertionError</c>
-        ///     does not give yet, N-1), and in discrete mode for an action outside the space, with Gymnasium's message
+        ///     Thrown before the first reset (Python's bare <c>assert</c>, with its empty message, which NumSharp's
+        ///     <c>AssertionError</c> gives since 0.81.0), and in discrete mode for an action outside the space, with Gymnasium's message
         ///     (<c>5 (&lt;class 'int'&gt;) invalid </c>, trailing space included).
         /// </exception>
         /// <exception cref="IndexError">

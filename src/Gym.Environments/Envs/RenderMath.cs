@@ -14,7 +14,7 @@ namespace Gym.Environments.Envs {
         /// <param name="value">The coordinate.</param>
         /// <returns>The integer.</returns>
         /// <exception cref="ValueError">Thrown for NaN (<c>cannot convert float NaN to integer</c>).</exception>
-        /// <exception cref="OverflowException">Thrown for an infinity (<c>cannot convert float infinity to integer</c>).</exception>
+        /// <exception cref="OverflowError">Thrown for an infinity (<c>cannot convert float infinity to integer</c>).</exception>
         public static long Int(double value) {
             BigInteger integer = PyBuiltins.Int(value);
             if (integer > long.MaxValue)

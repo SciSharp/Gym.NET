@@ -1206,6 +1206,12 @@ one:
   they compute them through `WrapperFunctions.Linspace` until NumSharp has array bounds. Proven by
   `NumSharpGapTests.N4_Linspace_TakesArrayBoundsAndKeepsTheirDtype` (`[OpenBugs("N-4")]`).
 
+**All four closed by NumSharp 0.81.0 (2026-11-21, DR-76).** The ten unit tests and six parity cells that proved them
+passed unchanged and gate now (their `[OpenBugs]` attributes are gone); `Gym.Exceptions`' stop-gap `NotImplementedError`,
+`ImportError` and `ModuleNotFoundError` are deleted in favor of NumSharp's; the discretizers call `np.linspace` and
+`WrapperFunctions.Linspace` is deleted; `ToyTextUtils.CharMap` stays as the toy_text envs' one builder and validator of
+their maps (public API, with tests of its own), giving the same arrays NumSharp's `np.array(rows, np.dtype("c"))` gives.
+
 ## 8. Risks
 
 | Risk | Impact | Mitigation |

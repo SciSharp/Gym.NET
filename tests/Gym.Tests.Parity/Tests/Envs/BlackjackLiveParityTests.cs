@@ -225,7 +225,6 @@ namespace Gym.Tests.Parity.Tests.Envs {
         ///     (N-1).
         /// </summary>
         [TestMethod]
-        [OpenBugs("N-1")]
         public void GymNet_RefusedActions_RaiseTheBareAssertion() {
             var refused = new (string Python, Func<PyObject> Gymnasium, Func<object?> DotNet)[] {
                 ("2", () => PyConvert.ToPython(2L), () => 2L),

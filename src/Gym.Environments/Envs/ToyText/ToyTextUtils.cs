@@ -58,10 +58,11 @@ namespace Gym.Environments.Envs.ToyText {
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="rows"/> or a row is <see langword="null"/>.</exception>
         /// <exception cref="ValueError">Thrown for rows of different lengths, with NumPy's message.</exception>
         /// <remarks>
-        ///     NumSharp 0.80.0's <c>np.array(string[], "c")</c> does not split the strings into characters yet (it gives shape
-        ///     <c>(rows,)</c>, open item N-2, proven by an <c>[OpenBugs("N-2")]</c> test), so this builds the two-dimensional
-        ///     array of one-character strings NumPy builds, through NumSharp's own <c>'c'</c> dtype: same shape, dtype
-        ///     (<c>|S1</c>) and bytes. Replace it with <c>np.asarray(rows, "c")</c> when NumSharp splits strings itself.
+        ///     It builds the two-dimensional array of one-character strings NumPy builds for <c>np.asarray(rows, "c")</c>,
+        ///     through NumSharp's own <c>'c'</c> dtype: same shape, dtype (<c>|S1</c>) and bytes. It was written while
+        ///     NumSharp 0.80.0's <c>np.array(string[], "c")</c> kept one element per string (open item N-2); NumSharp 0.81.0
+        ///     splits the strings itself (N-2 closed, DR-76, guarded by <c>NumSharpGapTests</c>), and this stays the toy_text
+        ///     envs' one place that builds and validates their maps.
         /// </remarks>
         public static NDArray CharMap(IReadOnlyList<string> rows) {
             if (rows is null)

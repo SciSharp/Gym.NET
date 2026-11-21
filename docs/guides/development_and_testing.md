@@ -21,7 +21,7 @@ repository's [CLAUDE.md](../../CLAUDE.md); the parity suite's own guide is
 
   `refs/Gymnasium` is Gymnasium v1.4.0 (`8ba8c3a6`), the behavior Gym.NET is held to. `refs/NumSharp` is NumSharp
   v0.80.0's source, used only by the opt-in `-p:NumSharpSource=Submodule` build; the default build uses the NumSharp
-  0.80.0 package.
+  0.81.0 package.
 - For the parity suite only: Python 3.12 with NumPy 2.4.2, pygame-ce 2.5.8, Box2D 2.3.10, OpenCV 4.13.0 and MuJoCo
   4.0.0, the stack pinned in `tools/parity/manifest.json`. `pwsh tools/parity/setup_venv.ps1` (or
   `bash tools/parity/setup_venv.sh`) creates it in `tools/parity/.venv`, where the suite finds it. A venv made before
@@ -82,8 +82,9 @@ dotnet test tests/Gym.Tests.Parity/Gym.Tests.Parity.csproj --filter "TestCategor
 ## Known gaps: [OpenBugs]
 
 A test Gym.NET does not pass yet carries `[OpenBugs("id")]`, NumSharp's convention: the gated runs exclude it, and a
-plain `dotnet test` runs it and fails. The id names the reason: `N-1`…`N-3` are NumSharp gaps
-(docs/plans/COMPLETION_PLAN.md §7), `P6`/`P7`/`P8` are phases still to come, `B-xx` the defect register of the port plan.
+plain `dotnet test` runs it and fails. The id names the reason: `N-x` a NumSharp gap (docs/plans/COMPLETION_PLAN.md §7;
+N-1 to N-4 closed with NumSharp 0.81.0), `DR-xx` a documented divergence such as DR-46's Intel IPP bilinear, `B-xx` the
+defect register of the port plan.
 The expectation is always Gymnasium's answer, never today's output: when the gap closes, the test passes, and the
 attribute is removed so it becomes part of the gate. A deliberate, documented deviation is not an open bug; it is a
 gated test that pins the deviation.

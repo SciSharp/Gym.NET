@@ -205,21 +205,21 @@ namespace Gym.Tests.Gymnasium.Spaces {
         public CustomSpace() : base(null, null, null) { }
 
         /// <summary>Gymnasium's base <c>is_np_flattenable</c>.</summary>
-        /// <exception cref="Gym.Exceptions.NotImplementedError">Always.</exception>
-        public override bool IsNpFlattenable => throw new Gym.Exceptions.NotImplementedError("");
+        /// <exception cref="NumSharp.NotImplementedError">Always.</exception>
+        public override bool IsNpFlattenable => throw new NumSharp.NotImplementedError("");
 
         /// <summary>Gymnasium's base <c>sample</c>.</summary>
         /// <param name="mask">Ignored.</param>
         /// <param name="probability">Ignored.</param>
         /// <returns>Never returns.</returns>
-        /// <exception cref="Gym.Exceptions.NotImplementedError">Always.</exception>
-        public override object? Sample(object? mask = null, object? probability = null) => throw new Gym.Exceptions.NotImplementedError("");
+        /// <exception cref="NumSharp.NotImplementedError">Always.</exception>
+        public override object? Sample(object? mask = null, object? probability = null) => throw new NumSharp.NotImplementedError("");
 
         /// <summary>Gymnasium's base <c>contains</c>.</summary>
         /// <param name="x">Ignored.</param>
         /// <returns>Never returns.</returns>
-        /// <exception cref="Gym.Exceptions.NotImplementedError">Always.</exception>
-        public override bool Contains(object? x) => throw new Gym.Exceptions.NotImplementedError("");
+        /// <exception cref="NumSharp.NotImplementedError">Always.</exception>
+        public override bool Contains(object? x) => throw new NumSharp.NotImplementedError("");
 
         /// <summary>Any custom space is equal to this one, as <c>CustomSpace.__eq__</c> says.</summary>
         /// <param name="obj">The other object.</param>

@@ -89,7 +89,7 @@ namespace Gym.Tests.Utils {
             Assert.AreEqual("float() argument must be a string or a real number, not 'NoneType'", Assert.ThrowsExactly<TypeError>(() => PyBuiltins.Float(null)).Message);
             using (NDArray vector = np.array(new[] { 0.1 }))
                 Assert.AreEqual("only 0-dimensional arrays can be converted to Python scalars", Assert.ThrowsExactly<TypeError>(() => PyBuiltins.Float(vector)).Message);
-            Assert.AreEqual("int too large to convert to float", Assert.ThrowsExactly<OverflowException>(() => PyBuiltins.Float(BigInteger.Pow(10, 400))).Message);
+            Assert.AreEqual("int too large to convert to float", Assert.ThrowsExactly<OverflowError>(() => PyBuiltins.Float(BigInteger.Pow(10, 400))).Message);
         }
 
         /// <summary><c>int(float)</c> truncates toward zero and fails on NaN and infinities with Python's messages.</summary>
@@ -98,7 +98,7 @@ namespace Gym.Tests.Utils {
             Assert.AreEqual(new BigInteger(-107), PyBuiltins.Int(-107.9));
             Assert.AreEqual(BigInteger.Parse("10000000000000000000000"), PyBuiltins.Int(1e22));
             Assert.AreEqual("cannot convert float NaN to integer", Assert.ThrowsExactly<ValueError>(() => PyBuiltins.Int(double.NaN)).Message);
-            Assert.AreEqual("cannot convert float infinity to integer", Assert.ThrowsExactly<OverflowException>(() => PyBuiltins.Int(double.NegativeInfinity)).Message);
+            Assert.AreEqual("cannot convert float infinity to integer", Assert.ThrowsExactly<OverflowError>(() => PyBuiltins.Int(double.NegativeInfinity)).Message);
         }
 
         /// <summary><c>repr(x)</c> and <c>str(type(x))</c> of the Python counterparts of .NET values, as Gymnasium's assert messages print them.</summary>

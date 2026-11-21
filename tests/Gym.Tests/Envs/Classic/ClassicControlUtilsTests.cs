@@ -43,7 +43,7 @@ namespace Gym.Tests.Envs.Classic {
         [TestMethod]
         public void MaybeParseResetBounds_LetsOverflowThrough() {
             var options = new Dictionary<string, object> { ["low"] = BigInteger.Pow(10, 400) };
-            Assert.AreEqual("int too large to convert to float", Assert.ThrowsExactly<OverflowException>(() => ClassicControlUtils.MaybeParseResetBounds(options, -0.05, 0.05)).Message);
+            Assert.AreEqual("int too large to convert to float", Assert.ThrowsExactly<OverflowError>(() => ClassicControlUtils.MaybeParseResetBounds(options, -0.05, 0.05)).Message);
         }
 
         /// <summary>

@@ -234,7 +234,7 @@ namespace Gym.Environments.Envs.Classic {
         /// <returns>The float32 observation and an empty info, <c>(obs, {})</c>.</returns>
         /// <exception cref="Error">Thrown for a negative seed, with Gymnasium's message.</exception>
         /// <exception cref="ValueError">Thrown for an option <c>float()</c> rejects, or a lower bound above the upper (see <see cref="ClassicControlUtils.MaybeParseResetBounds"/>).</exception>
-        /// <exception cref="OverflowException">
+        /// <exception cref="OverflowError">
         ///     Thrown, as Python's <c>OverflowError</c>, when the bounds are NaN or infinite (<c>high - low range exceeds valid
         ///     bounds</c>, from the generator) or an integer bound is beyond the float range.
         /// </exception>
@@ -350,7 +350,7 @@ namespace Gym.Environments.Envs.Classic {
         /// <exception cref="AssertionError">Thrown without a render mode when the env has no spec (<c>assert self.spec is not None</c>).</exception>
         /// <exception cref="KeyError">Thrown in human mode when <c>metadata["render_fps"]</c> was removed.</exception>
         /// <exception cref="ValueError">Thrown for a NaN coordinate (a NaN state), with pygame's message.</exception>
-        /// <exception cref="OverflowException">
+        /// <exception cref="OverflowError">
         ///     Thrown, as pygame's <c>OverflowError</c>, for a coordinate pygame cannot draw: beyond a C long in a polygon
         ///     (<c>x = 1e10</c>), or beyond Sint16 in the axle's circle (<c>x = 300</c>), or an infinite one.
         /// </exception>
@@ -507,7 +507,7 @@ namespace Gym.Environments.Envs.Classic {
         /// <param name="value">The float coordinate.</param>
         /// <returns>The integer for <see cref="GfxDraw"/>.</returns>
         /// <exception cref="ValueError">Thrown for NaN (<c>cannot convert float NaN to integer</c>).</exception>
-        /// <exception cref="OverflowException">Thrown for an infinity (<c>cannot convert float infinity to integer</c>).</exception>
+        /// <exception cref="OverflowError">Thrown for an infinity (<c>cannot convert float infinity to integer</c>).</exception>
         private static long PythonIntArgument(double value) {
             BigInteger integer = PyBuiltins.Int(value);
             if (integer > long.MaxValue)

@@ -29,7 +29,7 @@ namespace Gym.Tests.Gymnasium.Spaces {
             };
             foreach ((string name, Action<CustomSpace> call) in calls) {
                 using var space = new CustomSpace();
-                Assert.ThrowsExactly<Gym.Exceptions.NotImplementedError>(() => call(space), name);
+                Assert.ThrowsExactly<NumSharp.NotImplementedError>(() => call(space), name);
             }
         }
     }

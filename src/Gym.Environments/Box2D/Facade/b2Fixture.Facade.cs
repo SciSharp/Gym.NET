@@ -41,7 +41,7 @@ namespace Gym.Box2D {
         /// <param name="maskBits">The collision mask bits.</param>
         /// <param name="groupIndex">The collision group.</param>
         /// <param name="userData">The fixture's user data.</param>
-        /// <exception cref="System.OverflowException">Thrown for a scalar beyond the float32 range.</exception>
+        /// <exception cref="OverflowError">Thrown for a scalar beyond the float32 range.</exception>
         public b2FixtureDef(b2Shape? shape, double density = 0.0, double friction = 0.2, double restitution = 0.0, bool isSensor = false,
                             ushort categoryBits = 0x0001, ushort maskBits = 0xFFFF, short groupIndex = 0, object? userData = null) {
             this.shape = shape;

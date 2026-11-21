@@ -19,7 +19,7 @@ will be removed in 2.0.
   accepts a mix of 0.2.0 and 1.0.0 packages without a warning, and the mix fails when it runs: Gym.NET.Environments
   0.2.0 over Gym.NET 1.0.0 cannot load its envs (`Could not load type 'Gym.Envs.Env'`), and a 0.2.0 viewer over
   Gym.NET.Environments 1.0.0 cannot load its window (`Could not load type 'Gym.Environments.IEnvViewer'`).
-- NumSharp 0.80.0, which the packages bring, in place of 0.2's NumSharp.Lite 0.1.12. Remove any NumSharp.Lite
+- NumSharp 0.81.0, which the packages bring, in place of 0.2's NumSharp.Lite 0.1.12. Remove any NumSharp.Lite
   reference: with both, code naming `NDArray` stops compiling (CS0433, the type is in both). NumSharp's own API differs
   from NumSharp.Lite's: dtypes are `DType`s (`np.float32` still reads the same), indices are `long`, and random
   generators are NumPy's `Generator`.

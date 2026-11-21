@@ -135,7 +135,7 @@ namespace Gym.Environments.Envs.MuJoCo {
         /// <exception cref="ArgumentOutOfRangeException">The camera id names no model camera; or a human window's width or height is not positive.</exception>
         /// <exception cref="DependencyNotInstalled"><c>human</c> mode with neither a <c>viewer_factory</c> nor <c>Gymnasium.HumanViewerFactory</c> (DR-20).</exception>
         /// <exception cref="ValueError"><c>human</c> mode with a NaN simulation time or timestep, which the menu's step count cannot round.</exception>
-        /// <exception cref="OverflowException"><c>human</c> mode with an infinite step count in the menu (Python's <c>OverflowError</c>).</exception>
+        /// <exception cref="OverflowError"><c>human</c> mode with an infinite step count in the menu (Python's <c>OverflowError</c>).</exception>
         /// <exception cref="System.IO.IOException">The human window's T key could not write its PNG.</exception>
         /// <exception cref="UnauthorizedAccessException">The human window's T key may not write its PNG there.</exception>
         /// <exception cref="InvalidCastException">A camera configuration value of a kind the camera field cannot take.</exception>

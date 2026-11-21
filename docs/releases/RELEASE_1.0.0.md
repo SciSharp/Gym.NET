@@ -1,6 +1,6 @@
 # Gym.NET 1.0.0
 
-> **Prepared, not published yet.** Verified on 2026-11-12 on the working branch `journey1`; it ships when the
+> **Prepared, not published yet.** Verified on 2026-11-21 on the working branch `journey1`; it ships when the
 > maintainer merges it into `master`, tags it and publishes the packages (completion plan P10.5). Remove this note then.
 
 Gym.NET 1.0 gives .NET reinforcement-learning environments with Farama Gymnasium's API and behavior. For the same seed
@@ -33,7 +33,7 @@ API, which followed gym before 0.26, with Gymnasium's.
 | Gym.NET.Rendering.Avalonia | A window for `human` mode on Avalonia 12 (Windows, Linux, macOS), and `PlayPlot`'s live charts on ScottPlot (`AvaloniaPlotFigure`) |
 | Gym.NET.Rendering.WinForm | The same on Windows Forms (`WinFormPlotFigure`); its window's client area is the frame's size, where 0.2's form cropped the frame's bottom rows behind the title bar |
 
-All target .NET 8, .NET 10 and .NET 11, depend on NumSharp 0.80.0, and are Apache-2.0, the repository's license (decision
+All target .NET 8, .NET 10 and .NET 11, depend on NumSharp 0.81.0, and are Apache-2.0, the repository's license (decision
 DR-49). Each package carries THIRD-PARTY-NOTICES.md, which credits, with their notices, the sources Gym.NET translates
 (Box2D 2.3.0 and pybox2d, SDL_gfx, SDL_ttf, OpenCV's resize, CPython's difflib, json and math routines, pygame-ce's
 `draw.aaline`/`aalines`) and the data it carries (Gymnasium's assets, CarRacing's score glyphs, MuJoCo's font and
@@ -46,7 +46,7 @@ compiled models).
    0.2.0 over Gym.NET 1.0.0 cannot load its envs (`TypeLoadException: Could not load type 'Gym.Envs.Env'`), and a
    0.2.0 viewer over Gym.NET.Environments 1.0.0 cannot load its window (`Could not load type
    'Gym.Environments.IEnvViewer'`). Gym.NET.Rendering, new, comes with Gym.NET.Environments.
-2. **Remove NumSharp.Lite.** 1.0 depends on NumSharp 0.80.0; with NumSharp.Lite 0.1.12 still referenced, code naming
+2. **Remove NumSharp.Lite.** 1.0 depends on NumSharp 0.81.0; with NumSharp.Lite 0.1.12 still referenced, code naming
    `NDArray` stops compiling (CS0433: the type exists in both).
 3. **Target .NET 8 or later.** The packages carry .NET 8, .NET 10 and .NET 11 builds; 0.2's targeted .NET Core 3.1
    and .NET 6.
@@ -77,7 +77,7 @@ In short:
 - Envs are `Env<TObs, TAct>`; `Env`, `Env<TAction>` and `GoalEnv` are gone; `Gymnasium.Make` builds registered envs.
 - Rewards are `double`; infos are `Info` dicts; metadata keys are `render_modes` and `render_fps`.
 - Seeds select Gymnasium's random streams, so seeded runs give Gymnasium's numbers, not 0.2's.
-- NumSharp 0.80.0 replaces NumSharp.Lite 0.1.12; `Discrete` samples are 0-d int64 arrays.
+- NumSharp 0.81.0 replaces NumSharp.Lite 0.1.12; `Discrete` samples are 0-d int64 arrays.
 - The baselines-style vector types (`IVecEnv`, `VecEnv`, `DummyVecEnv`, `VecEnvWrapper`) moved to `Gym.Legacy`.
 - 0.2's unused public types are gone (DR-56): `CircularQueue<T>`, `CircularQueueThreadSafe<T>` and
   `GenericCallFactory`. The legacy `Dict`, which `Gym.Legacy` still returns, and its helpers in `Gym.Collections`,
@@ -191,28 +191,27 @@ Each is documented on the member, and the parity suite pins it, so a change show
   (DR-70): it draws at the viewer's client size, paces frames with a 60 Hz clock, opens at 960 × 540 when no size is
   given, writes T's capture under `/tmp` on the current drive (creating the folder), and after Esc or the close button
   draws nothing more.
-- **Exceptions**: Python's built-in exceptions are NumSharp's types; `OverflowError` and `ZeroDivisionError` are .NET's
-  `OverflowException` and `DivideByZeroException`. `InvalidAction`, `AlreadyPendingCallError` and `NoAsyncCallError` each
-  have one of 0.2's obsolete exceptions as their base (DR-58), a level Gymnasium's hierarchy does not have; their
-  messages, and the Python types they stand for, are Gymnasium's.
+- **Exceptions**: Python's and NumPy's exceptions are NumSharp 0.81.0's own classes, `OverflowError` and
+  `ZeroDivisionError` included, each under its .NET twin where .NET has one (`ValueError` is an `ArgumentException`).
+  `InvalidAction`, `AlreadyPendingCallError` and `NoAsyncCallError` each have one of 0.2's obsolete exceptions as their
+  base (DR-58), a level Gymnasium's hierarchy does not have; their messages, and the Python types they stand for, are
+  Gymnasium's.
 - **The reference platform is Windows x64.** Where Gymnasium's float64 arithmetic goes through the C runtime (CartPole's
   `cos`/`sin`, Box2D's and MuJoCo's math), results are verified on Windows; on Linux and macOS the C library may differ
   in the last bit.
 
 ## Known gaps
 
-Each has a test that asserts Gymnasium's answer and fails until the gap closes (`[OpenBugs]`):
+One, with a test that asserts Gymnasium's answer and fails until the gap closes (`[OpenBugs]`):
 
 - **`Cv2.Resize` of float32 images with `INTER_LINEAR`** gives OpenCV's own bilinear kernel, what `cv2` computes with
   `cv2.ipp.setUseIPP(False)` or on a build without Intel IPP. The `cv2` wheels hand that case to IPP by default, whose
   algorithm is not published, and its results differ by a few units in the last place (DR-46). uint8 images, which
   Gymnasium's wrappers use, and float32 `INTER_AREA` are exact either way.
-- **A bare `assert`'s message**: where Gymnasium fails a message-less `assert` (Taxi's `decode` beyond the grid,
-  Blackjack's refused actions, a Box2D env stepped before its first reset, `render()` without a render mode or spec),
-  Gym.NET raises `AssertionError` too, but its message is NumSharp's `"AssertionError"` instead of Python's empty one
-  (NumSharp gap N-1).
-- **`NotImplementedError` and `ImportError`** are `Gym.Exceptions` types until NumSharp defines them, and NumSharp's
-  exceptions take no inner exception yet (N-3).
+
+NumSharp 0.81.0 closed the four NumSharp gaps the 1.0 work found (N-1 to N-4): a bare `assert` fails with Python's
+empty message, `NotImplementedError` and `ImportError` are NumSharp's, every exception takes an inner exception, and
+`np.linspace` and the `'c'` dtype behave as NumPy's.
 
 ## Not in 1.0
 
@@ -262,23 +261,22 @@ A new advisory against 2.1.13 gets the same review before Gym.NET suppresses it.
 
 ## Verification
 
-On 2026-11-12, on Windows x64, in Release, on net8.0, net10.0 and net11.0 alike (built with the .NET 11 SDK, 11.0.100),
-on the tree of this release:
+On 2026-11-21, on Windows x64, in Release, on net8.0, net10.0 and net11.0 alike (built with the .NET 11 SDK, 11.0.100,
+against NumSharp 0.81.0):
 
-- **The unit suite** (Gymnasium's own tests rewritten in C#, and Gym.NET's): 3,894 of 3,894 pass (24 data rows skip
-  where Gymnasium's own tests call `pytest.skip`), and the 10 open tests fail only at their documented gaps (NumSharp's
-  N-1 to N-4).
+- **The unit suite** (Gymnasium's own tests rewritten in C#, and Gym.NET's): 3,904 of 3,904 pass (24 data rows skip
+  where Gymnasium's own tests call `pytest.skip`); none is open since NumSharp 0.81.0 closed N-1 to N-4.
 - **The live parity suite**, against Gymnasium v1.4.0 on Python 3.12, NumPy 2.4.2, pygame-ce 2.5.8, Box2D 2.3.10,
-  OpenCV 4.13.0 and MuJoCo 4.0.0: 2,916 of 2,916 gated cells pass, every registered id at every layer. The 7 open cells
-  fail only at their documented divergences: six at NumSharp's N-1, the bare assertion's empty message, and one at Intel
-  IPP's float32 bilinear (DR-46). The gate includes:
+  OpenCV 4.13.0 and MuJoCo 4.0.0: 2,922 of 2,922 gated cells pass, every registered id at every layer. The one open cell
+  fails only at its documented divergence, Intel IPP's float32 bilinear (DR-46). The gate includes:
   - Gymnasium's own `check_env` and `check_environments_match`, run through the reverse bridge on the 38 ids that build;
   - the 40 golden trajectories, replayed without Python;
   - the MuJoCo frame and window cells, on the reference GPU (NVIDIA GeForce RTX 4060 Ti, driver 616.56).
-- **The five packages**, packed from that tree with a build for each framework, and restored from a local feed into
-  apps of their own on .NET 10 and on .NET 11:
+- **The five packages** (checked on 2026-11-12, with NumSharp 0.80.0; redone at the release), packed with a build for
+  each framework, and restored from a local feed into apps of their own on .NET 10 and on .NET 11:
   - 12 ids from every family, MuJoCo's HalfCheetah, Humanoid, Pusher and Ant among them, made, stepped and rendered,
     the same frames on both runtimes;
   - installed all together, every type of the five assemblies loads, both viewers implement the window and input
     contracts, and 0.2's common lines compile and run through the shims.
-- **The rest**: the CartPole example solves CartPole-v1 in seven generations, and the documentation site builds.
+- **The rest** (2026-11-12): the CartPole example solves CartPole-v1 in seven generations, and the documentation site
+  builds.

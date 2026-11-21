@@ -36,7 +36,7 @@
 
   <!-- NumSharp's Generator is NumPy's bit for bit: it draws the reset noise and the sampled actions Gymnasium draws. -->
   <ItemGroup>
-    <PackageReference Include="NumSharp" Version="0.80.0" />
+    <PackageReference Include="NumSharp" Version="0.81.0" />
   </ItemGroup>
 
 </Project>

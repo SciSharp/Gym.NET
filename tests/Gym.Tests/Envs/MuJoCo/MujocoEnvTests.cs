@@ -325,7 +325,7 @@ namespace Gym.Tests.Envs.MuJoCo {
         [TestMethod]
         public void ZeroFrameSkip_FailsTheFrameRateAsPython() {
             Assert.AreEqual("cannot convert float infinity to integer",
-                Assert.ThrowsExactly<OverflowException>(() => new SwimmerEnvV5(frameSkip: 0)).Message);
+                Assert.ThrowsExactly<OverflowError>(() => new SwimmerEnvV5(frameSkip: 0)).Message);
         }
     }
 }

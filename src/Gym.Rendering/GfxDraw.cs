@@ -14,7 +14,7 @@ namespace Gym.Rendering {
     ///     <para>
     ///     Polygon vertices are floats, as Gymnasium computes them. pygame converts each coordinate with Python's
     ///     <c>int()</c> (truncation toward zero; NaN raises <see cref="ValueError"/>, an infinity
-    ///     <see cref="OverflowException"/>), then to a C <c>long</c> (32 bits on the reference platform, Windows x64; larger
+    ///     <see cref="OverflowError"/>), then to a C <c>long</c> (32 bits on the reference platform, Windows x64; larger
     ///     values raise <c>Python int too large to convert to C long</c>) and finally truncates it to Sint16 without a check:
     ///     a vertex at x = 40000 is drawn at x = -25536.
     ///     </para>
@@ -25,7 +25,7 @@ namespace Gym.Rendering {
     ///     argument is checked in order, so the first bad one names the error, as in Python.
     ///     </para>
     ///     <para>
-    ///     Python's <c>OverflowError</c> is <see cref="OverflowException"/>, the type NumSharp throws for NumPy's; its
+    ///     Python's <c>OverflowError</c> is <see cref="OverflowError"/>, the type NumSharp throws for NumPy's; its
     ///     <c>ValueError</c> is <see cref="ValueError"/>. On Linux and macOS a C long has 64 bits, so pygame there reports the
     ///     Sint16 range message for values between 2^31 and 2^63; Gym.NET follows the reference platform everywhere.
     ///     </para>
@@ -42,7 +42,7 @@ namespace Gym.Rendering {
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="surface"/> or <paramref name="points"/> is <see langword="null"/>.</exception>
         /// <exception cref="NotSupportedException">Thrown for a surface with per-pixel alpha, which the SDL_gfx port does not model.</exception>
         /// <exception cref="ValueError">Thrown for fewer than 3 points (<c>points must contain more than 2 points</c>) or a NaN coordinate.</exception>
-        /// <exception cref="OverflowException">Thrown for an infinite coordinate or one beyond a C long.</exception>
+        /// <exception cref="OverflowError">Thrown for an infinite coordinate or one beyond a C long.</exception>
         public static void AAPolygon(Surface surface, IReadOnlyList<(double X, double Y)> points, Color color) {
             (short[] vx, short[] vy) = PolygonArguments(surface, points);
             Check(SdlGfxPrimitives.AapolygonColor(surface, vx, vy, color.Packed), "aapolygon");
@@ -55,7 +55,7 @@ namespace Gym.Rendering {
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="surface"/> or <paramref name="points"/> is <see langword="null"/>.</exception>
         /// <exception cref="NotSupportedException">Thrown for a surface with per-pixel alpha, which the SDL_gfx port does not model.</exception>
         /// <exception cref="ValueError">Thrown for fewer than 3 points or a NaN coordinate.</exception>
-        /// <exception cref="OverflowException">Thrown for an infinite coordinate or one beyond a C long.</exception>
+        /// <exception cref="OverflowError">Thrown for an infinite coordinate or one beyond a C long.</exception>
         public static void FilledPolygon(Surface surface, IReadOnlyList<(double X, double Y)> points, Color color) {
             (short[] vx, short[] vy) = PolygonArguments(surface, points);
             Check(SdlGfxPrimitives.FilledPolygonColor(surface, vx, vy, color.Packed), "filled_polygon");
@@ -69,7 +69,7 @@ namespace Gym.Rendering {
         /// <param name="color">The colour.</param>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="surface"/> is <see langword="null"/>.</exception>
         /// <exception cref="NotSupportedException">Thrown for a surface with per-pixel alpha, which the SDL_gfx port does not model.</exception>
-        /// <exception cref="OverflowException">Thrown for an argument outside Sint16 (with pygame's message for it).</exception>
+        /// <exception cref="OverflowError">Thrown for an argument outside Sint16 (with pygame's message for it).</exception>
         /// <exception cref="SdlError">Thrown for a negative radius, which SDL_gfx rejects.</exception>
         public static void AACircle(Surface surface, long x, long y, long r, Color color) {
             if (surface is null)
@@ -87,7 +87,7 @@ namespace Gym.Rendering {
         /// <param name="color">The colour.</param>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="surface"/> is <see langword="null"/>.</exception>
         /// <exception cref="NotSupportedException">Thrown for a surface with per-pixel alpha, which the SDL_gfx port does not model.</exception>
-        /// <exception cref="OverflowException">Thrown for an argument outside Sint16.</exception>
+        /// <exception cref="OverflowError">Thrown for an argument outside Sint16.</exception>
         /// <exception cref="SdlError">Thrown for a negative radius.</exception>
         public static void FilledCircle(Surface surface, long x, long y, long r, Color color) {
             if (surface is null)
@@ -105,7 +105,7 @@ namespace Gym.Rendering {
         /// <param name="color">The colour.</param>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="surface"/> is <see langword="null"/>.</exception>
         /// <exception cref="NotSupportedException">Thrown for a surface with per-pixel alpha, which the SDL_gfx port does not model.</exception>
-        /// <exception cref="OverflowException">Thrown for an argument outside Sint16.</exception>
+        /// <exception cref="OverflowError">Thrown for an argument outside Sint16.</exception>
         public static void HLine(Surface surface, long x1, long x2, long y, Color color) {
             if (surface is null)
                 throw new ArgumentNullException(nameof(surface));
@@ -122,7 +122,7 @@ namespace Gym.Rendering {
         /// <param name="color">The colour.</param>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="surface"/> is <see langword="null"/>.</exception>
         /// <exception cref="NotSupportedException">Thrown for a surface with per-pixel alpha, which the SDL_gfx port does not model.</exception>
-        /// <exception cref="OverflowException">Thrown for an argument outside Sint16.</exception>
+        /// <exception cref="OverflowError">Thrown for an argument outside Sint16.</exception>
         public static void VLine(Surface surface, long x, long y1, long y2, Color color) {
             if (surface is null)
                 throw new ArgumentNullException(nameof(surface));
@@ -137,14 +137,14 @@ namespace Gym.Rendering {
         /// </summary>
         /// <param name="value">The Python int.</param>
         /// <returns>The Sint16.</returns>
-        /// <exception cref="OverflowException">Thrown with pygame's message for a value outside the C long or the Sint16 range.</exception>
+        /// <exception cref="OverflowError">Thrown with pygame's message for a value outside the C long or the Sint16 range.</exception>
         internal static short ShortArgument(long value) {
             if (value < int.MinValue || value > int.MaxValue)
-                throw new OverflowException("Python int too large to convert to C long");
+                throw new OverflowError("Python int too large to convert to C long");
             if (value > short.MaxValue)
-                throw new OverflowException("signed short integer is greater than maximum");
+                throw new OverflowError("signed short integer is greater than maximum");
             if (value < short.MinValue)
-                throw new OverflowException("signed short integer is less than minimum");
+                throw new OverflowError("signed short integer is less than minimum");
             return (short)value;
         }
 
@@ -155,11 +155,11 @@ namespace Gym.Rendering {
         /// <param name="value">The coordinate.</param>
         /// <returns>The Sint16 SDL_gfx draws at.</returns>
         /// <exception cref="ValueError">Thrown for NaN.</exception>
-        /// <exception cref="OverflowException">Thrown for an infinity or a value beyond a C long.</exception>
+        /// <exception cref="OverflowError">Thrown for an infinity or a value beyond a C long.</exception>
         internal static short CoordinateArgument(double value) {
             BigInteger integer = PyBuiltins.Int(value);
             if (integer < int.MinValue || integer > int.MaxValue)
-                throw new OverflowException("Python int too large to convert to C long");
+                throw new OverflowError("Python int too large to convert to C long");
             return unchecked((short)(int)integer);
         }
 
@@ -173,7 +173,7 @@ namespace Gym.Rendering {
         /// <exception cref="ArgumentNullException">Thrown when an argument is <see langword="null"/>.</exception>
         /// <exception cref="NotSupportedException">Thrown for a surface with per-pixel alpha.</exception>
         /// <exception cref="ValueError">Thrown for fewer than 3 points or a NaN coordinate.</exception>
-        /// <exception cref="OverflowException">Thrown for an infinite coordinate or one beyond a C long.</exception>
+        /// <exception cref="OverflowError">Thrown for an infinite coordinate or one beyond a C long.</exception>
         private static (short[] X, short[] Y) PolygonArguments(Surface surface, IReadOnlyList<(double X, double Y)> points) {
             if (surface is null)
                 throw new ArgumentNullException(nameof(surface));

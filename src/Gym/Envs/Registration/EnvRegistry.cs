@@ -356,7 +356,7 @@ namespace Gym.Envs.Registration {
         /// <param name="excludeNamespaces">Namespaces to leave out, or <see langword="null"/>.</param>
         /// <param name="disablePrint">Return the text instead of writing it to the console.</param>
         /// <returns>The text when <paramref name="disablePrint"/> is set, otherwise <see langword="null"/>.</returns>
-        /// <exception cref="DivideByZeroException">Thrown when <paramref name="numCols"/> is 0 (Python's <c>ZeroDivisionError</c>).</exception>
+        /// <exception cref="ZeroDivisionError">Thrown when <paramref name="numCols"/> is 0 (Python's <c>ZeroDivisionError</c>).</exception>
         /// <remarks>
         ///     An id without a namespace is grouped by its entry point, as in Gymnasium: a string
         ///     <c>"gymnasium.envs.classic_control.cartpole:CartPoleEnv"</c> by its third dotted part (<c>classic_control</c>),
@@ -411,7 +411,8 @@ namespace Gym.Envs.Registration {
                     // ljust pads to max_justify code points; ids longer than the longest name are left as they are.
                     string envId = sorted[count - 1];
                     namespaceOutput.Append(envId).Append(' ', Math.Max(0, maxJustify - CodePointLength(envId))).Append(' ');
-                    if (count % numCols == 0) {
+                    // Python's %: a num_cols of 0 raises ZeroDivisionError("integer modulo by zero"), NumSharp's class
+                    if (PyMath.Mod(count, numCols) == 0) {
                         TrimEndSpaces(namespaceOutput);
                         if (count != sorted.Count)
                             namespaceOutput.Append('\n');

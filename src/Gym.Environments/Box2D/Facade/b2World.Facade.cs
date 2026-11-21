@@ -196,7 +196,7 @@ namespace Gym.Box2D {
         /// <param name="userData">The user data.</param>
         /// <returns>The body.</returns>
         /// <exception cref="AssertionError">Thrown while the world is stepping, or for an invalid definition or shape.</exception>
-        /// <exception cref="System.OverflowException">Thrown for a scalar beyond the float32 range.</exception>
+        /// <exception cref="OverflowError">Thrown for a scalar beyond the float32 range.</exception>
         /// <exception cref="TypeError">Thrown for a vector coordinate beyond the float32 range.</exception>
         public b2Body CreateDynamicBody(b2Vec2? position = null, double angle = 0.0, IEnumerable<b2FixtureDef>? fixtures = null,
                                         IEnumerable<b2Shape>? shapes = null, b2FixtureDef? shapeFixture = null, b2Vec2? linearVelocity = null,
@@ -213,7 +213,7 @@ namespace Gym.Box2D {
         /// <param name="userData">The user data.</param>
         /// <returns>The body.</returns>
         /// <exception cref="AssertionError">Thrown while the world is stepping, or for an invalid shape.</exception>
-        /// <exception cref="System.OverflowException">Thrown for a scalar beyond the float32 range.</exception>
+        /// <exception cref="OverflowError">Thrown for a scalar beyond the float32 range.</exception>
         public b2Body CreateDynamicBody(b2FixtureDef fixtures, b2Vec2? position = null, double angle = 0.0, object? userData = null) =>
             CreateDynamicBody(position, angle, new[] { fixtures }, userData: userData);
 
@@ -226,7 +226,7 @@ namespace Gym.Box2D {
         /// <param name="userData">The user data.</param>
         /// <returns>The body.</returns>
         /// <exception cref="AssertionError">Thrown while the world is stepping, or for an invalid shape.</exception>
-        /// <exception cref="System.OverflowException">Thrown for a scalar beyond the float32 range.</exception>
+        /// <exception cref="OverflowError">Thrown for a scalar beyond the float32 range.</exception>
         public b2Body CreateStaticBody(b2Vec2? position = null, double angle = 0.0, IEnumerable<b2FixtureDef>? fixtures = null,
                                        IEnumerable<b2Shape>? shapes = null, b2FixtureDef? shapeFixture = null, object? userData = null) =>
             CreateBody(new b2BodyDef(b2BodyType.b2_staticBody, position, angle, fixtures, shapes, shapeFixture, userData: userData));
@@ -238,7 +238,7 @@ namespace Gym.Box2D {
         /// <param name="userData">The user data.</param>
         /// <returns>The body.</returns>
         /// <exception cref="AssertionError">Thrown while the world is stepping, or for an invalid shape.</exception>
-        /// <exception cref="System.OverflowException">Thrown for a scalar beyond the float32 range.</exception>
+        /// <exception cref="OverflowError">Thrown for a scalar beyond the float32 range.</exception>
         public b2Body CreateStaticBody(b2FixtureDef fixtures, b2Vec2? position = null, double angle = 0.0, object? userData = null) =>
             CreateStaticBody(position, angle, new[] { fixtures }, userData: userData);
 
@@ -248,7 +248,7 @@ namespace Gym.Box2D {
         /// <param name="angle">The angle in radians.</param>
         /// <returns>The body.</returns>
         /// <exception cref="AssertionError">Thrown while the world is stepping, or for an invalid shape.</exception>
-        /// <exception cref="System.OverflowException">Thrown for a scalar beyond the float32 range.</exception>
+        /// <exception cref="OverflowError">Thrown for a scalar beyond the float32 range.</exception>
         public b2Body CreateStaticBody(b2Shape shapes, b2Vec2? position = null, double angle = 0.0) =>
             CreateStaticBody(position, angle, shapes: new[] { shapes });
 
@@ -261,7 +261,7 @@ namespace Gym.Box2D {
         /// <param name="userData">The user data.</param>
         /// <returns>The body.</returns>
         /// <exception cref="AssertionError">Thrown while the world is stepping, or for an invalid shape.</exception>
-        /// <exception cref="System.OverflowException">Thrown for a scalar beyond the float32 range.</exception>
+        /// <exception cref="OverflowError">Thrown for a scalar beyond the float32 range.</exception>
         public b2Body CreateKinematicBody(b2Vec2? position = null, double angle = 0.0, IEnumerable<b2FixtureDef>? fixtures = null,
                                           b2Vec2? linearVelocity = null, double angularVelocity = 0.0, object? userData = null) =>
             CreateBody(new b2BodyDef(b2BodyType.b2_kinematicBody, position, angle, fixtures, linearVelocity: linearVelocity,
@@ -288,7 +288,7 @@ namespace Gym.Box2D {
         /// <param name="timeStep">The time step in seconds.</param>
         /// <param name="velocityIterations">The velocity iterations (Gymnasium's envs use <c>6 * 30</c>).</param>
         /// <param name="positionIterations">The position iterations (Gymnasium's envs use <c>2 * 30</c>).</param>
-        /// <exception cref="System.OverflowException">Thrown for a time step beyond the float32 range.</exception>
+        /// <exception cref="OverflowError">Thrown for a time step beyond the float32 range.</exception>
         /// <exception cref="AssertionError">Thrown on an internal inconsistency, leaving the world locked as pybox2d does.</exception>
         public void Step(double timeStep, int velocityIterations, int positionIterations) =>
             Step(Box2DConvert.ToFloat32(timeStep, "b2World_Step", 2), velocityIterations, positionIterations);

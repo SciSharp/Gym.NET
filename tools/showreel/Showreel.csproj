@@ -42,7 +42,7 @@
        -p:NumSharpSource=Submodule switch reaches this tool too. -->
   <ItemGroup>
     <PackageReference Include="SixLabors.ImageSharp" Version="2.1.13" />
-    <PackageReference Include="NumSharp" Version="0.80.0" />
+    <PackageReference Include="NumSharp" Version="0.81.0" />
   </ItemGroup>
   <Import Project="..\..\eng\NumSharp.props" />
 

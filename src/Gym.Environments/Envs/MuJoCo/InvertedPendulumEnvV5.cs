@@ -42,7 +42,7 @@ namespace Gym.Environments.Envs.MuJoCo {
         /// <param name="visualOptions">MuJoCo visual flags to switch (<c>visual_options</c>).</param>
         /// <param name="viewerFactory">Gym.NET's <c>viewer_factory</c> (DR-20) for <c>human</c> mode.</param>
         /// <exception cref="NotSupportedException"><paramref name="xmlFile"/> is not a bundled model.</exception>
-        /// <exception cref="OverflowException">A frame skip of 0 (Python's <c>OverflowError</c> deriving the frame rate).</exception>
+        /// <exception cref="OverflowError">A frame skip of 0 (Python's <c>OverflowError</c> deriving the frame rate).</exception>
         /// <exception cref="ValueError">Both a camera id and a camera name.</exception>
         public InvertedPendulumEnvV5(string xmlFile = "inverted_pendulum.xml", int frameSkip = 2,
                                      IReadOnlyDictionary<string, object?>? defaultCameraConfig = null, double resetNoiseScale = 0.01,

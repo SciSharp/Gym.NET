@@ -285,7 +285,7 @@ namespace Gym.Environments.Envs.Classic {
         /// <returns>One <see cref="RenderResult.Rgb"/> per cart (new arrays the caller owns), or <see langword="null"/> without a render mode.</returns>
         /// <exception cref="AssertionError">Thrown without a render mode when the env has no spec (<c>assert self.spec is not None</c>).</exception>
         /// <exception cref="ValueError">Thrown before the first reset (<c>Cartpole's state is None, it probably hasn't be reset yet.</c>), and for a NaN coordinate with pygame's message.</exception>
-        /// <exception cref="OverflowException">Thrown, as pygame's <c>OverflowError</c>, for a coordinate pygame cannot draw.</exception>
+        /// <exception cref="OverflowError">Thrown, as pygame's <c>OverflowError</c>, for a coordinate pygame cannot draw.</exception>
         /// <remarks>Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/envs/classic_control/cartpole.py#L516">gymnasium/envs/classic_control/cartpole.py</see>.</remarks>
         public override IReadOnlyList<RenderResult>? Render() {
             if (RenderMode is null) {
@@ -324,7 +324,7 @@ namespace Gym.Environments.Envs.Classic {
         /// <param name="cartwidth">The cart's width in pixels.</param>
         /// <param name="cartheight">The cart's height in pixels.</param>
         /// <exception cref="ValueError">Thrown for a NaN coordinate, with pygame's message.</exception>
-        /// <exception cref="OverflowException">Thrown for a coordinate pygame cannot draw.</exception>
+        /// <exception cref="OverflowError">Thrown for a coordinate pygame cannot draw.</exception>
         private void DrawCart(double x, double theta, Surface screen, double scale, double polewidth, double polelen, double cartwidth, double cartheight) {
             var surf = new Surface(ScreenWidth, ScreenHeight);
             Surf = surf;
@@ -394,7 +394,7 @@ namespace Gym.Environments.Envs.Classic {
         /// <param name="value">The float coordinate.</param>
         /// <returns>The integer for <see cref="GfxDraw"/>.</returns>
         /// <exception cref="ValueError">Thrown for NaN (<c>cannot convert float NaN to integer</c>).</exception>
-        /// <exception cref="OverflowException">Thrown for an infinity (<c>cannot convert float infinity to integer</c>).</exception>
+        /// <exception cref="OverflowError">Thrown for an infinity (<c>cannot convert float infinity to integer</c>).</exception>
         private static long PythonIntArgument(double value) {
             BigInteger integer = PyBuiltins.Int(value);
             if (integer > long.MaxValue)

@@ -73,7 +73,7 @@ namespace Gym.Box2D {
         /// <param name="collideConnected">Whether the bodies may collide.</param>
         /// <param name="anchor">A world anchor point; sets both local anchors from the bodies' current frames (pybox2d's <c>anchor</c>).</param>
         /// <exception cref="ValueError">Thrown when <paramref name="anchor"/> is given without both bodies.</exception>
-        /// <exception cref="OverflowException">Thrown for a scalar beyond the float32 range.</exception>
+        /// <exception cref="OverflowError">Thrown for a scalar beyond the float32 range.</exception>
         public b2RevoluteJointDef(b2Body? bodyA = null, b2Body? bodyB = null, b2Vec2? localAnchorA = null, b2Vec2? localAnchorB = null,
                                   double? referenceAngle = null, bool enableLimit = false, double lowerAngle = 0.0, double upperAngle = 0.0,
                                   bool enableMotor = false, double motorSpeed = 0.0, double maxMotorTorque = 0.0, bool collideConnected = false,

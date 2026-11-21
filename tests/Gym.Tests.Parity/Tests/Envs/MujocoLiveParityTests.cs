@@ -267,7 +267,7 @@ namespace Gym.Tests.Parity.Tests.Envs {
             using (WarningCatcher catcher = Warnings.Catch()) {
                 try {
                     Gymnasium.Make(id).Dispose();
-                } catch (Gym.Exceptions.ImportError) {
+                } catch (NumSharp.ImportError) {
                     // Pusher-v4 refuses in its constructor, after make's version check has warned.
                 }
 

@@ -294,7 +294,6 @@ namespace Gym.Tests.Parity.Tests.Core {
         ///     spec-and-warning half below, which stays gated.
         /// </remarks>
         [TestMethod]
-        [OpenBugs("N-1")]
         public void RenderWithoutRenderMode_WithoutSpec_RaisesGymnasiumsBareAssertion() {
             using PyRef python = PyRef.Of(() => Python.gymnasium.envs.classic_control.CartPoleEnv());
             var dotnet = new CartPoleEnv();

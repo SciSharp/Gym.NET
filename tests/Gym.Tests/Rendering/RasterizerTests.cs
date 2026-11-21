@@ -65,11 +65,11 @@ namespace Gym.Tests.Rendering {
             var black = new Color(0, 0, 0);
             Assert.AreEqual("points must contain more than 2 points", Assert.ThrowsExactly<ValueError>(() => GfxDraw.AAPolygon(surface, new[] { (0.0, 0.0), (1.0, 1.0) }, black)).Message);
             Assert.AreEqual("cannot convert float NaN to integer", Assert.ThrowsExactly<ValueError>(() => GfxDraw.FilledPolygon(surface, new[] { (double.NaN, 0.0), (1.0, 1.0), (2.0, 3.0) }, black)).Message);
-            Assert.AreEqual("cannot convert float infinity to integer", Assert.ThrowsExactly<OverflowException>(() => GfxDraw.AAPolygon(surface, new[] { (0.0, 0.0), (1.0, double.PositiveInfinity), (2.0, 3.0) }, black)).Message);
-            Assert.AreEqual("Python int too large to convert to C long", Assert.ThrowsExactly<OverflowException>(() => GfxDraw.AAPolygon(surface, new[] { (0.0, 0.0), (1e10, 1.0), (2.0, 3.0) }, black)).Message);
-            Assert.AreEqual("signed short integer is greater than maximum", Assert.ThrowsExactly<OverflowException>(() => GfxDraw.AACircle(surface, 40000, 0, 5, black)).Message);
-            Assert.AreEqual("signed short integer is less than minimum", Assert.ThrowsExactly<OverflowException>(() => GfxDraw.HLine(surface, 0, -40000, 0, black)).Message);
-            Assert.AreEqual("Python int too large to convert to C long", Assert.ThrowsExactly<OverflowException>(() => GfxDraw.VLine(surface, 1L << 40, 0, 1, black)).Message);
+            Assert.AreEqual("cannot convert float infinity to integer", Assert.ThrowsExactly<OverflowError>(() => GfxDraw.AAPolygon(surface, new[] { (0.0, 0.0), (1.0, double.PositiveInfinity), (2.0, 3.0) }, black)).Message);
+            Assert.AreEqual("Python int too large to convert to C long", Assert.ThrowsExactly<OverflowError>(() => GfxDraw.AAPolygon(surface, new[] { (0.0, 0.0), (1e10, 1.0), (2.0, 3.0) }, black)).Message);
+            Assert.AreEqual("signed short integer is greater than maximum", Assert.ThrowsExactly<OverflowError>(() => GfxDraw.AACircle(surface, 40000, 0, 5, black)).Message);
+            Assert.AreEqual("signed short integer is less than minimum", Assert.ThrowsExactly<OverflowError>(() => GfxDraw.HLine(surface, 0, -40000, 0, black)).Message);
+            Assert.AreEqual("Python int too large to convert to C long", Assert.ThrowsExactly<OverflowError>(() => GfxDraw.VLine(surface, 1L << 40, 0, 1, black)).Message);
         }
 
         /// <summary>A polygon vertex beyond Sint16 wraps around rather than failing, as pygame truncates it unchecked.</summary>

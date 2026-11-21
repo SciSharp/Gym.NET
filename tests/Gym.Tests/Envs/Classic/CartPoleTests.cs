@@ -232,7 +232,6 @@ namespace Gym.Tests.Envs.Classic {
         ///     <c>"AssertionError"</c> (N-1, decisions DR-01 and DR-02).
         /// </remarks>
         [TestMethod]
-        [OpenBugs("N-1")]
         public void Render_WithoutRenderModeOrSpec_HasPythonsEmptyMessage() {
             var env = new CartPoleEnv();
             env.Reset(seed: 0).Observation.Dispose();

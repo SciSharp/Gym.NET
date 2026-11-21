@@ -22,9 +22,9 @@ namespace Gym.Tests.Utils {
             Assert.AreEqual(-1L, PyMath.Mod(7L, -2L));
             Assert.AreEqual((-4L, 1L), PyMath.DivMod(-7L, 2L));
             Assert.AreEqual(0L, PyMath.Mod(long.MinValue, -1L));
-            Assert.AreEqual("integer division or modulo by zero", Assert.ThrowsExactly<DivideByZeroException>(() => PyMath.FloorDiv(1L, 0L)).Message);
-            Assert.AreEqual("integer modulo by zero", Assert.ThrowsExactly<DivideByZeroException>(() => PyMath.Mod(1L, 0L)).Message);
-            Assert.AreEqual("integer division or modulo by zero", Assert.ThrowsExactly<DivideByZeroException>(() => PyMath.DivMod(1L, 0L)).Message);
+            Assert.AreEqual("integer division or modulo by zero", Assert.ThrowsExactly<ZeroDivisionError>(() => PyMath.FloorDiv(1L, 0L)).Message);
+            Assert.AreEqual("integer modulo by zero", Assert.ThrowsExactly<ZeroDivisionError>(() => PyMath.Mod(1L, 0L)).Message);
+            Assert.AreEqual("integer division or modulo by zero", Assert.ThrowsExactly<ZeroDivisionError>(() => PyMath.DivMod(1L, 0L)).Message);
             Assert.ThrowsExactly<OverflowException>(() => PyMath.FloorDiv(long.MinValue, -1L));
         }
 
@@ -45,9 +45,9 @@ namespace Gym.Tests.Utils {
             AssertBits(BitConverter.Int64BitsToDouble(0x7FF8000000000000L), PyMath.Mod(double.PositiveInfinity, 2.0));
             AssertBits(BitConverter.Int64BitsToDouble(unchecked((long)0xFFF8000000000000UL)), PyMath.Mod(double.NegativeInfinity, 2.0));
             AssertBits(BitConverter.Int64BitsToDouble(unchecked((long)0xFFF8000000000000UL)), PyMath.FloorDiv(double.NegativeInfinity, 2.0));
-            Assert.AreEqual("float floor division by zero", Assert.ThrowsExactly<DivideByZeroException>(() => PyMath.FloorDiv(1.0, 0.0)).Message);
-            Assert.AreEqual("float modulo", Assert.ThrowsExactly<DivideByZeroException>(() => PyMath.Mod(1.0, -0.0)).Message);
-            Assert.AreEqual("float divmod()", Assert.ThrowsExactly<DivideByZeroException>(() => PyMath.DivMod(1.0, 0.0)).Message);
+            Assert.AreEqual("float floor division by zero", Assert.ThrowsExactly<ZeroDivisionError>(() => PyMath.FloorDiv(1.0, 0.0)).Message);
+            Assert.AreEqual("float modulo", Assert.ThrowsExactly<ZeroDivisionError>(() => PyMath.Mod(1.0, -0.0)).Message);
+            Assert.AreEqual("float divmod()", Assert.ThrowsExactly<ZeroDivisionError>(() => PyMath.DivMod(1.0, 0.0)).Message);
         }
 
         /// <summary>Python's <c>min</c>/<c>max</c> keep the first argument on ties and on every comparison with NaN.</summary>
@@ -75,7 +75,7 @@ namespace Gym.Tests.Utils {
             Assert.AreEqual(BigInteger.Zero, PyMath.Round(-0.5));
             Assert.AreEqual(new BigInteger(1e300), PyMath.Round(1e300));
             Assert.AreEqual("cannot convert float NaN to integer", Assert.ThrowsExactly<ValueError>(() => PyMath.Round(double.NaN)).Message);
-            Assert.AreEqual("cannot convert float infinity to integer", Assert.ThrowsExactly<OverflowException>(() => PyMath.Round(double.PositiveInfinity)).Message);
+            Assert.AreEqual("cannot convert float infinity to integer", Assert.ThrowsExactly<OverflowError>(() => PyMath.Round(double.PositiveInfinity)).Message);
         }
 
         /// <summary><c>round(x, n)</c> rounds the exact binary value, ties to even, and keeps the sign of a zero.</summary>
@@ -92,7 +92,7 @@ namespace Gym.Tests.Utils {
             AssertBits(-0.0, PyMath.Round(-1.5, -400));
             Assert.IsTrue(double.IsNaN(PyMath.Round(double.NaN, 2)));
             Assert.AreEqual(double.NegativeInfinity, PyMath.Round(double.NegativeInfinity, 2));
-            Assert.AreEqual("rounded value too large to represent", Assert.ThrowsExactly<OverflowException>(() => PyMath.Round(1.7976931348623157e308, -308)).Message);
+            Assert.AreEqual("rounded value too large to represent", Assert.ThrowsExactly<OverflowError>(() => PyMath.Round(1.7976931348623157e308, -308)).Message);
         }
 
         /// <summary>

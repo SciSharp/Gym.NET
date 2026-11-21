@@ -21,7 +21,7 @@
   <!-- NumSharp: the env's spaces and observations are NumSharp arrays, so the plugin declares the regular NuGet reference
        itself, immediately followed by the shared import, as every project compiling against NumSharp does. -->
   <ItemGroup>
-    <PackageReference Include="NumSharp" Version="0.80.0" />
+    <PackageReference Include="NumSharp" Version="0.81.0" />
   </ItemGroup>
   <Import Project="..\..\eng\NumSharp.props" />
 

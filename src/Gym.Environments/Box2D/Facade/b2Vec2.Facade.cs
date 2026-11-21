@@ -72,7 +72,7 @@ namespace Gym.Box2D {
         /// <summary>The cross product with a scalar, a vector (pybox2d's <c>cross(float)</c>).</summary>
         /// <param name="s">The scalar, rounded to float32 as pybox2d's argument conversion does.</param>
         /// <returns><c>(s * y, -s * x)</c>.</returns>
-        /// <exception cref="OverflowException">Thrown when <paramref name="s"/> lies beyond the float32 range.</exception>
+        /// <exception cref="OverflowError">Thrown when <paramref name="s"/> lies beyond the float32 range.</exception>
         public readonly b2Vec2 cross(double s) {
             float f = Box2DConvert.ToFloat32(s, "b2Vec2_cross", 2);
             return new b2Vec2(f * y, -f * x);
@@ -118,7 +118,7 @@ namespace Gym.Box2D {
         /// <param name="a">The vector.</param>
         /// <param name="s">The scale.</param>
         /// <returns><c>(a.x * (float)s, a.y * (float)s)</c>.</returns>
-        /// <exception cref="OverflowException">Thrown when <paramref name="s"/> lies beyond the float32 range.</exception>
+        /// <exception cref="OverflowError">Thrown when <paramref name="s"/> lies beyond the float32 range.</exception>
         public static b2Vec2 operator *(b2Vec2 a, double s) {
             float f = Box2DConvert.ToFloat32(s, "b2Vec2___mul__", 2);
             return new b2Vec2(a.x * f, a.y * f);
@@ -128,7 +128,7 @@ namespace Gym.Box2D {
         /// <param name="s">The scale.</param>
         /// <param name="a">The vector.</param>
         /// <returns><c>(a.x * (float)s, a.y * (float)s)</c>.</returns>
-        /// <exception cref="OverflowException">Thrown when <paramref name="s"/> lies beyond the float32 range.</exception>
+        /// <exception cref="OverflowError">Thrown when <paramref name="s"/> lies beyond the float32 range.</exception>
         public static b2Vec2 operator *(double s, b2Vec2 a) {
             float f = Box2DConvert.ToFloat32(s, "b2Vec2___rmul__", 2);
             return new b2Vec2(a.x * f, a.y * f);
@@ -138,7 +138,7 @@ namespace Gym.Box2D {
         /// <param name="a">The vector.</param>
         /// <param name="s">The divisor.</param>
         /// <returns><c>(a.x / (float)s, a.y / (float)s)</c>.</returns>
-        /// <exception cref="OverflowException">Thrown when <paramref name="s"/> lies beyond the float32 range.</exception>
+        /// <exception cref="OverflowError">Thrown when <paramref name="s"/> lies beyond the float32 range.</exception>
         public static b2Vec2 operator /(b2Vec2 a, double s) {
             float f = Box2DConvert.ToFloat32(s, "b2Vec2___truediv__", 2);
             return new b2Vec2(a.x / f, a.y / f);
@@ -210,13 +210,13 @@ namespace Gym.Box2D {
         /// <param name="method">The SWIG wrapper name the error names (<c>b2Vec2___mul__</c>).</param>
         /// <param name="argument">The 1-based argument position the error names.</param>
         /// <returns>The nearest float32.</returns>
-        /// <exception cref="OverflowException">
+        /// <exception cref="OverflowError">
         ///     Thrown, as Python's <c>OverflowError</c>, for a value beyond the float32 range, with SWIG's message
         ///     <c>in method '…', argument N of type 'float32'</c>.
         /// </exception>
         public static float ToFloat32(double value, string method, int argument) {
             if (!FitsFloat32(value))
-                throw new OverflowException($"in method '{method}', argument {argument} of type 'float32'");
+                throw new OverflowError($"in method '{method}', argument {argument} of type 'float32'");
             return (float)value;
         }
 
@@ -228,7 +228,7 @@ namespace Gym.Box2D {
         /// </summary>
         /// <remarks>
         ///     Only the facade's own error types are rewrapped (<see cref="AssertionError"/>, <see cref="ValueError"/>,
-        ///     <see cref="TypeError"/>, <see cref="OverflowException"/>); anything else propagates untouched. Footgun: a
+        ///     <see cref="TypeError"/>, <see cref="OverflowError"/>); anything else propagates untouched. Footgun: a
         ///     vector coordinate is converted where the caller builds the <see cref="b2Vec2"/>, before the constructor
         ///     runs, so its <see cref="TypeError"/> carries no prefix, unlike pybox2d's (a deviation C#'s argument
         ///     evaluation forces).
@@ -239,7 +239,7 @@ namespace Gym.Box2D {
         /// <exception cref="AssertionError">Thrown, prefixed, when the assignment fails a Box2D assertion.</exception>
         /// <exception cref="ValueError">Thrown, prefixed, when the assignment refuses a value.</exception>
         /// <exception cref="TypeError">Thrown, prefixed, when the assignment refuses a type.</exception>
-        /// <exception cref="OverflowException">Thrown, prefixed, for a scalar beyond the float32 range.</exception>
+        /// <exception cref="OverflowError">Thrown, prefixed, for a scalar beyond the float32 range.</exception>
         internal static void Kwarg(string className, string key, Action assign) =>
             Rewrapped(assign, $"Failed on kwargs for {className}.{key}: ");
 
@@ -255,7 +255,7 @@ namespace Gym.Box2D {
         /// <exception cref="AssertionError">Thrown, prefixed, when the assignment fails a Box2D assertion.</exception>
         /// <exception cref="ValueError">Thrown, prefixed, when the assignment refuses a value.</exception>
         /// <exception cref="TypeError">Thrown, prefixed, when the assignment refuses a type.</exception>
-        /// <exception cref="OverflowException">Thrown, prefixed, for a scalar beyond the float32 range.</exception>
+        /// <exception cref="OverflowError">Thrown, prefixed, for a scalar beyond the float32 range.</exception>
         internal static void ShapeFixtureKwarg(string className, string key, Action assign) =>
             Rewrapped(assign, $"Failed on kwargs, class=\"{className}\" key=\"{key}\": ");
 
@@ -265,7 +265,7 @@ namespace Gym.Box2D {
         /// <exception cref="AssertionError">Thrown, prefixed, when the assignment fails a Box2D assertion.</exception>
         /// <exception cref="ValueError">Thrown, prefixed, when the assignment refuses a value.</exception>
         /// <exception cref="TypeError">Thrown, prefixed, when the assignment refuses a type.</exception>
-        /// <exception cref="OverflowException">Thrown, prefixed, for a scalar beyond the float32 range.</exception>
+        /// <exception cref="OverflowError">Thrown, prefixed, for a scalar beyond the float32 range.</exception>
         private static void Rewrapped(Action assign, string prefix) {
             try {
                 assign();
@@ -276,8 +276,8 @@ namespace Gym.Box2D {
                 throw new ValueError(prefix + ex.Message, ex);
             } catch (TypeError ex) {
                 throw new TypeError(prefix + ex.Message, ex);
-            } catch (OverflowException ex) {
-                throw new OverflowException(prefix + ex.Message, ex);
+            } catch (OverflowError ex) {
+                throw new OverflowError(prefix + ex.Message, ex);
             }
         }
 

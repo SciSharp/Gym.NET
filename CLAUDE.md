@@ -273,7 +273,7 @@ without Python.
 # Not --recursive: that would also clone NumSharp's own submodules (numpy, OpenBLAS, onnxruntime, ...), which nothing needs.
 git submodule update --init refs/Gymnasium refs/NumSharp
 
-# The build uses NuGet NumSharp 0.80.0 by default (eng/NumSharp.props, decision D3). To try a NumSharp fix before it is
+# The build uses NuGet NumSharp 0.81.0 by default (eng/NumSharp.props, decision D3; DR-76). To try a NumSharp fix before it is
 # released, check it out in refs/NumSharp and build from source:
 dotnet build Gym.NET.sln -p:NumSharpSource=Submodule
 

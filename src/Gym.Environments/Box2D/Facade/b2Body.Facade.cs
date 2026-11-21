@@ -50,7 +50,7 @@ namespace Gym.Box2D {
         /// <param name="active">Whether it starts active.</param>
         /// <param name="gravityScale">The gravity scale.</param>
         /// <param name="userData">The user data.</param>
-        /// <exception cref="System.OverflowException">Thrown for a scalar beyond the float32 range.</exception>
+        /// <exception cref="OverflowError">Thrown for a scalar beyond the float32 range.</exception>
         public b2BodyDef(b2BodyType type = b2BodyType.b2_staticBody, b2Vec2? position = null, double angle = 0.0, IEnumerable<b2FixtureDef>? fixtures = null,
                          IEnumerable<b2Shape>? shapes = null, b2FixtureDef? shapeFixture = null, b2Vec2? linearVelocity = null,
                          double angularVelocity = 0.0, double linearDamping = 0.0, double angularDamping = 0.0, bool allowSleep = true,
@@ -269,13 +269,13 @@ namespace Gym.Box2D {
         /// <summary>Adds a torque given as a Python float, rounded to float32 as SWIG converts it.</summary>
         /// <param name="torque">The torque in N·m.</param>
         /// <param name="wake">Whether to wake the body.</param>
-        /// <exception cref="System.OverflowException">Thrown for a torque beyond the float32 range.</exception>
+        /// <exception cref="OverflowError">Thrown for a torque beyond the float32 range.</exception>
         public void ApplyTorque(double torque, bool wake) => ApplyTorque(Box2DConvert.ToFloat32(torque, "b2Body_ApplyTorque", 2), wake);
 
         /// <summary>Applies an angular impulse given as a Python float, rounded to float32 as SWIG converts it.</summary>
         /// <param name="impulse">The angular impulse.</param>
         /// <param name="wake">Whether to wake the body.</param>
-        /// <exception cref="System.OverflowException">Thrown for an impulse beyond the float32 range.</exception>
+        /// <exception cref="OverflowError">Thrown for an impulse beyond the float32 range.</exception>
         public void ApplyAngularImpulse(double impulse, bool wake) => ApplyAngularImpulse(Box2DConvert.ToFloat32(impulse, "b2Body_ApplyAngularImpulse", 2), wake);
 
         /// <summary>
@@ -312,7 +312,7 @@ namespace Gym.Box2D {
         /// <returns>The fixture.</returns>
         /// <exception cref="ValueError">Thrown for other than 2 to 4 vertices.</exception>
         /// <exception cref="AssertionError">Thrown while the world is stepping.</exception>
-        /// <exception cref="System.OverflowException">Thrown for a material scalar beyond the float32 range.</exception>
+        /// <exception cref="OverflowError">Thrown for a material scalar beyond the float32 range.</exception>
         public b2Fixture CreateEdgeFixture(IReadOnlyList<b2Vec2?> vertices, double density = 0.0, double friction = 0.2, double restitution = 0.0,
                                            bool isSensor = false, ushort categoryBits = 0x0001, ushort maskBits = 0xFFFF, short groupIndex = 0) {
             var shape = new b2EdgeShape();
@@ -342,7 +342,7 @@ namespace Gym.Box2D {
         /// <returns>The fixture.</returns>
         /// <exception cref="ValueError">Thrown for a vertex count outside 2..16.</exception>
         /// <exception cref="AssertionError">Thrown while the world is stepping, or for a degenerate or (with a density) empty polygon.</exception>
-        /// <exception cref="System.OverflowException">Thrown for a half-extent or material scalar beyond the float32 range.</exception>
+        /// <exception cref="OverflowError">Thrown for a half-extent or material scalar beyond the float32 range.</exception>
         public b2Fixture CreatePolygonFixture(IReadOnlyList<b2Vec2>? vertices = null, (double hx, double hy)? box = null, double density = 0.0,
                                               double friction = 0.2, double restitution = 0.0, bool isSensor = false, ushort categoryBits = 0x0001,
                                               ushort maskBits = 0xFFFF, short groupIndex = 0) {
@@ -371,7 +371,7 @@ namespace Gym.Box2D {
         /// <param name="groupIndex">The collision group.</param>
         /// <returns>The fixture.</returns>
         /// <exception cref="AssertionError">Thrown while the world is stepping.</exception>
-        /// <exception cref="System.OverflowException">Thrown for the radius or a material scalar beyond the float32 range.</exception>
+        /// <exception cref="OverflowError">Thrown for the radius or a material scalar beyond the float32 range.</exception>
         public b2Fixture CreateCircleFixture(double radius, b2Vec2? pos = null, double density = 0.0, double friction = 0.2, double restitution = 0.0,
                                              bool isSensor = false, ushort categoryBits = 0x0001, ushort maskBits = 0xFFFF, short groupIndex = 0) {
             var shape = new b2CircleShape();
@@ -395,7 +395,7 @@ namespace Gym.Box2D {
         /// <param name="categoryBits">The collision category bits.</param>
         /// <param name="maskBits">The collision mask bits.</param>
         /// <param name="groupIndex">The collision group.</param>
-        /// <exception cref="System.OverflowException">Thrown, prefixed, for a scalar beyond the float32 range.</exception>
+        /// <exception cref="OverflowError">Thrown, prefixed, for a scalar beyond the float32 range.</exception>
         private static void SetShapeFixtureMaterial(b2FixtureDef fixture, double density, double friction, double restitution, bool isSensor,
                                                     ushort categoryBits, ushort maskBits, short groupIndex) {
             Box2DConvert.ShapeFixtureKwarg("b2FixtureDef", "density", () => fixture.density = Box2DConvert.ToFloat32(density, "b2FixtureDef_density_set", 2));

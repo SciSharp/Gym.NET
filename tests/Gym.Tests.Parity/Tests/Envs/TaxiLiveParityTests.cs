@@ -219,7 +219,6 @@ namespace Gym.Tests.Parity.Tests.Envs {
         ///     NumSharp's parameterless <c>AssertionError</c> does not carry yet (N-1).
         /// </summary>
         [TestMethod]
-        [OpenBugs("N-1")]
         public void GymNet_DecodeBeyondTheGrid_RaisesTheBareAssertion() {
             using PyRef python = PyRef.Of(() => {
                 using PyObject made = Python.gymnasium.make("Taxi-v4");

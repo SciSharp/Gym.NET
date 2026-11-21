@@ -79,9 +79,9 @@ namespace Gym.Tests.Box2D {
         /// </summary>
         [TestMethod]
         public void KeywordErrors_NameClassAndKeyword_AndChainTheOriginal() {
-            var overflow = Assert.ThrowsExactly<OverflowException>(() => new b2FixtureDef(null, density: 1e39));
+            var overflow = Assert.ThrowsExactly<OverflowError>(() => new b2FixtureDef(null, density: 1e39));
             Assert.AreEqual("Failed on kwargs for b2FixtureDef.density: in method 'b2FixtureDef_density_set', argument 2 of type 'float32'", overflow.Message);
-            Assert.IsInstanceOfType<OverflowException>(overflow.InnerException);
+            Assert.IsInstanceOfType<OverflowError>(overflow.InnerException);
             Assert.AreEqual("in method 'b2FixtureDef_density_set', argument 2 of type 'float32'", overflow.InnerException!.Message);
 
             var assertion = Assert.ThrowsExactly<AssertionError>(() => new b2PolygonShape(new b2Vec2[] { (0, 0), (1, 0) }));

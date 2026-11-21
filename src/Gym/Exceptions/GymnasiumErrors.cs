@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using NumSharp;     // ImportError, DeprecatedWrapper's base: Python's exceptions are NumSharp's (DR-76)
 
 namespace Gym.Exceptions {
     /// <summary>

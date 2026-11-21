@@ -34,7 +34,7 @@ namespace Gym.Spaces {
         /// </param>
         /// <exception cref="NumSharp.ValueError">Thrown when <paramref name="n"/> is not positive: <c>n (counts) have to be positive, actual value: 0</c>.</exception>
         /// <exception cref="NumSharp.TypeError">Thrown when <paramref name="dtype"/> is not an integer dtype.</exception>
-        /// <exception cref="OverflowException">Thrown when <paramref name="n"/> or <paramref name="start"/> does not fit <paramref name="dtype"/>, as NumPy's <c>OverflowError</c>.</exception>
+        /// <exception cref="OverflowError">Thrown when <paramref name="n"/> or <paramref name="start"/> does not fit <paramref name="dtype"/>, as NumPy's <c>OverflowError</c>.</exception>
         /// <exception cref="Gym.Exceptions.Error">Thrown when an integer <paramref name="seed"/> is negative.</exception>
         public Discrete(long n, SpaceSeed? seed = null, long start = 0, DType? dtype = null)
             : base(new Shape(Array.Empty<long>()), ValidateDType(dtype), null) {
@@ -285,11 +285,11 @@ namespace Gym.Spaces {
         /// <param name="value">The value.</param>
         /// <param name="dtype">The integer dtype.</param>
         /// <returns>The value.</returns>
-        /// <exception cref="OverflowException">Thrown when the value is outside the dtype: <c>Python integer 300 out of bounds for uint8</c>.</exception>
+        /// <exception cref="OverflowError">Thrown when the value is outside the dtype: <c>Python integer 300 out of bounds for uint8</c>.</exception>
         private static long FitInDType(long value, DType dtype) {
             iinfo info = np.iinfo(dtype);
             if (value < info.min || value > MaxOf(info, dtype))
-                throw new OverflowException($"Python integer {value.ToString(CultureInfo.InvariantCulture)} out of bounds for {DTypeName(dtype)}");
+                throw new OverflowError($"Python integer {value.ToString(CultureInfo.InvariantCulture)} out of bounds for {DTypeName(dtype)}");
             return value;
         }
 

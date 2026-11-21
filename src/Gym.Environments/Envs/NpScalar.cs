@@ -117,11 +117,11 @@ namespace Gym.Environments.Envs {
         /// <param name="a">The left operand.</param>
         /// <param name="b">The right operand.</param>
         /// <returns>The quotient.</returns>
-        /// <exception cref="DivideByZeroException">Thrown for a Python-number zero divisor, as Python raises <c>ZeroDivisionError</c> (NumPy scalars divide to inf or NaN instead).</exception>
+        /// <exception cref="ZeroDivisionError">Thrown for a Python-number zero divisor, as Python raises <c>ZeroDivisionError</c> (NumPy scalars divide to inf or NaN instead).</exception>
         public static NpScalar operator /(NpScalar a, NpScalar b) {
             if (a.Kind <= NpKind.PyFloat && b.Kind <= NpKind.PyFloat) {
                 if (b.Value == 0)
-                    throw new DivideByZeroException("float division by zero");
+                    throw new ZeroDivisionError("float division by zero");
                 return PyFloat(a.Value / b.Value);
             }
 

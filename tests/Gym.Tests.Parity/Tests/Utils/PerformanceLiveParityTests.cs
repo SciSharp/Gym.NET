@@ -166,7 +166,7 @@ namespace Gym.Tests.Parity.Tests.Utils {
                     try {
                         call();
                         outcomes.Add("returned");
-                    } catch (Gym.Exceptions.NotImplementedError e) {
+                    } catch (NumSharp.NotImplementedError e) {
                         outcomes.Add(new object?[] { "NotImplementedError", e.Message });
                     }
                 }

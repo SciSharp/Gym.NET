@@ -65,7 +65,7 @@
        StepResult/ResetResult) survive. A development dependency: PrivateAssets="all" keeps it out of the package's
        dependencies, and it rewrites only this assembly. -p:SkipNDScopeWeave=true builds without weaving. -->
   <ItemGroup>
-    <PackageReference Include="NumSharp.Build" Version="0.80.0" PrivateAssets="all" />
+    <PackageReference Include="NumSharp.Build" Version="0.81.0" PrivateAssets="all" />
   </ItemGroup>
 
   <!-- NumSharp: the regular NuGet reference, used as it stands by default (NumSharpSource=Package; 0.80.0 is the first
@@ -73,7 +73,7 @@
        build, with its ownership analyzer, to try a NumSharp fix before NumSharp releases it. The import stays last: it
        removes the reference declared before it and overrides GeneratePackageOnBuild above. -->
   <ItemGroup>
-    <PackageReference Include="NumSharp" Version="0.80.0" />
+    <PackageReference Include="NumSharp" Version="0.81.0" />
   </ItemGroup>
   <Import Project="..\..\eng\NumSharp.props" />
 </Project>

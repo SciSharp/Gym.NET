@@ -19,13 +19,13 @@ option records.
 
 | Package | Project | Holds | Depends on |
 |---|---|---|---|
-| Gym.NET | `src/Gym` | The env contract, wrappers, spaces, registry and `Gymnasium.Make`/`MakeVec`, vector envs, checkers, seeding, errors, the Python-semantics helpers, `Gym.Legacy`; the source generator ships inside it as an analyzer | NumSharp 0.80.0, SixLabors.ImageSharp 2.1.13 |
+| Gym.NET | `src/Gym` | The env contract, wrappers, spaces, registry and `Gymnasium.Make`/`MakeVec`, vector envs, checkers, seeding, errors, the Python-semantics helpers, `Gym.Legacy`; the source generator ships inside it as an analyzer | NumSharp 0.81.0, SixLabors.ImageSharp 2.1.13 |
 | Gym.NET.Rendering | `src/Gym.Rendering` | The rasterizer the envs draw `rgb_array` frames with: `Surface`, `GfxDraw`, `Draw`, `Transform`, `ImageIO`, `SurfArray`, `Vector2`, `Clock` | Gym.NET, ImageSharp (PNG decoding) |
 | Gym.NET.Environments | `src/Gym.Environments` | classic_control, box2d (LunarLander, BipedalWalker, CarRacing), toy_text and mujoco (the 22 ids' classes in `Envs/MuJoCo`), `CartPoleVectorEnv`, the embedded images, CarRacing's score glyphs, Gymnasium's 14 compiled MuJoCo models and MuJoCo's overlay font, the registration of the built-in ids; the Box2D engine in `Box2D/` (namespace `Gym.Box2D`, DR-65) and the MuJoCo engine in `MuJoCo/` (namespace `Gym.MuJoCo`, DR-65, DR-66) | Gym.NET, Gym.NET.Rendering, SixLabors.ImageSharp 2.1.13 (the human window's images) |
 | Gym.NET.Rendering.Avalonia | `src/Gym.Rendering.Avalonia` | `AvaloniaEnvViewer`, a window for `human` mode; `AvaloniaPlotFigure`, `PlayPlot`'s ScottPlot figure (DR-39) | Gym.NET.Environments, Avalonia 12, ScottPlot.Avalonia 5.1 |
 | Gym.NET.Rendering.WinForm | `src/Gym.Rendering.WinForm` | `WinFormEnvViewer`, the same on Windows Forms; `WinFormPlotFigure` | Gym.NET.Environments, Windows Forms, ScottPlot.WinForms 5.1 |
 | (inside Gym.NET) | `src/Gym.SourceGenerators` | The generator behind `[GymOptions]`, `[GymTuple]` and `[GymDict]` (DR-13, DR-34) | Roslyn 4.8 |
-| (inside Gym.NET.Environments) | `src/Gym.Environments/Box2D` | Box2D 2.3.0 in managed C#, float32 and bit for bit as pybox2d 2.3.10 computes it, with pybox2d's surface (`b2World`, `CreateDynamicBody`, `b2FixtureDef`, `b2PolygonShape`, `b2RevoluteJointDef`, contact listeners, ray casts) for the box2d envs (D5, DR-26, DR-29): namespace `Gym.Box2D`, compiled into Gym.Environments.dll since DR-65 | NumSharp 0.80.0 (Python's exceptions) |
+| (inside Gym.NET.Environments) | `src/Gym.Environments/Box2D` | Box2D 2.3.0 in managed C#, float32 and bit for bit as pybox2d 2.3.10 computes it, with pybox2d's surface (`b2World`, `CreateDynamicBody`, `b2FixtureDef`, `b2PolygonShape`, `b2RevoluteJointDef`, contact listeners, ray casts) for the box2d envs (D5, DR-26, DR-29): namespace `Gym.Box2D`, compiled into Gym.Environments.dll since DR-65 | NumSharp 0.81.0 (Python's exceptions) |
 
 Gymnasium's modules map to namespaces by area, with Gymnasium's class names kept (D1, D16):
 
@@ -89,10 +89,11 @@ Matching Gymnasium byte for byte means matching Python and NumPy where Gymnasium
   `PyMath` (`//`, `%`, `divmod`, `round`, `np.clip`, `np.sign`), `PyKwargs` (binding keyword arguments to constructor
   parameters by Python name), `PyJson` (`json.dumps`/`loads` for `EnvSpec`), `Difflib` (the registry's "Did you mean"),
   `Warnings` and `Logger` (warnings as `gymnasium.logger` issues them).
-- **Errors**: every Gymnasium error type and message. Python's built-in exceptions are NumSharp's types (`ValueError`,
-  `TypeError`, `KeyError`, `AssertionError`, ...); `OverflowError` and `ZeroDivisionError` are .NET's
-  `OverflowException` and `DivideByZeroException`, as NumSharp throws them; `NotImplementedError` and `ImportError` live
-  in `Gym.Exceptions` until NumSharp has them (N-3).
+- **Errors**: every Gymnasium error type and message. Every Python and NumPy exception is NumSharp 0.81.0's own class
+  (`ValueError`, `TypeError`, `KeyError`, `AssertionError`, `OverflowError`, `ZeroDivisionError`, `NotImplementedError`,
+  `ImportError`, ...; DR-76), each under its .NET twin where .NET has one (`ValueError` is an `ArgumentException`,
+  `OverflowError` an `ArithmeticException`). `Gym.Exceptions` holds `gymnasium.error`'s classes only. .NET's own
+  `OverflowException` remains for Gym.NET's limits where Python would not raise (a value beyond a C# `int` or `long`).
 - **Platform**: Windows x64 is the reference platform. Where Gymnasium's arithmetic goes through the C runtime (CartPole's
   `cos`/`sin` in float64, `pow`), .NET calls the same CRT functions there; on Linux and macOS the platform's C library may
   differ in the last bit, so those results are verified on Windows and tracked elsewhere.

@@ -183,7 +183,7 @@ namespace Gym.Environments.Envs.Classic {
         ///     Thrown for an option <c>float()</c> rejects (<c>An option (None) could not be converted to a float.</c>), and by the
         ///     generator for a negative bound (<c>high - low &lt; 0</c>).
         /// </exception>
-        /// <exception cref="OverflowException">Thrown, as Python's <c>OverflowError</c>, for a NaN or infinite bound (<c>Range exceeds valid bounds</c>).</exception>
+        /// <exception cref="OverflowError">Thrown, as Python's <c>OverflowError</c>, for a NaN or infinite bound (<c>Range exceeds valid bounds</c>).</exception>
         /// <exception cref="DependencyNotInstalled">Thrown in human mode by the first render when no viewer factory is set (DR-20).</exception>
         /// <remarks>
         ///     The seed is applied before the options are read, as <c>super().reset(seed=seed)</c> runs first; a failed reset
@@ -237,7 +237,7 @@ namespace Gym.Environments.Envs.Classic {
         ///     empty one, with NumPy's messages.
         /// </exception>
         /// <exception cref="NotSupportedException">Thrown for an action Gym.NET does not model: more than one dimension, or a float16 or complex dtype.</exception>
-        /// <exception cref="DivideByZeroException">Thrown, as Python's <c>ZeroDivisionError</c>, when <see cref="Length"/> or <see cref="Mass"/> was set to zero (<c>float division by zero</c>).</exception>
+        /// <exception cref="ZeroDivisionError">Thrown, as Python's <c>ZeroDivisionError</c>, when <see cref="Length"/> or <see cref="Mass"/> was set to zero (<c>float division by zero</c>).</exception>
         /// <exception cref="DependencyNotInstalled">Thrown in human mode by the first render when no viewer factory is set (DR-20).</exception>
         /// <remarks>
         ///     The state is read before the action, as the source unpacks it first. Every <c>x ** 2</c> is the C runtime's
@@ -297,7 +297,7 @@ namespace Gym.Environments.Envs.Classic {
         ///     Thrown for a NaN coordinate (a NaN state), with pygame's message, and for an arrow of no valid size (a NaN
         ///     <see cref="LastU"/>: <c>Cannot scale to negative size</c>).
         /// </exception>
-        /// <exception cref="OverflowException">Thrown, as pygame's <c>OverflowError</c>, for a coordinate pygame cannot draw.</exception>
+        /// <exception cref="OverflowError">Thrown, as pygame's <c>OverflowError</c>, for a coordinate pygame cannot draw.</exception>
         /// <exception cref="NotSupportedException">Thrown when a torque beyond the image's size (a raised <see cref="MaxTorque"/>) would make smoothscale grow the arrow, which Gym.NET does not implement yet (P7).</exception>
         /// <exception cref="DependencyNotInstalled">Thrown on the first human render when no viewer factory is set (DR-20).</exception>
         /// <remarks>
@@ -445,10 +445,10 @@ namespace Gym.Environments.Envs.Classic {
         /// <param name="a">The dividend.</param>
         /// <param name="b">The divisor.</param>
         /// <returns>The quotient.</returns>
-        /// <exception cref="DivideByZeroException">Thrown, as Python's <c>ZeroDivisionError</c>, for a zero divisor (<c>float division by zero</c>).</exception>
+        /// <exception cref="ZeroDivisionError">Thrown, as Python's <c>ZeroDivisionError</c>, for a zero divisor (<c>float division by zero</c>).</exception>
         private static double PythonDivide(double a, double b) {
             if (b == 0)
-                throw new DivideByZeroException("float division by zero");
+                throw new ZeroDivisionError("float division by zero");
             return a / b;
         }
 

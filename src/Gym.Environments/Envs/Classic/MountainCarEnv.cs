@@ -208,7 +208,7 @@ namespace Gym.Environments.Envs.Classic {
         /// <returns>The float32 observation <c>[position, 0]</c> and an empty info.</returns>
         /// <exception cref="Error">Thrown for a negative seed, with Gymnasium's message.</exception>
         /// <exception cref="ValueError">Thrown for an option <c>float()</c> rejects, or a lower bound above the upper.</exception>
-        /// <exception cref="OverflowException">Thrown, as Python's <c>OverflowError</c>, for NaN or infinite bounds (from the generator).</exception>
+        /// <exception cref="OverflowError">Thrown, as Python's <c>OverflowError</c>, for NaN or infinite bounds (from the generator).</exception>
         /// <exception cref="DependencyNotInstalled">Thrown in human mode by the first render when no viewer factory is set (DR-20).</exception>
         /// <remarks>
         ///     The seed is applied before the options are parsed, as <c>super().reset(seed=seed)</c> runs first: a reset that
@@ -255,7 +255,7 @@ namespace Gym.Environments.Envs.Classic {
         ///     Thrown in continuous mode when an assigned state holds fewer than two values, or the action has no first element
         ///     (a 0-d or empty array), with NumPy's messages.
         /// </exception>
-        /// <exception cref="OverflowException">
+        /// <exception cref="OverflowError">
         ///     Thrown in continuous mode, as Python's <c>OverflowError</c>, when <c>math.pow(action[0], 2)</c> overflows
         ///     (<c>math range error</c>, a float64 force beyond about 1.3e154); the state is then unchanged, as in Python.
         /// </exception>
@@ -285,7 +285,7 @@ namespace Gym.Environments.Envs.Classic {
         /// <exception cref="IndexError">Thrown when an assigned state is empty.</exception>
         /// <exception cref="KeyError">Thrown in human mode when <c>metadata["render_fps"]</c> was removed.</exception>
         /// <exception cref="ValueError">Thrown for a NaN coordinate (a NaN state), with pygame's message.</exception>
-        /// <exception cref="OverflowException">Thrown, as pygame's <c>OverflowError</c>, for a coordinate pygame cannot draw.</exception>
+        /// <exception cref="OverflowError">Thrown, as pygame's <c>OverflowError</c>, for a coordinate pygame cannot draw.</exception>
         /// <exception cref="DependencyNotInstalled">Thrown on the first human render when no viewer factory is set (DR-20).</exception>
         /// <remarks>
         ///     The car's coordinates are computed in the state's precision: after a continuous step its position is float32, so
@@ -520,7 +520,7 @@ namespace Gym.Environments.Envs.Classic {
         /// <exception cref="AttributeError">Thrown before the first reset.</exception>
         /// <exception cref="TypeError">Thrown for a <c>None</c> state.</exception>
         /// <exception cref="IndexError">Thrown for a state of fewer than two values, or an action with no first element.</exception>
-        /// <exception cref="OverflowException">Thrown when <c>math.pow(action[0], 2)</c> overflows.</exception>
+        /// <exception cref="OverflowError">Thrown when <c>math.pow(action[0], 2)</c> overflows.</exception>
         /// <exception cref="NotSupportedException">Thrown for an action of more than one dimension, or of a float16 or complex dtype.</exception>
         private (bool Terminated, double Reward) ContinuousStep(NDArray action) {
             // position = self.state[0]; velocity = self.state[1]; then action[0], in that order.
@@ -549,7 +549,7 @@ namespace Gym.Environments.Envs.Classic {
             double squared = Math.Pow(first.Value, 2);
             // math.pow refuses an overflow from finite operands, before the state is assigned.
             if (double.IsInfinity(squared) && double.IsFinite(first.Value))
-                throw new OverflowException("math range error");
+                throw new OverflowError("math range error");
             double reward = (terminated ? 100.0 : 0.0) - squared * 0.1;
 
             // self.state = np.array([position, velocity], dtype=np.float32)

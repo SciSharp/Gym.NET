@@ -41,7 +41,7 @@ namespace Gym.Utils {
         /// <param name="seed">The first reset's seed (the action space is not seeded, as in Gymnasium).</param>
         /// <returns>The average steps per second.</returns>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="env"/> is <see langword="null"/>.</exception>
-        /// <exception cref="DivideByZeroException">Thrown when no time passed (a negative target), as Python's <c>float division by zero</c>.</exception>
+        /// <exception cref="ZeroDivisionError">Thrown when no time passed (a negative target), as Python's <c>float division by zero</c>.</exception>
         public static double BenchmarkStep(IEnv env, double targetDuration = 5, BigInteger? seed = null) {
             if (env is null)
                 throw new ArgumentNullException(nameof(env));
@@ -80,7 +80,7 @@ namespace Gym.Utils {
         /// <param name="seed">The seed of the action space and of both resets.</param>
         /// <returns>The number of individual environment steps per second.</returns>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="env"/> is <see langword="null"/>.</exception>
-        /// <exception cref="DivideByZeroException">Thrown when no time passed, as Python's <c>float division by zero</c>.</exception>
+        /// <exception cref="ZeroDivisionError">Thrown when no time passed, as Python's <c>float division by zero</c>.</exception>
         public static double BenchmarkVectorStep(IVectorEnv env, double targetDuration = 5, BigInteger? seed = null) {
             if (env is null)
                 throw new ArgumentNullException(nameof(env));
@@ -134,7 +134,7 @@ namespace Gym.Utils {
         /// <param name="seed">The seed of each first reset.</param>
         /// <returns>The constructions per second.</returns>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="envLambda"/> is <see langword="null"/>.</exception>
-        /// <exception cref="DivideByZeroException">Thrown when no time passed, as Python's <c>float division by zero</c>.</exception>
+        /// <exception cref="ZeroDivisionError">Thrown when no time passed, as Python's <c>float division by zero</c>.</exception>
         public static double BenchmarkInit(Func<IEnv> envLambda, double targetDuration = 5, BigInteger? seed = null) {
             if (envLambda is null)
                 throw new ArgumentNullException(nameof(envLambda));
@@ -159,7 +159,7 @@ namespace Gym.Utils {
         /// <param name="targetDuration">The duration in seconds; the benchmark goes slightly over it.</param>
         /// <returns>The renders per second.</returns>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="env"/> is <see langword="null"/>.</exception>
-        /// <exception cref="DivideByZeroException">Thrown when no time passed, as Python's <c>float division by zero</c>.</exception>
+        /// <exception cref="ZeroDivisionError">Thrown when no time passed, as Python's <c>float division by zero</c>.</exception>
         public static double BenchmarkRender(IEnv env, double targetDuration = 5) {
             if (env is null)
                 throw new ArgumentNullException(nameof(env));
@@ -182,10 +182,10 @@ namespace Gym.Utils {
         /// <param name="count">The count.</param>
         /// <param name="length">The seconds measured.</param>
         /// <returns>The rate.</returns>
-        /// <exception cref="DivideByZeroException">Thrown for a zero <paramref name="length"/>.</exception>
+        /// <exception cref="ZeroDivisionError">Thrown for a zero <paramref name="length"/>.</exception>
         private static double Divide(long count, double length) {
             if (length == 0)
-                throw new DivideByZeroException("float division by zero");
+                throw new ZeroDivisionError("float division by zero");
             return count / length;
         }
 

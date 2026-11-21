@@ -32,7 +32,7 @@ namespace Gym.Environments.Envs.ToyText {
     ///     </para>
     ///     <para>
     ///     The map is held as Gymnasium's <c>S1</c> character array (<see cref="Desc"/>, built by
-    ///     <see cref="ToyTextUtils.CharMap"/> until NumSharp splits strings itself, N-2). Rendering is Gymnasium's pixel
+    ///     <see cref="ToyTextUtils.CharMap"/>). Rendering is Gymnasium's pixel
     ///     art: tiles scaled to the cell, overlays scaled by <c>round</c> and blitted at truncated positions, a one-pixel
     ///     grid; <c>ansi</c> marks the agent in red with Gymnasium's escape codes. Human mode renders into the window from
     ///     <c>viewer_factory</c> or <c>Gymnasium.HumanViewerFactory</c> (DR-20) at 4 frames per second.
@@ -111,7 +111,7 @@ namespace Gym.Environments.Envs.ToyText {
         /// <param name="viewerFactory">Gym.NET's <c>viewer_factory</c> (DR-20) for human mode; <see langword="null"/> uses <c>Gymnasium.HumanViewerFactory</c>.</param>
         /// <exception cref="KeyError">Thrown for a <paramref name="mapName"/> <see cref="Maps"/> does not hold, with Python's message (<c>'5x5'</c>).</exception>
         /// <exception cref="ValueError">Thrown for rows of different lengths, with NumPy's message, or an empty <paramref name="rewardSchedule"/> (<c>min() arg is an empty sequence</c>).</exception>
-        /// <exception cref="DivideByZeroException">Thrown, as Python's <c>ZeroDivisionError</c>, for a map without rows or columns (the cell size divides by them).</exception>
+        /// <exception cref="ZeroDivisionError">Thrown, as Python's <c>ZeroDivisionError</c>, for a map without rows or columns (the cell size divides by them).</exception>
         public FrozenLakeEnv(string? renderMode = null, IReadOnlyList<string>? desc = null, string? mapName = "4x4", bool isSlippery = true, double successRate = 1.0 / 3.0,
             IReadOnlyList<double>? rewardSchedule = null, IEnvironmentViewerFactoryDelegate? viewerFactory = null) {
             Metadata = ClassMetadata;
@@ -186,7 +186,7 @@ namespace Gym.Environments.Envs.ToyText {
             // pygame utils
             WindowSize = (Math.Min(64 * Ncol, 512), Math.Min(64 * Nrow, 512));
             if (Ncol == 0 || Nrow == 0)
-                throw new DivideByZeroException("integer division or modulo by zero");
+                throw new ZeroDivisionError("integer division or modulo by zero");
             CellSize = (WindowSize.Width / Ncol, WindowSize.Height / Nrow);
             _window = new HumanWindow("Frozen Lake", viewerFactory);
         }

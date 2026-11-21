@@ -71,7 +71,7 @@ namespace Gym.Environments.Envs.MuJoCo {
         /// </param>
         /// <exception cref="NotSupportedException"><paramref name="modelPath"/> is not one of the bundled models.</exception>
         /// <exception cref="AssertionError">The class metadata's <c>render_fps</c> does not match the time step.</exception>
-        /// <exception cref="OverflowException">A zero time step makes the frame rate infinite (Python's <c>OverflowError</c> of <c>int(inf)</c>).</exception>
+        /// <exception cref="OverflowError">A zero time step makes the frame rate infinite (Python's <c>OverflowError</c> of <c>int(inf)</c>).</exception>
         /// <exception cref="ValueError">
         ///     Both a camera id and a camera name, with Gymnasium's message; or a NaN time step (<c>int(nan)</c>).
         /// </exception>
@@ -339,7 +339,7 @@ namespace Gym.Environments.Envs.MuJoCo {
 
         /// <summary>The v5 envs' instance metadata: the render modes and <c>int(np.round(1.0 / self.dt))</c>.</summary>
         /// <returns>A new metadata dict.</returns>
-        /// <exception cref="OverflowException">A zero time step (Python's <c>OverflowError</c> of <c>int(inf)</c>).</exception>
+        /// <exception cref="OverflowError">A zero time step (Python's <c>OverflowError</c> of <c>int(inf)</c>).</exception>
         /// <exception cref="ValueError">A NaN time step (<c>int(nan)</c>).</exception>
         protected Metadata MetadataFromDt() => MetadataFor(RenderFpsOf(Dt));
 
@@ -349,7 +349,7 @@ namespace Gym.Environments.Envs.MuJoCo {
         /// </summary>
         /// <param name="dt">The env step's duration in seconds.</param>
         /// <returns>The frame rate.</returns>
-        /// <exception cref="OverflowException">A zero duration: <c>cannot convert float infinity to integer</c>.</exception>
+        /// <exception cref="OverflowError">A zero duration: <c>cannot convert float infinity to integer</c>.</exception>
         /// <exception cref="ValueError">A NaN duration: <c>cannot convert float NaN to integer</c>.</exception>
         private static long RenderFpsOf(double dt) => (long)PyBuiltins.Int(Math.Round(1.0 / dt, MidpointRounding.ToEven));
 

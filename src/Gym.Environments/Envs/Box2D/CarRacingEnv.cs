@@ -361,7 +361,7 @@ namespace Gym.Environments.Envs.Box2D {
         ///     <c>truncated=False</c>, and the info (<c>lap_finished</c> when it ended).
         /// </returns>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="action"/> is <see langword="null"/> (only the reset's own step goes without one).</exception>
-        /// <exception cref="AssertionError">Thrown before the first reset (Python's bare <c>assert</c>; N-1 for its message).</exception>
+        /// <exception cref="AssertionError">Thrown before the first reset (Python's bare <c>assert</c>, with its empty message).</exception>
         /// <exception cref="InvalidAction">Thrown in discrete mode for an action outside <c>Discrete(5)</c>, with Gymnasium's message.</exception>
         /// <exception cref="IndexError">Thrown in continuous mode for a 0-d action or one of fewer than three elements, with NumPy's message, after the controls before the missing one were applied.</exception>
         /// <exception cref="NotSupportedException">Thrown in continuous mode for an action of more than one dimension (NumPy's array arithmetic on the wheels is not modelled).</exception>

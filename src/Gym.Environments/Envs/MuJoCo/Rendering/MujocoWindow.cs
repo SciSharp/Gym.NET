@@ -223,7 +223,7 @@ namespace Gym.Environments.Envs.MuJoCo.Rendering {
         ///     speed asks of the measured frame time. Each frame reads the viewer's input after it is shown.
         /// </summary>
         /// <exception cref="ValueError">The simulation's time or timestep is NaN, which the menu's step count cannot round.</exception>
-        /// <exception cref="OverflowException">An infinite step count or frame rate in the menu (Python's <c>OverflowError</c>).</exception>
+        /// <exception cref="OverflowError">An infinite step count or frame rate in the menu (Python's <c>OverflowError</c>).</exception>
         /// <exception cref="IOException">T could not write its PNG.</exception>
         /// <exception cref="UnauthorizedAccessException">T may not write where <see cref="ImagePath"/> points.</exception>
         /// <exception cref="InvalidOperationException">The camera's near plane is degenerate, or the embedded font is missing.</exception>
@@ -267,7 +267,7 @@ namespace Gym.Environments.Envs.MuJoCo.Rendering {
         ///     <see cref="TimePerRender"/>.
         /// </summary>
         /// <exception cref="ValueError">A NaN step count.</exception>
-        /// <exception cref="OverflowException">An infinite step count or frame rate.</exception>
+        /// <exception cref="OverflowError">An infinite step count or frame rate.</exception>
         /// <exception cref="IOException">T could not write its PNG.</exception>
         /// <exception cref="UnauthorizedAccessException">T may not write its PNG there.</exception>
         /// <exception cref="InvalidOperationException">The camera's near plane is degenerate, or the font is missing.</exception>
@@ -497,7 +497,7 @@ namespace Gym.Environments.Envs.MuJoCo.Rendering {
         ///     the same <see cref="Render"/> added.
         /// </summary>
         /// <exception cref="ValueError">A NaN step count.</exception>
-        /// <exception cref="OverflowException">An infinite step count or frame rate.</exception>
+        /// <exception cref="OverflowError">An infinite step count or frame rate.</exception>
         private void CreateOverlay() {
             const int topleft = MujocoOverlay.TopLeft, bottomleft = MujocoOverlay.BottomLeft;
             if (RenderEveryFrame)

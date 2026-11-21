@@ -314,9 +314,10 @@ namespace Gym.Spaces {
                 Logger.Warn("Casting input x to numpy array.");
                 try {
                     owned = AsArray(x, DType);
-                } catch (Exception e) when (e is ValueError or TypeError or OverflowException or ArgumentException or InvalidCastException or NotSupportedException) {
-                    // np.asarray's ValueError, TypeError and OverflowError make Gymnasium return False; .NET's conversion
-                    // failures are the same refusals.
+                } catch (Exception e) when (e is ValueError or TypeError or OverflowError or OverflowException or ArgumentException or InvalidCastException or NotSupportedException) {
+                    // np.asarray's ValueError, TypeError and OverflowError (NumSharp's since 0.81.0) make Gymnasium return
+                    // False; .NET's conversion failures (a checked cast's OverflowException among them) are the same
+                    // refusals.
                     return false;
                 }
 
@@ -672,7 +673,7 @@ namespace Gym.Spaces {
         /// <param name="dtype">The dtype.</param>
         /// <returns>A new array, owned by the caller (a copy even when <paramref name="value"/> already is an array of that dtype).</returns>
         /// <exception cref="ArgumentException">Thrown for <see langword="null"/>, ragged nesting, or a value no array can be made from.</exception>
-        /// <exception cref="OverflowException">Thrown for a Python int outside an integer dtype's range, NumPy's <c>OverflowError</c> (it never wraps, unlike a cast).</exception>
+        /// <exception cref="OverflowError">Thrown for a Python int outside an integer dtype's range, NumPy's <c>OverflowError</c> (it never wraps, unlike a cast).</exception>
         /// <exception cref="NumSharp.ValueError">Thrown for a string that is not a number, or a NaN into an integer dtype.</exception>
         /// <exception cref="NumSharp.TypeError">Thrown for an item NumPy cannot store in the dtype.</exception>
         /// <remarks>

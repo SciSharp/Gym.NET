@@ -49,7 +49,7 @@ namespace Gym.Spaces {
         /// <param name="space">The space.</param>
         /// <returns>The flattened size.</returns>
         /// <exception cref="ValueError">Thrown for a space that cannot be flattened to an array (a graph, a sequence, or a composite holding one).</exception>
-        /// <exception cref="Gym.Exceptions.NotImplementedError">Thrown for a custom space flattenable but unknown to this function.</exception>
+        /// <exception cref="NumSharp.NotImplementedError">Thrown for a custom space flattenable but unknown to this function.</exception>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="space"/> is <see langword="null"/>.</exception>
         public static long Flatdim(Space space) {
             // An untyped env's space is a view (ObjectSpace): dispatch on the space it shows, as Python sees only that one.
@@ -83,7 +83,7 @@ namespace Gym.Spaces {
                     // Gymnasium's base function: a space that says it cannot be flattened gets the ValueError first.
                     if (!space.IsNpFlattenable)
                         throw new ValueError(NotFlattenable(space));
-                    throw new Gym.Exceptions.NotImplementedError($"Unknown space: `{space}`");
+                    throw new NumSharp.NotImplementedError($"Unknown space: `{space}`");
             }
         }
 
@@ -104,7 +104,7 @@ namespace Gym.Spaces {
         /// <exception cref="KeyError">Thrown for a dict element missing a key, or a character outside a text space's charset.</exception>
         /// <exception cref="ValueError">Thrown for a tuple element of another length than the space (Python's <c>zip(strict=True)</c>).</exception>
         /// <exception cref="TypeError">Thrown for a dict space given something that is not a mapping, or a text space given something that is not a string, with Python's messages.</exception>
-        /// <exception cref="Gym.Exceptions.NotImplementedError">Thrown for a custom space.</exception>
+        /// <exception cref="NumSharp.NotImplementedError">Thrown for a custom space.</exception>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="space"/> is <see langword="null"/>.</exception>
         public static object? Flatten(Space space, object? x) {
             // An untyped env's space is a view (ObjectSpace): dispatch on the space it shows, as Python sees only that one.
@@ -154,7 +154,7 @@ namespace Gym.Spaces {
                 case OneOf oneOf:
                     return FlattenOneOf(oneOf, x);
                 default:
-                    throw new Gym.Exceptions.NotImplementedError($"Unknown space: `{space}`");
+                    throw new NumSharp.NotImplementedError($"Unknown space: `{space}`");
             }
         }
 
@@ -168,7 +168,7 @@ namespace Gym.Spaces {
         /// <exception cref="ValueError">Thrown for a flattened discrete element with no one-hot entry, with Gymnasium's message.</exception>
         /// <exception cref="AssertionError">Thrown for a composite given the wrong flattened form (an array for a non-flattenable space or the reverse), with Gymnasium's messages.</exception>
         /// <exception cref="KeyError">Thrown for a non-flattenable dict space's flattened dict missing a key.</exception>
-        /// <exception cref="Gym.Exceptions.NotImplementedError">Thrown for a custom space.</exception>
+        /// <exception cref="NumSharp.NotImplementedError">Thrown for a custom space.</exception>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="space"/> is <see langword="null"/>.</exception>
         /// <remarks>
         ///     Not every array of the flattened space unflattens: a one-hot block with no 1 has no element, as in Gymnasium.
@@ -229,7 +229,7 @@ namespace Gym.Spaces {
                 case OneOf oneOf:
                     return UnflattenOneOf(oneOf, AsArray(x));
                 default:
-                    throw new Gym.Exceptions.NotImplementedError($"Unknown space: `{space}`");
+                    throw new NumSharp.NotImplementedError($"Unknown space: `{space}`");
             }
         }
 
@@ -240,7 +240,7 @@ namespace Gym.Spaces {
         /// </summary>
         /// <param name="space">The space.</param>
         /// <returns>A new space, owned by the caller, unseeded.</returns>
-        /// <exception cref="Gym.Exceptions.NotImplementedError">Thrown for a custom space.</exception>
+        /// <exception cref="NumSharp.NotImplementedError">Thrown for a custom space.</exception>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="space"/> is <see langword="null"/>.</exception>
         /// <remarks>
         ///     Sampling the flattened space is not sampling the original: a flattened <see cref="Discrete"/> is a 0/1 box
@@ -281,7 +281,7 @@ namespace Gym.Spaces {
                 case OneOf oneOf:
                     return FlattenSpaceOneOf(oneOf);
                 default:
-                    throw new Gym.Exceptions.NotImplementedError($"Unknown space: `{space}`");
+                    throw new NumSharp.NotImplementedError($"Unknown space: `{space}`");
             }
         }
 
@@ -293,7 +293,7 @@ namespace Gym.Spaces {
         /// <param name="space1">The first space; its type decides the comparison, as Gymnasium dispatches on it.</param>
         /// <param name="space2">The second space.</param>
         /// <returns><see langword="true"/> when equivalent.</returns>
-        /// <exception cref="Gym.Exceptions.NotImplementedError">Thrown for a custom first space, with Gymnasium's message.</exception>
+        /// <exception cref="NumSharp.NotImplementedError">Thrown for a custom first space, with Gymnasium's message.</exception>
         /// <exception cref="TypeError">Thrown when either argument is <see langword="null"/> (Gymnasium's bare <c>TypeError()</c>).</exception>
         public static bool IsSpaceDtypeShapeEquiv(Space space1, Space space2) {
             // An untyped env's space is a view (ObjectSpace): dispatch on the space it shows, as Python sees only that one.
@@ -327,7 +327,7 @@ namespace Gym.Spaces {
                 default:
                     if (space2 is null)
                         throw new TypeError("");
-                    throw new Gym.Exceptions.NotImplementedError("`check_dtype_shape_equivalence` doesn't support Generic Gymnasium Spaces, ");
+                    throw new NumSharp.NotImplementedError("`check_dtype_shape_equivalence` doesn't support Generic Gymnasium Spaces, ");
             }
         }
 
@@ -375,8 +375,11 @@ namespace Gym.Spaces {
                 throw new IndexError("only integers, slices (`:`), ellipsis (`...`), numpy.newaxis (`None`) and integer or boolean arrays are valid indices");
             NDArray onehot = np.zeros(new Shape(space.N), space.DType);
             try {
-                // onehot[x - start] = 1: np.put has NumPy's index wrap and out-of-bounds message.
-                np.put(onehot, value - space.Start, (object)1L);
+                // onehot[x - start] = 1: np.put has NumPy's index wrap and out-of-bounds message. Since NumSharp 0.81.0
+                // np.put takes arrays only (NumPy's signature), so the index and the 1 are 0-d arrays this method owns.
+                using NDArray index = np.array(value - space.Start);
+                using NDArray one = np.array(1L);
+                np.put(onehot, index, one);
                 return onehot;
             } catch {
                 onehot.Dispose();
@@ -405,8 +408,13 @@ namespace Gym.Spaces {
                 // onehot[offsets[:-1] + (x - start).flatten()] = 1: the fancy index broadcasts, wraps and bounds-checks.
                 if (values.Length != nvec.Length && values.Length != 1)
                     throw new ValueError($"operands could not be broadcast together with shapes ({nvec.Length},) ({values.Length},) ");
-                for (int i = 0; i < nvec.Length; i++)
-                    np.put(onehot, offsets[i] + values[values.Length == 1 ? 0 : i] - start[i], (object)1L);
+                // np.put takes arrays only since NumSharp 0.81.0: one 0-d 1 for every block, and a 0-d index per block
+                using NDArray one = np.array(1L);
+                for (int i = 0; i < nvec.Length; i++) {
+                    using NDArray index = np.array(offsets[i] + values[values.Length == 1 ? 0 : i] - start[i]);
+                    np.put(onehot, index, one);
+                }
+
                 return onehot;
             } catch {
                 onehot.Dispose();
@@ -849,7 +857,7 @@ namespace Gym.Spaces {
         /// <param name="value">The boxed element.</param>
         /// <returns>The integer.</returns>
         /// <exception cref="ValueError">Thrown for NaN: <c>cannot convert float NaN to integer</c>.</exception>
-        /// <exception cref="OverflowException">Thrown for an infinity, as NumPy's <c>OverflowError</c>.</exception>
+        /// <exception cref="OverflowError">Thrown for an infinity, as NumPy's <c>OverflowError</c>.</exception>
         private static long TruncateToInt64(object? value) {
             switch (value) {
                 case double or float or Half: {
@@ -857,7 +865,7 @@ namespace Gym.Spaces {
                     if (double.IsNaN(d))
                         throw new ValueError("cannot convert float NaN to integer");
                     if (double.IsInfinity(d))
-                        throw new OverflowException("cannot convert float infinity to integer");
+                        throw new OverflowError("cannot convert float infinity to integer");
                     return (long)Math.Truncate(d);
                 }
                 case bool flag:

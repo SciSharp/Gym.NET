@@ -639,7 +639,8 @@ namespace Gym.Wrappers {
             for (int i = 0; i < NDims; i++) {
                 using NDArray start = Low[i];
                 using NDArray stop = High[i];
-                using NDArray edges = WrapperFunctions.Linspace(start, stop, Bins[i] + 1);
+                // np.linspace(low[i], high[i], bins[i] + 1): NumSharp computes float32 ends in float32, NumPy's edges (N-4)
+                using NDArray edges = np.linspace(start, stop, Bins[i] + 1);
                 BinEdges[i] = edges[$"1:-1"].copy();
             }
 
@@ -686,7 +687,8 @@ namespace Gym.Wrappers {
                 for (int i = 0; i < indices.Length; i++) {
                     using NDArray start = Low[i];
                     using NDArray stop = High[i];
-                    using NDArray edges = WrapperFunctions.Linspace(start, stop, Bins[i] + 1);
+                    // np.linspace(low[i], high[i], bins[i] + 1): NumSharp computes float32 ends in float32, NumPy's edges (N-4)
+                    using NDArray edges = np.linspace(start, stop, Bins[i] + 1);
                     lows[i] = edges[indices[i]].copy();
                     highs[i] = edges[indices[i] + 1].copy();
                 }

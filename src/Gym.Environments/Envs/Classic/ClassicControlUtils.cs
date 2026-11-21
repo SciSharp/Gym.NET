@@ -21,7 +21,7 @@ namespace Gym.Environments.Envs.Classic {
         ///     Thrown when Python's <c>float()</c> rejects the value: <c>An option (abc) could not be converted to a float.</c>
         ///     (<c>{x}</c> is Python's <c>str(x)</c>, see <see cref="PyBuiltins.Str"/>).
         /// </exception>
-        /// <exception cref="OverflowException">
+        /// <exception cref="OverflowError">
         ///     Thrown, as Python's <c>OverflowError</c>, for an integer beyond the float range: Gymnasium catches only
         ///     <c>ValueError</c> and <c>TypeError</c>, so this one propagates unchanged.
         /// </exception>
@@ -48,7 +48,7 @@ namespace Gym.Environments.Envs.Classic {
         ///     Python's <c>None</c>), and when the lower bound exceeds the upper one:
         ///     <c>Lower bound (0.1) must be lower than higher bound (-0.1).</c>
         /// </exception>
-        /// <exception cref="OverflowException">Thrown for an integer bound beyond the float range.</exception>
+        /// <exception cref="OverflowError">Thrown for an integer bound beyond the float range.</exception>
         /// <remarks>
         ///     Equal bounds are accepted, and NaN passes the comparison (<c>nan &gt; x</c> is false), exactly as in Python; a NaN or
         ///     infinite bound then fails in the generator's <c>uniform</c> instead (<c>high - low range exceeds valid bounds</c>).

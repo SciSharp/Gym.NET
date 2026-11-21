@@ -46,7 +46,7 @@ namespace Gym.Utils {
         ///     not 'NoneType'</c>), and for an array with dimensions (<c>only 0-dimensional arrays can be converted to Python
         ///     scalars</c>, NumPy 2.4's message).
         /// </exception>
-        /// <exception cref="OverflowException">Thrown, as Python's <c>OverflowError</c>, for an integer beyond the float range: <c>int too large to convert to float</c>.</exception>
+        /// <exception cref="OverflowError">Thrown, as Python's <c>OverflowError</c>, for an integer beyond the float range: <c>int too large to convert to float</c>.</exception>
         public static double Float(object? value) {
             switch (value) {
                 case null:
@@ -85,12 +85,12 @@ namespace Gym.Utils {
         /// <param name="value">The float.</param>
         /// <returns>The integer part.</returns>
         /// <exception cref="ValueError">Thrown for NaN: <c>cannot convert float NaN to integer</c>.</exception>
-        /// <exception cref="OverflowException">Thrown, as Python's <c>OverflowError</c>, for an infinity: <c>cannot convert float infinity to integer</c>.</exception>
+        /// <exception cref="OverflowError">Thrown, as Python's <c>OverflowError</c>, for an infinity: <c>cannot convert float infinity to integer</c>.</exception>
         public static BigInteger Int(double value) {
             if (double.IsNaN(value))
                 throw new ValueError("cannot convert float NaN to integer");
             if (double.IsInfinity(value))
-                throw new OverflowException("cannot convert float infinity to integer");
+                throw new OverflowError("cannot convert float infinity to integer");
             // Every finite double with a zero fraction is an integer the BigInteger constructor represents exactly.
             return new BigInteger(Math.Truncate(value));
         }
@@ -525,13 +525,13 @@ namespace Gym.Utils {
         /// </summary>
         /// <param name="value">The integer.</param>
         /// <returns>The float.</returns>
-        /// <exception cref="OverflowException">Thrown for an integer that rounds beyond <see cref="double.MaxValue"/>.</exception>
+        /// <exception cref="OverflowError">Thrown for an integer that rounds beyond <see cref="double.MaxValue"/>.</exception>
         private static double BigIntegerToFloat(BigInteger value) {
             // The exact decimal digits, correctly rounded by double.Parse (IEEE-compliant since .NET Core 3.0); an overflow
             // comes back as an infinity instead of an exception.
             double result = double.Parse(value.ToString(CultureInfo.InvariantCulture), NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture);
             if (double.IsInfinity(result))
-                throw new OverflowException("int too large to convert to float");
+                throw new OverflowError("int too large to convert to float");
             return result;
         }
 

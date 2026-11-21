@@ -56,7 +56,7 @@ namespace Gym.Environments.Envs.MuJoCo {
         /// <param name="visualOptions">MuJoCo visual flags to switch (<c>visual_options</c>).</param>
         /// <param name="viewerFactory">Gym.NET's <c>viewer_factory</c> (DR-20) for <c>human</c> mode.</param>
         /// <exception cref="NotSupportedException"><paramref name="xmlFile"/> is not a bundled model.</exception>
-        /// <exception cref="OverflowException">A frame skip of 0 (Python's <c>OverflowError</c> deriving the frame rate).</exception>
+        /// <exception cref="OverflowError">A frame skip of 0 (Python's <c>OverflowError</c> deriving the frame rate).</exception>
         /// <exception cref="ValueError">Both a camera id and a camera name.</exception>
         public PusherEnvV5(string xmlFile = "pusher_v5.xml", int frameSkip = 5, IReadOnlyDictionary<string, object?>? defaultCameraConfig = null,
                            double rewardNearWeight = 0.5, double rewardDistWeight = 1, double rewardControlWeight = 0.1, string? renderMode = null,

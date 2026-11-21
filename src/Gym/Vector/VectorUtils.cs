@@ -239,7 +239,7 @@ namespace Gym.Vector {
         ///     Thrown when <paramref name="space"/> is <see langword="null"/>, or an array space's item is neither an array nor
         ///     a Python number (<c>Expected an array to concatenate, got &lt;class 'str'&gt;</c>).
         /// </exception>
-        /// <exception cref="OverflowException">Thrown, as Python's <c>OverflowError</c>, for an int beyond 64 bits, which NumPy would stack as an object.</exception>
+        /// <exception cref="OverflowError">Thrown, as Python's <c>OverflowError</c>, for an int beyond 64 bits, which NumPy would stack as an object.</exception>
         /// <remarks>
         ///     An array space's items may be Python numbers, as <c>np.stack</c> takes them: an int stacks as int64 (uint64 above
         ///     <see cref="long.MaxValue"/>), a float as float64, a bool as bool, a .NET <see langword="float"/> as float32 (the
@@ -345,7 +345,7 @@ namespace Gym.Vector {
         /// <param name="item">The item.</param>
         /// <returns>A new 0-d array the caller disposes.</returns>
         /// <exception cref="TypeError">Thrown for anything else: <c>Expected an array to concatenate, got &lt;class 'str'&gt;</c>.</exception>
-        /// <exception cref="OverflowException">Thrown for an int beyond 64 bits.</exception>
+        /// <exception cref="OverflowError">Thrown for an int beyond 64 bits.</exception>
         private static NDArray ScalarArray(object? item) {
             switch (item) {
                 case bool flag:
@@ -359,7 +359,7 @@ namespace Gym.Vector {
                 case BigInteger integer when integer >= 0 && integer <= ulong.MaxValue:
                     return NDArray.Scalar((ulong)integer);
                 case BigInteger:
-                    throw new OverflowException("Python int too large to convert to C long");
+                    throw new OverflowError("Python int too large to convert to C long");
                 case double d:
                     return NDArray.Scalar(d);
                 case float f:

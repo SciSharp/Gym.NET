@@ -15,10 +15,10 @@ namespace Gym.Utils {
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///     Python raises where C# would return a value: division or modulo by zero throws
-    ///     <see cref="DivideByZeroException"/> with Python's <c>ZeroDivisionError</c> message, and an integer result Python
-    ///     could hold but <see langword="long"/> cannot (only <c>long.MinValue // -1</c>) throws
-    ///     <see cref="OverflowException"/>, like the checked arithmetic §3.2 asks for.
+    ///     Python raises where C# would return a value: division or modulo by zero throws NumSharp's
+    ///     <see cref="ZeroDivisionError"/> with Python's message (DR-76), and an integer result Python could hold but
+    ///     <see langword="long"/> cannot (only <c>long.MinValue // -1</c>) throws .NET's <see cref="OverflowException"/>,
+    ///     like the checked arithmetic §3.2 asks for: that one is Gym.NET's limit, not a Python error.
     ///     </para>
     ///     <para>
     ///     The float operations reproduce CPython 3.12's <c>floatobject.c</c> operation for operation on top of the reference
@@ -38,11 +38,11 @@ namespace Gym.Utils {
         /// <param name="a">The dividend.</param>
         /// <param name="b">The divisor.</param>
         /// <returns>The floored quotient.</returns>
-        /// <exception cref="DivideByZeroException">Thrown when <paramref name="b"/> is 0: <c>integer division or modulo by zero</c>.</exception>
+        /// <exception cref="ZeroDivisionError">Thrown when <paramref name="b"/> is 0: <c>integer division or modulo by zero</c>.</exception>
         /// <exception cref="OverflowException">Thrown for <c>long.MinValue // -1</c>, whose result 2^63 Python holds and <see langword="long"/> cannot.</exception>
         public static long FloorDiv(long a, long b) {
             if (b == 0)
-                throw new DivideByZeroException("integer division or modulo by zero");
+                throw new ZeroDivisionError("integer division or modulo by zero");
             if (a == long.MinValue && b == -1)
                 throw new OverflowException("Python's result 9223372036854775808 does not fit in a 64-bit integer.");
             long quotient = a / b;
@@ -60,10 +60,10 @@ namespace Gym.Utils {
         /// <param name="a">The dividend.</param>
         /// <param name="b">The divisor.</param>
         /// <returns>The remainder, in <c>[0, b)</c> for a positive divisor and <c>(b, 0]</c> for a negative one.</returns>
-        /// <exception cref="DivideByZeroException">Thrown when <paramref name="b"/> is 0: <c>integer modulo by zero</c>.</exception>
+        /// <exception cref="ZeroDivisionError">Thrown when <paramref name="b"/> is 0: <c>integer modulo by zero</c>.</exception>
         public static long Mod(long a, long b) {
             if (b == 0)
-                throw new DivideByZeroException("integer modulo by zero");
+                throw new ZeroDivisionError("integer modulo by zero");
             // Every integer is a multiple of -1; C#'s long.MinValue % -1 would throw an overflow from the hardware divide.
             if (b == -1)
                 return 0;
@@ -77,11 +77,11 @@ namespace Gym.Utils {
         /// <param name="a">The dividend.</param>
         /// <param name="b">The divisor.</param>
         /// <returns>The floored quotient and the divisor-signed remainder.</returns>
-        /// <exception cref="DivideByZeroException">Thrown when <paramref name="b"/> is 0: <c>integer division or modulo by zero</c>.</exception>
+        /// <exception cref="ZeroDivisionError">Thrown when <paramref name="b"/> is 0: <c>integer division or modulo by zero</c>.</exception>
         /// <exception cref="OverflowException">Thrown for <c>divmod(long.MinValue, -1)</c> (see <see cref="FloorDiv(long, long)"/>).</exception>
         public static (long Quotient, long Remainder) DivMod(long a, long b) {
             if (b == 0)
-                throw new DivideByZeroException("integer division or modulo by zero");
+                throw new ZeroDivisionError("integer division or modulo by zero");
             return (FloorDiv(a, b), Mod(a, b));
         }
 
@@ -93,10 +93,10 @@ namespace Gym.Utils {
         /// <param name="a">The dividend.</param>
         /// <param name="b">The divisor.</param>
         /// <returns>The floored quotient; a zero result carries the sign of <c>a / b</c>.</returns>
-        /// <exception cref="DivideByZeroException">Thrown when <paramref name="b"/> is ±0: <c>float floor division by zero</c>.</exception>
+        /// <exception cref="ZeroDivisionError">Thrown when <paramref name="b"/> is ±0: <c>float floor division by zero</c>.</exception>
         public static double FloorDiv(double a, double b) {
             if (b == 0.0)
-                throw new DivideByZeroException("float floor division by zero");
+                throw new ZeroDivisionError("float floor division by zero");
             return FloatDivMod(a, b).Quotient;
         }
 
@@ -107,10 +107,10 @@ namespace Gym.Utils {
         /// <param name="a">The dividend.</param>
         /// <param name="b">The divisor.</param>
         /// <returns>The remainder.</returns>
-        /// <exception cref="DivideByZeroException">Thrown when <paramref name="b"/> is ±0: <c>float modulo</c> (Python 3.12's message).</exception>
+        /// <exception cref="ZeroDivisionError">Thrown when <paramref name="b"/> is ±0: <c>float modulo</c> (Python 3.12's message).</exception>
         public static double Mod(double a, double b) {
             if (b == 0.0)
-                throw new DivideByZeroException("float modulo");
+                throw new ZeroDivisionError("float modulo");
             double mod = Fmod(a, b);
             // C's `if (mod)`: NaN is non-zero, so a NaN remainder takes this branch and stays NaN.
             if (mod != 0.0) {
@@ -129,10 +129,10 @@ namespace Gym.Utils {
         /// <param name="a">The dividend.</param>
         /// <param name="b">The divisor.</param>
         /// <returns><c>(a // b, a % b)</c> as <see cref="FloorDiv(double, double)"/> and <see cref="Mod(double, double)"/> compute them.</returns>
-        /// <exception cref="DivideByZeroException">Thrown when <paramref name="b"/> is ±0: <c>float divmod()</c>.</exception>
+        /// <exception cref="ZeroDivisionError">Thrown when <paramref name="b"/> is ±0: <c>float divmod()</c>.</exception>
         public static (double Quotient, double Remainder) DivMod(double a, double b) {
             if (b == 0.0)
-                throw new DivideByZeroException("float divmod()");
+                throw new ZeroDivisionError("float divmod()");
             return FloatDivMod(a, b);
         }
 
@@ -234,7 +234,7 @@ namespace Gym.Utils {
         /// <param name="x">The value.</param>
         /// <returns>The rounded integer.</returns>
         /// <exception cref="ValueError">Thrown for NaN: <c>cannot convert float NaN to integer</c>.</exception>
-        /// <exception cref="OverflowException">Thrown, as Python's <c>OverflowError</c>, for an infinity: <c>cannot convert float infinity to integer</c>.</exception>
+        /// <exception cref="OverflowError">Thrown, as Python's <c>OverflowError</c>, for an infinity: <c>cannot convert float infinity to integer</c>.</exception>
         /// <remarks>
         ///     CPython rounds half away from zero with C's <c>round</c> and fixes exact halves to even; .NET's exact
         ///     <see cref="Math.Round(double, MidpointRounding)"/> with <see cref="MidpointRounding.ToEven"/> is the same function.
@@ -250,7 +250,7 @@ namespace Gym.Utils {
         /// <param name="x">The value.</param>
         /// <param name="ndigits">The number of decimal places; negative rounds to the left of the point.</param>
         /// <returns>The rounded value; NaN and the infinities are returned as they are, and a zero keeps <paramref name="x"/>'s sign.</returns>
-        /// <exception cref="OverflowException">
+        /// <exception cref="OverflowError">
         ///     Thrown, as Python's <c>OverflowError</c>, when the rounded value exceeds the double range:
         ///     <c>rounded value too large to represent</c> (<c>round(1.7976931348623157e308, -308)</c>).
         /// </exception>
@@ -368,7 +368,7 @@ namespace Gym.Utils {
         /// <param name="x">A finite value.</param>
         /// <param name="ndigits">The number of decimal places, within CPython's limits.</param>
         /// <returns>The rounded value.</returns>
-        /// <exception cref="OverflowException">Thrown when the rounded value is beyond the double range.</exception>
+        /// <exception cref="OverflowError">Thrown when the rounded value is beyond the double range.</exception>
         private static double DoubleRound(double x, int ndigits) {
             // |x| = mantissa * 2^exponent exactly; the sign is applied to the decimal string, as dtoa reports it separately.
             long bits = BitConverter.DoubleToInt64Bits(x);
@@ -398,7 +398,7 @@ namespace Gym.Utils {
             double rounded = double.Parse(text, NumberStyles.Float, CultureInfo.InvariantCulture);
             // _Py_dg_strtod reports ERANGE with an infinity when the value overflows; underflow to zero is a valid result.
             if (double.IsInfinity(rounded))
-                throw new OverflowException("rounded value too large to represent");
+                throw new OverflowError("rounded value too large to represent");
             return rounded;
         }
     }

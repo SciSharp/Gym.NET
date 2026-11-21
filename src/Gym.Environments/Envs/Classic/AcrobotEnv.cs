@@ -208,7 +208,7 @@ namespace Gym.Environments.Envs.Classic {
         /// <returns>The float32 observation <c>[cos θ1, sin θ1, cos θ2, sin θ2, θ̇1, θ̇2]</c> and an empty info.</returns>
         /// <exception cref="Error">Thrown for a negative seed, with Gymnasium's message.</exception>
         /// <exception cref="ValueError">Thrown for an option <c>float()</c> rejects, or a lower bound above the upper.</exception>
-        /// <exception cref="OverflowException">Thrown, as Python's <c>OverflowError</c>, for NaN or infinite bounds (from the generator).</exception>
+        /// <exception cref="OverflowError">Thrown, as Python's <c>OverflowError</c>, for NaN or infinite bounds (from the generator).</exception>
         /// <exception cref="DependencyNotInstalled">Thrown in human mode by the first render when no viewer factory is set (DR-20).</exception>
         /// <remarks>
         ///     The seed is applied before the options are parsed, as <c>super().reset(seed=seed)</c> runs first. Reference:
@@ -299,7 +299,7 @@ namespace Gym.Environments.Envs.Classic {
         /// <exception cref="IndexError">Thrown for an assigned state of fewer than two values, with NumPy's message.</exception>
         /// <exception cref="KeyError">Thrown in human mode when <c>metadata["render_fps"]</c> was removed.</exception>
         /// <exception cref="ValueError">Thrown for a NaN coordinate (a NaN state), with pygame's or Python's message.</exception>
-        /// <exception cref="OverflowException">Thrown, as pygame's <c>OverflowError</c>, for a coordinate pygame cannot draw.</exception>
+        /// <exception cref="OverflowError">Thrown, as pygame's <c>OverflowError</c>, for a coordinate pygame cannot draw.</exception>
         /// <exception cref="DependencyNotInstalled">Thrown on the first human render when no viewer factory is set (DR-20).</exception>
         /// <remarks>
         ///     After a reset the state is float32, so the first link's end and both angles are computed in float32 (NumPy's

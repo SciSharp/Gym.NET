@@ -69,7 +69,7 @@
        NumSharp releases it. The import stays last: it removes the reference declared before it and overrides
        GeneratePackageOnBuild above. -->
   <ItemGroup>
-    <PackageReference Include="NumSharp" Version="0.80.0" />
+    <PackageReference Include="NumSharp" Version="0.81.0" />
   </ItemGroup>
   <Import Project="..\..\eng\NumSharp.props" />
 

@@ -445,8 +445,8 @@ namespace Gym.Environments.Envs.Box2D {
         ///     whether the episode ended (a fall, the left edge, or past the far end), <c>truncated=False</c> and <c>{}</c>.
         /// </returns>
         /// <exception cref="AssertionError">
-        ///     Thrown before the first reset (Python's bare <c>assert</c>, whose empty message NumSharp's <c>AssertionError</c>
-        ///     does not give yet, N-1).
+        ///     Thrown before the first reset (Python's bare <c>assert</c>, with its empty message, which NumSharp's
+        ///     <c>AssertionError</c> gives since 0.81.0).
         /// </exception>
         /// <exception cref="IndexError">
         ///     Thrown for a 0-d action or one of fewer than four elements, with NumPy's message; the joints before the missing

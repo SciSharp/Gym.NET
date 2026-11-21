@@ -432,7 +432,6 @@ namespace Gym.Tests.Parity.Tests.Envs {
         ///     <c>AssertionError()</c> does not give yet (N-1).
         /// </summary>
         [TestMethod]
-        [OpenBugs("N-1")]
         public void GymNet_StepBeforeReset_RaisesLikeGymnasium() {
             using PyRef python = PyRef.Of(() => {
                 using PyObject made = Python.gymnasium.make(Id);

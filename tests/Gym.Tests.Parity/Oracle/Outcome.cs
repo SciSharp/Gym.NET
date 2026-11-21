@@ -198,18 +198,18 @@ namespace Gym.Tests.Parity.Oracle {
             ["AttributeError"] = "NumSharp.AttributeError",
             ["RuntimeError"] = "NumSharp.RuntimeError",
             ["NameError"] = "NumSharp.NameError",
-            // NumSharp throws .NET's own OverflowException for NumPy's OverflowError ("high - low range exceeds valid
-            // bounds"), so Gym.NET does the same for Gymnasium's and pygame's, and one Python type keeps one .NET type.
-            ["OverflowError"] = "System.OverflowException",
-            // .NET's own counterpart, which PyMath throws with Python's messages, as OverflowError maps to OverflowException.
-            ["ZeroDivisionError"] = "System.DivideByZeroException",
+            // NumSharp 0.81.0 has Python's classes for these two (DR-76): NumPy's OverflowError ("high - low range exceeds
+            // valid bounds") and ZeroDivisionError arrive as them, and Gym.NET throws them for Gymnasium's, pygame's and
+            // CPython's, so one Python type keeps one .NET type. (0.80.0 threw .NET's OverflowException and
+            // DivideByZeroException, which Gym.NET then matched.)
+            ["OverflowError"] = "NumSharp.OverflowError",
+            ["ZeroDivisionError"] = "NumSharp.ZeroDivisionError",
             // NumSharp 0.80.0 added AssertionError, so Gym.NET throws NumSharp's (DR-02).
             ["AssertionError"] = "NumSharp.AssertionError",
-            // Not in NumSharp 0.80.0: Gym.Exceptions keeps them until NumSharp adds them (DR-01's stuck-case workaround,
-            // open item N-3); this row then moves to NumSharp's type names.
-            ["NotImplementedError"] = "Gym.Exceptions.NotImplementedError",
-            ["ImportError"] = "Gym.Exceptions.ImportError",
-            ["ModuleNotFoundError"] = "Gym.Exceptions.ModuleNotFoundError",
+            // NumSharp's since 0.81.0 (DR-76), where Gym.Exceptions held stop-gaps until then (N-3).
+            ["NotImplementedError"] = "NumSharp.NotImplementedError",
+            ["ImportError"] = "NumSharp.ImportError",
+            ["ModuleNotFoundError"] = "NumSharp.ModuleNotFoundError",
             // json.loads' error is a ValueError subclass; EnvSpec.FromJson raises its base, as NumSharp has no JSONDecodeError.
             ["json.decoder.JSONDecodeError"] = "NumSharp.ValueError",
             // A ufunc without a loop for the operands' dtypes (np.sign of booleans in BipedalWalker's step) raises this

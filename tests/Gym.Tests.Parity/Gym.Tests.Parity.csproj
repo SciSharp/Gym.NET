@@ -51,8 +51,8 @@
        (NumSharpSource=Package). -p:NumSharpSource=Submodule makes eng/NumSharp.props replace both with refs/NumSharp's
        source builds. The import stays last: an item Remove only sees the items declared before it. -->
   <ItemGroup>
-    <PackageReference Include="NumSharp" Version="0.80.0" />
-    <PackageReference Include="NumSharp.Interop.pythonnet" Version="0.80.0" />
+    <PackageReference Include="NumSharp" Version="0.81.0" />
+    <PackageReference Include="NumSharp.Interop.pythonnet" Version="0.81.0" />
   </ItemGroup>
   <Import Project="..\..\eng\NumSharp.props" />
 

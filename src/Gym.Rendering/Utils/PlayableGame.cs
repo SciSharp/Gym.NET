@@ -60,7 +60,7 @@ namespace Gym.Utils {
         /// </exception>
         /// <exception cref="TypeError">Thrown when the mapping is not a dictionary, or a key is not iterable (an int).</exception>
         /// <exception cref="IndexError">Thrown for a one-dimensional render (<c>tuple index out of range</c>) or an empty frame list (<c>list index out of range</c>).</exception>
-        /// <exception cref="OverflowException">Thrown, as Python's <c>OverflowError</c>, for an infinite zoom.</exception>
+        /// <exception cref="OverflowError">Thrown, as Python's <c>OverflowError</c>, for an infinite zoom.</exception>
         /// <exception cref="ArgumentOutOfRangeException">Thrown when the window's size comes out zero, which pygame would turn into a desktop-sized window (not modelled).</exception>
         /// <exception cref="DependencyNotInstalled">Thrown when no viewer factory is given or set.</exception>
         public PlayableGame(IEnv env, object? keysToAction = null, double? zoom = null, IEnvironmentViewerFactoryDelegate? viewerFactory = null,
@@ -130,9 +130,10 @@ namespace Gym.Utils {
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="event"/> is <see langword="null"/>.</exception>
         /// <exception cref="AttributeError">Thrown when a key event has no <c>key</c>, or a resize no <c>x</c> or <c>y</c> (<c>'pygame.event.Event' object has no attribute 'key'</c>).</exception>
         /// <exception cref="TypeError">Thrown for a key Python cannot hash (<c>unhashable type: 'list'</c>), or a resize size that is no number.</exception>
-        /// <exception cref="DivideByZeroException">Thrown, as Python's <c>ZeroDivisionError</c>, for a resize of a game whose frame is zero pixels wide or high.</exception>
+        /// <exception cref="ZeroDivisionError">Thrown, as Python's <c>ZeroDivisionError</c>, for a resize of a game whose frame is zero pixels wide or high.</exception>
         /// <exception cref="ValueError">Thrown for a NaN resize size (<c>cannot convert float NaN to integer</c>).</exception>
-        /// <exception cref="OverflowException">Thrown, as Python's <c>OverflowError</c>, for an infinite resize size, or one beyond an int.</exception>
+        /// <exception cref="OverflowError">Thrown, as Python's <c>OverflowError</c>, for an infinite resize size.</exception>
+        /// <exception cref="OverflowException">Thrown for a resize size beyond an int (Gym.NET's limit; Python's ints are unbounded).</exception>
         /// <remarks>
         ///     A held key that repeats (several presses, one release) is released by its one release; a release of a key never
         ///     pressed does nothing. A resize keeps the frame's aspect: the scale is the smaller of the two axes' ratios, and
@@ -213,7 +214,8 @@ namespace Gym.Utils {
         /// <exception cref="AssertionError">Thrown, with an empty message, when the render is not an array.</exception>
         /// <exception cref="IndexError">Thrown for a one-dimensional frame or an empty frame list.</exception>
         /// <exception cref="ValueError">Thrown for a NaN zoom.</exception>
-        /// <exception cref="OverflowException">Thrown for an infinite zoom, or a size beyond an int.</exception>
+        /// <exception cref="OverflowError">Thrown for an infinite zoom, as Python's <c>int(inf)</c> raises.</exception>
+        /// <exception cref="OverflowException">Thrown for a size beyond an int (Gym.NET's limit).</exception>
         private (int Width, int Height) GetVideoSize(double? zoom) {
             using RenderResult rendered = Env.Render();
             NDArray frame = Play.FrameOf(rendered);
@@ -229,7 +231,7 @@ namespace Gym.Utils {
         /// <param name="value">The event's size, a number.</param>
         /// <param name="divisor">The frame's side.</param>
         /// <returns>The quotient.</returns>
-        /// <exception cref="DivideByZeroException">Thrown for a zero side: <c>division by zero</c> for an int size, <c>float division by zero</c> for a float.</exception>
+        /// <exception cref="ZeroDivisionError">Thrown for a zero side: <c>division by zero</c> for an int size, <c>float division by zero</c> for a float.</exception>
         /// <exception cref="TypeError">Thrown when the size is no number: <c>unsupported operand type(s) for /: 'str' and 'int'</c>.</exception>
         private static double TrueDivide(object? value, int divisor) {
             if (value is NDArray { ndim: 0 } scalar && PlayKeys.Number(scalar) is { } numpyNumber)
@@ -238,7 +240,7 @@ namespace Gym.Utils {
             if (PlayKeys.Number(value) is not { } number || value is NDArray)
                 throw new TypeError($"unsupported operand type(s) for /: '{PyBuiltins.TypeName(value)}' and 'int'");
             if (divisor == 0)
-                throw new DivideByZeroException(PlayKeys.IsInt(value) ? "division by zero" : "float division by zero");
+                throw new ZeroDivisionError(PlayKeys.IsInt(value) ? "division by zero" : "float division by zero");
             // An int below 2^53 and a side are exact doubles, so one IEEE division rounds as Python's int / int does.
             return number.AsDouble / divisor;
         }
@@ -247,7 +249,8 @@ namespace Gym.Utils {
         /// <param name="value">The float.</param>
         /// <returns>The rounded value.</returns>
         /// <exception cref="ValueError">Thrown for NaN.</exception>
-        /// <exception cref="OverflowException">Thrown for an infinity, or a result beyond an int.</exception>
+        /// <exception cref="OverflowError">Thrown for an infinity, as Python's <c>int(inf)</c> raises.</exception>
+        /// <exception cref="OverflowException">Thrown for a result beyond an int (Gym.NET's limit).</exception>
         private static int RoundHalfEven(double value) => checked((int)PyBuiltins.Int(Math.Round(value, MidpointRounding.ToEven)));
     }
 
