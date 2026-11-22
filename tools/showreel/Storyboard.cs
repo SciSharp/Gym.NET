@@ -215,8 +215,40 @@ internal sealed record Storyboard(
 }
 
 /// <summary>
-///     The showreel's two timelines: the 60-second video (playful layouts of one, two or four envs, the maintainer's
-///     direction) and the 12-second loop for the README.
+///     One lettered scene of the video (DR-100): a self-contained stretch that starts and ends on an empty stage, so the
+///     scenes play in any order a line of letters gives.
+/// </summary>
+/// <param name="Letter">The letter an order names it by, <c>A</c> to <c>N</c>.</param>
+/// <param name="Name">What it shows, for messages and the README's table.</param>
+/// <param name="Caption">
+///     The caption over it, or <see langword="null"/> for none (the title and the outro). Scenes that play back to back
+///     with the same caption share one, typed on once.
+/// </param>
+/// <param name="CaptionNeon">The caption's colour.</param>
+/// <param name="Length">
+///     Seconds from its start to the next scene's start. A little shorter than <paramref name="Tail"/> where the next
+///     scene's panels fly in while this one's leave.
+/// </param>
+/// <param name="Tail">Seconds from its start until its last panel or overlay is gone; the video ends there after its last scene.</param>
+/// <param name="Build">
+///     Adds its panels, overlays and flashes to a stage, at an origin in seconds. It must add nothing that starts before
+///     the origin or lasts past the origin plus <paramref name="Tail"/>: that is what lets the composer put it anywhere.
+/// </param>
+internal sealed record Scene(char Letter, string Name, string? Caption, Rgb CaptionNeon, double Length, double Tail, Action<SceneStage, double> Build);
+
+/// <summary>What the scenes build the video on: the lists a <see cref="Storyboard"/> is made of, and the parity replays.</summary>
+/// <param name="Tracks">The panels, in drawing order.</param>
+/// <param name="Overlays">The overlays, in drawing order.</param>
+/// <param name="Flashes">The white flashes' times.</param>
+/// <param name="Parity">
+///     The verified Gymnasium replays, or <see langword="null"/> with <c>--no-parity</c>; the composer never builds the
+///     parity scene without them.
+/// </param>
+internal sealed record SceneStage(List<Track> Tracks, List<Overlay> Overlays, List<double> Flashes, ParityReplays? Parity);
+
+/// <summary>
+///     The showreel's timelines: the video, composed from 14 lettered scenes in the order the maintainer picks (DR-100),
+///     and the README's 51-second cut of the video as it was before (DR-73).
 /// </summary>
 internal static class Storyboards {
     /// <summary>Neon cyan, for borders and captions.</summary>
@@ -234,156 +266,299 @@ internal static class Storyboards {
     /// <summary>Neon orange.</summary>
     public static readonly Rgb Orange = Rgb.Hex("#ff9e3d");
 
+    /// <summary>The scene order the video plays when neither <c>--order</c> nor <c>video-order.txt</c> says otherwise.</summary>
+    public const string DefaultOrder = "A B C D E F G H I J K L M N";
+
     /// <summary>
-    ///     The 85-second video: intro; classic control (1, 2, then 4 panels); MuJoCo's control tasks (CartPole stays on
-    ///     beside its MuJoCo twin, then 4); Box2D (1, 2, 1); MuJoCo's locomotion (CarRacing stays on beside HalfCheetah,
-    ///     then 1, 2 and 4); toy text (4, then 1); the parity segment (Gymnasium beside Gym.NET); a finale of four panels
-    ///     flipping through all 24 ids; the outro.
+    ///     The video's 14 scenes, lettered A to N in the order they were made to play (DR-100): the title; classic control;
+    ///     MuJoCo's control tasks; LunarLander; the walkers; CarRacing; HalfCheetah; Hopper and Walker2d; MuJoCo's four;
+    ///     toy text's four; FrozenLake; the parity segment; the finale; the outro.
     /// </summary>
-    /// <param name="parity">The Gymnasium replays for the parity segment, or <see langword="null"/> to leave it out.</param>
-    /// <returns>The storyboard.</returns>
+    /// <returns>The scenes, in letter order.</returns>
     /// <remarks>
-    ///     The MuJoCo sections were inserted between the existing ones (the maintainer, 2026-11-12: "insert between existing
-    ///     envs the new envs"). Each section hands over to the next through a panel that stays on screen: CartPole meets
-    ///     InvertedPendulum, MuJoCo's cart-pole, and CarRacing races beside HalfCheetah.
+    ///     <para>
+    ///     Each scene starts and ends on an empty stage, so any order plays: its panels fly in after its start and are gone
+    ///     by its <see cref="Scene.Tail"/>. The next scene starts at <see cref="Scene.Length"/>, a little before that, so
+    ///     the incoming panels meet the outgoing ones as the sections of the 85 s video did. The timings inside each scene
+    ///     are that video's, moved to start at 0.
+    ///     </para>
+    ///     <para>
+    ///     Two hand-overs of the 85 s video crossed a section boundary and cannot survive reordering. CartPole now enters
+    ///     scene C afresh, beside InvertedPendulum (the two cart-poles stay a pair, inside one scene), 0.3 s after it so
+    ///     that it never meets scene B's CartPole on its way out. CarRacing no longer drives into HalfCheetah's scene: F
+    ///     ends with it leaving, and G is HalfCheetah alone, joined at step 40 so it is already running.
+    ///     </para>
     /// </remarks>
-    public static Storyboard Video(ParityReplays? parity) {
-        var tracks = new List<Track>();
-        var overlays = new List<Overlay>();
-        var flashes = new List<double> { 1.62 };
-
-        Title(overlays, 0.55, 4.25);
-
-        // Classic control: one panel, then two, then four; CartPole stays for the hand-over to MuJoCo.
-        Caption(overlays, 4.0, 15.2, "CLASSIC CONTROL", Cyan);
-        tracks.Add(Panel(Cyan, new[] {
-                new Content(4.0, () => new EpisodeSource(Episodes.Get("CartPole-v1"), 4.0, 1, 0)),
-                // Its first episode ends at 500 steps (14 s); a fresh one, flipped in mid-move, keeps it balancing beside its twin.
-                new Content(15.3, Mid("CartPole-v1", 15.3, 60)),
-            },
-            K(4.0, Slots.OffBottom(Slots.One)), K(4.6, Slots.One, Ease.OutBack), K(8.0, Slots.One), K(8.6, Slots.TwoLeft, Ease.InOutCubic),
-            K(11.4, Slots.TwoLeft), K(12.0, Slots.FourTL, Ease.InOutCubic), K(15.0, Slots.FourTL), K(15.6, Slots.TwoLeft, Ease.InOutCubic),
-            K(18.6, Slots.TwoLeft), K(19.2, Slots.OffLeft(Slots.TwoLeft), Ease.InBack)));
-        tracks.Add(Panel(Pink, Play("MountainCar-v0", 8.0),
-            K(8.0, Slots.OffRight(Slots.TwoRight)), K(8.6, Slots.TwoRight, Ease.OutBack), K(11.4, Slots.TwoRight), K(12.0, Slots.FourTR, Ease.InOutCubic),
-            K(15.0, Slots.FourTR), K(15.6, Slots.OffRight(Slots.FourTR), Ease.InBack)));
-        tracks.Add(Panel(Yellow, Play("Pendulum-v1", 11.5),
-            K(11.5, Slots.OffBottom(Slots.FourBL)), K(12.1, Slots.FourBL, Ease.OutBack), K(15.05, Slots.FourBL), K(15.65, Slots.OffBottom(Slots.FourBL), Ease.InBack)));
-        tracks.Add(Panel(Green, Play("Acrobot-v1", 11.65, speed: 20.0 / 15.0),
-            K(11.65, Slots.OffBottom(Slots.FourBR)), K(12.25, Slots.FourBR, Ease.OutBack), K(15.1, Slots.FourBR), K(15.7, Slots.OffBottom(Slots.FourBR), Ease.InBack)));
-
-        // MuJoCo's control tasks: InvertedPendulum beside CartPole, then four panels.
-        Caption(overlays, 15.3, 23.9, "MUJOCO PHYSICS · BIT FOR BIT, IN C#", Orange);
-        tracks.Add(Panel(Orange, Play("InvertedPendulum-v5", 15.3),
-            K(15.3, Slots.OffRight(Slots.TwoRight)), K(15.9, Slots.TwoRight, Ease.OutBack), K(18.6, Slots.TwoRight), K(19.2, Slots.FourTL, Ease.InOutCubic),
-            K(23.2, Slots.FourTL), K(23.8, Slots.OffLeft(Slots.FourTL), Ease.InBack)));
-        var control = new[] { ("InvertedDoublePendulum-v5", Slots.FourTR, Pink), ("Reacher-v5", Slots.FourBL, Yellow), ("Pusher-v5", Slots.FourBR, Green) };
-        for (int i = 0; i < control.Length; i++) {
-            var (id, slot, neon) = control[i];
-            double t0 = 18.7 + 0.1 * i;
-            RectF entry = slot.Cy < 360 ? Slots.OffTop(slot) : Slots.OffBottom(slot);
-            RectF exit = slot.Cx < 640 ? Slots.OffLeft(slot) : Slots.OffRight(slot);
-            tracks.Add(Panel(neon, Play(id, t0), K(t0, entry), K(t0 + 0.7, slot, Ease.OutBack), K(23.25 + 0.05 * i, slot),
-                K(23.85 + 0.05 * i, exit, Ease.InBack)));
-        }
-
-        // Box2D: the lander alone, the two walkers side by side, then the race car, which stays for the hand-over.
-        Caption(overlays, 24.0, 41.8, "BOX2D", Pink);
-        tracks.Add(Panel(Cyan, Play("LunarLander-v3", 24.0),
-            K(24.0, Slots.Point(Slots.One)), K(24.6, Slots.One, Ease.OutBack), K(30.8, Slots.One), K(31.3, Slots.OffTop(Slots.One), Ease.InBack)));
-        tracks.Add(Panel(Yellow, Play("BipedalWalker-v3", 31.0),
-            K(31.0, Slots.OffLeft(Slots.TwoLeft)), K(31.6, Slots.TwoLeft, Ease.OutBack), K(36.2, Slots.TwoLeft), K(36.7, Slots.OffLeft(Slots.TwoLeft), Ease.InBack)));
-        tracks.Add(Panel(Orange, Play("BipedalWalkerHardcore-v3", 31.1),
-            K(31.1, Slots.OffRight(Slots.TwoRight)), K(31.7, Slots.TwoRight, Ease.OutBack), K(36.2, Slots.TwoRight), K(36.7, Slots.OffRight(Slots.TwoRight), Ease.InBack)));
-        tracks.Add(Panel(Pink, Play("CarRacing-v3", 36.5),
-            K(36.5, Slots.OffBottom(Slots.One)), K(37.1, Slots.One, Ease.OutBack), K(41.8, Slots.One), K(42.4, Slots.TwoLeft, Ease.InOutCubic),
-            K(45.2, Slots.TwoLeft), K(45.7, Slots.OffLeft(Slots.TwoLeft), Ease.InBack)));
-
-        // MuJoCo's locomotion: HalfCheetah beside CarRacing, then alone; the hopper and the walker; four more.
-        Caption(overlays, 41.9, 57.6, "MUJOCO · LOCOMOTION", Orange);
-        tracks.Add(Panel(Orange, Play("HalfCheetah-v5", 41.9),
-            K(41.9, Slots.OffRight(Slots.TwoRight)), K(42.5, Slots.TwoRight, Ease.OutBack), K(45.2, Slots.TwoRight), K(45.8, Slots.One, Ease.InOutCubic),
-            K(48.4, Slots.One), K(48.9, Slots.OffTop(Slots.One), Ease.InBack)));
-        tracks.Add(Panel(Cyan, Play("Hopper-v5", 48.6),
-            K(48.6, Slots.OffLeft(Slots.TwoLeft)), K(49.2, Slots.TwoLeft, Ease.OutBack), K(52.6, Slots.TwoLeft), K(53.1, Slots.OffLeft(Slots.TwoLeft), Ease.InBack)));
-        tracks.Add(Panel(Pink, Play("Walker2d-v5", 48.7),
-            K(48.7, Slots.OffRight(Slots.TwoRight)), K(49.3, Slots.TwoRight, Ease.OutBack), K(52.6, Slots.TwoRight), K(53.1, Slots.OffRight(Slots.TwoRight), Ease.InBack)));
-        var locomotion = new[] { ("Ant-v5", Slots.FourTL, Yellow), ("Humanoid-v5", Slots.FourTR, Green), ("Swimmer-v5", Slots.FourBL, Cyan), ("HumanoidStandup-v5", Slots.FourBR, Pink) };
-        for (int i = 0; i < locomotion.Length; i++) {
-            var (id, slot, neon) = locomotion[i];
-            double t0 = 52.9 + 0.1 * i;
-            RectF exit = slot.Cx < 640 ? Slots.OffLeft(slot) : Slots.OffRight(slot);
-            tracks.Add(Panel(neon, Play(id, t0 + 0.7), K(t0, Slots.OffTop(slot)), K(t0 + 0.8, slot, Ease.OutBounce), K(57.6, slot), K(58.1, exit, Ease.InBack)));
-        }
-
-        // Toy text: four panels dropping in with a bounce, then the small lake alone.
-        Caption(overlays, 58.1, 69.5, "TOY TEXT", Yellow);
-        var toy = new[] { ("FrozenLake8x8-v1", Slots.FourTL, Cyan), ("CliffWalking-v1", Slots.FourTR, Pink), ("Taxi-v4", Slots.FourBL, Yellow), ("Blackjack-v1", Slots.FourBR, Green) };
-        for (int i = 0; i < toy.Length; i++) {
-            var (id, slot, neon) = toy[i];
-            double t0 = 58.0 + 0.1 * i;
-            RectF exit = slot.Cx < 640 ? Slots.OffLeft(slot) : Slots.OffRight(slot);
-            tracks.Add(Panel(neon, Play(id, t0 + 0.7), K(t0, Slots.OffTop(slot)), K(t0 + 0.8, slot, Ease.OutBounce), K(64.0, slot), K(64.5, exit, Ease.InBack)));
-        }
-        tracks.Add(Panel(Cyan, Play("FrozenLake-v1", 64.3, speed: 10.0 / 8.0),
-            K(64.3, Slots.Point(Slots.One)), K(64.9, Slots.One, Ease.OutBack), K(69.1, Slots.One), K(69.6, Slots.OffBottom(Slots.One), Ease.InBack)));
-
-        double finale = 69.7;
-        if (parity is not null) {
-            // Parity: Gymnasium on the left, Gym.NET on the right, the same seeds and actions, a pixel count between them.
-            Caption(overlays, 69.7, 76.5, "SAME SEED · SAME ACTIONS · SAME PIXELS", Green);
-            Columns(overlays, 70.0, 76.3);
+    public static IReadOnlyList<Scene> Scenes() => new[] {
+        new Scene('A', "Title", null, Cyan, 4.0, 4.25, (stage, o) => {
+            Title(stage.Overlays, o + 0.55, o + 4.25);
+            // The flash where the bouncing logo first lands.
+            stage.Flashes.Add(o + 1.62);
+        }),
+        new Scene('B', "Classic control", "CLASSIC CONTROL", Cyan, 11.3, 11.7, (stage, o) => {
+            // One panel, then two, then four: CartPole grows the layout around itself.
+            stage.Tracks.Add(Panel(Cyan, Play("CartPole-v1", o),
+                K(o, Slots.OffBottom(Slots.One)), K(o + 0.6, Slots.One, Ease.OutBack), K(o + 4.0, Slots.One), K(o + 4.6, Slots.TwoLeft, Ease.InOutCubic),
+                K(o + 7.4, Slots.TwoLeft), K(o + 8.0, Slots.FourTL, Ease.InOutCubic), K(o + 11.0, Slots.FourTL), K(o + 11.6, Slots.OffLeft(Slots.FourTL), Ease.InBack)));
+            stage.Tracks.Add(Panel(Pink, Play("MountainCar-v0", o + 4.0),
+                K(o + 4.0, Slots.OffRight(Slots.TwoRight)), K(o + 4.6, Slots.TwoRight, Ease.OutBack), K(o + 7.4, Slots.TwoRight), K(o + 8.0, Slots.FourTR, Ease.InOutCubic),
+                K(o + 11.0, Slots.FourTR), K(o + 11.6, Slots.OffRight(Slots.FourTR), Ease.InBack)));
+            stage.Tracks.Add(Panel(Yellow, Play("Pendulum-v1", o + 7.5),
+                K(o + 7.5, Slots.OffBottom(Slots.FourBL)), K(o + 8.1, Slots.FourBL, Ease.OutBack), K(o + 11.05, Slots.FourBL), K(o + 11.65, Slots.OffBottom(Slots.FourBL), Ease.InBack)));
+            stage.Tracks.Add(Panel(Green, Play("Acrobot-v1", o + 7.65, speed: 20.0 / 15.0),
+                K(o + 7.65, Slots.OffBottom(Slots.FourBR)), K(o + 8.25, Slots.FourBR, Ease.OutBack), K(o + 11.1, Slots.FourBR), K(o + 11.7, Slots.OffBottom(Slots.FourBR), Ease.InBack)));
+        }),
+        new Scene('C', "MuJoCo control", "MUJOCO PHYSICS · BIT FOR BIT, IN C#", Orange, 8.7, 8.65, (stage, o) => {
+            // The two cart-poles side by side (CartPole joined mid-move, at step 60), then MuJoCo's four control tasks.
+            // CartPole comes 0.3 s after InvertedPendulum: after scene B, whose CartPole leaves the same side until then,
+            // an earlier entry showed two CartPoles at once.
+            stage.Tracks.Add(Panel(Cyan, new[] { new Content(o + 0.3, Mid("CartPole-v1", o + 0.3, 60)) },
+                K(o + 0.3, Slots.OffLeft(Slots.TwoLeft)), K(o + 0.9, Slots.TwoLeft, Ease.OutBack), K(o + 3.3, Slots.TwoLeft), K(o + 3.9, Slots.OffLeft(Slots.TwoLeft), Ease.InBack)));
+            stage.Tracks.Add(Panel(Orange, Play("InvertedPendulum-v5", o),
+                K(o, Slots.OffRight(Slots.TwoRight)), K(o + 0.6, Slots.TwoRight, Ease.OutBack), K(o + 3.3, Slots.TwoRight), K(o + 3.9, Slots.FourTL, Ease.InOutCubic),
+                K(o + 7.9, Slots.FourTL), K(o + 8.5, Slots.OffLeft(Slots.FourTL), Ease.InBack)));
+            var control = new[] { ("InvertedDoublePendulum-v5", Slots.FourTR, Pink), ("Reacher-v5", Slots.FourBL, Yellow), ("Pusher-v5", Slots.FourBR, Green) };
+            for (int i = 0; i < control.Length; i++) {
+                var (id, slot, neon) = control[i];
+                double t0 = o + 3.4 + 0.1 * i;
+                RectF entry = slot.Cy < 360 ? Slots.OffTop(slot) : Slots.OffBottom(slot);
+                RectF exit = slot.Cx < 640 ? Slots.OffLeft(slot) : Slots.OffRight(slot);
+                stage.Tracks.Add(Panel(neon, Play(id, t0), K(t0, entry), K(t0 + 0.7, slot, Ease.OutBack), K(o + 7.95 + 0.05 * i, slot),
+                    K(o + 8.55 + 0.05 * i, exit, Ease.InBack)));
+            }
+        }),
+        new Scene('D', "LunarLander", "BOX2D", Pink, 7.0, 7.3, (stage, o) =>
+            stage.Tracks.Add(Panel(Cyan, Play("LunarLander-v3", o),
+                K(o, Slots.Point(Slots.One)), K(o + 0.6, Slots.One, Ease.OutBack), K(o + 6.8, Slots.One), K(o + 7.3, Slots.OffTop(Slots.One), Ease.InBack)))),
+        new Scene('E', "The walkers", "BOX2D", Pink, 5.5, 5.7, (stage, o) => {
+            stage.Tracks.Add(Panel(Yellow, Play("BipedalWalker-v3", o),
+                K(o, Slots.OffLeft(Slots.TwoLeft)), K(o + 0.6, Slots.TwoLeft, Ease.OutBack), K(o + 5.2, Slots.TwoLeft), K(o + 5.7, Slots.OffLeft(Slots.TwoLeft), Ease.InBack)));
+            // The hardcore walker trips over its first stump at step 157, 3.1 s in.
+            stage.Tracks.Add(Panel(Orange, Play("BipedalWalkerHardcore-v3", o + 0.1),
+                K(o + 0.1, Slots.OffRight(Slots.TwoRight)), K(o + 0.7, Slots.TwoRight, Ease.OutBack), K(o + 5.2, Slots.TwoRight), K(o + 5.7, Slots.OffRight(Slots.TwoRight), Ease.InBack)));
+        }),
+        new Scene('F', "CarRacing", "BOX2D", Pink, 5.6, 5.8, (stage, o) =>
+            stage.Tracks.Add(Panel(Pink, Play("CarRacing-v3", o),
+                K(o, Slots.OffBottom(Slots.One)), K(o + 0.6, Slots.One, Ease.OutBack), K(o + 5.3, Slots.One), K(o + 5.8, Slots.OffTop(Slots.One), Ease.InBack)))),
+        new Scene('G', "HalfCheetah", "MUJOCO · LOCOMOTION", Orange, 4.2, 4.5, (stage, o) =>
+            stage.Tracks.Add(Panel(Orange, new[] { new Content(o, Mid("HalfCheetah-v5", o, 40)) },
+                K(o, Slots.Point(Slots.One)), K(o + 0.6, Slots.One, Ease.OutBack), K(o + 4.0, Slots.One), K(o + 4.5, Slots.OffTop(Slots.One), Ease.InBack)))),
+        new Scene('H', "Hopper and Walker2d", "MUJOCO · LOCOMOTION", Orange, 4.3, 4.5, (stage, o) => {
+            stage.Tracks.Add(Panel(Cyan, Play("Hopper-v5", o),
+                K(o, Slots.OffLeft(Slots.TwoLeft)), K(o + 0.6, Slots.TwoLeft, Ease.OutBack), K(o + 4.0, Slots.TwoLeft), K(o + 4.5, Slots.OffLeft(Slots.TwoLeft), Ease.InBack)));
+            stage.Tracks.Add(Panel(Pink, Play("Walker2d-v5", o + 0.1),
+                K(o + 0.1, Slots.OffRight(Slots.TwoRight)), K(o + 0.7, Slots.TwoRight, Ease.OutBack), K(o + 4.0, Slots.TwoRight), K(o + 4.5, Slots.OffRight(Slots.TwoRight), Ease.InBack)));
+        }),
+        new Scene('I', "MuJoCo's four", "MUJOCO · LOCOMOTION", Orange, 5.1, 5.2, (stage, o) => {
+            var four = new[] { ("Ant-v5", Slots.FourTL, Yellow), ("Humanoid-v5", Slots.FourTR, Green), ("Swimmer-v5", Slots.FourBL, Cyan), ("HumanoidStandup-v5", Slots.FourBR, Pink) };
+            for (int i = 0; i < four.Length; i++) {
+                var (id, slot, neon) = four[i];
+                double t0 = o + 0.1 * i;
+                RectF exit = slot.Cx < 640 ? Slots.OffLeft(slot) : Slots.OffRight(slot);
+                stage.Tracks.Add(Panel(neon, Play(id, t0 + 0.7), K(t0, Slots.OffTop(slot)), K(t0 + 0.8, slot, Ease.OutBounce), K(o + 4.7, slot), K(o + 5.2, exit, Ease.InBack)));
+            }
+        }),
+        new Scene('J', "Toy text's four", "TOY TEXT", Yellow, 6.3, 6.5, (stage, o) => {
+            var four = new[] { ("FrozenLake8x8-v1", Slots.FourTL, Cyan), ("CliffWalking-v1", Slots.FourTR, Pink), ("Taxi-v4", Slots.FourBL, Yellow), ("Blackjack-v1", Slots.FourBR, Green) };
+            for (int i = 0; i < four.Length; i++) {
+                var (id, slot, neon) = four[i];
+                double t0 = o + 0.1 * i;
+                RectF exit = slot.Cx < 640 ? Slots.OffLeft(slot) : Slots.OffRight(slot);
+                stage.Tracks.Add(Panel(neon, Play(id, t0 + 0.7), K(t0, Slots.OffTop(slot)), K(t0 + 0.8, slot, Ease.OutBounce), K(o + 6.0, slot), K(o + 6.5, exit, Ease.InBack)));
+            }
+        }),
+        new Scene('K', "FrozenLake", "TOY TEXT", Yellow, 5.4, 5.3, (stage, o) =>
+            stage.Tracks.Add(Panel(Cyan, Play("FrozenLake-v1", o, speed: 10.0 / 8.0),
+                K(o, Slots.Point(Slots.One)), K(o + 0.6, Slots.One, Ease.OutBack), K(o + 4.8, Slots.One), K(o + 5.3, Slots.OffBottom(Slots.One), Ease.InBack)))),
+        new Scene('L', "Parity", "SAME SEED · SAME ACTIONS · SAME PIXELS", Green, 6.8, 6.9, (stage, o) => {
+            // Gymnasium on the left, Gym.NET on the right, the same seeds and actions, a pixel count between them. The
+            // composer leaves this scene out when there are no replays (--no-parity).
+            ParityReplays parity = stage.Parity!;
+            Columns(stage.Overlays, o + 0.3, o + 6.6);
             var rows = new[] { (parity.Lander, Slots.FourTL, Slots.FourTR), (parity.Racer, Slots.FourBL, Slots.FourBR) };
             for (int i = 0; i < rows.Length; i++) {
                 var (replay, left, right) = rows[i];
-                double t0 = 69.7 + 0.15 * i;
-                tracks.Add(Panel(Cyan, new[] { new Content(t0, () => new ReplaySource(replay, t0, gymNet: false)) },
-                    K(t0, Slots.Point(left)), K(t0 + 0.6, left, Ease.OutBack), K(76.1, left), K(76.6, Slots.OffLeft(left), Ease.InBack)));
-                tracks.Add(Panel(Pink, new[] { new Content(t0, () => new ReplaySource(replay, t0, gymNet: true)) },
-                    K(t0, Slots.Point(right)), K(t0 + 0.6, right, Ease.OutBack), K(76.1, right), K(76.6, Slots.OffRight(right), Ease.InBack)));
-                DiffBadge(overlays, replay, t0, 76.3, (left.Cy + right.Cy) / 2);
+                double t0 = o + 0.15 * i;
+                stage.Tracks.Add(Panel(Cyan, new[] { new Content(t0, () => new ReplaySource(replay, t0, gymNet: false)) },
+                    K(t0, Slots.Point(left)), K(t0 + 0.6, left, Ease.OutBack), K(o + 6.4, left), K(o + 6.9, Slots.OffLeft(left), Ease.InBack)));
+                stage.Tracks.Add(Panel(Pink, new[] { new Content(t0, () => new ReplaySource(replay, t0, gymNet: true)) },
+                    K(t0, Slots.Point(right)), K(t0 + 0.6, right, Ease.OutBack), K(o + 6.4, right), K(o + 6.9, Slots.OffRight(right), Ease.InBack)));
+                DiffBadge(stage.Overlays, replay, t0, o + 6.6, (left.Cy + right.Cy) / 2);
             }
-            finale = 76.5;
+        }),
+        new Scene('M', "Finale", "22 ENVS · 39 IDS · ONE API", Cyan, 4.2, 4.2, (stage, o) => {
+            // Four panels flipping through all 24 ids, mid-episode, every 0.6 s. Each row of the table is one moment of the
+            // four panels, so every moment mixes families; each column is one panel's run of six.
+            string[,] order = {
+                { "LunarLander-v3", "HalfCheetah-v5", "Taxi-v4", "Ant-v5" },
+                { "Hopper-v5", "CartPole-v1", "Humanoid-v5", "CarRacing-v3" },
+                { "FrozenLake8x8-v1", "Walker2d-v5", "Acrobot-v1", "Reacher-v5" },
+                { "InvertedDoublePendulum-v5", "BipedalWalker-v3", "Swimmer-v5", "Blackjack-v1" },
+                { "MountainCar-v0", "Pusher-v5", "CliffWalking-v1", "HumanoidStandup-v5" },
+                { "InvertedPendulum-v5", "Pendulum-v1", "BipedalWalkerHardcore-v3", "FrozenLake-v1" },
+            };
+            RectF[] quad = { Slots.FourTL, Slots.FourTR, Slots.FourBL, Slots.FourBR };
+            Rgb[] neons = { Cyan, Pink, Yellow, Green };
+            for (int q = 0; q < 4; q++) {
+                var contents = new List<Content>();
+                for (int k = 0; k < order.GetLength(0); k++) {
+                    double at = o + 0.05 * q + 0.6 * k;
+                    contents.Add(new Content(at, Mid(order[k, q], at)));
+                }
+                RectF slot = quad[q];
+                double t0 = o + 0.05 * q;
+                stage.Tracks.Add(Panel(neons[q], contents, K(t0, Slots.Point(slot)), K(t0 + 0.5, slot, Ease.OutBack), K(o + 3.7, slot),
+                    K(o + 4.2, Slots.Point(slot), Ease.InBack)));
+            }
+        }),
+        new Scene('N', "Outro", null, Cyan, 4.4, 4.4, (stage, o) => {
+            stage.Flashes.Add(o);
+            Outro(stage.Overlays, o, o + 4.4);
+        }),
+    };
+
+    /// <summary>
+    ///     The video: the scenes an order names, played back to back (DR-100). <see cref="DefaultOrder"/> plays all 14 in
+    ///     letter order, about 83 s.
+    /// </summary>
+    /// <param name="parity">The Gymnasium replays for the parity scene, or <see langword="null"/> to leave scene L out.</param>
+    /// <param name="order">
+    ///     Scene letters in the order they play, separated by spaces or commas (<c>"A D B I L M N"</c>); a letter may come
+    ///     back. See <see cref="ParseOrder"/>.
+    /// </param>
+    /// <param name="letters">
+    ///     Whether to print each scene's letter in the bottom-right corner while it plays: a preview for choosing an order,
+    ///     never the published video.
+    /// </param>
+    /// <returns>The storyboard.</returns>
+    /// <exception cref="ArgumentException">The order is empty or names a letter that is not a scene.</exception>
+    /// <remarks>
+    ///     <para>
+    ///     The composer starts each scene at the previous one's <see cref="Scene.Length"/> and ends the video when the last
+    ///     one's panels have left. A caption that consecutive scenes share (BOX2D over D, E and F) types on once and stays
+    ///     until the next caption is due. The small header logo shows over every scene but the title and the outro: it
+    ///     takes over from the big logo where the title hands it on, and leaves as the outro's logo zooms in.
+    ///     </para>
+    ///     <para>
+    ///     The 85 s video before DR-100 ran these scenes in this order, with the two hand-overs that <see cref="Scenes"/>
+    ///     describes; the README's 51 s cut (<see cref="Hero"/>) is still that video's own timeline and follows no order.
+    ///     </para>
+    /// </remarks>
+    public static Storyboard Video(ParityReplays? parity, string order, bool letters = false) {
+        var (placed, seconds) = Layout(order, withParity: parity is not null);
+        List<Scene> chosen = placed.Select(p => p.Scene).ToList();
+        double[] starts = placed.Select(p => p.Start).ToArray();
+        var stage = new SceneStage(new List<Track>(), new List<Overlay>(), new List<double>(), parity);
+        foreach (var (scene, start) in placed)
+            scene.Build(stage, start);
+
+        // Captions: one per run of scenes that share it, typed on at the run's start, gone just before the next scene.
+        for (int i = 0; i < chosen.Count;) {
+            int j = i;
+            while (j + 1 < chosen.Count && chosen[j + 1].Caption == chosen[i].Caption)
+                j++;
+            if (chosen[i].Caption is { } text) {
+                double end = j + 1 < chosen.Count ? starts[j + 1] - 0.1 : starts[j] + chosen[j].Tail;
+                Caption(stage.Overlays, starts[i], end, text, chosen[i].CaptionNeon);
+            }
+            i = j + 1;
         }
 
-        // Finale: four panels flipping through all 24 ids, mid-episode, every 0.6 s. Each row of the table is one moment of
-        // the four panels, so every moment mixes families; each column is one panel's run of six.
-        Caption(overlays, finale, finale + 4.0, "22 ENVS · 39 IDS · ONE API", Cyan);
-        string[,] order = {
-            { "LunarLander-v3", "HalfCheetah-v5", "Taxi-v4", "Ant-v5" },
-            { "Hopper-v5", "CartPole-v1", "Humanoid-v5", "CarRacing-v3" },
-            { "FrozenLake8x8-v1", "Walker2d-v5", "Acrobot-v1", "Reacher-v5" },
-            { "InvertedDoublePendulum-v5", "BipedalWalker-v3", "Swimmer-v5", "Blackjack-v1" },
-            { "MountainCar-v0", "Pusher-v5", "CliffWalking-v1", "HumanoidStandup-v5" },
-            { "InvertedPendulum-v5", "Pendulum-v1", "BipedalWalkerHardcore-v3", "FrozenLake-v1" },
-        };
-        RectF[] quad = { Slots.FourTL, Slots.FourTR, Slots.FourBL, Slots.FourBR };
-        Rgb[] neons = { Cyan, Pink, Yellow, Green };
-        for (int q = 0; q < 4; q++) {
-            var contents = new List<Content>();
-            for (int k = 0; k < order.GetLength(0); k++) {
-                double at = finale + 0.05 * q + 0.6 * k;
-                contents.Add(new Content(at, Mid(order[k, q], at)));
+        // The header logo, over each run of scenes that are neither the title nor the outro.
+        static bool Framed(Scene s) => s.Letter is not ('A' or 'N');
+        for (int i = 0; i < chosen.Count;) {
+            if (!Framed(chosen[i])) {
+                i++;
+                continue;
             }
-            RectF slot = quad[q];
-            double t0 = finale + 0.05 * q;
-            tracks.Add(Panel(neons[q], contents, K(t0, Slots.Point(slot)), K(t0 + 0.5, slot, Ease.OutBack), K(finale + 3.7, slot),
-                K(finale + 4.2, Slots.Point(slot), Ease.InBack)));
+            int j = i;
+            while (j + 1 < chosen.Count && Framed(chosen[j + 1]))
+                j++;
+            // After the title, the small logo fades in as the big one shrinks into its place (0.55 s before the title ends).
+            double from = i > 0 && chosen[i - 1].Letter == 'A' ? starts[i - 1] + 3.7 : starts[i];
+            // Before the outro, it stays until the outro's logo has begun to zoom in.
+            double to = j + 1 < chosen.Count && chosen[j + 1].Letter == 'N' ? starts[j + 1] + 0.2 : starts[j] + chosen[j].Tail;
+            HeaderLogo(stage.Overlays, from, to);
+            i = j + 1;
         }
 
-        double outro = finale + 4.2;
-        flashes.Add(outro);
-        HeaderLogo(overlays, 3.7, outro + 0.2);
-        Outro(overlays, outro, outro + 4.4);
-        double seconds = outro + 4.4;
-        return new Storyboard(seconds, 30, tracks, overlays, flashes,
-            t => Ease.OutCubic((float)Math.Clamp(t / 2.2, 0, 1)),
-            t => (float)Math.Min(Math.Clamp(t / 0.8, 0, 1), Math.Clamp((seconds - t) / 0.6, 0, 1)));
+        if (letters)
+            for (int i = 0; i < chosen.Count; i++)
+                SceneLetter(stage.Overlays, chosen[i].Letter, starts[i], starts[i] + chosen[i].Length);
+
+        return new Storyboard(seconds, 30, stage.Tracks, stage.Overlays, stage.Flashes,
+            time => Ease.OutCubic((float)Math.Clamp(time / 2.2, 0, 1)),
+            time => (float)Math.Min(Math.Clamp(time / 0.8, 0, 1), Math.Clamp((seconds - time) / 0.6, 0, 1)));
     }
 
     /// <summary>
+    ///     Where each scene of an order starts and how long the video runs, without building a frame: what <c>scenes</c>
+    ///     prints, so an order's length and <c>stills --at</c> times are known before minutes of rendering.
+    /// </summary>
+    /// <param name="order">The order's text (see <see cref="ParseOrder"/>).</param>
+    /// <param name="withParity">
+    ///     Whether the parity replays will be there; without them scene L is left out wherever the order names it, as
+    ///     <see cref="Video"/> leaves it out.
+    /// </param>
+    /// <returns>The scenes with their start times, in playing order, and the video's length in seconds.</returns>
+    /// <exception cref="ArgumentException">The order names a letter that is not a scene, or leaves no scene to play.</exception>
+    public static (List<(Scene Scene, double Start)> Placed, double Seconds) Layout(string order, bool withParity) {
+        List<Scene> chosen = ParseOrder(order, Scenes());
+        // Without replays there is no parity scene to play (--no-parity), whatever the order says.
+        if (!withParity)
+            chosen.RemoveAll(s => s.Letter == 'L');
+        if (chosen.Count == 0)
+            throw new ArgumentException($"the order '{order.Trim()}' leaves no scene to play");
+        var placed = new List<(Scene Scene, double Start)>(chosen.Count);
+        double t = 0;
+        foreach (Scene scene in chosen) {
+            placed.Add((scene, t));
+            t += scene.Length;
+        }
+        // The last scene has no successor to overlap: the video runs until its panels are gone (or its Length, if longer).
+        var (last, lastStart) = placed[^1];
+        return (placed, lastStart + Math.Max(last.Length, last.Tail));
+    }
+
+    /// <summary>
+    ///     Reads an order: scene letters separated by spaces or commas, upper case; anything after a <c>#</c> on a line is
+    ///     a comment, so <c>video-order.txt</c> can say what it is.
+    /// </summary>
+    /// <param name="order">The order's text.</param>
+    /// <param name="scenes">The scenes it may name.</param>
+    /// <returns>The scenes in that order (a scene named twice plays twice).</returns>
+    /// <exception cref="ArgumentException">An entry is not exactly one of the scenes' letters.</exception>
+    /// <remarks>
+    ///     Lower case is refused rather than folded: it is kept free for a short form of a scene, should one be asked for.
+    /// </remarks>
+    public static List<Scene> ParseOrder(string order, IReadOnlyList<Scene> scenes) {
+        var chosen = new List<Scene>();
+        foreach (string line in order.Split('\n')) {
+            string text = line.Split('#')[0];
+            foreach (string entry in text.Split(new[] { ' ', ',', '\t', '\r' }, StringSplitOptions.RemoveEmptyEntries)) {
+                Scene? scene = entry.Length == 1 ? scenes.FirstOrDefault(s => s.Letter == entry[0]) : null;
+                chosen.Add(scene ?? throw new ArgumentException(
+                    $"'{entry}' is not a scene: the scenes are {string.Join(" ", scenes.Select(s => s.Letter))} ({string.Join(", ", scenes.Select(s => $"{s.Letter} {s.Name}"))})"));
+            }
+        }
+        return chosen;
+    }
+
+    /// <summary>A scene's letter in the bottom-right corner, on a dark plate, for the lettered preview.</summary>
+    /// <param name="overlays">Where it is added.</param>
+    /// <param name="letter">The scene's letter.</param>
+    /// <param name="start">When the scene starts.</param>
+    /// <param name="end">When the next scene starts.</param>
+    private static void SceneLetter(List<Overlay> overlays, char letter, double start, double end) =>
+        overlays.Add(new Overlay(start, end, (img, _, _) => {
+            img.FillRect(new RectF(1280 - 96, 720 - 104, 80, 88), Rgb.Hex("#0a0218"), 0.8f);
+            Centered(img, letter.ToString(), 1280 - 56, 720 - 92, 9, Yellow, 1);
+        }));
+
+    /// <summary>
     ///     The README's animation: the whole showreel cut to 51 seconds, the video's 85 minus two fifths. The sections are
-    ///     the video's, in its order and with its hand-overs: intro; classic control (1, 2, then 4 panels); MuJoCo's
+    ///     those of the 85 s video as it was before DR-100 split it into scenes, in its order and with its hand-overs (the
+    ///     maintainer kept this cut as it is: "The MP4 only"): intro; classic control (1, 2, then 4 panels); MuJoCo's
     ///     control tasks (CartPole beside InvertedPendulum, then 4); Box2D (1, 2, 1); MuJoCo's locomotion (CarRacing beside
     ///     HalfCheetah, then 1, 2 and 4); toy text (4, then 1); the parity segment; the finale through all 24 ids; the
     ///     outro, which fades into the intro where the loop starts over.

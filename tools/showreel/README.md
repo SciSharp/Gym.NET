@@ -5,14 +5,17 @@ played by a scripted or trained policy, composed in C# over a synthwave backdrop
 
 | Output | Where it is used |
 |---|---|
-| `docs/media/gym-net-showreel.mp4`: 85 s, 1280x720, 30 fps, H.264 (about 13 MB) | The docs site's landing page, and linked from the README |
-| `docs/media/gym-net-hero.webp`: the same tour cut to 51 s, animated WebP, 800x450, 15 fps (about 8 MB) | The top of `README.md` (GitHub and nuget.org), and the site's fallback where video does not play |
+| `docs/media/gym-net-showreel.mp4`: 14 lettered scenes in the order `video-order.txt` gives (82.8 s in letter order), 1280x720, 30 fps, H.264 (about 13 MB) | The docs site's landing page, and linked from the README |
+| `docs/media/gym-net-hero.webp`: the tour as the video showed it before its scenes (85 s), cut to 51 s, animated WebP, 800x450, 15 fps (about 8 MB) | The top of `README.md` (GitHub and nuget.org), and the site's fallback where video does not play |
 | `docs/website-src/images/envs/*.webp`, `*.png`, `envs.json` | The site's 8-bit "select your environment" gallery |
 | `docs/website-src/images/showreel-poster.jpg`, `gymnet-logo.png`, `gymnet-icon.png` | The video's poster, the site's navbar logo and favicon |
 
 ```bash
 dotnet run --project tools/showreel -c Release                  # everything (about 13 minutes on 32 threads: the video 7.5, the README cut 2.5)
 dotnet run --project tools/showreel -c Release -- video         # or one output: video, hero, gallery
+dotnet run --project tools/showreel -c Release -- scenes        # where each scene of the video's order starts, and its length
+dotnet run --project tools/showreel -c Release -- video --letters     # a preview with each scene's letter in the corner
+dotnet run --project tools/showreel -c Release -- video --order "A D B I L M N" --out short.mp4
 dotnet run --project tools/showreel -c Release -- hero --format gif   # the README cut as a GIF instead (19 MB)
 dotnet run --project tools/showreel -c Release -- stills --board hero --at 2.6,17.5,40 --out stills
 dotnet run --project tools/showreel -c Release -- parity        # only the Gymnasium comparison
@@ -22,7 +25,10 @@ dotnet run --project tools/showreel -c Release -- train --env Hopper-v5   # retr
 Pass the command after `--`. Options: `--repo DIR` (default: the checkout it runs in), `--ffmpeg EXE`, `--python EXE`,
 `--gymnasium DIR` (default `refs/Gymnasium`), `--work DIR` (the Python exchange files, about 1 GB while it runs),
 `--no-parity`, `--width N` (the README animation's, default 800; `--gif-width` is the same option), `--format webp|gif`,
-and for `train`, `--env ID[,ID...]` and `--minutes M`.
+for `video`, `scenes` and `stills --board video`, `--order "LETTERS"` (in place of `video-order.txt`) and `--letters`
+(each scene's letter in the bottom-right corner; without `--out` the preview goes to the temp folder,
+`gymnet-showreel-letters.mp4`, and never over the published video or its poster), and for `train`, `--env ID[,ID...]`
+and `--minutes M`.
 
 ## Requirements
 
@@ -38,6 +44,44 @@ and for `train`, `--env ID[,ID...]` and `--minutes M`.
   not display. Measured on the 51 s cut: animated WebP 7.2 MB, the GIF 19 MB (one palette for 24 envs dithers and
   smears the grey MuJoCo skies), AVIF 3.0 MB at 1280x720 (newer browsers only); DR-73 chose WebP.
 
+## The scenes
+
+The video is 14 scenes, each with a letter (DR-100). `video-order.txt` lists the letters in the order they play: leave
+one out to drop its scene, write one twice to play it twice. Each scene starts and ends on an empty stage, so any order
+plays: its panels fly in after its start and are gone a moment after the next scene starts, while the next scene's
+panels fly in. `scenes` prints where each one starts, and `video --letters` renders a preview with the letters on
+screen.
+
+| Letter | Scene | What plays | Seconds |
+|---|---|---|---|
+| A | Title | The logo drops in with a bounce, the pitch types on | 4.0 |
+| B | Classic control | CartPole alone, then beside MountainCar, then four with Pendulum and Acrobot | 11.3 |
+| C | MuJoCo control | CartPole beside InvertedPendulum, then four: InvertedPendulum, InvertedDoublePendulum, Reacher, Pusher | 8.7 |
+| D | LunarLander | Alone: the descent and `LANDED!` | 7.0 |
+| E | The walkers | BipedalWalker beside BipedalWalkerHardcore, which trips over its first stump | 5.5 |
+| F | CarRacing | Alone, pure pursuit | 5.6 |
+| G | HalfCheetah | Alone, the autopilot already running (joined at step 40) | 4.2 |
+| H | Hopper and Walker2d | Side by side | 4.3 |
+| I | MuJoCo's four | Ant, Humanoid, Swimmer, HumanoidStandup | 5.1 |
+| J | Toy text's four | FrozenLake8x8, CliffWalking, Taxi, Blackjack | 6.3 |
+| K | FrozenLake | Alone, to the goal | 5.4 |
+| L | Parity | Gymnasium beside Gym.NET, the pixel counts between them; left out with `--no-parity` | 6.8 |
+| M | Finale | Four panels flipping through all 24 ids | 4.2 |
+| N | Outro | The logo, the install line, the address | 4.4 |
+
+The seconds are each scene's share of the video, from its start to the next scene's; the last scene runs until its
+panels are gone. In letter order the video is 82.8 s.
+
+The composer (`Storyboards.Video`) lays the scenes end to end and adds what spans them. A caption that consecutive
+scenes share types on once: BOX2D over D, E and F; MUJOCO · LOCOMOTION over G, H and I; TOY TEXT over J and K. The
+small header logo shows over every scene but the title and the outro. The flashes belong to the title and the outro.
+
+Two hand-overs of the 85 s video crossed from one section into the next and could not survive reordering. CartPole now
+enters scene C afresh beside InvertedPendulum, 0.3 s after it, so that after B it never meets B's CartPole leaving.
+CarRacing leaves at the end of F instead of driving beside HalfCheetah, and HalfCheetah has scene G to itself.
+
+Shortening a scene other than by dropping it is left for later (the maintainer, 2026-11-22: "Ill say when i need").
+
 ## What it shows
 
 The look and structure are the maintainer's choices (DR-59, 2026-11-11): a synthwave video in which a playful layout
@@ -50,11 +94,16 @@ intro, classic control, MuJoCo's control tasks (CartPole stays on beside Inverte
 MuJoCo's locomotion (CarRacing stays on beside HalfCheetah), toy text, the parity segment, a finale flipping through all
 24 ids, the outro.
 
-The README shows the same tour cut to 51 s (DR-73, 2026-11-12: "the gif is not great, redo the showreel but -2/5 of the
-time of the mp4"): every section and env, each on screen about 60% as long, in place of DR-59's 12 s loop of seven
-envs. Where a panel became too short for the moment its episode is known for, it joins mid-episode so that moment still
-lands on screen: MountainCar's summit, Acrobot's crossing, the toy-text goals (`Storyboards.Hero`). LunarLander's story
-is its descent, which ends at step 117 of 299, so it plays from its start at twice its speed instead.
+Since DR-100 (2026-11-22: "Kindly split into segments lettered so i can reorder and shorten time") the video is 14
+lettered scenes, played in the order `video-order.txt` gives ([the scenes](#the-scenes)); the two hand-overs above
+became scenes of their own.
+
+The README shows the 85 s tour, as it was before the scenes, cut to 51 s (DR-73, 2026-11-12: "the gif is not great,
+redo the showreel but -2/5 of the time of the mp4"; DR-100 left it as it is): every section and env, each on screen
+about 60% as long, in place of DR-59's 12 s loop of seven envs. Where a panel became too short for the moment its
+episode is known for, it joins mid-episode so that moment still lands on screen: MountainCar's summit, Acrobot's
+crossing, the toy-text goals (`Storyboards.Hero`). LunarLander's story is its descent, which ends at step 117 of 299,
+so it plays from its start at twice its speed instead.
 
 Stamps such as `LANDED!` mark how an episode ended.
 
@@ -131,7 +180,10 @@ so "0 pixels different" would not hold. The MuJoCo caption says what does: "MUJO
 ## Where to change things
 
 - `Episodes.cs`: the recipes (id, seed, policy, speed, stamp, the gallery's blurb, presentation arguments).
-- `Storyboard.cs`: the two timelines: which panel is where, when, with what easing; captions and titles.
+- `video-order.txt`: the video's scene order.
+- `Storyboard.cs`: the video's scenes (`Storyboards.Scenes`: which panel is where, when, with what easing) and their
+  composer (`Storyboards.Video`: captions, the header logo, the letters), and the README cut's timeline
+  (`Storyboards.Hero`); captions and titles.
 - `Synthwave.cs`, `Compositor.cs`, `PixelFont.cs`: the backdrop, the panels and post-processing, the lettering. The
   site's gallery script ports the same 5x7 font (`docs/website-src/templates/gymnet/public/main.js`).
 - `Ars.cs`, `LinearPolicy.cs`, `policies/`: the MuJoCo trainer, the policy format, the committed policies.

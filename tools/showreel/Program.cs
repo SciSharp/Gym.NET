@@ -13,7 +13,9 @@ namespace Gym.Showreel;
 /// <remarks>
 ///     <code>
 ///     Showreel [all]       gallery and logo, the README animation, then the video (the default; one parity run for both)
-///     Showreel video       docs/media/gym-net-showreel.mp4 and the site's poster for it (needs the parity stack unless --no-parity)
+///     Showreel video       docs/media/gym-net-showreel.mp4 and the site's poster for it (needs the parity stack unless --no-parity),
+///                          its scenes in the order tools/showreel/video-order.txt gives
+///     Showreel scenes      where each scene of the order starts and how long the video runs, without rendering
 ///     Showreel hero        docs/media/gym-net-hero.webp, the README's 51 s cut (also needs the parity stack unless --no-parity);
 ///                          --format gif writes docs/media/gym-net-hero.gif instead
 ///     Showreel gallery     docs/website-src/images/envs/*, the site's logo and icon
@@ -22,12 +24,18 @@ namespace Gym.Showreel;
 ///     Showreel train       trains MuJoCo policies with ARS into tools/showreel/policies: --env Hopper-v5,Ant-v5 [--minutes M]
 ///     options: --repo DIR (default: the checkout this runs in), --ffmpeg EXE, --python EXE, --gymnasium DIR,
 ///              --work DIR (Python exchange files), --no-parity, --width N (the README animation's, default 800;
-///              --gif-width is the same option), --format webp|gif
+///              --gif-width is the same option), --format webp|gif,
+///              --order "A D B ..." (the video's scenes, in place of video-order.txt), --letters (each scene's letter
+///              in the corner: a preview, written to the temp folder unless --out says where)
 ///     </code>
 ///     <para>
 ///     The MuJoCo recipes play the committed policies in <c>tools/showreel/policies</c>; <c>train</c> is only needed to
 ///     replace one. Training is deterministic for its seed but takes minutes per env (the budgets are in
 ///     <see cref="Ars.For"/>).
+///     </para>
+///     <para>
+///     The video is 14 lettered scenes (DR-100, <see cref="Storyboards.Scenes"/>); the order file is the maintainer's to
+///     edit, and the tool reads it from the checkout, so a new order needs no rebuild.
 ///     </para>
 /// </remarks>
 internal static class Program {
@@ -40,6 +48,8 @@ internal static class Program {
             string command = options.Command ?? "all";
             switch (command) {
                 case "all":
+                    // A typo in the video's order should stop the run now, not after the gallery and the README cut.
+                    VideoOrder(options);
                     Gallery(options);
                     // The README cut and the video show the same verified replays: one Python run serves both, and its
                     // temporary files are released when both are rendered, even if one fails.
@@ -49,8 +59,13 @@ internal static class Program {
                     }
                     return 0;
                 case "video":
+                    // The order is read and checked before the parity run: a typo in it costs nothing.
+                    VideoOrder(options);
                     using (ParityReplays? parity = options.NoParity ? null : ParityReplays.Create(options.Python, Console.Out))
                         Video(options, parity);
+                    return 0;
+                case "scenes":
+                    Scenes(options);
                     return 0;
                 case "hero":
                     using (ParityReplays? parity = options.NoParity ? null : ParityReplays.Create(options.Python, Console.Out))
@@ -70,7 +85,7 @@ internal static class Program {
                     Train(options);
                     return 0;
                 default:
-                    Console.Error.WriteLine($"unknown command '{command}': all, video, hero, gallery, parity, stills or train");
+                    Console.Error.WriteLine($"unknown command '{command}': all, video, scenes, hero, gallery, parity, stills or train");
                     return 2;
             }
         } catch (ArgumentException e) {
@@ -105,16 +120,63 @@ internal static class Program {
     }
 
     /// <summary>
-    ///     Renders the video, with the parity segment when replays are given, and the docs site's poster for it (the
-    ///     title, 3.3 s in). No scanlines: the site scales the video to its column, and resampled scanlines moiré.
+    ///     Renders the video, its scenes in <see cref="VideoOrder"/>'s order, with the parity scene when replays are given,
+    ///     and the docs site's poster for it (the title, 3.3 s into its scene). No scanlines: the site scales the video to
+    ///     its column, and resampled scanlines moiré.
     /// </summary>
     /// <param name="o">The options.</param>
     /// <param name="parity">The verified Gymnasium replays, or <see langword="null"/> for <c>--no-parity</c>; the caller disposes them.</param>
+    /// <exception cref="ArgumentException">The order names a letter that is not a scene, or leaves no scene to play.</exception>
+    /// <exception cref="IOException">The order file exists but cannot be read.</exception>
+    /// <exception cref="InvalidOperationException">ffmpeg cannot start, or fails writing the video or the poster.</exception>
+    /// <remarks>
+    ///     With <c>--letters</c> and no <c>--out</c>, the lettered preview goes to the temp folder and the poster is left
+    ///     alone: a preview must never overwrite the published video or its poster.
+    /// </remarks>
     private static void Video(Options o, ParityReplays? parity) {
-        string output = o.Output ?? Path.Combine(o.Repo, "docs", "media", "gym-net-showreel.mp4");
-        Render(Storyboards.Video(parity), output, o.Ffmpeg, FfmpegPipe.Mp4(), scanlines: false);
-        if (o.Output is null)
-            FfmpegPipe.ExtractFrame(o.Ffmpeg, output, 3.3, Path.Combine(o.Repo, "docs", "website-src", "images", "showreel-poster.jpg"));
+        string order = VideoOrder(o);
+        string output = o.Output ?? (o.Letters
+            ? Path.Combine(Path.GetTempPath(), "gymnet-showreel-letters.mp4")
+            : Path.Combine(o.Repo, "docs", "media", "gym-net-showreel.mp4"));
+        Console.WriteLine($"video: scenes {string.Join(" ", Storyboards.Layout(order, parity is not null).Placed.Select(p => p.Scene.Letter))}");
+        Render(Storyboards.Video(parity, order, o.Letters), output, o.Ffmpeg, FfmpegPipe.Mp4(), scanlines: false);
+        if (o.Output is null && !o.Letters) {
+            // The poster is the title's frame wherever the order plays it (3.3 s in, the pitch typed on), else 3.3 s in.
+            var (placed, _) = Storyboards.Layout(order, parity is not null);
+            double title = placed.Where(p => p.Scene.Letter == 'A').Select(p => p.Start).DefaultIfEmpty(0).First();
+            FfmpegPipe.ExtractFrame(o.Ffmpeg, output, title + 3.3, Path.Combine(o.Repo, "docs", "website-src", "images", "showreel-poster.jpg"));
+        }
+    }
+
+    /// <summary>
+    ///     The video's scene order: <c>--order</c> when given, else <c>tools/showreel/video-order.txt</c> in the checkout,
+    ///     else <see cref="Storyboards.DefaultOrder"/>. Parsed once here, so a bad letter stops the tool before any
+    ///     rendering or parity run.
+    /// </summary>
+    /// <param name="o">The options.</param>
+    /// <returns>The order's text.</returns>
+    /// <exception cref="ArgumentException">The order names a letter that is not a scene.</exception>
+    /// <exception cref="IOException">The order file exists but cannot be read.</exception>
+    private static string VideoOrder(Options o) {
+        string file = Path.Combine(o.Repo, "tools", "showreel", "video-order.txt");
+        string order = o.Order ?? (File.Exists(file) ? File.ReadAllText(file) : Storyboards.DefaultOrder);
+        Storyboards.ParseOrder(order, Storyboards.Scenes());
+        return order;
+    }
+
+    /// <summary>
+    ///     Prints the order's scenes with their start times and the video's length: the times <c>stills --at</c> needs, at
+    ///     no rendering cost.
+    /// </summary>
+    /// <param name="o">The options (<c>--order</c> and <c>--no-parity</c> count).</param>
+    /// <exception cref="ArgumentException">The order names a letter that is not a scene, or leaves no scene to play.</exception>
+    /// <exception cref="IOException">The order file exists but cannot be read.</exception>
+    private static void Scenes(Options o) {
+        string order = VideoOrder(o);
+        var (placed, seconds) = Storyboards.Layout(order, withParity: !o.NoParity);
+        foreach (var (scene, start) in placed)
+            Console.WriteLine($"{scene.Letter}  {start.ToString("0.00", CultureInfo.InvariantCulture),6} s  {scene.Name}");
+        Console.WriteLine($"   {seconds.ToString("0.00", CultureInfo.InvariantCulture),6} s  the end");
     }
 
     /// <summary>
@@ -152,9 +214,11 @@ internal static class Program {
             throw new ArgumentException("stills needs --at with comma-separated seconds");
         if (o.Board is not ("video" or "hero"))
             throw new ArgumentException($"unknown board '{o.Board}': video or hero");
+        // A bad order stops the tool before the parity run.
+        string? order = o.Board == "video" ? VideoOrder(o) : null;
         // The replays own large temporary files: dispose them even when a still fails. Both boards hold the parity segment.
         using ParityReplays? parity = o.NoParity ? null : ParityReplays.Create(o.Python, Console.Out);
-        Storyboard board = o.Board == "video" ? Storyboards.Video(parity) : Storyboards.Hero(parity);
+        Storyboard board = order is not null ? Storyboards.Video(parity, order, o.Letters) : Storyboards.Hero(parity);
         string folder = o.Output ?? Path.Combine(Path.GetTempPath(), "gymnet-showreel-stills");
         Directory.CreateDirectory(folder);
         using var compositor = new Compositor(board, scanlines: o.Board == "video");
@@ -226,6 +290,12 @@ internal static class Program {
         /// <summary>A time budget per env for <c>train</c> replacing <see cref="Ars.For"/>'s, or null.</summary>
         public double? Minutes { get; private set; }
 
+        /// <summary>The video's scene order from <c>--order</c>, or null to read <c>video-order.txt</c>.</summary>
+        public string? Order { get; private set; }
+
+        /// <summary>Whether to print each scene's letter over the video (<c>--letters</c>): a preview, never the published video.</summary>
+        public bool Letters { get; private set; }
+
         /// <summary>Parses the arguments.</summary>
         /// <param name="args">The arguments.</param>
         /// <returns>The options.</returns>
@@ -252,6 +322,8 @@ internal static class Program {
                         break;
                     case "--env": o.Envs.AddRange(Value().Split(',', StringSplitOptions.RemoveEmptyEntries)); break;
                     case "--minutes": o.Minutes = double.Parse(Value(), CultureInfo.InvariantCulture); break;
+                    case "--order": o.Order = Value(); break;
+                    case "--letters": o.Letters = true; break;
                     default:
                         if (a.StartsWith("--", StringComparison.Ordinal) || o.Command is not null)
                             throw new ArgumentException($"unknown argument '{a}'");
