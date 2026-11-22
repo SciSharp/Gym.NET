@@ -45,14 +45,18 @@ jobs:
     # enough. Tune it from the first runs' timings (GitHub's own limit for a hosted job is 360). The first full runs, on
     # the 1.0.0+rc1 PR (2026-11-21), took about 50 minutes: builds 4, unit gates 22 and 10, parity 11 to 19.
     timeout-minutes: 240
-    # Bit for bit is proven on the reference machine's instruction set (an i9-13900K: AVX2 and FMA, no AVX-512), and
-    # GitHub's windows-latest hosts are a mix. On an AVX-512 host NumPy sends float64 sin and cos to its X86_V4 (SVML)
-    # loops and its OpenBLAS picks SkylakeX kernels, both a last bit away from the reference's paths: one run of the
-    # 1.0.0+rc1 PR (44960756920) failed 106 MuJoCo cells by 1 ulp (Reacher, Ant, Humanoid, Pusher, Swimmer: the envs that
-    # take cos, sin or norms in NumPy), while the push run of the same commit (44960751732) passed every cell. These pin
-    # both interpreters to the reference's paths on any host: NumPy dispatches only its X86_V3 (AVX2) loops (naming the
-    # level to enable is silent where X86_V4 is absent, where disabling it is not), OpenBLAS runs its Haswell kernels, as
-    # the maintainer's OptunaSharp CI does, and .NET's JIT leaves AVX-512 aside.
+    # Bit for bit is proven on the reference machine (an i9-13900K: AVX2 and FMA, no AVX-512), and GitHub's
+    # windows-latest hosts are a mix. One run of the 1.0.0+rc1 PR (44960756920) failed 106 MuJoCo cells by 1 ulp while
+    # the push run of the same commit (44960751732) passed every cell. Every field that differed was a norm
+    # (distance_from_origin, reward_dist, reward_near, and the rewards built on them; no observation): NumPy's linalg.norm
+    # is sqrt(x.dot(x)), a BLAS ddot, and NumPy's OpenBLAS picks its ddot kernel by the host's CPU, so a host unlike the
+    # reference sums in another order. OPENBLAS_CORETYPE=Haswell pins the reference's kernels on any host, as the
+    # maintainer's OptunaSharp CI does; with it, the release commit's runs passed every cell on an Intel Xeon Platinum
+    # 8370C (44967516625) and on an AMD EPYC 9V74 (44967519304), both with AVX-512. NPY_ENABLE_CPU_FEATURES=X86_V3
+    # changes nothing today, since NumPy 2.4.2's win_amd64 wheel dispatches X86_V3 only (its own warning text names the
+    # list), and keeps a later wheel off X86_V4; naming the level to enable is silent where X86_V4 is absent, where
+    # disabling it raises ImportWarning. DOTNET_EnableAVX512F=0 keeps .NET on the reference's paths as a precaution: the
+    # .NET side did not move.
     env:
       NPY_ENABLE_CPU_FEATURES: "X86_V3"
       OPENBLAS_CORETYPE: "Haswell"
@@ -93,12 +97,14 @@ jobs:
         shell: pwsh
         run: ./tools/parity/setup_venv.ps1 -Python python
 
-      # Which host this run got, and whether the pins above took hold: the parity gate's last bits depend on both.
+      # Which host this run got, and which SIMD levels NumPy dispatches there under the pin above ('found'). The CPU's
+      # own AVX-512 support is __cpu_features__, which reports the host, not the dispatch; OpenBLAS's kernels are set by
+      # OPENBLAS_CORETYPE and not printed.
       - name: Runner CPU and NumPy dispatch
         shell: pwsh
         run: |
           (Get-CimInstance Win32_Processor | Select-Object -First 1).Name
-          ./tools/parity/.venv/Scripts/python.exe -I -c "import numpy as np; f = np._core._multiarray_umath.__cpu_features__; print('NumPy', np.__version__, '| X86_V3', f.get('X86_V3'), '| X86_V4', f.get('X86_V4'), '| AVX512F', f.get('AVX512F'))"
+          ./tools/parity/.venv/Scripts/python.exe -I -c "import numpy as np; f = np._core._multiarray_umath.__cpu_features__; print('NumPy', np.__version__, '| SIMD', np.show_config(mode='dicts')['SIMD Extensions'], '| host AVX512F', f.get('AVX512F'))"
 
       - name: Parity gate (live Gymnasium, Release)
         env:
