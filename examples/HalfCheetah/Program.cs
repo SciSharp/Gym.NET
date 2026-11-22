@@ -20,7 +20,7 @@ using Gym.MuJoCo;
 namespace MujocoPoc.Play;
 
 /// <summary>
-///     HalfCheetah-v5 played by Farama's TQC expert (DR-103): <c>dotnet run --project examples/HalfCheetah -c Release</c>
+///     HalfCheetah-v5 played by Farama's TQC expert (DR-109): <c>dotnet run --project examples/HalfCheetah -c Release</c>
 ///     plays one seeded episode headless through <c>Gymnasium.Make</c> and prints its steps and return; <c>-- --render</c>
 ///     plays it in MuJoCo's window, <c>-- --autopilot</c> plays it on the autopilot instead (a linear policy trained by
 ///     Augmented Random Search), and <c>-- --play</c> opens the playable HalfCheetah, where the keyboard drives the six
@@ -30,7 +30,7 @@ namespace MujocoPoc.Play;
 /// <remarks>
 ///     Usage:
 ///     <code>
-///     HalfCheetah [--seed N] [--episodes N] [--render]    Farama's TQC expert through Gymnasium.Make (default; DR-74, DR-103)
+///     HalfCheetah [--seed N] [--episodes N] [--render]    Farama's TQC expert through Gymnasium.Make (default; DR-74, DR-109)
 ///     HalfCheetah --autopilot [--seed N] [--episodes N] [--render]    the same, on the autopilot
 ///     HalfCheetah --play [--seed N]                        the game, with the keyboard driving
 ///     HalfCheetah play [--seed N] [--manual]               the game, with the autopilot driving until Tab
@@ -68,7 +68,7 @@ internal static class Program {
         try {
             switch (command) {
                 case "episode":
-                    // The expert plays by default (DR-103); --autopilot keeps the linear policy whose returns Gymnasium
+                    // The expert plays by default (DR-109); --autopilot keeps the linear policy whose returns Gymnasium
                     // reproduces to the last bit (replay_in_gymnasium.py).
                     return options.Flag("autopilot")
                         ? Episodes(policyPath, options.Int("seed", 0), options.Int("episodes", 1), options.Flag("render"))
@@ -99,7 +99,7 @@ internal static class Program {
     }
 
     /// <summary>
-    ///     The mode every example shares (DR-74), as the expert plays it (DR-103): seeded episodes of HalfCheetah-v5 played
+    ///     The mode every example shares (DR-74), as the expert plays it (DR-109): seeded episodes of HalfCheetah-v5 played
     ///     by Farama's TQC expert through <c>Gymnasium.Make</c>, headless or in MuJoCo's window, each one's steps and return
     ///     printed.
     /// </summary>

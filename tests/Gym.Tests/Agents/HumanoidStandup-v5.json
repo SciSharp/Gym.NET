@@ -80,7 +80,7 @@
   "trained_by": "the Farama Foundation, to record the Minari datasets",
   "training_code": "https://github.com/Farama-Foundation/minari-dataset-generation-scripts (MIT)",
   "reported_mean_return": "395485.91 +/- 33309.92",
-  "licence": "No licence is stated on the model repository; its training code is MIT. Committed with attribution on the maintainer's decision (DR-103)."
+  "licence": "No licence is stated on the model repository; its training code is MIT. Committed with attribution on the maintainer's decision (DR-109)."
  },
  "checks": [
   {

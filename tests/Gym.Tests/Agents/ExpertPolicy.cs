@@ -11,7 +11,7 @@ namespace Gym.Agents;
 /// <summary>
 ///     A published expert agent for one of Gym.NET's ids, read from <c>tests/Gym.Tests/Agents/&lt;id&gt;.json</c>: the
 ///     deterministic actor network of a Stable-Baselines3 model (Farama's MuJoCo experts, RL Zoo's hardcore walker),
-///     mapping an observation to the action its <c>predict(deterministic=True)</c> takes (DR-103).
+///     mapping an observation to the action its <c>predict(deterministic=True)</c> takes (DR-109).
 /// </summary>
 /// <remarks>
 ///     <para>

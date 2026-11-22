@@ -5,7 +5,7 @@ using NumSharp;
 namespace Gym.Showreel;
 
 /// <summary>
-///     An <see cref="IPolicy"/> driving an env with a published expert agent (DR-103): the observation, whatever its
+///     An <see cref="IPolicy"/> driving an env with a published expert agent (DR-109): the observation, whatever its
 ///     dtype, goes through the agent's network and the float32 action comes back as an array.
 /// </summary>
 /// <remarks>

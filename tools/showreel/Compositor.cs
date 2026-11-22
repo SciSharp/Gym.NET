@@ -44,7 +44,7 @@ internal sealed class Compositor : IDisposable {
     /// <param name="board">The timeline.</param>
     /// <param name="scanlines">Whether to draw scanlines.</param>
     /// <param name="backdrop">
-    ///     The backdrop's name for <see cref="Backdrops.Create"/>: <see cref="Backdrops.Default"/> (the dusk beach, DR-102)
+    ///     The backdrop's name for <see cref="Backdrops.Create"/>: <see cref="Backdrops.Default"/> (the dusk beach, DR-108)
     ///     unless <c>--backdrop</c> picks another.
     /// </param>
     /// <exception cref="ArgumentException">The backdrop's name is unknown.</exception>

@@ -28,7 +28,7 @@ deterministic `predict` does.
 
 Over seeds 0-9 it scores 6,949.0 in Gym.NET (every seed runs all 1,000 steps); the model card reports 6956.61 +/- 15.95.
 The model repository states no licence; its training code is MIT. Gym.NET commits the weights with this attribution, on
-the maintainer's decision (DR-103).
+the maintainer's decision (DR-109).
 
 ## Watching and playing
 

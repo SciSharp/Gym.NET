@@ -34,8 +34,8 @@ namespace Gym.Showreel;
 ///     <see cref="Ars.For"/>).
 ///     </para>
 ///     <para>
-///     The video is 15 lettered scenes (DR-100, DR-101, <see cref="Storyboards.Scenes"/>) and the README's animation their
-///     short form (DR-104, <see cref="Storyboards.ShortScenes"/>), both in the order file's order; the file is the
+///     The video is 15 lettered scenes (DR-100, DR-107, <see cref="Storyboards.Scenes"/>) and the README's animation their
+///     short form (DR-110, <see cref="Storyboards.ShortScenes"/>), both in the order file's order; the file is the
 ///     maintainer's to edit, and the tool reads it from the checkout, so a new order needs no rebuild.
 ///     </para>
 /// </remarks>
@@ -182,7 +182,7 @@ internal static class Program {
     }
 
     /// <summary>
-    ///     Renders the README animation, the short form of the video's scenes in the video's order (DR-104, about 49 s), at
+    ///     Renders the README animation, the short form of the video's scenes in the video's order (DR-110, about 49 s), at
     ///     15 frames a second: an animated WebP, or a GIF with <c>--format gif</c>. No scanlines, as for the video.
     /// </summary>
     /// <param name="o">The options.</param>
@@ -305,7 +305,7 @@ internal static class Program {
         /// <summary>Whether to print each scene's letter over the video (<c>--letters</c>): a preview, never the published video.</summary>
         public bool Letters { get; private set; }
 
-        /// <summary>The backdrop (<c>--backdrop</c>): <c>beach</c>, the dusk beach of DR-102, or <c>synthwave</c>, DR-59's grid.</summary>
+        /// <summary>The backdrop (<c>--backdrop</c>): <c>beach</c>, the dusk beach of DR-108, or <c>synthwave</c>, DR-59's grid.</summary>
         public string Backdrop { get; private set; } = Backdrops.Default;
 
         /// <summary>Parses the arguments.</summary>

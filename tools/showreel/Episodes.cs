@@ -105,7 +105,7 @@ internal sealed record EpisodeRecipe(
 ///     table. LunarLander and BipedalWalker use Gymnasium's own heuristics as Gym.NET ships them.
 ///     </para>
 ///     <para>
-///     The eleven MuJoCo envs and the hardcore walker play published expert agents (DR-103), read from
+///     The eleven MuJoCo envs and the hardcore walker play published expert agents (DR-109), read from
 ///     <c>agents/&lt;id&gt;.json</c> next to the program, which the build copies from their home in
 ///     <c>tests/Gym.Tests/Agents</c>: Farama's own SAC, TQC and PPO experts for the MuJoCo v5 envs (the agents Farama
 ///     trained to record the Minari datasets) and RL Zoo's TQC agent for BipedalWalkerHardcore-v3. Measured in Gym.NET
@@ -132,7 +132,7 @@ internal static class Episodes {
 
     /// <summary>
     ///     HumanoidStandup's arguments: the track camera, and the observation Farama's expert was trained on, positions and
-    ///     velocities only (its <c>make_kwargs</c>, DR-103). They change what the agent sees, never the dynamics.
+    ///     velocities only (its <c>make_kwargs</c>, DR-109). They change what the agent sees, never the dynamics.
     /// </summary>
     /// <remarks>Declared before <see cref="All"/> for the same reason as <see cref="TrackCamera"/>.</remarks>
     private static readonly IReadOnlyDictionary<string, object?> StandupKwargs = new Dictionary<string, object?> {
@@ -236,7 +236,7 @@ internal static class Episodes {
 
     /// <summary>
     ///     A factory of agents playing the published expert of an id (<c>agents/&lt;id&gt;.json</c> next to the program,
-    ///     DR-103), the file read once, on first use, and shared by every player.
+    ///     DR-109), the file read once, on first use, and shared by every player.
     /// </summary>
     /// <param name="id">The registered id.</param>
     /// <returns>The factory.</returns>
@@ -251,7 +251,7 @@ internal static class Episodes {
 
     /// <summary>
     ///     A factory of agents playing the committed ARS policy of an id (<c>policies/&lt;id&gt;.json</c> next to the
-    ///     program), the file read once, on first use, and shared by every player. No recipe plays one since DR-103.
+    ///     program), the file read once, on first use, and shared by every player. No recipe plays one since DR-109.
     /// </summary>
     /// <param name="id">The registered id.</param>
     /// <returns>The factory.</returns>

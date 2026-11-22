@@ -56,7 +56,7 @@ internal sealed class EpisodeSource : IPanelSource {
     /// <param name="skipFrom">
     ///     The tick from which to play <paramref name="skipSpeed"/> times faster, or <see langword="null"/> to keep one
     ///     speed: LunarLander's 4 s scene plays its descent at its own speed, then skips through the 180 steps it rests on
-    ///     the pad, so the LANDED! verdict still lands on screen (DR-101).
+    ///     the pad, so the LANDED! verdict still lands on screen (DR-107).
     /// </param>
     /// <param name="skipSpeed">The factor from <paramref name="skipFrom"/> on; above 1 fast-forwards.</param>
     public EpisodeSource(EpisodeRecipe recipe, double start, double speed, int startTick, int? skipFrom = null, double skipSpeed = 1) {

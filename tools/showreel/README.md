@@ -20,7 +20,7 @@ dotnet run --project tools/showreel -c Release -- video --backdrop synthwave --o
 dotnet run --project tools/showreel -c Release -- hero --format gif   # the README cut as a GIF instead
 dotnet run --project tools/showreel -c Release -- stills --board hero --at 2,12,30 --out stills
 dotnet run --project tools/showreel -c Release -- parity        # only the Gymnasium comparison
-dotnet run --project tools/showreel -c Release -- train --env Hopper-v5   # retrain an ARS policy (no recipe plays them since DR-103)
+dotnet run --project tools/showreel -c Release -- train --env Hopper-v5   # retrain an ARS policy (no recipe plays them since DR-109)
 ```
 
 Pass the command after `--`. Options: `--repo DIR` (default: the checkout it runs in), `--ffmpeg EXE`, `--python EXE`,
@@ -47,11 +47,11 @@ the published video or its poster), and for `train`, `--env ID[,ID...]` and `--m
 
 ## The scenes
 
-The video is 15 scenes, each with a letter (DR-100, DR-101). `video-order.txt` lists the letters in the order they
+The video is 15 scenes, each with a letter (DR-100, DR-107). `video-order.txt` lists the letters in the order they
 play: leave one out to drop its scene, write one twice to play it twice. Each scene starts and ends on an empty stage, so
 any order plays: its panels fly in after its start and are gone a moment after the next scene starts, while the next
 scene's panels fly in. `scenes` prints where each one starts, and `video --letters` renders a preview with the letters
-on screen. The README's animation plays the same scenes in the same order, each in a short form (DR-104).
+on screen. The README's animation plays the same scenes in the same order, each in a short form (DR-110).
 
 | Letter | Scene | What plays | Video, s | README, s |
 |---|---|---|---|---|
@@ -80,7 +80,7 @@ and L. A scene may end the shared caption early and type its own (`Scene.Caption
 MUJOCO" when InvertedDoublePendulum, a MuJoCo env, joins the classic four. The small header logo shows over every scene
 but the title and the outro. The flashes belong to the title and the outro.
 
-DR-101 (the maintainer, 2026-11-22) reshaped DR-100's fourteen scenes without changing their order ("dont shuffle envs
+DR-107 (the maintainer, 2026-11-22) reshaped DR-100's fourteen scenes without changing their order ("dont shuffle envs
 order"): Pendulum and InvertedPendulum left the video, two of its four vertical poles; InvertedDoublePendulum took
 Pendulum's place in the classic four; Reacher and Pusher became a pair ("move reacher and pusher to a 2 in a scene"),
 and MuJoCo's four became two pairs ("Show the humanoid and its kind 2 in scene and another scene with other 2"). The
@@ -94,15 +94,15 @@ The structure is the maintainer's (DR-59, 2026-11-11): a video in which a playfu
 four envs; below it on the site, an 8-bit cartridge-select gallery; one id per visually distinct env (twins such as
 LunarLanderContinuous-v3 or the MuJoCo v4 ids look the same and are left out); and a parity segment. The MuJoCo envs
 joined between the existing sections when they landed (DR-72), the video became lettered scenes (DR-100) and then took
-its present shape (DR-101). The gallery still shows all 24 ids; the video shows 22.
+its present shape (DR-107). The gallery still shows all 24 ids; the video shows 22.
 
-The backdrop is the 16-bit dusk beach (DR-102, `DuskBeach.cs`), which the maintainer chose from eight candidates
+The backdrop is the 16-bit dusk beach (DR-108, `DuskBeach.cs`), which the maintainer chose from eight candidates
 animated live under the video's panels: pixel art drawn at 320x180 and scaled up four times, an ordered-dithered sunset
 sky, the sun half-sunk in the sea with gaps rolling down it, a far skyline's blinking lights, the sun's reflection
 shimmering on the sea bands, and two swaying palms. DR-59's synthwave grid stays available with `--backdrop
 synthwave` (`Synthwave.cs`).
 
-The README's animation is the same scenes' short form (DR-104, "Re-cut from the new video"), in the video's order: each
+The README's animation is the same scenes' short form (DR-110, "Re-cut from the new video"), in the video's order: each
 scene about 60% as long. Where a panel became too short for the moment its episode is known for, it joins mid-episode
 so that moment still lands on screen: MountainCar's summit, Acrobot's crossing, Pusher's push, the toy-text goals
 (`Storyboards.ShortScenes`). LunarLander plays at one and a half times its speed and fast-forwards its rest.
@@ -118,9 +118,9 @@ frames left the particles of the unshown steps unaged, so a mid-episode join sta
 |---|---|---|---|
 | CartPole-v1 | 3 | Linear feedback around a set point that sways, so the cart glides | 500 steps, return 500 |
 | MountainCar-v0 | 4 | Accelerate with the velocity | Summit in 122 steps |
-| Pendulum-v1 | 5 | Energy pumping, then a PD catch at the top (the gallery only, since DR-101) | Return -114.1 |
+| Pendulum-v1 | 5 | Energy pumping, then a PD catch at the top (the gallery only, since DR-107) | Return -114.1 |
 | Acrobot-v1 | 1 | Torque with the second joint's swing | Over the line in 65 steps |
-| InvertedPendulum-v5 | 0 | Farama's SAC expert (the gallery only, since DR-101) | 1,000 steps balanced |
+| InvertedPendulum-v5 | 0 | Farama's SAC expert (the gallery only, since DR-107) | 1,000 steps balanced |
 | InvertedDoublePendulum-v5 | 0 | Farama's SAC expert | 1,000 steps, return 9,355.8 |
 | Reacher-v5 | 0-3 | Farama's SAC expert | Four targets reached; the fourth's return -5.4 |
 | Pusher-v5 | 7 | Farama's SAC expert | The puck in the goal, return -20.4 |
@@ -142,7 +142,7 @@ frames left the particles of the unshown steps unaged, so a mid-episode join sta
 
 ### The expert agents
 
-The eleven MuJoCo envs and the hardcore walker play published expert agents (DR-103): the agents the Farama
+The eleven MuJoCo envs and the hardcore walker play published expert agents (DR-109): the agents the Farama
 Foundation, Gymnasium's maintainers, trained on these v5 envs to record the Minari datasets (Stable-Baselines3's SAC,
 TQC and PPO), and RL Zoo's TQC agent for the hardcore course. The maintainer, 2026-11-22: "All of our envs must be good
 or state of the art". Their home is [`tests/Gym.Tests/Agents`](../../tests/Gym.Tests/Agents), whose README lists each

@@ -33,7 +33,7 @@ sees, never the dynamics.
 
 Over seeds 0-9 it scores 400,097.0 in Gym.NET (every seed stands up within a second and stays up); the model card
 reports 395485.91 +/- 33309.92. The model repository states no licence; its training code is MIT. Gym.NET commits the
-weights with this attribution, on the maintainer's decision (DR-103).
+weights with this attribution, on the maintainer's decision (DR-109).
 
 ## Watching and playing
 

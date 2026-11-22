@@ -10,7 +10,7 @@ using NumSharp;
 
 namespace Gym.Tests.Agents {
     /// <summary>
-    ///     The published expert agents (DR-103) played in Gym.NET: the reader computes what PyTorch computes, and each agent
+    ///     The published expert agents (DR-109) played in Gym.NET: the reader computes what PyTorch computes, and each agent
     ///     plays a whole expert episode on Gym.NET's own engines, as it did in the libraries it was trained on.
     /// </summary>
     /// <remarks>
@@ -90,7 +90,7 @@ namespace Gym.Tests.Agents {
 
         /// <summary>
         ///     Each file names its source: the Hugging Face repository, a pinned 40-character revision, the algorithm and the
-        ///     licence note, as the maintainer's decision to commit them requires (DR-103).
+        ///     licence note, as the maintainer's decision to commit them requires (DR-109).
         /// </summary>
         /// <param name="id">The agent's id.</param>
         [TestMethod]
@@ -100,7 +100,7 @@ namespace Gym.Tests.Agents {
             StringAssert.StartsWith(agent.Source["repository"]!.GetValue<string>(), "https://huggingface.co/");
             Assert.AreEqual(40, agent.Source["revision"]!.GetValue<string>().Length);
             Assert.IsFalse(string.IsNullOrEmpty(agent.Source["algorithm"]!.GetValue<string>()));
-            StringAssert.Contains(agent.Source["licence"]!.GetValue<string>(), "DR-103");
+            StringAssert.Contains(agent.Source["licence"]!.GetValue<string>(), "DR-109");
         }
 
         /// <summary>Plays one episode to its end.</summary>

@@ -29,7 +29,7 @@ it through the network, and squashes the result into the motors' range with tanh
 
 Over seeds 0-9 it scores -28.0 in Gym.NET (seed 7, the default, puts the puck in the goal for -20.4); the model card
 reports -22.05 +/- 2.69. The model repository states no licence; its training code is MIT. Gym.NET commits the weights
-with this attribution, on the maintainer's decision (DR-103).
+with this attribution, on the maintainer's decision (DR-109).
 
 ## Watching and playing
 

@@ -55,7 +55,7 @@
     <EmbeddedResource Include="Gymnasium\inventory.expected-missing.txt" LogicalName="Gym.Tests.inventory.expected-missing.txt" />
   </ItemGroup>
 
-  <!-- The published expert agents (DR-103), written by tools/agents/import_agents.py: Farama's MuJoCo experts and RL Zoo's
+  <!-- The published expert agents (DR-109), written by tools/agents/import_agents.py: Farama's MuJoCo experts and RL Zoo's
        hardcore walker as gym.net-agent/1 JSON. This project is their home; the parity suite, the showreel and the examples
        take them from here or from their own copies. Embedded, as the goldens above are, so ExpertAgentTests never depends
        on the working directory. -->

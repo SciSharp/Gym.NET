@@ -33,7 +33,7 @@ closer `default_camera_config` (2.6 m away, looking at the poles' middle). It ch
 
 Over seeds 0-9 it scores 9,356.0 in Gym.NET (every seed holds both poles all 1,000 steps); the model card reports
 9356.02 +/- 0.06. The model repository states no licence; its training code is MIT. Gym.NET commits the weights with
-this attribution, on the maintainer's decision (DR-103).
+this attribution, on the maintainer's decision (DR-109).
 
 ## Watching and playing
 

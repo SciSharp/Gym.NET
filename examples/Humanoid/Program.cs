@@ -29,7 +29,7 @@ namespace Gym.Examples.Humanoid {
     ///     </para>
     ///     <para>
     ///     The model repository states no licence; its training code is MIT. Gym.NET commits the weights with this
-    ///     attribution, on the maintainer's decision (DR-103).
+    ///     attribution, on the maintainer's decision (DR-109).
     ///     </para>
     ///     <para>
     ///     The default seed, 0, is the episode the front-page showreel plays (<c>tools/showreel</c>, DR-74).
@@ -134,7 +134,7 @@ namespace Gym.Examples.Humanoid {
     }
 
     /// <summary>
-    ///     A published expert agent read from <c>policy.json</c> (DR-103): the deterministic actor network of a
+    ///     A published expert agent read from <c>policy.json</c> (DR-109): the deterministic actor network of a
     ///     Stable-Baselines3 model, which maps an observation to the action its <c>predict(deterministic=True)</c>
     ///     takes.
     /// </summary>

@@ -32,7 +32,7 @@
     <None Include="policies\*.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
-  <!-- The expert agents the MuJoCo envs and the hardcore walker play (DR-103), and their reader, taken from their home
+  <!-- The expert agents the MuJoCo envs and the hardcore walker play (DR-109), and their reader, taken from their home
        in the unit tests, so the showreel plays exactly the agents the tests measure: agents\<id>.json next to the
        program. -->
   <ItemGroup>

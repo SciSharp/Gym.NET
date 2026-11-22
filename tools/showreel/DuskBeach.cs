@@ -14,11 +14,11 @@ internal interface IBackdrop {
 
 /// <summary>The backdrops the showreel can draw, by the name <c>--backdrop</c> takes.</summary>
 internal static class Backdrops {
-    /// <summary>The backdrop the video and the README cut use unless <c>--backdrop</c> says otherwise (DR-102).</summary>
+    /// <summary>The backdrop the video and the README cut use unless <c>--backdrop</c> says otherwise (DR-108).</summary>
     public const string Default = "beach";
 
     /// <summary>Creates a backdrop by name.</summary>
-    /// <param name="name"><c>beach</c> (the 16-bit dusk beach, DR-102) or <c>synthwave</c> (the sunset grid of DR-59).</param>
+    /// <param name="name"><c>beach</c> (the 16-bit dusk beach, DR-108) or <c>synthwave</c> (the sunset grid of DR-59).</param>
     /// <param name="width">Frame width.</param>
     /// <param name="height">Frame height.</param>
     /// <returns>The backdrop.</returns>
@@ -31,7 +31,7 @@ internal static class Backdrops {
 }
 
 /// <summary>
-///     The 16-bit dusk beach (DR-102): pixel art drawn at 320x180 and scaled up four times without smoothing, so every
+///     The 16-bit dusk beach (DR-108): pixel art drawn at 320x180 and scaled up four times without smoothing, so every
 ///     pixel is a crisp 4x4 block. An ordered-dithered sunset sky, the sun half-sunk in the sea with gaps rolling down
 ///     it, a far skyline whose lights blink on the horizon, sea bands with the sun's reflection shimmering on them, and
 ///     two palm silhouettes swaying at the edges.

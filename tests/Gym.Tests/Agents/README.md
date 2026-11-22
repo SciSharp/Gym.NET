@@ -1,6 +1,6 @@
 # The expert agents
 
-Published agents for Gym.NET's envs (DR-103, 2026-11-22): the eleven MuJoCo v5 envs played by the experts the Farama
+Published agents for Gym.NET's envs (DR-109, 2026-11-22): the eleven MuJoCo v5 envs played by the experts the Farama
 Foundation, Gymnasium's maintainers, trained on them to record the Minari datasets, and BipedalWalkerHardcore-v3 by
 RL Baselines3 Zoo's TQC agent. The maintainer: "All of our envs must be good or state of the art", and "i want all sota
 weights to be used and served in the tests project or wherever fit".
@@ -35,7 +35,7 @@ trained seeing positions and velocities only, so its file's `make_kwargs` turns 
 
 The model repositories state no licence; the code that trained them is MIT (Farama's generation scripts, RL Baselines3
 Zoo). The weights are committed here with this attribution, on the maintainer's decision ("Commit, attributed",
-2026-11-22, DR-103), and every file's `source` names its repository, revision and trainer.
+2026-11-22, DR-109), and every file's `source` names its repository, revision and trainer.
 
 ## The format
 

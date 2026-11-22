@@ -1,5 +1,5 @@
-# The showreel's scenes, in the order they play (DR-100, DR-101); the README's animation plays the same order, each scene
-# shorter (DR-104). Letters, left to right, on any number of lines: leave a letter out to drop its scene, write one twice
+# The showreel's scenes, in the order they play (DR-100, DR-107); the README's animation plays the same order, each scene
+# shorter (DR-110). Letters, left to right, on any number of lines: leave a letter out to drop its scene, write one twice
 # to play it twice. Anything after a # is a comment.
 #
 #   A  Title                   F  CarRacing                     K  Toy text's four

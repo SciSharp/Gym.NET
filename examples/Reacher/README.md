@@ -30,7 +30,7 @@ it through the network, and squashes the result into the motors' range with tanh
 
 Over seeds 0-9 it scores -3.4 in Gym.NET (from -5.9 to -1); the model card reports -3.28 +/- 1.38. The model repository
 states no licence; its training code is MIT. Gym.NET commits the weights with this attribution, on the maintainer's
-decision (DR-103).
+decision (DR-109).
 
 ## Watching and playing
 

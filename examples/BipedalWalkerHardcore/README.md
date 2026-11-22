@@ -30,7 +30,7 @@ as Stable-Baselines3's deterministic `predict` does.
 
 Over seeds 0-9 it scores 243.8 in Gym.NET (six seeds of ten finish the course; seed 7, the default, in 968 steps for
 308); the model card reports 208.05 +/- 121.38. The model repository states no licence; its training code is MIT.
-Gym.NET commits the weights with this attribution, on the maintainer's decision (DR-103).
+Gym.NET commits the weights with this attribution, on the maintainer's decision (DR-109).
 
 ## Watching and playing
 

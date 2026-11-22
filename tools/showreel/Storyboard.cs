@@ -254,7 +254,7 @@ internal sealed record SceneStage(List<Track> Tracks, List<Overlay> Overlays, Li
 
 /// <summary>
 ///     The showreel's timelines: the video, composed from 15 lettered scenes in the order the maintainer picks (DR-100,
-///     DR-101), and the README's animation, the same scenes' short form in the same order (DR-104).
+///     DR-107), and the README's animation, the same scenes' short form in the same order (DR-110).
 /// </summary>
 internal static class Storyboards {
     /// <summary>Neon cyan, for borders and captions.</summary>
@@ -276,7 +276,7 @@ internal static class Storyboards {
     public const string DefaultOrder = "A B C D E F G H I J K L M N O";
 
     /// <summary>
-    ///     The video's 15 scenes, lettered A to O in the order they play (DR-100, DR-101): the title; classic control;
+    ///     The video's 15 scenes, lettered A to O in the order they play (DR-100, DR-107): the title; classic control;
     ///     Reacher and Pusher; LunarLander; the walkers; CarRacing; HalfCheetah; Hopper and Walker2d; Humanoid and
     ///     HumanoidStandup; Ant and Swimmer; toy text's four; FrozenLake; the parity segment; the finale; the outro.
     /// </summary>
@@ -288,7 +288,7 @@ internal static class Storyboards {
     ///     the incoming panels meet the outgoing ones.
     ///     </para>
     ///     <para>
-    ///     DR-101 (the maintainer, 2026-11-22) reshaped DR-100's fourteen: Pendulum and InvertedPendulum left the video, two
+    ///     DR-107 (the maintainer, 2026-11-22) reshaped DR-100's fourteen: Pendulum and InvertedPendulum left the video, two
     ///     of its vertical poles; InvertedDoublePendulum took Pendulum's place in the classic four; Reacher and Pusher became
     ///     a pair, and MuJoCo's four became two pairs, Humanoid with HumanoidStandup and Ant with Swimmer ("Show the
     ///     humanoid and its kind 2 in scene and another scene with other 2"); the title shrank to 2.5 s, LunarLander to 4 s
@@ -310,7 +310,7 @@ internal static class Storyboards {
             stage.Tracks.Add(Panel(Pink, Play("MountainCar-v0", o + 4.0),
                 K(o + 4.0, Slots.OffRight(Slots.TwoRight)), K(o + 4.6, Slots.TwoRight, Ease.OutBack), K(o + 7.4, Slots.TwoRight), K(o + 8.0, Slots.FourTR, Ease.InOutCubic),
                 K(o + 11.0, Slots.FourTR), K(o + 11.6, Slots.OffRight(Slots.FourTR), Ease.InBack)));
-            // MuJoCo's double cart-pole in Pendulum's old place (DR-101), in MuJoCo's orange; the caption retypes to say so.
+            // MuJoCo's double cart-pole in Pendulum's old place (DR-107), in MuJoCo's orange; the caption retypes to say so.
             stage.Tracks.Add(Panel(Orange, Play("InvertedDoublePendulum-v5", o + 7.5),
                 K(o + 7.5, Slots.OffBottom(Slots.FourBL)), K(o + 8.1, Slots.FourBL, Ease.OutBack), K(o + 11.05, Slots.FourBL), K(o + 11.65, Slots.OffBottom(Slots.FourBL), Ease.InBack)));
             stage.Tracks.Add(Panel(Green, Play("Acrobot-v1", o + 7.65, speed: 20.0 / 15.0),
@@ -337,7 +337,7 @@ internal static class Storyboards {
                 K(o + 0.1, Slots.OffRight(Slots.TwoRight)), K(o + 0.7, Slots.TwoRight, Ease.OutBack), K(o + 5.2, Slots.TwoRight), K(o + 5.7, Slots.OffRight(Slots.TwoRight), Ease.InBack)));
         }),
         new Scene('F', "CarRacing", "BOX2D", Pink, 4.0, 4.2, (stage, o) =>
-            // The S-bends, steps 430-630 of the lap (DR-101: "car racing 4s (the loop part)", the S-bends chosen).
+            // The S-bends, steps 430-630 of the lap (DR-107: "car racing 4s (the loop part)", the S-bends chosen).
             stage.Tracks.Add(Panel(Pink, new[] { new Content(o, Mid("CarRacing-v3", o, 430)) },
                 K(o, Slots.OffBottom(Slots.One)), K(o + 0.6, Slots.One, Ease.OutBack), K(o + 3.7, Slots.One), K(o + 4.2, Slots.OffTop(Slots.One), Ease.InBack)))),
         new Scene('G', "HalfCheetah", "MUJOCO · LOCOMOTION", Orange, 4.2, 4.5, (stage, o) =>
@@ -401,7 +401,7 @@ internal static class Storyboards {
     };
 
     /// <summary>
-    ///     The README's cut of the video's 15 scenes (DR-104, "Re-cut from the new video"): the same letters, envs, layouts
+    ///     The README's cut of the video's 15 scenes (DR-110, "Re-cut from the new video"): the same letters, envs, layouts
     ///     and captions, each scene about 60% as long, so the README shows the same tour as the video in about 49 s.
     /// </summary>
     /// <returns>The scenes, in letter order.</returns>
@@ -528,7 +528,7 @@ internal static class Storyboards {
     /// <param name="hold">Seconds from the origin until the panels start shrinking away.</param>
     /// <param name="gone">Seconds from the origin until they are gone.</param>
     /// <remarks>
-    ///     The last row holds only two ids since Pendulum and InvertedPendulum left the video (DR-101); the top two panels
+    ///     The last row holds only two ids since Pendulum and InvertedPendulum left the video (DR-107); the top two panels
     ///     keep the ids they show, a flip longer.
     /// </remarks>
     private static void Finale(SceneStage stage, double o, double flip, double arrive, double hold, double gone) {
@@ -558,7 +558,7 @@ internal static class Storyboards {
     }
 
     /// <summary>
-    ///     The video: the scenes an order names, played back to back (DR-100, DR-101). <see cref="DefaultOrder"/> plays all
+    ///     The video: the scenes an order names, played back to back (DR-100, DR-107). <see cref="DefaultOrder"/> plays all
     ///     15 in letter order, about 78 s.
     /// </summary>
     /// <param name="parity">The Gymnasium replays for the parity scene, or <see langword="null"/> to leave it out.</param>
@@ -582,7 +582,7 @@ internal static class Storyboards {
     public static Storyboard Video(ParityReplays? parity, string order, bool letters = false) => Compose(Scenes(), parity, order, letters);
 
     /// <summary>
-    ///     The README's animation (DR-104): the video's scenes in their short form (<see cref="ShortScenes"/>), in the
+    ///     The README's animation (DR-110): the video's scenes in their short form (<see cref="ShortScenes"/>), in the
     ///     video's order, about 49 s.
     /// </summary>
     /// <param name="parity">The Gymnasium replays for the parity scene, or <see langword="null"/> to leave it out.</param>
@@ -769,7 +769,7 @@ internal static class Storyboards {
     /// <summary>
     ///     A recipe played from its first step at its own speed until a tick, then fast-forwarded: LunarLander's descent
     ///     at its own pace, then the 180 steps it rests on the pad skipped through, so the 4 s scene still ends on its
-    ///     LANDED! verdict (DR-101: "lunar lander landing cut earlier, 4s total").
+    ///     LANDED! verdict (DR-107: "lunar lander landing cut earlier, 4s total").
     /// </summary>
     /// <param name="id">The recipe's id.</param>
     /// <param name="at">Seconds at which the episode starts.</param>
@@ -802,7 +802,7 @@ internal static class Storyboards {
     /// <param name="start">When the logo starts falling.</param>
     /// <param name="end">When the title is gone (it shrinks away into the header logo before).</param>
     /// <param name="brisk">
-    ///     The 2.5 s title of DR-101 ("Title reduce to 2.5s"): the logo drops in 0.6 s instead of 1, the lines type at 64
+    ///     The 2.5 s title of DR-107 ("Title reduce to 2.5s"): the logo drops in 0.6 s instead of 1, the lines type at 64
     ///     letters a second from 0.45 s and 0.8 s instead of 32 from 1.25 s and 2.0 s, and the title shrinks away over
     ///     0.5 s instead of 0.6, which leaves about 0.75 s to read both lines whole.
     /// </param>

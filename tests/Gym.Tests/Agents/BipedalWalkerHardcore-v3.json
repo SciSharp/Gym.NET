@@ -49,7 +49,7 @@
   "trained_by": "RL Baselines3 Zoo",
   "training_code": "https://github.com/DLR-RM/rl-baselines3-zoo (MIT)",
   "reported_mean_return": "208.05 +/- 121.38",
-  "licence": "No licence is stated on the model repository; its training code is MIT. Committed with attribution on the maintainer's decision (DR-103)."
+  "licence": "No licence is stated on the model repository; its training code is MIT. Committed with attribution on the maintainer's decision (DR-109)."
  },
  "checks": [
   {

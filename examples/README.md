@@ -78,7 +78,7 @@ last-bit difference over 1,000 steps.
 
 ## The expert agents
 
-The eleven MuJoCo examples and BipedalWalkerHardcore play published expert agents (DR-103): the agents the Farama
+The eleven MuJoCo examples and BipedalWalkerHardcore play published expert agents (DR-109): the agents the Farama
 Foundation, Gymnasium's maintainers, trained on these v5 envs to record the Minari datasets (Stable-Baselines3's SAC,
 TQC and PPO), and RL Zoo's TQC agent for the hardcore course. Each sits beside its program as `policy.json`
 (HalfCheetah's as `expert.json`), a copy of the agent in [`tests/Gym.Tests/Agents`](../tests/Gym.Tests/Agents), where

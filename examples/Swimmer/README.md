@@ -28,7 +28,7 @@ it through the network, and clips the result to the motors' range, as Stable-Bas
 
 Over seeds 0-9 it scores 364.0 in Gym.NET (from 361 to 366); the model card reports 363.70 +/- 1.81. The model
 repository states no licence; its training code is MIT. Gym.NET commits the weights with this attribution, on the
-maintainer's decision (DR-103).
+maintainer's decision (DR-109).
 
 ## Watching and playing
 

@@ -1,4 +1,4 @@
-"""Imports the expert agents Gym.NET plays and tests with into tests/Gym.Tests/Agents (design round 32, DR-103).
+"""Imports the expert agents Gym.NET plays and tests with into tests/Gym.Tests/Agents (design round 34, DR-109).
 
 Each agent is a published Stable-Baselines3 model for one of Gym.NET's ids: Farama's own experts for the eleven MuJoCo
 v5 envs (the agents Farama trained to record the Minari datasets) and RL Zoo's TQC agent for BipedalWalkerHardcore-v3.
@@ -292,7 +292,7 @@ def import_agent(entry, out_folder, pins):
             "training_code": FARAMA_CODE if farama else ZOO_CODE,
             "reported_mean_return": reported_return(repo, revision),
             "licence": "No licence is stated on the model repository; its training code is MIT. Committed with "
-                       "attribution on the maintainer's decision (DR-103).",
+                       "attribution on the maintainer's decision (DR-109).",
         },
         "checks": checks,
     }

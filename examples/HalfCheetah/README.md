@@ -71,14 +71,14 @@ maintainers, trained on HalfCheetah-v5 to record the Minari datasets. It comes f
 [farama-minari/HalfCheetah-v5-TQC-expert](https://huggingface.co/farama-minari/HalfCheetah-v5-TQC-expert) at revision
 `995505a`, imported by `tools/agents/import_agents.py`, and is a copy of
 [`tests/Gym.Tests/Agents/HalfCheetah-v5.json`](../../tests/Gym.Tests/Agents/HalfCheetah-v5.json), where the tests
-measure it; `ExpertPolicy.cs` is this example's copy of that folder's reader (DR-103). It is a Stable-Baselines3 network
+measure it; `ExpertPolicy.cs` is this example's copy of that folder's reader (DR-109). It is a Stable-Baselines3 network
 of two dense layers of 256 with relu: each step it casts the observation to float32, runs it through the network and
 squashes the result into the motors' range with tanh, as Stable-Baselines3's deterministic `predict` does.
 
 Over seeds 0-9 it scores 17,629 in Gym.NET (the model card reports 17641.80 +/- 61.88), three times the autopilot: at
 full gallop the runner covers 17 m a second, and from step 96 it runs off the model's 40 m floor, past which MuJoCo's
 window shows grey. The model repository states no licence; its training code is MIT. Gym.NET commits the weights with
-this attribution, on the maintainer's decision (DR-103).
+this attribution, on the maintainer's decision (DR-109).
 
 ## The autopilot
 

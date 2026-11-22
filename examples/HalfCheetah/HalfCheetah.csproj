@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- HalfCheetah-v5 (decision DR-74): one seeded episode played by Farama's TQC expert (DR-103) or on its autopilot,
+  <!-- HalfCheetah-v5 (decision DR-74): one seeded episode played by Farama's TQC expert (DR-109) or on its autopilot,
        headless or in MuJoCo's window, through Gymnasium.Make; and the playable HalfCheetah, which moved here from tools/parity/mujoco/halfcheetah_poc/play: Gym.NET's
        MuJoCo engine (compiled in from src/Gym.Environments/MuJoCo) in a Gym.NET viewer window, keyboard-driven or on the
        autopilot, which Augmented Random Search trained on the same engine. Gym.NET.sln builds it, so an API change that
@@ -29,7 +29,7 @@
   </ItemGroup>
 
   <!-- MuJoCo's compiled HalfCheetah (the embedded model of DR-63), the trained autopilot, and Farama's TQC expert (a copy
-       of tests/Gym.Tests/Agents/HalfCheetah-v5.json, DR-103), next to the program. -->
+       of tests/Gym.Tests/Agents/HalfCheetah-v5.json, DR-109), next to the program. -->
   <ItemGroup>
     <None Include="..\..\src\Gym.Environments\Assets\mujoco\half_cheetah.json" Link="half_cheetah.json" CopyToOutputDirectory="PreserveNewest" />
     <None Include="policy.json" CopyToOutputDirectory="PreserveNewest" Condition="Exists('policy.json')" />
