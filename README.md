@@ -1,7 +1,24 @@
-# Gym.NET
+# [![Gym.NET](https://raw.githubusercontent.com/SciSharp/Gym.NET/master/docs/website-src/images/gymnet-logo.png)](https://github.com/SciSharp/Gym.NET)
+
+**Reinforcement-learning environments for .NET, bit for bit with Gymnasium.**
 
 [![NuGet](https://img.shields.io/nuget/v/Gym.NET.Environments?label=Gym.NET.Environments)](https://www.nuget.org/packages/Gym.NET.Environments)
 [![NuGet downloads](https://img.shields.io/nuget/dt/Gym.NET)](https://www.nuget.org/packages/Gym.NET)
+[![Build](https://github.com/SciSharp/Gym.NET/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/SciSharp/Gym.NET/actions/workflows/ci.yml)
+[![Docs](https://github.com/SciSharp/Gym.NET/actions/workflows/docs.yml/badge.svg)](https://scisharp.github.io/Gym.NET)
+[![License](https://img.shields.io/github/license/SciSharp/Gym.NET)](https://github.com/SciSharp/Gym.NET/blob/master/LICENSE)
+
+Gym.NET is a native .NET library of reinforcement-learning environments with
+[Farama Gymnasium](https://github.com/Farama-Foundation/Gymnasium)'s API: `Env<TObs, TAct>`, spaces, wrappers, vector
+environments, and 39 environments from classic_control, box2d, toy_text and MuJoCo. Box2D and MuJoCo run as managed C#
+inside the package, with no native code to install.
+
+The compatibility target is **Gymnasium v1.4.0**. Given the same seed and actions, Gym.NET returns the same observations,
+rewards, `terminated`/`truncated` flags and infos as Gymnasium, bit for bit, and renders the same frames, pixel for pixel
+(MuJoCo's within a measured margin, [below](#what-is-in-10)). When Gym.NET and Gymnasium differ, Gymnasium is treated as the
+source of truth and Gym.NET aligns, except for the 14 deliberate differences the
+[release notes](https://github.com/SciSharp/Gym.NET/blob/master/docs/releases/RELEASE_1.0.0.md) list. A test suite that
+runs Gymnasium itself inside the test process checks this, call by call.
 
 [![Gym.NET's 24 visually distinct environments playing in neon panels over a synthwave grid: classic control, MuJoCo, Box2D and toy text, each played by a scripted or trained policy, then Gymnasium and Gym.NET side by side with zero pixels different](https://raw.githubusercontent.com/SciSharp/Gym.NET/master/docs/media/gym-net-hero.webp)](https://github.com/SciSharp/Gym.NET/blob/master/docs/media/gym-net-showreel.mp4)
 
@@ -11,21 +28,43 @@ pixels that differ stays at zero. This is a 51-second cut of the
 [showreel](https://github.com/SciSharp/Gym.NET/blob/master/docs/media/gym-net-showreel.mp4), and
 [tools/showreel](https://github.com/SciSharp/Gym.NET/tree/master/tools/showreel) makes both.
 
-Reinforcement-learning environments for .NET with [Farama Gymnasium](https://github.com/Farama-Foundation/Gymnasium)'s
-API and behavior. Given the same seed and actions, Gym.NET's environments return the same observations, rewards,
-`terminated`/`truncated` flags and infos as Gymnasium's, bit for bit, and render the same frames, pixel for pixel. A test
-suite that runs Gymnasium itself inside the test process checks this, call by call.
+## What is Gym.NET?
 
-Gym.NET is part of the [SciSharp STACK](https://scisharpstack.org) and builds on [NumSharp](https://github.com/SciSharp/NumSharp)
-for arrays and NumPy-exact random generators.
+Gym.NET gives .NET code the environments that Python's Gymnasium gives reinforcement-learning research, without embedding
+CPython and without the GIL: the same `Env` contract (`Reset`, `Step`, spaces, wrappers, vector envs), the same 39
+environment ids and the same numbers, with vector environments that step on worker threads instead of processes. It is for
+training and evaluating agents in C#, for moving a Gymnasium experiment to .NET and checking that it still produces what it
+produced, and for writing new environments against a contract that is already known.
+
+Gym.NET focuses on:
+
+- Gymnasium's API and names: `Env<TObs, TAct>`, `Gymnasium.Make`, `Reset(seed)` returning `(observation, info)`, `Step`
+  returning `(observation, reward, terminated, truncated, info)`.
+- Bit-for-bit values: the same observations, rewards, flags and infos for the same seed and actions, checked by a live
+  parity suite that runs Gymnasium inside the test process.
+- Pixel-for-pixel frames: `rgb_array` frames equal to Gymnasium's (MuJoCo's within a measured margin).
+- Managed code all the way down: Box2D 2.3.0 and a MuJoCo engine written in C#, so there is no native code to install.
+- Threads, not processes: `AsyncVectorEnv` steps its sub-envs on worker threads, with Gymnasium's protocol and the same bits
+  as `SyncVectorEnv`.
+- .NET types where Gymnasium's shape allows them: generic envs, enums beside Gymnasium's strings, typed info records,
+  `ValueTask` stepping.
+
+[Getting started](https://github.com/SciSharp/Gym.NET/blob/master/docs/guides/getting_started.md) walks through making envs,
+seeding, spaces, rendering, wrappers and vector envs.
 
 ## Installation
 
 ```sh
-dotnet add package Gym.NET.Environments          # the environments, with Gym.NET's core (Gym.NET)
-dotnet add package Gym.NET.Rendering.Avalonia    # optional: a window for render_mode "human" (Windows, Linux, macOS)
-dotnet add package Gym.NET.Rendering.WinForm     # optional: the same on Windows Forms
+dotnet add package Gym.NET.Environments
 ```
+
+| Package | What it brings |
+|---|---|
+| [Gym.NET.Environments](https://www.nuget.org/packages/Gym.NET.Environments) | The 39 environments with their Box2D and MuJoCo engines; brings Gym.NET and Gym.NET.Rendering |
+| [Gym.NET](https://www.nuget.org/packages/Gym.NET) | The API alone, for writing your own environments: `Env<TObs, TAct>`, spaces, wrappers, the registry, vector envs, checkers |
+| [Gym.NET.Rendering](https://www.nuget.org/packages/Gym.NET.Rendering) | pygame's drawing in managed C#: the rasterizer behind the `rgb_array` frames, and Gymnasium's `play` |
+| [Gym.NET.Rendering.Avalonia](https://www.nuget.org/packages/Gym.NET.Rendering.Avalonia) | Optional: a window for `render_mode "human"` on Windows, Linux and macOS |
+| [Gym.NET.Rendering.WinForm](https://www.nuget.org/packages/Gym.NET.Rendering.WinForm) | Optional: the same on Windows Forms |
 
 Gym.NET 1.0 targets .NET 8, .NET 10 and .NET 11. Coming from 0.2: move every Gym.NET package to 1.0.0 at once and remove any
 NumSharp.Lite reference ([migrating from 0.2](https://github.com/SciSharp/Gym.NET/blob/master/docs/guides/migrating_to_1.0.md)).
@@ -67,6 +106,119 @@ has one project for each of the 24 environments in the showreel above. Each play
 hand-written controller, Gymnasium's heuristic, value iteration or a trained linear policy, headless, in a window
 (`--render`) or from your keyboard (`--play`).
 
+## Features
+
+- **39 environment ids** - classic_control, box2d, toy_text and MuJoCo, with Gymnasium's names and versions, registered for
+  `Gymnasium.Make` before `Main` runs. See [Environments](#environments).
+- **Gymnasium's API in C#** - `Env<TObs, TAct>`, all ten spaces, `Gymnasium.Make`, `MakeVec` and `Register`, and every
+  wrapper but Atari's and the JAX/PyTorch conversions. See
+  [Getting started](https://github.com/SciSharp/Gym.NET/blob/master/docs/guides/getting_started.md).
+- **Bit for bit, pixel for pixel** - a parity suite runs Gymnasium inside the test process and compares every value and
+  every frame. See [Architecture](https://github.com/SciSharp/Gym.NET/blob/master/docs/architecture.md).
+- **No native code, no CPython** - Box2D 2.3.0 and a MuJoCo engine that computes what MuJoCo 4.0.0 computes, both managed
+  C# inside Gym.NET.Environments.
+- **Vector environments** - `SyncVectorEnv` in every autoreset mode, `AsyncVectorEnv` and every vector wrapper, through
+  `Gymnasium.MakeVec`.
+- **Async, on threads** - `AsyncVectorEnv` steps its sub-envs on worker threads (the thread pool, dedicated threads, or a
+  thread per env) with Gymnasium's protocol and the same bits as `SyncVectorEnv`, without processes or a GIL. `StepAsync`
+  is a `ValueTask`, completing synchronously unless an environment has asynchronous work to do, and the viewers have an
+  asynchronous contract (`IAsyncEnvViewer`).
+- **.NET-typed** - `RenderMode`, `AutoresetMode` and `VectorizeMode` enums beside Gymnasium's strings, a typed info record
+  per env, typed `Sample` masks.
+- **Desktop windows** - `human` mode in an Avalonia (Windows, Linux, macOS) or Windows Forms window, with keyboard play
+  through `play` and, for MuJoCo, Gymnasium's mouse and key controls.
+- **Your own environments** - write an `Env<TObs, TAct>`, register it and check it with Gymnasium's checkers. See
+  [Creating custom environments](https://github.com/SciSharp/Gym.NET/blob/master/docs/guides/creating_custom_environments.md).
+- **Faster than Gymnasium** - per step, from `x1.4` (CartPole) to `x14.4` (Acrobot) in the nine environments measured. See
+  [Performance](#performance).
+
+## Environments
+
+One still for each of the 24 visually distinct environments of the showreel; every still opens its example project. All 39
+ids are listed in [What is in 1.0](#what-is-in-10).
+
+| [**CartPole**][CartPole] | [**MountainCar**][MountainCar] | [**Pendulum**][Pendulum] | [**Acrobot**][Acrobot] | [**LunarLander**][LunarLander] | [**BipedalWalker**][BipedalWalker] |
+|:---:|:---:|:---:|:---:|:---:|:---:|
+| [![CartPole][CartPole-img]][CartPole] | [![MountainCar][MountainCar-img]][MountainCar] | [![Pendulum][Pendulum-img]][Pendulum] | [![Acrobot][Acrobot-img]][Acrobot] | [![LunarLander][LunarLander-img]][LunarLander] | [![BipedalWalker][BipedalWalker-img]][BipedalWalker] |
+| [**BipedalWalkerHardcore**][BipedalWalkerHardcore] | [**CarRacing**][CarRacing] | [**FrozenLake**][FrozenLake] | [**FrozenLake8x8**][FrozenLake8x8] | [**CliffWalking**][CliffWalking] | [**Taxi**][Taxi] |
+| [![BipedalWalkerHardcore][BipedalWalkerHardcore-img]][BipedalWalkerHardcore] | [![CarRacing][CarRacing-img]][CarRacing] | [![FrozenLake][FrozenLake-img]][FrozenLake] | [![FrozenLake8x8][FrozenLake8x8-img]][FrozenLake8x8] | [![CliffWalking][CliffWalking-img]][CliffWalking] | [![Taxi][Taxi-img]][Taxi] |
+| [**Blackjack**][Blackjack] | [**Ant**][Ant] | [**HalfCheetah**][HalfCheetah] | [**Hopper**][Hopper] | [**Humanoid**][Humanoid] | [**HumanoidStandup**][HumanoidStandup] |
+| [![Blackjack][Blackjack-img]][Blackjack] | [![Ant][Ant-img]][Ant] | [![HalfCheetah][HalfCheetah-img]][HalfCheetah] | [![Hopper][Hopper-img]][Hopper] | [![Humanoid][Humanoid-img]][Humanoid] | [![HumanoidStandup][HumanoidStandup-img]][HumanoidStandup] |
+| [**InvertedDoublePendulum**][InvertedDoublePendulum] | [**InvertedPendulum**][InvertedPendulum] | [**Pusher**][Pusher] | [**Reacher**][Reacher] | [**Swimmer**][Swimmer] | [**Walker2d**][Walker2d] |
+| [![InvertedDoublePendulum][InvertedDoublePendulum-img]][InvertedDoublePendulum] | [![InvertedPendulum][InvertedPendulum-img]][InvertedPendulum] | [![Pusher][Pusher-img]][Pusher] | [![Reacher][Reacher-img]][Reacher] | [![Swimmer][Swimmer-img]][Swimmer] | [![Walker2d][Walker2d-img]][Walker2d] |
+
+[CartPole]: https://github.com/SciSharp/Gym.NET/tree/master/examples/CartPole
+[MountainCar]: https://github.com/SciSharp/Gym.NET/tree/master/examples/MountainCar
+[Pendulum]: https://github.com/SciSharp/Gym.NET/tree/master/examples/Pendulum
+[Acrobot]: https://github.com/SciSharp/Gym.NET/tree/master/examples/Acrobot
+[LunarLander]: https://github.com/SciSharp/Gym.NET/tree/master/examples/LunarLander
+[BipedalWalker]: https://github.com/SciSharp/Gym.NET/tree/master/examples/BipedalWalker
+[BipedalWalkerHardcore]: https://github.com/SciSharp/Gym.NET/tree/master/examples/BipedalWalkerHardcore
+[CarRacing]: https://github.com/SciSharp/Gym.NET/tree/master/examples/CarRacing
+[FrozenLake]: https://github.com/SciSharp/Gym.NET/tree/master/examples/FrozenLake
+[FrozenLake8x8]: https://github.com/SciSharp/Gym.NET/tree/master/examples/FrozenLake8x8
+[CliffWalking]: https://github.com/SciSharp/Gym.NET/tree/master/examples/CliffWalking
+[Taxi]: https://github.com/SciSharp/Gym.NET/tree/master/examples/Taxi
+[Blackjack]: https://github.com/SciSharp/Gym.NET/tree/master/examples/Blackjack
+[Ant]: https://github.com/SciSharp/Gym.NET/tree/master/examples/Ant
+[HalfCheetah]: https://github.com/SciSharp/Gym.NET/tree/master/examples/HalfCheetah
+[Hopper]: https://github.com/SciSharp/Gym.NET/tree/master/examples/Hopper
+[Humanoid]: https://github.com/SciSharp/Gym.NET/tree/master/examples/Humanoid
+[HumanoidStandup]: https://github.com/SciSharp/Gym.NET/tree/master/examples/HumanoidStandup
+[InvertedDoublePendulum]: https://github.com/SciSharp/Gym.NET/tree/master/examples/InvertedDoublePendulum
+[InvertedPendulum]: https://github.com/SciSharp/Gym.NET/tree/master/examples/InvertedPendulum
+[Pusher]: https://github.com/SciSharp/Gym.NET/tree/master/examples/Pusher
+[Reacher]: https://github.com/SciSharp/Gym.NET/tree/master/examples/Reacher
+[Swimmer]: https://github.com/SciSharp/Gym.NET/tree/master/examples/Swimmer
+[Walker2d]: https://github.com/SciSharp/Gym.NET/tree/master/examples/Walker2d
+[CartPole-img]: https://raw.githubusercontent.com/SciSharp/Gym.NET/master/docs/website-src/images/envs/CartPole-v1.png
+[MountainCar-img]: https://raw.githubusercontent.com/SciSharp/Gym.NET/master/docs/website-src/images/envs/MountainCar-v0.png
+[Pendulum-img]: https://raw.githubusercontent.com/SciSharp/Gym.NET/master/docs/website-src/images/envs/Pendulum-v1.png
+[Acrobot-img]: https://raw.githubusercontent.com/SciSharp/Gym.NET/master/docs/website-src/images/envs/Acrobot-v1.png
+[LunarLander-img]: https://raw.githubusercontent.com/SciSharp/Gym.NET/master/docs/website-src/images/envs/LunarLander-v3.png
+[BipedalWalker-img]: https://raw.githubusercontent.com/SciSharp/Gym.NET/master/docs/website-src/images/envs/BipedalWalker-v3.png
+[BipedalWalkerHardcore-img]: https://raw.githubusercontent.com/SciSharp/Gym.NET/master/docs/website-src/images/envs/BipedalWalkerHardcore-v3.png
+[CarRacing-img]: https://raw.githubusercontent.com/SciSharp/Gym.NET/master/docs/website-src/images/envs/CarRacing-v3.png
+[FrozenLake-img]: https://raw.githubusercontent.com/SciSharp/Gym.NET/master/docs/website-src/images/envs/FrozenLake-v1.png
+[FrozenLake8x8-img]: https://raw.githubusercontent.com/SciSharp/Gym.NET/master/docs/website-src/images/envs/FrozenLake8x8-v1.png
+[CliffWalking-img]: https://raw.githubusercontent.com/SciSharp/Gym.NET/master/docs/website-src/images/envs/CliffWalking-v1.png
+[Taxi-img]: https://raw.githubusercontent.com/SciSharp/Gym.NET/master/docs/website-src/images/envs/Taxi-v4.png
+[Blackjack-img]: https://raw.githubusercontent.com/SciSharp/Gym.NET/master/docs/website-src/images/envs/Blackjack-v1.png
+[Ant-img]: https://raw.githubusercontent.com/SciSharp/Gym.NET/master/docs/website-src/images/envs/Ant-v5.png
+[HalfCheetah-img]: https://raw.githubusercontent.com/SciSharp/Gym.NET/master/docs/website-src/images/envs/HalfCheetah-v5.png
+[Hopper-img]: https://raw.githubusercontent.com/SciSharp/Gym.NET/master/docs/website-src/images/envs/Hopper-v5.png
+[Humanoid-img]: https://raw.githubusercontent.com/SciSharp/Gym.NET/master/docs/website-src/images/envs/Humanoid-v5.png
+[HumanoidStandup-img]: https://raw.githubusercontent.com/SciSharp/Gym.NET/master/docs/website-src/images/envs/HumanoidStandup-v5.png
+[InvertedDoublePendulum-img]: https://raw.githubusercontent.com/SciSharp/Gym.NET/master/docs/website-src/images/envs/InvertedDoublePendulum-v5.png
+[InvertedPendulum-img]: https://raw.githubusercontent.com/SciSharp/Gym.NET/master/docs/website-src/images/envs/InvertedPendulum-v5.png
+[Pusher-img]: https://raw.githubusercontent.com/SciSharp/Gym.NET/master/docs/website-src/images/envs/Pusher-v5.png
+[Reacher-img]: https://raw.githubusercontent.com/SciSharp/Gym.NET/master/docs/website-src/images/envs/Reacher-v5.png
+[Swimmer-img]: https://raw.githubusercontent.com/SciSharp/Gym.NET/master/docs/website-src/images/envs/Swimmer-v5.png
+[Walker2d-img]: https://raw.githubusercontent.com/SciSharp/Gym.NET/master/docs/website-src/images/envs/Walker2d-v5.png
+
+## Performance
+
+Steps per second of one environment stepped in a loop of sampled actions, Gymnasium v1.4.0 against Gym.NET on the same
+machine. The ratio is Gym.NET's steps divided by Gymnasium's: `x2` is twice Gymnasium's speed.
+
+| Family | Environment | Gymnasium (steps/s) | Gym.NET (steps/s) | Ratio | Gym.NET allocates per step |
+|---|---|---:|---:|---:|---:|
+| classic_control | Acrobot | 11,696 | 168,049 | x14.4 | 4,019 B |
+| | Pendulum | 12,930 | 48,601 | x3.8 | 11,088 B |
+| | MountainCar | 43,440 | 145,364 | x3.3 | 3,192 B |
+| | CartPole | 65,464 | 93,898 | x1.4 | 3,266 B |
+| toy_text | Taxi | 36,414 | 164,917 | x4.5 | 4,681 B |
+| | FrozenLake | 59,436 | 213,280 | x3.6 | 4,283 B |
+| box2d | BipedalWalker | 2,499 | 9,024 | x3.6 | 35,071 B |
+| | CarRacing | 74 | 164 | x2.2 | 3,631,032 B |
+| | LunarLander | 12,503 | 19,744 | x1.6 | 8,993 B |
+
+Measured 2026-11-11, before the MuJoCo environments landed, with net10.0 Release builds against Gymnasium v1.4.0 on CPython
+3.12.12 (NumPy 2.4.2, pygame-ce 2.5.8, Box2D 2.3.10): five rounds of Gym.NET and four of Gymnasium, interleaved, medians.
+Single runs strayed up to 25% from the median and the machine's load moves the absolute numbers, so the ratio is the steadier
+figure. Only these nine environments are measured. The method, the CarRacing and LunarLander profiles and the table are in
+[the code review](https://github.com/SciSharp/Gym.NET/blob/master/docs/plans/CSHARP_CODE_REVIEW.md#4-measurements).
+
 ## What is in 1.0
 
 | Area | Contents |
@@ -99,6 +251,14 @@ list what 1.0 leaves out and every known difference from Gymnasium:
   is held to Gymnasium's behavior.
 - [Development and testing](https://github.com/SciSharp/Gym.NET/blob/master/docs/guides/development_and_testing.md):
   building, the unit suite, and the live parity suite.
+
+## Related projects
+
+- [Gymnasium](https://github.com/Farama-Foundation/Gymnasium) - the Python library whose API and behavior Gym.NET is held
+  to; v1.4.0 is the pinned reference.
+- [NumSharp](https://github.com/SciSharp/NumSharp) - the arrays and NumPy-exact random generators under every Gym.NET
+  environment.
+- [SciSharp STACK](https://scisharp.github.io/SciSharp/) - the ecosystem Gym.NET belongs to.
 
 ## A note on SixLabors.ImageSharp
 
