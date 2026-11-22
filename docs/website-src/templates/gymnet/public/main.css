@@ -168,6 +168,22 @@
   }
 }
 
+/* Side by side, the "now playing" column follows the reader down the cartridge shelf: it sticks 16 px under the landing
+   page's sticky header (60 px tall in DocFX's modern template) and stays inside the gallery body, whose bottom edge
+   pushes it back up past the last row, so it never leaves the "select your environment" screen. It works because the
+   column is a grid item aligned to the start of a row as tall as the shelf, and no ancestor up to the viewport clips
+   overflow; an overflow other than visible on any of them would quietly turn the stickiness off. Only on windows tall
+   enough for the whole panel: the tallest (Pusher's and HalfCheetah's, whose blurb and make() call wrap to more lines)
+   measured 516 px in Chrome on Windows, so 76 + 516 px plus about two lines of slack for other fonts' wrapping gives the
+   660 px floor. On a shorter window the stuck panel would hide its own last lines, the make() call, until the shelf
+   ended, so there it scrolls with the page as before. */
+@media (min-width: 992px) and (min-height: 660px) {
+  .gn-now {
+    position: sticky;
+    top: 76px;
+  }
+}
+
 .gn-carts {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(156px, 1fr));
@@ -235,7 +251,8 @@
   overflow: hidden;
 }
 
-/* The loops are a fifth of the env's frame size: fill the art box's height so each env pixel becomes a chunky block. */
+/* The cartridge loops are a fifth of the env's frame size: fill the art box's height so each env pixel becomes a chunky
+   block (the "now playing" screen shows the full-size loop instead). */
 .gn-cart-art img {
   height: 100%;
   width: auto;
@@ -261,6 +278,29 @@
   border: 4px solid #fcfcfc;
 }
 
+/* The screen's loop is the env's own frame (256 to 768 px wide) in a column of at most 440 px: scaled smoothly, as any
+   video is, it keeps the frame's detail. It autoplays muted with no controls and takes no pointer input, so nothing can
+   pause it or open a video menu over it: it behaves like the animated image it replaced (DR-101: "it should be
+   autoplayed and not a video with a play button or pause"). */
+.gn-screen-video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+}
+
+/* WebKit paints a start-playback button over a video it has not started (iOS Safari when autoplay is refused); main.js
+   then swaps in the cartridge loop, and this keeps the button from flashing in between. One rule per pseudo-element: a
+   browser that does not know one drops the whole rule it appears in. */
+.gn-screen-video::-webkit-media-controls-start-playback-button {
+  display: none !important;
+}
+
+.gn-screen-video::-webkit-media-controls {
+  display: none !important;
+}
+
+/* The fallback: the cartridge's 8-bit loop, stretched in chunky pixels, where the full-size loop cannot play. */
 .gn-screen-img {
   width: 100%;
   height: 100%;

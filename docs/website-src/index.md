@@ -38,7 +38,7 @@ var (next, reward, terminated, truncated, info) = env.Step(action);</code></pre>
 <div class="gn-carts" role="listbox" aria-label="Environments"></div>
 <div class="gn-now" aria-live="polite">
 <canvas class="gn-pixel gn-now-label" data-scale="2" data-color="#3cbcfc"></canvas>
-<div class="gn-screen"><img class="gn-screen-img" alt=""></div>
+<div class="gn-screen"><video class="gn-screen-video" muted loop playsinline autoplay disablepictureinpicture disableremoteplayback></video><img class="gn-screen-img" alt="" hidden></div>
 <canvas class="gn-pixel gn-hud" data-scale="2" data-color="#fcfcfc"></canvas>
 <p class="gn-blurb"></p>
 <pre class="gn-snippet"><code class="lang-csharp"></code></pre>

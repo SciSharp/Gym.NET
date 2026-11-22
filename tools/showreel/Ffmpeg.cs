@@ -9,7 +9,8 @@ namespace Gym.Showreel;
 
 /// <summary>
 ///     An ffmpeg process fed raw RGB24 frames on stdin, encoding to one file: the video, the README's WebP animation (or
-///     its GIF) and the gallery's WebP loops all go through it, so the tool itself never encodes anything.
+///     its GIF), the gallery's 8-bit WebP loops and its full-size MP4 screen loops all go through it, so the tool itself
+///     never encodes anything.
 /// </summary>
 /// <remarks>
 ///     ffmpeg must be on <c>PATH</c> (or named with <c>--ffmpeg</c>); this machine's is 7.0. The process runs with
@@ -179,4 +180,26 @@ internal sealed class FfmpegPipe : IDisposable {
     /// <returns>The output options.</returns>
     public static string[] PixelWebP(int width, int height) =>
         new[] { "-vf", $"scale={width}:{height}:flags=area", "-c:v", "libwebp", "-lossless", "1", "-compression_level", "6", "-loop", "0" };
+
+    /// <summary>
+    ///     Options for a gallery screen loop (DR-101): the env's frames at their own size, unscaled, as H.264 at the
+    ///     video's CRF 20 in 4:2:0 (the H.264 format every current browser plays), the index first so a loop starts
+    ///     playing while it downloads, and the colour matrix tagged as the BT.601 that ffmpeg converts RGB with.
+    /// </summary>
+    /// <returns>The output options.</returns>
+    /// <remarks>
+    ///     <para>
+    ///     Measured against the exact frames, decoded by headless Chrome: the mean colour stays within half a level and
+    ///     the mean pixel differs by 0.05 (CartPole) to 1.2 levels (HalfCheetah); what H.264 loses is the sharpness of
+    ///     colour edges, such as CarRacing's red car on grey, which 4:2:0 stores at half resolution. CRF 18 made the 24
+    ///     loops 19% larger (5.0 MB against 4.2 MB) for under 1 dB. The tag spares players a guess: an untagged stream
+    ///     leaves the matrix to the player, and one that picks BT.709 shifts every colour slightly.
+    ///     </para>
+    ///     <para>
+    ///     Footgun: 4:2:0 needs even frame sides, and an env with an odd width or height makes libx264 fail (the pipe then
+    ///     reports ffmpeg's message). Every recipe's frame has even sides today, 256 to 768 pixels.
+    ///     </para>
+    /// </remarks>
+    public static string[] ScreenMp4() =>
+        new[] { "-c:v", "libx264", "-preset", "slow", "-crf", "20", "-pix_fmt", "yuv420p", "-colorspace", "smpte170m", "-movflags", "+faststart" };
 }

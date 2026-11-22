@@ -11,16 +11,34 @@ namespace Gym.Showreel;
 
 /// <summary>
 ///     The docs site's cartridge gallery (the 8-bit "select your environment" screen under the video): for every recipe a
-///     looping WebP at a fifth of the frame size, a poster PNG, and <c>envs.json</c> describing them, plus the site's logo
-///     and icon in the video's chrome lettering.
+///     looping WebP at a fifth of the frame size for its cartridge, the same moments at the env's full frame size and
+///     twice the frame rate as an MP4 for the "now playing" screen, a poster PNG, and <c>envs.json</c> describing them,
+///     plus the site's logo and icon in the video's chrome lettering.
 /// </summary>
 /// <remarks>
-///     The loops are deliberately low resolution: the page scales them up with <c>image-rendering: pixelated</c>, which is
-///     the 8-bit look the maintainer chose for this section, and it keeps all thirteen loops to a few megabytes.
+///     <para>
+///     The cartridge loops are deliberately low resolution: the page scales them up with
+///     <c>image-rendering: pixelated</c>, which is the 8-bit look the maintainer chose for the cartridges (DR-60), and it
+///     keeps all 24 of them to about 5 MB, all loaded at once with the page.
+///     </para>
+///     <para>
+///     The screen loops are the opposite (DR-101: "The gif is pixelated, it needs to be high quality (preview is okay to
+///     be pixelated)"): every frame at the size the env renders it, H.264 at 30 fps. Measured on the 24 recipes, H.264 is
+///     the smallest full-size form by far: 4.2 MB for all of them, against 13.4 MB as lossy animated WebP at the same
+///     rate (7.7 MB at 15 fps) and 28.9 MB as lossless WebP at 15 fps (up to 4.9 MB for one MuJoCo loop). The page
+///     downloads only the loop on screen.
+///     </para>
 /// </remarks>
 internal static class Gallery {
-    /// <summary>Frames per second of the loops.</summary>
+    /// <summary>Frames per second of the cartridge loops.</summary>
     private const int Fps = 15;
+
+    /// <summary>
+    ///     Frames per second of the screen loops: exactly twice <see cref="Fps"/>, which is what lets one pass over the
+    ///     episode feed both encoders (screen frame <c>2k</c> falls on the same tick as cartridge frame <c>k</c>). Changing
+    ///     either rate breaks that pairing: <see cref="Write"/> would then hand the cartridge loop other ticks than before.
+    /// </summary>
+    private const int ScreenFps = Fps * 2;
 
     /// <summary>How much smaller than the env's frame a loop is (the "8-bit" pixel size).</summary>
     private const int Pixelate = 5;
@@ -31,12 +49,16 @@ internal static class Gallery {
     /// <summary>Seconds the final frame is held before the loop restarts.</summary>
     private const double HoldSeconds = 1.2;
 
-    /// <summary>Writes every loop, poster and the manifest into a folder.</summary>
+    /// <summary>Writes every loop (cartridge and screen), poster and the manifest into a folder.</summary>
     /// <param name="folder">The output folder, e.g. <c>docs/website-src/images/envs</c>; created if missing.</param>
     /// <param name="ffmpeg">The ffmpeg executable.</param>
     /// <param name="log">Progress lines.</param>
-    /// <exception cref="InvalidOperationException">ffmpeg failed.</exception>
+    /// <exception cref="InvalidOperationException">ffmpeg failed (for instance an env whose frame has an odd side, which H.264's 4:2:0 refuses).</exception>
     /// <exception cref="IOException">A file cannot be written.</exception>
+    /// <remarks>
+    ///     Each recipe is played once, its frames sent to both encoders as they are rendered: the MuJoCo frames are the
+    ///     costly part of the run, and a second pass for the screen loop would render each of them again.
+    /// </remarks>
     public static void Write(string folder, string ffmpeg, TextWriter log) {
         Directory.CreateDirectory(folder);
         var entries = new List<Dictionary<string, object>>();
@@ -44,20 +66,36 @@ internal static class Gallery {
             var (ticks, seed, steps, ret, stamp, wins, losses, action, observation) = Measure(recipe);
             int loopTicks = Math.Min(ticks, (int)(recipe.StepsPerSecond * MaxSeconds));
             int frames = (int)Math.Ceiling(loopTicks / recipe.StepsPerSecond * Fps) + (int)(HoldSeconds * Fps);
+            int screenFrames = (int)Math.Ceiling(loopTicks / recipe.StepsPerSecond * ScreenFps) + (int)(HoldSeconds * ScreenFps);
             using var player = new EpisodePlayer(recipe);
             RgbImage first = player.Frame;
             int w = Math.Max(48, (int)Math.Round(first.Width / (double)Pixelate)), h = Math.Max(32, (int)Math.Round(first.Height / (double)Pixelate));
             string loop = Path.Combine(folder, recipe.Id + ".webp"), poster = Path.Combine(folder, recipe.Id + ".png");
-            using (var pipe = new FfmpegPipe(ffmpeg, first.Width, first.Height, Fps, FfmpegPipe.PixelWebP(w, h), loop)) {
-                for (int f = 0; f < frames; f++) {
-                    player.AdvanceTo(Math.Min(loopTicks, (int)Math.Floor(f * recipe.StepsPerSecond / Fps)));
-                    pipe.Write(player.Frame);
-                    if (f == frames * 2 / 5)
-                        Downscale(player.Frame, w, h).SavePng(poster);
+            string screen = Path.Combine(folder, recipe.Id + ".mp4");
+            // Both pipes are disposed on any failure, which kills an unfinished encoder instead of leaving it waiting on
+            // its input; only Finish, reached once every frame is written, closes a file properly.
+            using (var pipe = new FfmpegPipe(ffmpeg, first.Width, first.Height, Fps, FfmpegPipe.PixelWebP(w, h), loop))
+            using (var screenPipe = new FfmpegPipe(ffmpeg, first.Width, first.Height, ScreenFps, FfmpegPipe.ScreenMp4(), screen)) {
+                // Screen frame s shows tick floor(s * sps / 30). For s = 2k that is floor(2k * sps / 30), the very double
+                // floor(k * sps / 15) gives (doubling is exact and both quotients round the same real number), so the
+                // cartridge loop keeps exactly the frames it had before the screen loops existed. The last cartridge
+                // frame falls on s = 2 * frames - 2, which ceil(2x) >= 2 * ceil(x) - 1 keeps below screenFrames; the Max
+                // only keeps the cartridge loop whole should the rates or the hold ever change.
+                for (int s = 0; s < Math.Max(screenFrames, 2 * frames - 1); s++) {
+                    player.AdvanceTo(Math.Min(loopTicks, (int)Math.Floor(s * recipe.StepsPerSecond / ScreenFps)));
+                    if (s < screenFrames)
+                        screenPipe.Write(player.Frame);
+                    if (s % 2 == 0 && s / 2 < frames) {
+                        pipe.Write(player.Frame);
+                        if (s / 2 == frames * 2 / 5)
+                            Downscale(player.Frame, w, h).SavePng(poster);
+                    }
                 }
                 pipe.Finish();
+                screenPipe.Finish();
             }
-            log.WriteLine($"gallery: {recipe.Id}: {frames} frames at {w}x{h}, {new FileInfo(loop).Length / 1024} KB");
+            log.WriteLine($"gallery: {recipe.Id}: {frames} frames at {w}x{h}, {new FileInfo(loop).Length / 1024} KB; "
+                + $"screen {screenFrames} frames at {first.Width}x{first.Height}, {new FileInfo(screen).Length / 1024} KB");
             entries.Add(new Dictionary<string, object> {
                 ["id"] = recipe.Id,
                 ["family"] = recipe.Family,
@@ -72,8 +110,11 @@ internal static class Gallery {
                 ["make"] = MakeSnippet(recipe),
                 ["loop"] = $"images/envs/{recipe.Id}.webp",
                 ["poster"] = $"images/envs/{recipe.Id}.png",
+                // width and height are the cartridge loop's (the page sets them on its img); the screen loop is the env's
+                // own frame size, which the page fits into the screen, so only its path is listed.
                 ["width"] = w,
                 ["height"] = h,
+                ["screen"] = $"images/envs/{recipe.Id}.mp4",
             });
         }
         // Relaxed escaping keeps the quotes in the make snippets readable; the file is fetched as JSON, never inlined in HTML.

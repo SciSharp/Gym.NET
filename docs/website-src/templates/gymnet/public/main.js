@@ -3,7 +3,8 @@
 // The modern template imports this module's default export through its options() hook. It adds three behaviours:
 //   1. pixel text: every <canvas class="gn-pixel" data-text="..."> is drawn in the showreel's 5x7 font;
 //   2. the landing page's 8-bit "select your environment" gallery, filled from images/envs/envs.json, which the
-//      showreel tool (tools/showreel) writes together with the looping clips;
+//      showreel tool (tools/showreel) writes together with the looping clips (the cartridges' 8-bit WebPs and the
+//      "now playing" screen's full-size MP4s);
 //   3. links docfx could not resolve (repository files outside the site, such as CLAUDE.md or LICENSE) are pointed at
 //      GitHub, so pages copied from docs/ keep working links on the site.
 
@@ -118,10 +119,11 @@ function siteRoot() {
 }
 
 /**
- * Builds the 8-bit gallery on the landing page: one cartridge per environment, a "now playing" screen with the chosen
- * env's loop scaled up in chunky pixels, a HUD with the showreel episode's seed, steps and return, and the make() call.
- * It runs in attract mode (the cursor moves on by itself every few seconds) until the reader hovers, clicks or uses
- * the arrow keys. Does nothing on pages without the gallery, or when the manifest cannot be fetched.
+ * Builds the 8-bit gallery on the landing page: one cartridge per environment (its loop scaled up in chunky pixels), a
+ * "now playing" screen with the chosen env's full-size loop, a HUD with the showreel episode's seed, steps and return,
+ * and the make() call. It runs in attract mode (the cursor moves on by itself every few seconds) until the reader
+ * hovers, clicks or uses the arrow keys. Does nothing on pages without the gallery, or when the manifest cannot be
+ * fetched.
  * @returns {Promise<void>} Settles when the gallery is built (or skipped).
  */
 async function installArcade() {
@@ -143,7 +145,8 @@ async function installArcade() {
   }
   const carts = arcade.querySelector('.gn-carts')
   const label = arcade.querySelector('.gn-now-label')
-  const screen = arcade.querySelector('.gn-screen-img')
+  const screenVideo = arcade.querySelector('.gn-screen-video')
+  const screenImg = arcade.querySelector('.gn-screen-img')
   const hud = arcade.querySelector('.gn-hud')
   const blurb = arcade.querySelector('.gn-blurb')
   const snippet = arcade.querySelector('.gn-snippet code')
@@ -173,6 +176,67 @@ async function installArcade() {
   })
   let current = -1
   let attract = true
+  // H.264 in MP4 plays in every current browser except Chromium builds without the proprietary codecs. The codecs string
+  // names the screen loops' own profile (High; level 3.0 is the highest any of them needs), so the answer is about these
+  // files, not about MP4 in general.
+  const playsScreenLoops = screenVideo.canPlayType('video/mp4; codecs="avc1.64001E"') !== ''
+  // Set once the browser refuses to start a muted video by itself (iOS in Low Power Mode, some data savers): from then on
+  // every env shows its cartridge loop, an image that animates anyway, never a still frame waiting for a tap.
+  let autoplayRefused = false
+  // Envs whose screen loop failed to load or decode (a missing file, a broken download); each falls back on its own.
+  const brokenLoops = new Set()
+
+  /**
+   * Puts an env's loop on the "now playing" screen: its full-size H.264 loop, muted, looping and without controls, or,
+   * where that cannot play, its cartridge's 8-bit loop stretched in chunky pixels, as the screen showed every env before
+   * the full-size loops existed. Only one of the two elements is visible, and a hidden video is emptied so that it stops
+   * downloading and decoding.
+   * @param {{id: string, loop: string, screen?: string}} env The env's manifest entry; a manifest written before the
+   *   screen loops existed has no screen field, and its envs show their cartridge loops.
+   * @returns {void}
+   */
+  function showOnScreen(env) {
+    const description = `${env.id}, played by the showreel's policy`
+    if (env.screen && playsScreenLoops && !autoplayRefused && !brokenLoops.has(env.id)) {
+      screenImg.hidden = true
+      screenImg.removeAttribute('src')
+      screenVideo.hidden = false
+      screenVideo.setAttribute('aria-label', description)
+      // The muted attribute only sets the default; autoplay policies read the property, so it is set as well.
+      screenVideo.muted = true
+      screenVideo.src = new URL(env.screen, root).href
+      screenVideo.play().catch((error) => {
+        // AbortError: a newer selection replaced this source before it started, as attract mode does every few seconds.
+        // NotAllowedError: this browser will not autoplay here at all, so the screen switches to the animated images.
+        if (error.name === 'NotAllowedError') {
+          autoplayRefused = true
+          if (envs[current] === env) {
+            showOnScreen(env)
+          }
+        }
+      })
+    } else {
+      screenVideo.hidden = true
+      if (screenVideo.hasAttribute('src')) {
+        screenVideo.removeAttribute('src')
+        // load() with no source releases the old one: without it the hidden video keeps its download and decoder alive.
+        screenVideo.load()
+      }
+      screenImg.hidden = false
+      screenImg.alt = description
+      screenImg.src = new URL(env.loop, root).href
+    }
+  }
+
+  // A screen loop that fails to load or decode falls back to its cartridge loop. The event always belongs to the current
+  // source: a new source aborts the old load and drops its queued media events, "error" among them.
+  screenVideo.addEventListener('error', () => {
+    const env = envs[current]
+    if (env && screenVideo.hasAttribute('src')) {
+      brokenLoops.add(env.id)
+      showOnScreen(env)
+    }
+  })
 
   /**
    * Shows an env on the "now playing" screen and moves the cartridge cursor to it.
@@ -191,8 +255,7 @@ async function installArcade() {
     const env = envs[i]
     buttons.forEach((b, n) => b.setAttribute('aria-selected', String(n === i)))
     paintPixelText(label, `NOW PLAYING: ${env.id}`, 2, '#3cbcfc')
-    screen.src = new URL(env.loop, root).href
-    screen.alt = `${env.id}, played by the showreel's policy`
+    showOnScreen(env)
     const result = env.result ? `  ${env.result}` : ''
     paintPixelText(hud, `SEED ${env.seed}  STEPS ${env.steps}\nRETURN ${env.return}${result}`, 2, '#fcfcfc')
     blurb.textContent = `${env.blurb} Actions: ${env.actionSpace}.`
