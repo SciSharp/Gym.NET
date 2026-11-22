@@ -32,6 +32,30 @@ internal sealed record DelegatePolicy(Func<IEnv, object?, object> Rule) : IPolic
 }
 
 /// <summary>
+///     How the gallery cuts a recipe's poster still (the PNG the README's gallery shows) out of its episode: which moment, which
+///     part of the env's frame, and at what size. A recipe without one gets the default still, the whole frame at a fifth of its
+///     size from 2/5 of the way through the loop, which suits an env whose subject fills its frame and leaves a few dozen
+///     meaningful pixels for one that does not (Pusher's arm, Reacher's arm and Humanoid's figure fill a third of theirs).
+/// </summary>
+/// <param name="Seconds">
+///     The moment, in seconds from the start of the loop (the loop plays at the recipe's own speed; the still is the cartridge
+///     frame nearest this time, at the gallery's 15 frames a second). It must fall inside the loop, its final hold included.
+/// </param>
+/// <param name="Left">The left edge of the part of the env's frame that is kept, in the frame's own pixels.</param>
+/// <param name="Top">The top edge of that part, in the frame's own pixels.</param>
+/// <param name="Width">The width of that part, in the frame's own pixels.</param>
+/// <param name="Height">The height of that part, in the frame's own pixels.</param>
+/// <param name="PixelWidth">The still's width in pixels.</param>
+/// <param name="PixelHeight">The still's height in pixels.</param>
+/// <remarks>
+///     Choose <paramref name="Width"/> and <paramref name="Height"/> as whole multiples of <paramref name="PixelWidth"/> and
+///     <paramref name="PixelHeight"/>: the gallery averages each output pixel's footprint of source pixels in whole pixels
+///     (<see cref="Gallery.Downscale(RgbImage, int, int, int, int, int, int)"/>), exact when the ratio is an integer and
+///     unevenly sampled when it is not, which shows on thin lines such as Reacher's arm.
+/// </remarks>
+internal sealed record PosterShot(double Seconds, int Left, int Top, int Width, int Height, int PixelWidth, int PixelHeight);
+
+/// <summary>
 ///     One episode the showreel plays: a registered id, a seed, the policy that plays it, how fast it plays, and the stamp
 ///     its ending earns.
 /// </summary>
@@ -56,6 +80,10 @@ internal sealed record DelegatePolicy(Func<IEnv, object?, object> Rule) : IPolic
 ///     unaged, a cloud of them after a mid-episode join. Costs a render per step, cheap for these 2-D envs; the MuJoCo
 ///     envs, whose frames are costly, have no such state.
 /// </param>
+/// <param name="Poster">
+///     How the gallery's poster still is cut from this episode, or null for the default (see <see cref="PosterShot"/>). The
+///     still is what the README's gallery shows, so a recipe sets one when its default would be a speck in a mostly empty frame.
+/// </param>
 internal sealed record EpisodeRecipe(
     string Id,
     string Family,
@@ -68,7 +96,8 @@ internal sealed record EpisodeRecipe(
     string HandLabel = "HAND",
     bool ScoresHands = false,
     IReadOnlyDictionary<string, object?>? Kwargs = null,
-    bool RenderEveryStep = false) {
+    bool RenderEveryStep = false,
+    PosterShot? Poster = null) {
     /// <summary>Ticks a finished episode is held on screen before the next one starts (multi-episode recipes only).</summary>
     public int HandPauseTicks => 2;
 
@@ -142,12 +171,21 @@ internal static class Episodes {
                 },
             }),
         // One Reacher episode is 50 steps (a second at its own 50 fps): four targets in a row at half speed make a clip.
+        // The still: the arena (the purple frame) spans x 48-408 and y 150-370 of the 480x480 frame, the arm's base at its middle;
+        // the crop frames it whole and shrinks it 3x, so the 120x80 still shows the arena, the arm and the target. The first
+        // target is reached at about 1.9 s (the arm folds onto it and hides it) and the second appears at about 2.1 s; at 2.2 s
+        // the arm is stretched out and the target is a red dot of its own.
         new EpisodeRecipe("Reacher-v5", "mujoco", 0, 25, () => new DelegatePolicy(ReacherReach),
             (_, _, ret) => ret > -6 ? "REACHED!" : null, "Inverse kinematics finds the joint angles that put the fingertip on each new target.",
-            Hands: 4, HandLabel: "TARGET"),
+            Hands: 4, HandLabel: "TARGET",
+            Poster: new PosterShot(Seconds: 2.2, Left: 48, Top: 140, Width: 360, Height: 240, PixelWidth: 120, PixelHeight: 80)),
         // Seed 73: the best of seeds 0-199 for the scripted push (the puck ends 0.145 from the goal; return -39.0).
+        // The still: the table and the arm fill the frame's upper left (x 50-320, y 112-290 of 480x480) and the rest is black, so
+        // the default still is a speck. The crop keeps the arm's end of the table, the puck and the pole's foot and shrinks it 2x;
+        // at 0.5 s the arm is stretched out with its gripper open beside the red puck.
         new EpisodeRecipe("Pusher-v5", "mujoco", 73, 20, () => new PusherScript(),
-            (_, _, ret) => ret > -35 ? "PUSHED!" : null, "A seven-joint arm, steered by its fingertip's Jacobian, sweeps to the puck and nudges it goalward."),
+            (_, _, ret) => ret > -35 ? "PUSHED!" : null, "A seven-joint arm, steered by its fingertip's Jacobian, sweeps to the puck and nudges it goalward.",
+            Poster: new PosterShot(Seconds: 0.5, Left: 110, Top: 150, Width: 240, Height: 160, PixelWidth: 120, PixelHeight: 80)),
         new EpisodeRecipe("LunarLander-v3", "box2d", 7, 50, () => new DelegatePolicy((env, o) => LunarLanderEnv.Heuristic(env, (NDArray)o!)),
             (term, _, ret) => term && ret > 100 ? "LANDED!" : term ? "CRASH" : null, "Gymnasium's own heuristic lands between the flags.",
             RenderEveryStep: true),
@@ -174,9 +212,13 @@ internal static class Episodes {
             (term, _, _) => term ? "FLIPPED" : null, "Four legs, eight motors, walking forward.", Kwargs: TrackCamera),
         // A linear policy keeps Humanoid up for about 120 steps on average; seed 73 is the longest of seeds 0-199 (203
         // steps), and three-quarter speed stretches that past the 3.9 s the panel is on screen.
+        // The still: the track camera keeps the figure (x 190-370, y 213-427 of 480x480) near the middle of a frame that is mostly
+        // sky and floor. The crop gives it equal margins above and below and shrinks it 2x; at 0.9 s it stands with its arms out,
+        // well before the fall the recipe ends on.
         new EpisodeRecipe("Humanoid-v5", "mujoco", 73, 50, Trained("Humanoid-v5"),
             (term, _, _) => term ? "FELL" : null, "Seventeen motors keep a humanoid on its feet for a while (shown at three-quarter speed).",
-            Kwargs: TrackCamera),
+            Kwargs: TrackCamera,
+            Poster: new PosterShot(Seconds: 0.9, Left: 144, Top: 200, Width: 240, Height: 240, PixelWidth: 120, PixelHeight: 120)),
         new EpisodeRecipe("HumanoidStandup-v5", "mujoco", 0, 67, Trained("HumanoidStandup-v5"),
             (_, _, _) => null, "Lying on the floor, working its way up.", Kwargs: TrackCamera),
         new EpisodeRecipe("Swimmer-v5", "mujoco", 0, 50, Trained("Swimmer-v5"),

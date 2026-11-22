@@ -28,6 +28,12 @@ namespace Gym.Showreel;
 ///     rate (7.7 MB at 15 fps) and 28.9 MB as lossless WebP at 15 fps (up to 4.9 MB for one MuJoCo loop). The page
 ///     downloads only the loop on screen.
 ///     </para>
+///     <para>
+///     The poster PNG is the still the README's gallery shows (the docs site does not read it). By default it is the frame 2/5 of
+///     the way through the loop at the cartridge loop's size, a fifth of the frame's: right for an env whose subject fills its
+///     frame, a few dozen meaningful pixels for one that does not. A recipe with a <see cref="PosterShot"/> (Pusher, Reacher and
+///     Humanoid) names its own moment and the part of the frame to keep.
+///     </para>
 /// </remarks>
 internal static class Gallery {
     /// <summary>Frames per second of the cartridge loops.</summary>
@@ -70,6 +76,12 @@ internal static class Gallery {
             using var player = new EpisodePlayer(recipe);
             RgbImage first = player.Frame;
             int w = Math.Max(48, (int)Math.Round(first.Width / (double)Pixelate)), h = Math.Max(32, (int)Math.Round(first.Height / (double)Pixelate));
+            // The poster's cartridge frame: 2/5 of the way through by default, else the recipe's own moment (PosterShot). Checked
+            // here, before any encoder starts, so a moment outside the loop fails at once, not after every frame was rendered
+            // and no still was ever written.
+            int posterFrame = recipe.Poster is { } shot ? (int)Math.Round(shot.Seconds * Fps, MidpointRounding.AwayFromZero) : frames * 2 / 5;
+            if (posterFrame < 0 || posterFrame >= frames)
+                throw new InvalidOperationException($"{recipe.Id}: the poster's moment is cartridge frame {posterFrame}, outside the loop's {frames} frames");
             string loop = Path.Combine(folder, recipe.Id + ".webp"), poster = Path.Combine(folder, recipe.Id + ".png");
             string screen = Path.Combine(folder, recipe.Id + ".mp4");
             // Both pipes are disposed on any failure, which kills an unfinished encoder instead of leaving it waiting on
@@ -87,8 +99,8 @@ internal static class Gallery {
                         screenPipe.Write(player.Frame);
                     if (s % 2 == 0 && s / 2 < frames) {
                         pipe.Write(player.Frame);
-                        if (s / 2 == frames * 2 / 5)
-                            Downscale(player.Frame, w, h).SavePng(poster);
+                        if (s / 2 == posterFrame)
+                            Poster(player.Frame, recipe, w, h).SavePng(poster);
                     }
                 }
                 pipe.Finish();
@@ -162,22 +174,61 @@ internal static class Gallery {
             env.ActionSpace.ToString()!, env.ObservationSpace.ToString()!);
     }
 
+    /// <summary>
+    ///     Cuts a recipe's poster still out of one of its frames: the whole frame shrunk to the loop's size, or the part of it the
+    ///     recipe's <see cref="PosterShot"/> names at the size it names.
+    /// </summary>
+    /// <param name="frame">The env's frame at the poster's moment.</param>
+    /// <param name="recipe">The recipe; its <see cref="EpisodeRecipe.Poster"/> says how to cut, or is null for the default.</param>
+    /// <param name="w">The loop's width, which is the default still's.</param>
+    /// <param name="h">The loop's height, which is the default still's.</param>
+    /// <returns>The still.</returns>
+    /// <exception cref="InvalidOperationException">The recipe's crop does not lie inside the frame (a recipe written for a frame size the env no longer renders).</exception>
+    private static RgbImage Poster(RgbImage frame, EpisodeRecipe recipe, int w, int h) {
+        if (recipe.Poster is not { } shot)
+            return Downscale(frame, w, h);
+        // A crop that leaves the frame would average pixels that are not there (the filter clips silently), so it is refused:
+        // the still would come out dark along the missing edge, and nobody would notice until the README showed it.
+        if (shot.Left < 0 || shot.Top < 0 || shot.Width <= 0 || shot.Height <= 0
+            || shot.Left + shot.Width > frame.Width || shot.Top + shot.Height > frame.Height)
+            throw new InvalidOperationException($"{recipe.Id}: the poster's crop {shot.Width}x{shot.Height} at {shot.Left},{shot.Top} does not lie inside the {frame.Width}x{frame.Height} frame");
+        return Downscale(frame, shot.Left, shot.Top, shot.Width, shot.Height, shot.PixelWidth, shot.PixelHeight);
+    }
+
     /// <summary>Shrinks a frame by averaging each output pixel's footprint (an area filter, like ffmpeg's).</summary>
     /// <param name="src">The frame.</param>
     /// <param name="w">Output width.</param>
     /// <param name="h">Output height.</param>
     /// <returns>The small image.</returns>
-    public static RgbImage Downscale(RgbImage src, int w, int h) {
+    public static RgbImage Downscale(RgbImage src, int w, int h) => Downscale(src, 0, 0, src.Width, src.Height, w, h);
+
+    /// <summary>
+    ///     Shrinks a rectangle of a frame by averaging each output pixel's footprint of source pixels, in whole pixels: exact when
+    ///     the rectangle is a whole multiple of the output size, unevenly sampled when it is not.
+    /// </summary>
+    /// <param name="src">The frame.</param>
+    /// <param name="left">The rectangle's left edge, in the frame's pixels.</param>
+    /// <param name="top">The rectangle's top edge.</param>
+    /// <param name="width">The rectangle's width.</param>
+    /// <param name="height">The rectangle's height.</param>
+    /// <param name="w">Output width.</param>
+    /// <param name="h">Output height.</param>
+    /// <returns>The small image.</returns>
+    /// <remarks>
+    ///     The whole-frame overload calls this with the whole frame, so its output is what it always was, bit for bit. The
+    ///     rectangle is not checked here; <see cref="Poster"/>, the one place a rectangle comes from, checks it.
+    /// </remarks>
+    public static RgbImage Downscale(RgbImage src, int left, int top, int width, int height, int w, int h) {
         var dst = new RgbImage(w, h);
-        double sx = (double)src.Width / w, sy = (double)src.Height / h;
+        double sx = (double)width / w, sy = (double)height / h;
         for (int y = 0; y < h; y++) {
-            int y0 = (int)(y * sy), y1 = Math.Max(y0 + 1, (int)((y + 1) * sy));
+            int y0 = top + (int)(y * sy), y1 = Math.Max(y0 + 1, top + (int)((y + 1) * sy));
             for (int x = 0; x < w; x++) {
-                int x0 = (int)(x * sx), x1 = Math.Max(x0 + 1, (int)((x + 1) * sx));
+                int x0 = left + (int)(x * sx), x1 = Math.Max(x0 + 1, left + (int)((x + 1) * sx));
                 double r = 0, g = 0, b = 0;
                 int n = 0;
-                for (int yy = y0; yy < y1 && yy < src.Height; yy++)
-                    for (int xx = x0; xx < x1 && xx < src.Width; xx++) {
+                for (int yy = y0; yy < y1 && yy < top + height; yy++)
+                    for (int xx = x0; xx < x1 && xx < left + width; xx++) {
                         int o = (yy * src.Width + xx) * 3;
                         r += src.Pixels[o];
                         g += src.Pixels[o + 1];

@@ -6,8 +6,9 @@ played by a scripted or trained policy, composed in C# over a synthwave backdrop
 | Output | Where it is used |
 |---|---|
 | `docs/media/gym-net-showreel.mp4`: 85 s, 1280x720, 30 fps, H.264 (about 13 MB) | The docs site's landing page, and linked from the README |
-| `docs/media/gym-net-hero.webp`: the same tour cut to 51 s, animated WebP, 800x450, 15 fps (about 8 MB) | The top of `README.md` (GitHub and nuget.org), and the site's fallback where video does not play |
-| `docs/website-src/images/envs/*.webp`, `*.png`, `envs.json` | The site's 8-bit "select your environment" gallery |
+| `docs/media/gym-net-hero.webp`: the same tour cut to 51 s, animated WebP, 800x450, 15 fps (about 8 MB) | The top of `README.md` on GitHub (no package embeds the README), and the site's fallback where video does not play |
+| `docs/website-src/images/envs/*.webp`, `envs.json` | The site's 8-bit "select your environment" gallery |
+| `docs/website-src/images/envs/*.png`: one still per env, the frame 2/5 of the way through its loop at a fifth of the frame's size, except Pusher, Reacher and Humanoid, whose subjects fill only part of the frame: each names a moment and a crop (`PosterShot` in `Episodes.cs`) | The gallery of stills in `README.md` (the site does not read them) |
 | `docs/website-src/images/envs/*.mp4`: the same moments at each env's own frame size, H.264, 30 fps (about 4.2 MB for the 24) | The gallery's "now playing" screen (DR-101), muted and looping without controls |
 | `docs/website-src/images/showreel-poster.jpg`, `gymnet-logo.png`, `gymnet-icon.png` | The video's poster, the site's navbar logo and favicon |
 
