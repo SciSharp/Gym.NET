@@ -29,9 +29,11 @@ namespace Gym.Showreel;
 ///              in the corner: a preview, written to the temp folder unless --out says where), --backdrop beach|synthwave
 ///     </code>
 ///     <para>
-///     The MuJoCo recipes play the committed policies in <c>tools/showreel/policies</c>; <c>train</c> is only needed to
-///     replace one. Training is deterministic for its seed but takes minutes per env (the budgets are in
-///     <see cref="Ars.For"/>).
+///     The eleven MuJoCo envs and the hardcore walker play the published expert agents of <c>tests/Gym.Tests/Agents</c>
+///     (DR-109), which the build copies next to the program. The ARS policies in <c>tools/showreel/policies</c> are what
+///     those agents replaced, kept as the record: no recipe plays them, so a policy <c>train</c> writes shows up only once
+///     a recipe names <c>Episodes.Trained</c> (private) again. Training is deterministic for its seed but takes minutes per
+///     env (the budgets are in <see cref="Ars.For"/>).
 ///     </para>
 ///     <para>
 ///     The video is 15 lettered scenes (DR-100, DR-107, <see cref="Storyboards.Scenes"/>) and the README's animation their
