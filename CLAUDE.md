@@ -10,7 +10,7 @@ Gym.NET is a native C# (.NET) reinforcement learning environment toolkit and ben
 - **Roadmap:** `docs/plans/COMPLETION_PLAN.md` orders the work to one release, 1.0.0 (planned as 2.0 until decision D23 of 2026-11-12), through phases R0, P0r, P2, P3, P7, P4, P5, P6, P8, P9 (MuJoCo, resumed by DR-61) and P10, whose last step, P10.5, releases this tree as `v1.0.0+rc1` (the maintainer, 2026-11-21: CI green, then the fast-forward merge into `master` and the tag); it records the decisions D2–D25; `docs/plans/GYMNASIUM_PORT_PLAN.md` holds the per-area specifications.
 - **User docs (P10):** `docs/README.md` indexes the guides, `docs/architecture.md` and the release notes `docs/releases/RELEASE_1.0.0.md` (the body of the GitHub release `v1.0.0+rc1`); every code sample in them was compiled and run against the tree. Keep them true when the API changes.
 - **Release notes style:** the maintainer's house style, as the NumSharp and OptunaSharp releases have it: the GitHub copy of SciSharp/NumSharp's `.claude/skills/changelog/references/CHANGELOG_STYLE.md` (the local NumSharp checkout's copy is older). An owner-voice intro, `### 🧭 Overview`, a one-line `### 📦 New NuGet Packages` list, `## Detailed Breakdown` in one `<details>` block (📦, 📊, ✨, 🧩 Environments in NumSharp's ndarray slot, ⚡ with an `xLOW->xHIGH` Gymnasium ÷ Gym.NET explainer, 🎯, 🧰, 💥 last), then `### Install via NuGet` and the badge table; one bullet per physical line, ASCII hyphens only, no commit hashes, every number from a source, the Overview's counts matching the sections. The GitHub release body is the file without its H1 (and without the hidden "prepared" comment a draft carries until its release), and the release PR's body is that same text, under the release's title (the maintainer, 2026-11-21: "Gym.NET 1.0.0+rc1 - Gymnasium 1.4.0, Modernize and redesign Gym.NET"). The Overview lists every env under the 39 ids, linked to its page in Gymnasium v1.4.0's documentation (`https://gymnasium.farama.org/v1.4.0/environments/<family>/<env>/`): move those links with a Gymnasium re-pin.
-- **Design gate:** `docs/plans/DESIGN_REVIEW.md` holds the approved implementation designs (DR-01…DR-97). Implement only what an approved design covers; a design question no DR-xx answers goes back to the maintainer for review before the step continues.
+- **Design gate:** `docs/plans/DESIGN_REVIEW.md` holds the approved implementation designs (DR-01…DR-104). Implement only what an approved design covers; a design question no DR-xx answers goes back to the maintainer for review before the step continues.
 - **Working branch:** `master`, from the 1.0.0+rc1 release on: `journey1`, the one working branch until then (decision D20), is fast-forwarded into it at that release.
 
 ---
@@ -124,6 +124,8 @@ refs/Gym.NET/
 │
 ├── tests/
 │   ├── Gym.Tests/                 # MSTest test suite for environments, spaces, and multi-instance concurrency
+│   │   ├── Agents/                # The published expert agents (DR-103) as gym.net-agent/1 JSON, their reader (ExpertPolicy.cs, linked by
+│   │                              #   the showreel) and ExpertAgentTests: each plays an expert episode on Gym.NET's engines
 │   │   └── Gymnasium/             # refs/Gymnasium/tests mirrored one to one (test_core.py → TestCore.cs), namespace Gym.Tests.Gymnasium.* (DR-06)
 │   ├── Gym.Tests.Parity/          # Live parity gate: embedded CPython runs refs/Gymnasium, compared byte/pixel-exact (see its CLAUDE.md)
 │   └── Gym.Tests.Plugin/          # A module that registers an id when loaded, for make("Gym.Tests.Plugin:RegisterDuringMake-v0")
@@ -133,20 +135,23 @@ refs/Gym.NET/
 │                                  #   the renderer reproduces, scoring its models); halfcheetah_poc/: the trace checker over the
 │                                  #   product engine (oracle.py records MuJoCo's state per mj_step; verify/: traces.txt, record_traces.py,
 │                                  #   negative_controls.py, branch_search.py, cs_coverage.py); its playable HalfCheetah moved to examples/ (DR-74)
-├── tools/showreel/                # The front-page media (DR-59, DR-60, DR-72, DR-73): the synthwave video and the README's 51 s WebP cut of it (docs/media), the site's 8-bit
-│                                  #   gallery (docs/website-src/images/envs), from the envs' own frames under scripted or trained policies (the
-│                                  #   MuJoCo envs' ARS-trained linear policies in policies/, retrained by its train command); its parity
-│                                  #   segment is checked against Gymnasium in Python (gymnasium_replay.py). Not in the sln; README.md has the commands
+├── tools/showreel/                # The front-page media (DR-59, DR-60, DR-72, DR-73, DR-100..DR-104): the video, 15 lettered scenes in
+│                                  #   video-order.txt's order over the 16-bit dusk beach, and the README's WebP cut of the same scenes
+│                                  #   (docs/media), the site's 8-bit gallery (docs/website-src/images/envs), from the envs' own frames under
+│                                  #   scripted policies and the published expert agents of tests/Gym.Tests/Agents (the ARS policies in
+│                                  #   policies/ are the record of what they replaced); its parity segment is checked against Gymnasium in
+│                                  #   Python (gymnasium_replay.py). Not in the sln; README.md has the commands
+├── tools/agents/                  # import_agents.py: the expert agents (DR-103), from their pinned Hugging Face revisions into tests/Gym.Tests/Agents
 │
 ├── examples/                      # One project per env the showreel plays (DR-74), all in Gym.NET.sln so API changes break their build;
 │   │                              #   README.md indexes them. Each plays a seeded episode with its agent (the showreel's: controllers,
-│   │                              #   Gymnasium's heuristics, value iteration, ARS-trained policy.json files), --render in a window,
+│   │                              #   Gymnasium's heuristics, value iteration, the expert agents' policy.json copies, DR-103), --render in a window,
 │   │                              #   --play from the keyboard through Play.Run where a few keys and the frame cost allow; each episode
 │   │                              #   is one [NDScoped] method (NumSharp.Build in every project, DR-80)
 │   ├── CartPole/                  # The first example (D13): the cross-entropy method over linear policies, 100 carts at once through
 │   │                              #   MakeVec, then a played episode; --controller the showreel's hand-written controller
-│   ├── HalfCheetah/               # The autopilot through Gymnasium.Make, and the playable HalfCheetah (moved from tools/parity), which
-│   │                              #   compiles the engine in for its internals (CS0436 silenced)
+│   ├── HalfCheetah/               # Farama's TQC expert (expert.json) or the autopilot (--autopilot) through Gymnasium.Make, and the playable
+│   │                              #   HalfCheetah (moved from tools/parity), which compiles the engine in for its internals (CS0436 silenced)
 │   └── Acrobot/ … Walker2d/       # The other 22 envs, one folder each: Program.cs, README.md, and policy.json for the trained ones
 │
 ├── docs/                          # README.md (index), architecture.md, guides/ (getting_started, creating_custom_environments,

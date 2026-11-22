@@ -55,6 +55,14 @@
     <EmbeddedResource Include="Gymnasium\inventory.expected-missing.txt" LogicalName="Gym.Tests.inventory.expected-missing.txt" />
   </ItemGroup>
 
+  <!-- The published expert agents (DR-103), written by tools/agents/import_agents.py: Farama's MuJoCo experts and RL Zoo's
+       hardcore walker as gym.net-agent/1 JSON. This project is their home; the parity suite, the showreel and the examples
+       take them from here or from their own copies. Embedded, as the goldens above are, so ExpertAgentTests never depends
+       on the working directory. -->
+  <ItemGroup>
+    <EmbeddedResource Include="Agents\*.json" LogicalName="Gym.Tests.Agents.%(Filename)%(Extension)" />
+  </ItemGroup>
+
   <!-- The Gymnasium facade (Make, Spec, Register, Registry, ...) imported statically (DESIGN_REVIEW.md, "Consequences found
        while implementing", DR-06 with DR-10/DR-20): the namespace Gym.Tests.Gymnasium hides the class Gym.Gymnasium in every
        Gym.Tests.* namespace, so the tests call Make("CartPole-v1") as `from gymnasium import make` reads. -->
