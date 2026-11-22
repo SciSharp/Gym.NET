@@ -1,32 +1,30 @@
-# [![Gym.NET](https://raw.githubusercontent.com/SciSharp/Gym.NET/master/docs/website-src/images/gymnet-logo.png)](https://github.com/SciSharp/Gym.NET)
+<h1 align="center">
+  <a href="https://github.com/SciSharp/Gym.NET"><img src="https://raw.githubusercontent.com/SciSharp/Gym.NET/master/docs/website-src/images/gymnet-logo.png" alt="Gym.NET" width="232" height="52"></a>
+</h1>
 
-**Reinforcement-learning environments for .NET, bit for bit with Gymnasium.**
+<p align="center">
+  <strong>Reinforcement-learning environments framework for .NET</strong>
+</p>
 
-[![NuGet](https://img.shields.io/nuget/v/Gym.NET.Environments?label=Gym.NET.Environments)](https://www.nuget.org/packages/Gym.NET.Environments)
-[![NuGet downloads](https://img.shields.io/nuget/dt/Gym.NET)](https://www.nuget.org/packages/Gym.NET)
-[![Build](https://github.com/SciSharp/Gym.NET/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/SciSharp/Gym.NET/actions/workflows/ci.yml)
-[![Docs](https://github.com/SciSharp/Gym.NET/actions/workflows/docs.yml/badge.svg)](https://scisharp.github.io/Gym.NET)
-[![License](https://img.shields.io/github/license/SciSharp/Gym.NET)](https://github.com/SciSharp/Gym.NET/blob/master/LICENSE)
+<p align="center">
+  <a href="https://www.nuget.org/packages/Gym.NET.Environments"><img alt="NuGet" src="https://img.shields.io/nuget/v/Gym.NET.Environments?label=Gym.NET.Environments"></a>
+  <a href="https://www.nuget.org/packages/Gym.NET"><img alt="NuGet downloads" src="https://img.shields.io/nuget/dt/Gym.NET"></a>
+  <a href="https://github.com/SciSharp/Gym.NET/actions/workflows/ci.yml"><img alt="Build" src="https://github.com/SciSharp/Gym.NET/actions/workflows/ci.yml/badge.svg?branch=master"></a>
+  <a href="https://scisharp.github.io/Gym.NET"><img alt="Docs" src="https://github.com/SciSharp/Gym.NET/actions/workflows/docs.yml/badge.svg"></a>
+  <a href="https://github.com/SciSharp/Gym.NET/blob/master/LICENSE"><img alt="License" src="https://img.shields.io/github/license/SciSharp/Gym.NET"></a>
+</p>
 
-Gym.NET is a native .NET library of reinforcement-learning environments with
-[Farama Gymnasium](https://github.com/Farama-Foundation/Gymnasium)'s API: `Env<TObs, TAct>`, spaces, wrappers, vector
-environments, and 39 environments from classic_control, box2d, toy_text and MuJoCo. Box2D and MuJoCo run as managed C#
-inside the package, with no native code to install.
+<p align="center">
+  Gym.NET is a native .NET library for reinforcement learning: <a href="https://github.com/Farama-Foundation/Gymnasium">Gymnasium</a>'s environments and API, the same results for the same seed and actions, entirely in pure C#.
+</p>
 
-The compatibility target is **Gymnasium v1.4.0**. Given the same seed and actions, Gym.NET returns the same observations,
-rewards, `terminated`/`truncated` flags and infos as Gymnasium, bit for bit, and renders the same frames, pixel for pixel
-(MuJoCo's within a measured margin, [below](#what-is-in-10)). When Gym.NET and Gymnasium differ, Gymnasium is treated as the
-source of truth and Gym.NET aligns, except for the 14 deliberate differences the
-[release notes](https://github.com/SciSharp/Gym.NET/blob/master/docs/releases/RELEASE_1.0.0.md) list. A test suite that
-runs Gymnasium itself inside the test process checks this, call by call.
+<p align="center">
+  <a href="https://github.com/SciSharp/Gym.NET/blob/master/docs/media/gym-net-showreel.mp4"><img src="https://raw.githubusercontent.com/SciSharp/Gym.NET/master/docs/media/gym-net-hero.webp" alt="Gym.NET's 24 visually distinct environments playing in neon panels over a synthwave grid: classic control, MuJoCo, Box2D and toy text, each played by a scripted or trained policy, then Gymnasium and Gym.NET side by side with zero pixels different"></a>
+</p>
 
-[![Gym.NET's 24 visually distinct environments playing in neon panels over a synthwave grid: classic control, MuJoCo, Box2D and toy text, each played by a scripted or trained policy, then Gymnasium and Gym.NET side by side with zero pixels different](https://raw.githubusercontent.com/SciSharp/Gym.NET/master/docs/media/gym-net-hero.webp)](https://github.com/SciSharp/Gym.NET/blob/master/docs/media/gym-net-showreel.mp4)
-
-Each panel above shows an environment's own `rgb_array` frames, played by a scripted or trained policy: 24 of them,
-MuJoCo's among the rest. Then Gymnasium and Gym.NET play side by side on the same seed and actions, and the count of
-pixels that differ stays at zero. This is a 51-second cut of the
-[showreel](https://github.com/SciSharp/Gym.NET/blob/master/docs/media/gym-net-showreel.mp4), and
-[tools/showreel](https://github.com/SciSharp/Gym.NET/tree/master/tools/showreel) makes both.
+<p align="center">
+  <sub>24 environments playing, <a href="https://scisharp.github.io/Gym.NET/#select-your-environment">see all environments</a></sub>
+</p>
 
 ## What is Gym.NET?
 
@@ -35,6 +33,13 @@ CPython and without the GIL: the same `Env` contract (`Reset`, `Step`, spaces, w
 environment ids and the same numbers, with vector environments that step on worker threads instead of processes. It is for
 training and evaluating agents in C#, for moving a Gymnasium experiment to .NET and checking that it still produces what it
 produced, and for writing new environments against a contract that is already known.
+
+The compatibility target is **Gymnasium v1.4.0**. Given the same seed and actions, Gym.NET returns the same observations,
+rewards, `terminated`/`truncated` flags and infos as Gymnasium, bit for bit, and renders the same frames, pixel for pixel
+(MuJoCo's within a measured margin, [below](#what-is-in-10)). When Gym.NET and Gymnasium differ, Gymnasium is treated as the
+source of truth and Gym.NET aligns, except for the 14 deliberate differences the
+[release notes](https://github.com/SciSharp/Gym.NET/blob/master/docs/releases/RELEASE_1.0.0.md) list. A test suite that
+runs Gymnasium itself inside the test process checks this, call by call.
 
 Gym.NET focuses on:
 
