@@ -1610,20 +1610,23 @@ Pixels (or depth values) differing from Gymnasium's closest frame, of 230,400, a
 | Family (v5) | RGB before (2026-11-12) | RGB now | Depth before | Depth now |
 |---|---|---|---|---|
 | InvertedPendulum | 153 / 133 | **0 / 0** | 105 / 124 | 32 / 45 |
-| InvertedDoublePendulum | 49 / 54 | 1 / **0** (v4: **0 / 0**) | 501 / 500 | 3 / 3 |
+| InvertedDoublePendulum | 49 / 54 | **0 / 0** (v4 too) | 501 / 500 | 2 / 3 |
 | Reacher | 757 / 763 | 1 / 1 | 833 / 932 | 461 / 461 |
-| Pusher | 397 / 412 | 353 / 358 | 12 / 17 | 3 / 3 |
+| Pusher | 397 / 412 | 352 / 357 | 12 / 17 | 3 / 3 |
 | Swimmer | 5,590 / 5,585 | 5,533 / 5,527 | 532 / 542 | 30 / 40 |
 | HalfCheetah | 4,373 / 4,359 | 4,191 / 4,189 | 1,501 / 1,504 | 855 / 850 |
-| Walker2d | 23,899 / 24,104 | 23,701 / 23,946 | 2,023 / 2,034 | 820 / 812 |
+| Walker2d | 23,899 / 24,104 | 23,701 / 23,945 | 2,023 / 2,034 | 820 / 812 |
 | Hopper | 32,251 / 32,249 | 32,124 / 32,082 | 3,818 / 3,840 | 32 / 24 |
 | Ant | 6,088 / 6,472 | 5,759 / 6,185 | 3,087 / 3,019 | 520 / 407 |
 | Humanoid | 36,334 / 36,576 | 36,128 / 36,362 | 524 / 539 | 13 / 22 |
 | HumanoidStandup | 34,750 / 34,902 | 34,504 / 34,679 | 1,992 / 1,974 | 530 / 513 |
 
 The baseline (`tests/Gym.Tests.Parity/Baselines/mujoco_frames.json`) and the MuJoCo goldens were re-recorded on
-2026-11-22 with these frames; InvertedPendulum's RGB cells now record 0, so the gate holds them to equality. The tie
-rule alone took Reacher from 173 pixels to 1 at both states, and every other family's edges by a few pixels.
+2026-11-22 with these frames; InvertedPendulum's and InvertedDoublePendulum's RGB cells (v4 and v5) record 0, so the
+gate holds them to equality. The tie rule alone took Reacher from 173 pixels to 1 at both states, and every other
+family's edges by a few pixels. The exact facing test (below) gave InvertedDoublePendulum its last pixel and removed the
+large single-pixel outliers elsewhere: Walker2d's largest delta after its steps fell from 92 levels to 3, Pusher's from
+26 to 13.
 
 ### 18.4 What is left, by cause
 
@@ -1635,9 +1638,11 @@ buffer (Reacher, InvertedDoublePendulum), these causes show:
 - **Edge coverage**: near a shared edge inside a capsule's mesh the GPU gave a sample to the other triangle; the
   measured tie rule settled every such sample in Reacher. Every clip-space triangle of InvertedDoublePendulum and
   Reacher is now the GPU's bit for bit (transform feedback around MuJoCo's own `mjr_render`), and so is the window
-  position and its snap. InvertedDoublePendulum's last pixel is a sliver of 0.005 square pixels at the pole's cap that
-  the GPU draws and Gym.NET culls: its facing is the sign of a float32 shoelace sum, which rounds a sliver's area to
-  zero or the wrong side (the next step).
+  position and its snap. InvertedDoublePendulum's last pixel was a sliver of 0.005 square pixels at the pole's cap
+  that the GPU draws and Gym.NET culled: the facing was the sign of a float32 shoelace sum over absolute window
+  coordinates, which rounds a sliver's area to zero or the wrong side (between 1 and about 2,000 triangles per frame in
+  every family). `GlContext.Triangle` now sums the fan's areas from vertex 0 in double, exactly, as the GPU decides on
+  its snapped coordinates.
 - **Interior shading by one level**: the fixed-function lighting the driver compiles (normalization, the specular
   power, the colour sum) and the attribute interpolation in the shader core, which uses the shader's own reciprocal and
   special functions.
@@ -1648,3 +1653,35 @@ buffer (Reacher, InvertedDoublePendulum), these causes show:
   ulp below the exact plane (on exact-slope triangles every 4×4 tile showed one consistent deficit; 8×8 tiles did not),
   and its slopes carry setup errors of one to three ulps on general triangles; neither is modelled yet.
 - **Shadows and the reflection**: not yet examined on their own.
+
+### 18.5 Vertex outputs and attribute interpolation, measured (not yet in the renderer)
+
+The vertex stage, compared output by output: NVIDIA's `NV_transform_feedback` records the fixed-function stage's own
+outputs (no program bound) around MuJoCo's `mjr_render`, and the renderer's diagnostic records its own per vertex
+(`MujocoFrame.DebugVertexAttributes`, in the same order as `DebugClipTriangles`):
+
+- Reacher-v5 at the reset, 41,520 vertices: clip positions, unit 0's texture coordinates (texgen and texture matrix)
+  and the fog distance are the GPU's bit for bit; the lit colours are equal for 26,550, the rest one or two ulps off and
+  some more. HalfCheetah-v5: 170,700 vertices, positions and texture coordinates bit for bit, colours equal for
+  112,003. The driver's fixed-function lighting is the vertex stage's last model to measure.
+- Gym.NET's skybox pass sends 420 triangles in HalfCheetah that MuJoCo's capture does not contain, every one with
+  w ≤ 0 (so no pixel): to be checked against `mjr_render`'s skybox condition.
+
+The interpolation, probed with triangles of chosen vertices and attributes in single-sampled float targets under
+MuJoCo's clip control (`tools/parity/mujoco` will carry these probes when the renderer adopts the model):
+
+- Perspective: a smooth varying is `RZ(plane(a/w) · rcp(plane(1/w)))` with the viewport's own reciprocal (the
+  `rcp.bin` table), 64,512 of 64,512 pixels on exact planes; `gl_FragCoord.w` is the 1/w plane itself, and a vertex's
+  `a/w` is `RN(a · rcp(w))`, 128 of 128 constant triangles.
+- A plane's value at a pixel is computed exactly from an anchor and truncated toward zero (an exact negative float
+  comes out one ulp toward zero); with power-of-two slopes every pixel is exact.
+- The anchor is the 4-pixel grid corner of the triangle's bottom vertex, where the plane's value is truncated to
+  float32: 87 of 95 general triangles reproduced in every pixel (their doubled area 4096, so any reciprocal is exact).
+- The slopes are float32: the numerator times the setup's own reciprocal of the doubled area, truncated. That
+  reciprocal is not the viewport's (equal in 80% of 512 measured areas; RN(1/D) in 88%), and the attribute differences
+  round mostly toward zero (95% when aligned to the largest attribute's precision); neither is exact yet.
+- On HalfCheetah's floor, a replay of MuJoCo's own triangles through a shader that writes the smooth texture
+  coordinates shows Gym.NET's interpolation (double barycentrics) equal to the GPU's s and t in 27% to 29% of 222,693
+  interior pixels, up to four ulps apart: a quarter of the bilinear weights land in another 1/256 step, which is where
+  the checker edges differ. The partial model above matches 58% to 75% on the floor triangles in front of the camera
+  and about 3% on those crossing the near plane: how the GPU clips them is the next measurement.

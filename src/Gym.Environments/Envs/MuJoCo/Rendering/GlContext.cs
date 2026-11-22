@@ -420,18 +420,38 @@ namespace Gym.Environments.Envs.MuJoCo.Rendering {
                 }
             }
 
+            // and of every vertex's attributes: all vertices lit, then the flags cleared again so the rejection below
+            // decides, as in a product frame, which ones phase 3 processes (again, to the same values)
+            if (DebugVertexAttributes != null) {
+                Array.Fill(_needed, true, 0, n);
+                ProcessVertices(mesh, n);
+                Array.Clear(_needed, 0, n);
+                int first = 0;
+                foreach (int size in mesh.Sizes) {
+                    RecordAttributes(first, first + 1, first + 2);
+                    if (size == 4)
+                        RecordAttributes(first, first + 2, first + 3);
+                    first += size;
+                }
+            }
+
             // phase 2: a triangle wholly outside one half-space of the clip volume yields no pixel (for any w); only
             // the survivors' vertices are lit, which spares the far reaches of an infinite plane
             _triangles.Clear();
-            int start = 0;
+            _debugKept.Clear();
+            int start = 0, sent = 0;
             foreach (int size in mesh.Sizes) {
                 // a quad is the triangles (0, 1, 2) and (0, 2, 3)
-                Keep(start, start + 1, start + 2);
+                Keep(start, start + 1, start + 2, sent++);
                 if (size == 4)
-                    Keep(start, start + 2, start + 3);
+                    Keep(start, start + 2, start + 3, sent++);
                 start += size;
             }
 
+            // the diagnostic numbers every triangle the mesh sends, kept or rejected, so an id minus one indexes
+            // DebugClipTriangles (and the GPU's transform-feedback capture, which sees every triangle too)
+            int debugBase = _debugTriangle;
+            _debugTriangle = debugBase + sent;
             if (_triangles.Count == 0)
                 return;
 
@@ -444,6 +464,8 @@ namespace Gym.Environments.Envs.MuJoCo.Rendering {
                 idx[0] = _triangles[i];
                 idx[1] = _triangles[i + 1];
                 idx[2] = _triangles[i + 2];
+                if (DebugTriangleIds != null)
+                    _debugCurrent = debugBase + _debugKept[i / 3] + 1;
                 Triangle(idx);
             }
 
@@ -457,15 +479,33 @@ namespace Gym.Environments.Envs.MuJoCo.Rendering {
                 }
             }
 
-            void Keep(int a, int b, int c) {
+            void RecordAttributes(int a, int b, int c) {
+                foreach (int k in (ReadOnlySpan<int>)[a, b, c]) {
+                    ref Vtx o = ref _vertices[k];
+                    DebugVertexAttributes!.AddRange([o.R, o.G, o.B, o.A, o.S, o.T, o.U, o.Q, o.S1, o.T1, o.U1, o.Q1, o.FogZ]);
+                }
+            }
+
+            void Keep(int a, int b, int c, int index) {
                 if ((_outcodes[a] & _outcodes[b] & _outcodes[c]) != 0)
                     return;
                 _triangles.Add(a);
                 _triangles.Add(b);
                 _triangles.Add(c);
                 _needed[a] = _needed[b] = _needed[c] = true;
+                if (DebugTriangleIds != null)
+                    _debugKept.Add(index);
             }
         }
+
+        /// <summary>
+        ///     While the diagnostic records (<see cref="DebugTriangleIds"/>), each kept triangle's index among the triangles
+        ///     its mesh sent, in <see cref="_triangles"/>' order; empty otherwise.
+        /// </summary>
+        private readonly List<int> _debugKept = new();
+
+        /// <summary>The diagnostic's id of the triangle being rasterized (1-based over every triangle sent this frame).</summary>
+        private int _debugCurrent;
 
         /// <summary>Each vertex's clip-volume outcode, from <see cref="DrawMesh"/>'s first phase.</summary>
         private int[] _outcodes = new int[1024];
@@ -627,16 +667,27 @@ namespace Gym.Environments.Envs.MuJoCo.Rendering {
 
         /// <summary>
         ///     A diagnostic for the frame-parity work (DR-98): when set, the id of the triangle that last wrote each sample's
-        ///     colour into <see cref="DebugTarget"/> (triangles numbered from 1 in drawing order), so a pixel that differs
-        ///     from the GPU's can be told apart as an edge (samples from several triangles) or an interior (one triangle).
-        ///     <see langword="null"/> in every product frame, which then pays one null check per written sample.
+        ///     colour into <see cref="DebugTarget"/>, so a pixel that differs from the GPU's can be told apart as an edge
+        ///     (samples from several triangles) or an interior (one triangle). Triangles are numbered from 1 over every
+        ///     triangle the frame's meshes send, the trivially rejected ones included, so an id minus one indexes
+        ///     <see cref="DebugClipTriangles"/> and the GPU's transform-feedback capture alike; setting it starts the count
+        ///     again. <see langword="null"/> in every product frame, which then pays one null check per written sample.
         /// </summary>
-        internal int[]? DebugTriangleIds;
+        internal int[]? DebugTriangleIds {
+            get => _debugTriangleIds;
+            set {
+                _debugTriangleIds = value;
+                _debugTriangle = 0;
+            }
+        }
+
+        /// <summary>The backing store of <see cref="DebugTriangleIds"/>.</summary>
+        private int[]? _debugTriangleIds;
 
         /// <summary>The target <see cref="DebugTriangleIds"/> records, its length that target's sample count; others are not recorded.</summary>
         internal GlTarget? DebugTarget;
 
-        /// <summary>The number of the triangle being drawn, counted while <see cref="DebugTriangleIds"/> is set.</summary>
+        /// <summary>The triangles the frame's meshes sent so far, counted from the last time <see cref="DebugTriangleIds"/> was set.</summary>
         private int _debugTriangle;
 
         /// <summary>
@@ -647,12 +698,21 @@ namespace Gym.Environments.Envs.MuJoCo.Rendering {
         /// </summary>
         internal List<float>? DebugClipTriangles;
 
+        /// <summary>
+        ///     A diagnostic for the frame-parity work (DR-98): when set, every triangle a mesh draws, before any rejection, as
+        ///     its three vertices' attributes after the vertex stage (<see cref="DebugAttributeFloats"/> each: red, green,
+        ///     blue, alpha, unit 0's s, t, r, q, unit 1's s, t, r, q, the fog distance), in <see cref="DebugClipTriangles"/>'
+        ///     order. Setting it lights every vertex of a mesh, the rejected triangles' too, which costs time but changes no
+        ///     pixel (the vertex stage is a pure function of the vertex); <see langword="null"/> in every product frame.
+        /// </summary>
+        internal List<float>? DebugVertexAttributes;
+
+        /// <summary>The floats <see cref="DebugVertexAttributes"/> records per vertex.</summary>
+        internal const int DebugAttributeFloats = 13;
+
         /// <summary>Clips one triangle against the near, far and user planes, culls it and rasterizes what remains.</summary>
         /// <param name="idx">Its three vertex indices.</param>
         private void Triangle(Span<int> idx) {
-            // counted before any rejection, so ids stay stable across a change that culls or clips differently
-            if (DebugTriangleIds != null)
-                _debugTriangle++;
             Span<Vtx> poly = stackalloc Vtx[12];
             Span<Vtx> tmp = stackalloc Vtx[12];
             poly[0] = _vertices[idx[0]];
@@ -688,12 +748,16 @@ namespace Gym.Environments.Envs.MuJoCo.Rendering {
                 iw[i] = invW;
             }
 
-            // facing: the polygon's signed area in window coordinates (y up)
-            float area = 0;
-            for (int i = 0; i < count; i++) {
-                int j = (i + 1) % count;
-                area += wx[i] * wy[j] - wx[j] * wy[i];
-            }
+            // facing: the polygon's signed area in window coordinates (y up), exact, as the GPU decides it on the snapped
+            // coordinates. Every coordinate is a multiple of 1/256, so each difference from vertex 0 is exact in double
+            // and each product of two is a multiple of 2^-16 far below 2^53; the fan's sum keeps the sign. The float32
+            // shoelace over absolute coordinates this replaces rounded its products of hundreds of pixels to about 1/128
+            // of a pixel squared, turning slivers of a few thousandths to zero or the wrong side: InvertedDoublePendulum's
+            // pole cap lost a 0.005 square-pixel triangle the GPU draws, and every family a few hundred more (DR-98,
+            // measured 2026-11-22)
+            double area = 0;
+            for (int i = 1; i + 1 < count; i++)
+                area += ((double)wx[i] - wx[0]) * ((double)wy[i + 1] - wy[0]) - ((double)wx[i + 1] - wx[0]) * ((double)wy[i] - wy[0]);
 
             if (area == 0)
                 return;
@@ -1335,7 +1399,7 @@ namespace Gym.Environments.Envs.MuJoCo.Rendering {
             if (!ColorMask || tg.Color == null)
                 return;
             if (DebugTriangleIds != null && ReferenceEquals(tg, DebugTarget))
-                DebugTriangleIds[k] = _debugTriangle;
+                DebugTriangleIds[k] = _debugCurrent;
             int o = 4 * k;
             byte[] px = tg.Color;
             byte sr = ToUnorm8(r), sg = ToUnorm8(g), sb = ToUnorm8(b), sa = ToUnorm8(a);

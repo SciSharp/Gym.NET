@@ -63,6 +63,15 @@ namespace Gym.Environments.Envs.MuJoCo.Rendering {
         /// </summary>
         internal List<float>? DebugClipTriangles => _gl.DebugClipTriangles;
 
+        /// <summary>
+        ///     The last frame's per-vertex attributes as the vertex stage produced them, in <see cref="DebugClipTriangles"/>'
+        ///     order and layout (<see cref="GlContext.DebugAttributeFloats"/> floats per vertex: the lit colour, unit 0's and
+        ///     unit 1's texture coordinates, the fog distance), or <see langword="null"/> when <see cref="DebugRecordTriangles"/>
+        ///     was off; compared with the fixed-function outputs NVIDIA's transform feedback captures around MuJoCo's own
+        ///     <c>mjr_render</c>.
+        /// </summary>
+        internal List<float>? DebugVertexAttributes => _gl.DebugVertexAttributes;
+
         /// <summary>The offscreen buffer's samples per pixel (4, or 1 for the human window's), 0 before the first frame.</summary>
         internal int DebugSamples => _off?.Samples ?? 0;
 
@@ -105,6 +114,7 @@ namespace Gym.Environments.Envs.MuJoCo.Rendering {
             _gl.DebugTriangleIds = DebugRecordTriangles ? new int[width * height * samples] : null;
             _gl.DebugTarget = DebugRecordTriangles ? _off : null;
             _gl.DebugClipTriangles = DebugRecordTriangles ? new List<float>() : null;
+            _gl.DebugVertexAttributes = DebugRecordTriangles ? new List<float>() : null;
             GlCamera cam = AverageCamera(scn.Camera[0], scn.Camera[1]);
             if (cam.FrustumNear < 1e-15) {
                 if (scn.Geoms.Count > 0)
