@@ -22,7 +22,7 @@
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/SciSharp/Gym.NET</PackageProjectUrl>
     <PackageIcon>icon.png</PackageIcon>
-    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <!-- No PackageReadmeFile, deliberately: Directory.Build.targets (GYMNET0012) says why and enforces it. -->
     <RepositoryUrl>https://github.com/SciSharp/Gym.NET</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageTags>gym;gymnasium;reinforcement-learning;rl;environments;cartpole;mountaincar;pendulum;acrobot;lunarlander;bipedalwalker;carracing;box2d;frozenlake;taxi;blackjack;mujoco;halfcheetah;hopper;humanoid;ant;walker2d</PackageTags>
@@ -83,15 +83,15 @@
     <EmbeddedResource Include="Assets\**\*.json" LogicalName="assets/$([System.String]::Copy('%(RecursiveDir)').Replace('\','/'))%(Filename)%(Extension)" />
   </ItemGroup>
 
-  <!-- The package's icon and readme, packed at its root (NuGet's PackageIcon / PackageReadmeFile). They replace the
-       deprecated PackageIconUrl / PackageLicenseUrl, which fail packing as NU5048 / NU5125 where warnings are errors.
-       THIRD-PARTY-NOTICES.md goes with them: the packages carry code and data from other projects (Gymnasium's assets,
+  <!-- The package's icon, packed at its root (NuGet's PackageIcon), replaces the deprecated PackageIconUrl, as
+       PackageLicenseExpression replaces PackageLicenseUrl: both deprecated properties fail packing as NU5048 / NU5125 where
+       warnings are errors. No readme is packed (Directory.Build.targets, GYMNET0012).
+       THIRD-PARTY-NOTICES.md goes with the icon: the packages carry code and data from other projects (Gymnasium's assets,
        Box2D, SDL_gfx, SDL_ttf, CPython, OpenCV, pygame-ce, MuJoCo; each listed there with its notice), and those
        licences ask for their notices in every copy. One file in all five packages, so none ships without a notice it
        needs; the package's own licence stays the Apache-2.0 expression (DR-49). -->
   <ItemGroup>
     <None Include="..\..\eng\icon.png" Pack="true" PackagePath="\" Visible="false" />
-    <None Include="..\..\README.md" Pack="true" PackagePath="\" Visible="false" />
     <None Include="..\..\THIRD-PARTY-NOTICES.md" Pack="true" PackagePath="\" Visible="false" />
   </ItemGroup>
 

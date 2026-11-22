@@ -13,4 +13,32 @@
            Text="A Gym.NET release build (ContinuousIntegrationBuild=true) targets .NET 11 too, which needs the .NET 11 SDK (11.0.100 or later); this is SDK $(NETCoreSdkVersion), which would build and pack without net11.0. Install the .NET 11 SDK, or build without ContinuousIntegrationBuild for development." />
   </Target>
 
+  <!-- No embedded package README, for every package (the rule NumSharp's Directory.Build.props documents, adopted here on
+       2026-11-22, before the first nuget.org push).
+
+       WHY. nuget.org shows one readme per package version on its README tab. When the .nupkg embeds one
+       (PackageReadmeFile, the nuspec's <readme>), the gallery always renders that file and ignores the owner-editable readme
+       on the package's Manage page, and the embedded copy can never change afterwards, because a published package is
+       immutable. Leaving the readme out keeps every version's README tab editable after publishing, which is where the owner
+       pastes that release's GitHub release notes (nuget.org > package > Manage > Readme > select the version > Custom >
+       Submit); until then the tab shows the package's Description. The nuspec's <releaseNotes> is no substitute: it is just
+       as immutable after publishing and nuget.org draws it as plain text.
+
+       It also frees README.md of nuget.org's rules. The Markdig pipeline there runs with raw HTML switched off, drops relative
+       image paths and draws images only from an allow-list of hosts, so a README written for GitHub (a header centered with
+       HTML, as NumSharp's) would show as text on every package page. README.md is the repository's front page and is not
+       packed; THIRD-PARTY-NOTICES.md still is (each project's csproj).
+
+       ENFORCED. This target fails the pack of any project that sets PackageReadmeFile, so the rule cannot regress through a
+       copied csproj or a well-meaning "add a readme" fix, a slip that would only surface after an irreversible publish. It
+       hooks GenerateNuspec, which `dotnet pack` and a GeneratePackageOnBuild build both run. Its Condition is evaluated when
+       the target runs, after the whole project has been evaluated, so it sees a project's own PackageReadmeFile. To return to
+       embedded readmes on purpose, delete this target together with this comment. -->
+  <Target Name="GymNetForbidEmbeddedReadme"
+          BeforeTargets="GenerateNuspec"
+          Condition="'$(PackageReadmeFile)' != ''">
+    <Error Code="GYMNET0012"
+           Text="$(MSBuildProjectFile) sets PackageReadmeFile='$(PackageReadmeFile)', but Gym.NET packages must not embed a README: nuget.org always shows an embedded readme and then ignores the owner-editable one, so this version's README tab could never be given its release notes after publishing, and the repository's README.md is written for GitHub (HTML) and would show as text on nuget.org. Remove PackageReadmeFile and the packed README.md item; see the comment in Directory.Build.targets." />
+  </Target>
+
 </Project>
