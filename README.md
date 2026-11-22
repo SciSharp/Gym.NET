@@ -3,11 +3,12 @@
 [![NuGet](https://img.shields.io/nuget/v/Gym.NET.Environments?label=Gym.NET.Environments)](https://www.nuget.org/packages/Gym.NET.Environments)
 [![NuGet downloads](https://img.shields.io/nuget/dt/Gym.NET)](https://www.nuget.org/packages/Gym.NET)
 
-[![Gym.NET's 24 visually distinct environments playing in neon panels over a synthwave grid: classic control, MuJoCo, Box2D and toy text, each played by a scripted or trained policy, then Gymnasium and Gym.NET side by side with zero pixels different](https://raw.githubusercontent.com/SciSharp/Gym.NET/master/docs/media/gym-net-hero.webp)](https://github.com/SciSharp/Gym.NET/blob/master/docs/media/gym-net-showreel.mp4)
+[![Gym.NET's environments playing in neon panels over a 16-bit dusk beach: classic control, MuJoCo, Box2D and toy text, each played by a scripted policy or a published expert agent, then Gymnasium and Gym.NET side by side with zero pixels different](https://raw.githubusercontent.com/SciSharp/Gym.NET/master/docs/media/gym-net-hero.webp)](https://github.com/SciSharp/Gym.NET/blob/master/docs/media/gym-net-showreel.mp4)
 
-Each panel above shows an environment's own `rgb_array` frames, played by a scripted or trained policy: 24 of them,
-MuJoCo's among the rest. Then Gymnasium and Gym.NET play side by side on the same seed and actions, and the count of
-pixels that differ stays at zero. This is a 51-second cut of the
+Each panel above shows an environment's own `rgb_array` frames, played by a scripted policy or a published expert agent
+(the MuJoCo envs by the experts Farama trained on them): 22 of them, MuJoCo's among the rest. Then Gymnasium and Gym.NET
+play side by side on the same seed and actions, and the count of pixels that differ stays at zero. This is a 49-second
+cut of the
 [showreel](https://github.com/SciSharp/Gym.NET/blob/master/docs/media/gym-net-showreel.mp4), and
 [tools/showreel](https://github.com/SciSharp/Gym.NET/tree/master/tools/showreel) makes both.
 

@@ -6,7 +6,7 @@ _layout: landing
 <section class="gn-hero" aria-label="The Gym.NET showreel">
 <video class="gn-video" autoplay muted loop playsinline controls preload="metadata" poster="images/showreel-poster.jpg">
 <source src="../media/gym-net-showreel.mp4" type="video/mp4">
-<img src="../media/gym-net-hero.webp" alt="Gym.NET's environments playing in panels over a synthwave grid">
+<img src="../media/gym-net-hero.webp" alt="Gym.NET's environments playing in panels over a 16-bit dusk beach">
 </video>
 </section>
 <section class="gn-intro">

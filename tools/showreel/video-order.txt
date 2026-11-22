@@ -1,14 +1,15 @@
-# The showreel video's scenes, in the order they play (DR-100). Letters, left to right, on any number of lines:
-# leave a letter out to drop its scene, write one twice to play it twice. Anything after a # is a comment.
+# The showreel's scenes, in the order they play (DR-100, DR-101); the README's animation plays the same order, each scene
+# shorter (DR-104). Letters, left to right, on any number of lines: leave a letter out to drop its scene, write one twice
+# to play it twice. Anything after a # is a comment.
 #
-#   A  Title                   F  CarRacing               K  FrozenLake
-#   B  Classic control         G  HalfCheetah             L  Parity (left out with --no-parity)
-#   C  MuJoCo control          H  Hopper and Walker2d     M  Finale
-#   D  LunarLander             I  MuJoCo's four           N  Outro
-#   E  The walkers             J  Toy text's four
+#   A  Title                   F  CarRacing                     K  Toy text's four
+#   B  Classic control         G  HalfCheetah                   L  FrozenLake
+#   C  Reacher and Pusher      H  Hopper and Walker2d           M  Parity (left out with --no-parity)
+#   D  LunarLander             I  Humanoid and HumanoidStandup  N  Finale
+#   E  The walkers             J  Ant and Swimmer               O  Outro
 #
 # dotnet run --project tools/showreel -c Release -- scenes              where each scene starts, and the length
 # dotnet run --project tools/showreel -c Release -- video --letters     a preview with each scene's letter in the corner
 # dotnet run --project tools/showreel -c Release -- video               docs/media/gym-net-showreel.mp4
 
-A B C D E F G H I J K L M N
+A B C D E F G H I J K L M N O

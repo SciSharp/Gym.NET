@@ -16,7 +16,7 @@ namespace Gym.Showreel;
 ///     Showreel video       docs/media/gym-net-showreel.mp4 and the site's poster for it (needs the parity stack unless --no-parity),
 ///                          its scenes in the order tools/showreel/video-order.txt gives
 ///     Showreel scenes      where each scene of the order starts and how long the video runs, without rendering
-///     Showreel hero        docs/media/gym-net-hero.webp, the README's 51 s cut (also needs the parity stack unless --no-parity);
+///     Showreel hero        docs/media/gym-net-hero.webp, the README's cut of the same scenes (also needs the parity stack unless --no-parity);
 ///                          --format gif writes docs/media/gym-net-hero.gif instead
 ///     Showreel gallery     docs/website-src/images/envs/*, the site's logo and icon
 ///     Showreel parity      only the Gymnasium comparison, printing what was compared
@@ -26,7 +26,7 @@ namespace Gym.Showreel;
 ///              --work DIR (Python exchange files), --no-parity, --width N (the README animation's, default 800;
 ///              --gif-width is the same option), --format webp|gif,
 ///              --order "A D B ..." (the video's scenes, in place of video-order.txt), --letters (each scene's letter
-///              in the corner: a preview, written to the temp folder unless --out says where)
+///              in the corner: a preview, written to the temp folder unless --out says where), --backdrop beach|synthwave
 ///     </code>
 ///     <para>
 ///     The MuJoCo recipes play the committed policies in <c>tools/showreel/policies</c>; <c>train</c> is only needed to
@@ -34,8 +34,9 @@ namespace Gym.Showreel;
 ///     <see cref="Ars.For"/>).
 ///     </para>
 ///     <para>
-///     The video is 14 lettered scenes (DR-100, <see cref="Storyboards.Scenes"/>); the order file is the maintainer's to
-///     edit, and the tool reads it from the checkout, so a new order needs no rebuild.
+///     The video is 15 lettered scenes (DR-100, DR-101, <see cref="Storyboards.Scenes"/>) and the README's animation their
+///     short form (DR-104, <see cref="Storyboards.ShortScenes"/>), both in the order file's order; the file is the
+///     maintainer's to edit, and the tool reads it from the checkout, so a new order needs no rebuild.
 ///     </para>
 /// </remarks>
 internal static class Program {
@@ -121,8 +122,8 @@ internal static class Program {
 
     /// <summary>
     ///     Renders the video, its scenes in <see cref="VideoOrder"/>'s order, with the parity scene when replays are given,
-    ///     and the docs site's poster for it (the title, 3.3 s into its scene). No scanlines: the site scales the video to
-    ///     its column, and resampled scanlines moiré.
+    ///     and the docs site's poster for it (the title, 1.7 s into its scene, both lines of the pitch typed). No
+    ///     scanlines: the site scales the video to its column, and resampled scanlines moiré.
     /// </summary>
     /// <param name="o">The options.</param>
     /// <param name="parity">The verified Gymnasium replays, or <see langword="null"/> for <c>--no-parity</c>; the caller disposes them.</param>
@@ -139,12 +140,13 @@ internal static class Program {
             ? Path.Combine(Path.GetTempPath(), "gymnet-showreel-letters.mp4")
             : Path.Combine(o.Repo, "docs", "media", "gym-net-showreel.mp4"));
         Console.WriteLine($"video: scenes {string.Join(" ", Storyboards.Layout(order, parity is not null).Placed.Select(p => p.Scene.Letter))}");
-        Render(Storyboards.Video(parity, order, o.Letters), output, o.Ffmpeg, FfmpegPipe.Mp4(), scanlines: false);
+        Render(Storyboards.Video(parity, order, o.Letters), output, o.Ffmpeg, FfmpegPipe.Mp4(), scanlines: false, o.Backdrop);
         if (o.Output is null && !o.Letters) {
-            // The poster is the title's frame wherever the order plays it (3.3 s in, the pitch typed on), else 3.3 s in.
+            // The poster is the title's frame wherever the order plays it: 1.7 s in, the brisk title's two lines are typed
+            // and it has not begun to shrink away (at 2.0 s). Without a title, 1.7 s into the video.
             var (placed, _) = Storyboards.Layout(order, parity is not null);
-            double title = placed.Where(p => p.Scene.Letter == 'A').Select(p => p.Start).DefaultIfEmpty(0).First();
-            FfmpegPipe.ExtractFrame(o.Ffmpeg, output, title + 3.3, Path.Combine(o.Repo, "docs", "website-src", "images", "showreel-poster.jpg"));
+            double title = placed.Where(p => p.Scene.Name == "Title").Select(p => p.Start).DefaultIfEmpty(0).First();
+            FfmpegPipe.ExtractFrame(o.Ffmpeg, output, title + 1.7, Path.Combine(o.Repo, "docs", "website-src", "images", "showreel-poster.jpg"));
         }
     }
 
@@ -180,12 +182,16 @@ internal static class Program {
     }
 
     /// <summary>
-    ///     Renders the README animation, the showreel's 51 s cut (DR-73), at 15 frames a second: an animated WebP, or a GIF
-    ///     with <c>--format gif</c>. No scanlines, as for the video.
+    ///     Renders the README animation, the short form of the video's scenes in the video's order (DR-104, about 49 s), at
+    ///     15 frames a second: an animated WebP, or a GIF with <c>--format gif</c>. No scanlines, as for the video.
     /// </summary>
     /// <param name="o">The options.</param>
     /// <param name="parity">The verified Gymnasium replays, or <see langword="null"/> for <c>--no-parity</c>; the caller disposes them.</param>
-    /// <exception cref="ArgumentException"><c>--format</c> is neither <c>webp</c> nor <c>gif</c>.</exception>
+    /// <exception cref="ArgumentException">
+    ///     <c>--format</c> is neither <c>webp</c> nor <c>gif</c>, or the order names a letter that is not a scene.
+    /// </exception>
+    /// <exception cref="IOException">The order file exists but cannot be read.</exception>
+    /// <exception cref="InvalidOperationException">ffmpeg cannot start, or fails.</exception>
     private static void Hero(Options o, ParityReplays? parity) {
         // Checked before rendering, so a typo costs nothing rather than minutes of frames.
         string[] encoder = o.Format switch {
@@ -194,8 +200,8 @@ internal static class Program {
             _ => throw new ArgumentException($"unknown --format '{o.Format}': webp or gif"),
         };
         string output = o.Output ?? Path.Combine(o.Repo, "docs", "media", "gym-net-hero." + o.Format);
-        Storyboard board = Storyboards.Hero(parity) with { Fps = 15 };
-        Render(board, output, o.Ffmpeg, encoder, scanlines: false);
+        Storyboard board = Storyboards.Hero(parity, VideoOrder(o)) with { Fps = 15 };
+        Render(board, output, o.Ffmpeg, encoder, scanlines: false, o.Backdrop);
     }
 
     /// <summary>Writes the gallery's loops and manifest and the site's logo.</summary>
@@ -214,14 +220,14 @@ internal static class Program {
             throw new ArgumentException("stills needs --at with comma-separated seconds");
         if (o.Board is not ("video" or "hero"))
             throw new ArgumentException($"unknown board '{o.Board}': video or hero");
-        // A bad order stops the tool before the parity run.
-        string? order = o.Board == "video" ? VideoOrder(o) : null;
+        // A bad order stops the tool before the parity run; both boards follow it (the README cut plays the video's order).
+        string order = VideoOrder(o);
         // The replays own large temporary files: dispose them even when a still fails. Both boards hold the parity segment.
         using ParityReplays? parity = o.NoParity ? null : ParityReplays.Create(o.Python, Console.Out);
-        Storyboard board = order is not null ? Storyboards.Video(parity, order, o.Letters) : Storyboards.Hero(parity);
+        Storyboard board = o.Board == "video" ? Storyboards.Video(parity, order, o.Letters) : Storyboards.Hero(parity, order);
         string folder = o.Output ?? Path.Combine(Path.GetTempPath(), "gymnet-showreel-stills");
         Directory.CreateDirectory(folder);
-        using var compositor = new Compositor(board, scanlines: o.Board == "video");
+        using var compositor = new Compositor(board, scanlines: o.Board == "video", o.Backdrop);
         foreach (double t in o.At.OrderBy(t => t)) {
             string path = Path.Combine(folder, $"{o.Board}_{t.ToString("000.00", CultureInfo.InvariantCulture)}.png");
             compositor.Render(t).SavePng(path);
@@ -235,10 +241,13 @@ internal static class Program {
     /// <param name="ffmpeg">The ffmpeg executable.</param>
     /// <param name="encoder">The output options.</param>
     /// <param name="scanlines">Whether to draw scanlines.</param>
-    private static void Render(Storyboard board, string output, string ffmpeg, string[] encoder, bool scanlines) {
+    /// <param name="backdrop">The backdrop's name (<c>--backdrop</c>).</param>
+    /// <exception cref="ArgumentException">The backdrop's name is unknown.</exception>
+    /// <exception cref="InvalidOperationException">ffmpeg cannot start, or fails.</exception>
+    private static void Render(Storyboard board, string output, string ffmpeg, string[] encoder, bool scanlines, string backdrop) {
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(output))!);
         var clock = Stopwatch.StartNew();
-        using var compositor = new Compositor(board, scanlines);
+        using var compositor = new Compositor(board, scanlines, backdrop);
         using var pipe = new FfmpegPipe(ffmpeg, Slots.Width, Slots.Height, board.Fps, encoder, output);
         long lastReport = 0;
         for (int f = 0; f < board.Frames; f++) {
@@ -296,6 +305,9 @@ internal static class Program {
         /// <summary>Whether to print each scene's letter over the video (<c>--letters</c>): a preview, never the published video.</summary>
         public bool Letters { get; private set; }
 
+        /// <summary>The backdrop (<c>--backdrop</c>): <c>beach</c>, the dusk beach of DR-102, or <c>synthwave</c>, DR-59's grid.</summary>
+        public string Backdrop { get; private set; } = Backdrops.Default;
+
         /// <summary>Parses the arguments.</summary>
         /// <param name="args">The arguments.</param>
         /// <returns>The options.</returns>
@@ -324,6 +336,7 @@ internal static class Program {
                     case "--minutes": o.Minutes = double.Parse(Value(), CultureInfo.InvariantCulture); break;
                     case "--order": o.Order = Value(); break;
                     case "--letters": o.Letters = true; break;
+                    case "--backdrop": o.Backdrop = Value(); break;
                     default:
                         if (a.StartsWith("--", StringComparison.Ordinal) || o.Command is not null)
                             throw new ArgumentException($"unknown argument '{a}'");

@@ -5,8 +5,8 @@ using System.Linq;
 namespace Gym.Showreel;
 
 /// <summary>
-///     Renders a storyboard frame by frame: the synthwave backdrop, the panels with their env frames, labels and stamps,
-///     the overlays, then the flashes, bloom, scanlines, vignette and fades.
+///     Renders a storyboard frame by frame: the backdrop (the dusk beach, or the synthwave grid), the panels with their
+///     env frames, labels and stamps, the overlays, then the flashes, bloom, scanlines, vignette and fades.
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -22,8 +22,8 @@ internal sealed class Compositor : IDisposable {
     /// <summary>The timeline.</summary>
     private readonly Storyboard _board;
 
-    /// <summary>The backdrop.</summary>
-    private readonly Synthwave _backdrop;
+    /// <summary>The backdrop, drawn first in every frame.</summary>
+    private readonly IBackdrop _backdrop;
 
     /// <summary>The output frame, reused.</summary>
     private readonly RgbImage _frame;
@@ -43,10 +43,15 @@ internal sealed class Compositor : IDisposable {
     /// <summary>Creates a compositor for a storyboard at the slots' 1280x720.</summary>
     /// <param name="board">The timeline.</param>
     /// <param name="scanlines">Whether to draw scanlines.</param>
-    public Compositor(Storyboard board, bool scanlines) {
+    /// <param name="backdrop">
+    ///     The backdrop's name for <see cref="Backdrops.Create"/>: <see cref="Backdrops.Default"/> (the dusk beach, DR-102)
+    ///     unless <c>--backdrop</c> picks another.
+    /// </param>
+    /// <exception cref="ArgumentException">The backdrop's name is unknown.</exception>
+    public Compositor(Storyboard board, bool scanlines, string backdrop = Backdrops.Default) {
         _board = board;
         _scanlines = scanlines;
-        _backdrop = new Synthwave(Slots.Width, Slots.Height);
+        _backdrop = Backdrops.Create(backdrop, Slots.Width, Slots.Height);
         _frame = new RgbImage(Slots.Width, Slots.Height);
         _vignette = new float[Slots.Width * Slots.Height];
         for (int y = 0; y < Slots.Height; y++)
