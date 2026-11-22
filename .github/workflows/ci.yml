@@ -42,8 +42,21 @@ jobs:
     runs-on: windows-latest
     # The live parity gate alone took 16 minutes per framework on the reference machine (Release, 32 threads, 2026-11-12),
     # and the job runs it for three frameworks after two builds and two unit runs, on 4 runner cores; 60 minutes was never
-    # enough. Tune it from the first runs' timings (GitHub's own limit for a hosted job is 360).
+    # enough. Tune it from the first runs' timings (GitHub's own limit for a hosted job is 360). The first full runs, on
+    # the 1.0.0+rc1 PR (2026-11-21), took about 50 minutes: builds 4, unit gates 22 and 10, parity 11 to 19.
     timeout-minutes: 240
+    # Bit for bit is proven on the reference machine's instruction set (an i9-13900K: AVX2 and FMA, no AVX-512), and
+    # GitHub's windows-latest hosts are a mix. On an AVX-512 host NumPy sends float64 sin and cos to its X86_V4 (SVML)
+    # loops and its OpenBLAS picks SkylakeX kernels, both a last bit away from the reference's paths: one run of the
+    # 1.0.0+rc1 PR (44960756920) failed 106 MuJoCo cells by 1 ulp (Reacher, Ant, Humanoid, Pusher, Swimmer: the envs that
+    # take cos, sin or norms in NumPy), while the push run of the same commit (44960751732) passed every cell. These pin
+    # both interpreters to the reference's paths on any host: NumPy dispatches only its X86_V3 (AVX2) loops (naming the
+    # level to enable is silent where X86_V4 is absent, where disabling it is not), OpenBLAS runs its Haswell kernels, as
+    # the maintainer's OptunaSharp CI does, and .NET's JIT leaves AVX-512 aside.
+    env:
+      NPY_ENABLE_CPU_FEATURES: "X86_V3"
+      OPENBLAS_CORETYPE: "Haswell"
+      DOTNET_EnableAVX512F: "0"
     steps:
       - uses: actions/checkout@v4
 
@@ -79,6 +92,13 @@ jobs:
       - name: Parity stack (tools/parity/.venv)
         shell: pwsh
         run: ./tools/parity/setup_venv.ps1 -Python python
+
+      # Which host this run got, and whether the pins above took hold: the parity gate's last bits depend on both.
+      - name: Runner CPU and NumPy dispatch
+        shell: pwsh
+        run: |
+          (Get-CimInstance Win32_Processor | Select-Object -First 1).Name
+          ./tools/parity/.venv/Scripts/python.exe -I -c "import numpy as np; f = np._core._multiarray_umath.__cpu_features__; print('NumPy', np.__version__, '| X86_V3', f.get('X86_V3'), '| X86_V4', f.get('X86_V4'), '| AVX512F', f.get('AVX512F'))"
 
       - name: Parity gate (live Gymnasium, Release)
         env:
