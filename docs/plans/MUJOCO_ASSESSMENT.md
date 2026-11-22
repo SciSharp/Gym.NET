@@ -1562,3 +1562,89 @@ described, at 3 (Humanoid) to 42 (InvertedPendulum) frames a second on the deskt
 older defect, fixed with the window: the WinForms viewer sized its form by the outer size plus 12 pixels, so on
 Windows 10 and 11 the title bar cropped about 27 rows off the bottom of every env's frame; its client area is now the
 frame's size.
+
+## 18. Byte-exact frames, family by family (DR-98, 2026-11-21)
+
+The maintainer's instruction "ensure every env is able to render in every renderer and byte perfect", and for MuJoCo
+"Like onces we already did, we port mujoco envs completely one by one" (DR-98): the frames become equal to Gymnasium's,
+one env family at a time, the GPU's arithmetic measured and reproduced as the engine's was.
+
+### 18.1 How it is measured
+
+A scratch frame-diff loop, outside the repository: Gymnasium renders each family's v5 id at `reset(seed=0)` and after
+ten seeded sampled steps, eight times per state (its own frames vary on this GPU, below), and saves every distinct
+frame and depth map with the actions; Gym.NET replays the actions (the trajectories are bit for bit) and diffs every
+pixel against the closest of Gymnasium's frames, in about 9 seconds for the eleven families. A diagnostic in the
+software rasterizer (`MujocoFrame.DebugRecordTriangles`, off in product frames) records which triangle wrote each
+sample, so a differing pixel is told apart as an edge or an interior; and Gymnasium's own per-sample colours are read
+out of MuJoCo's multisample buffer (its `offFBO` blitted into a multisample texture and fetched with `texelFetch`),
+whose resolve by the model below reproduces Gymnasium's frame exactly.
+
+Gymnasium's own frames are not deterministic on the reference GPU for every family: eight renders of one state gave one
+frame for InvertedPendulum, InvertedDoublePendulum, Reacher, Pusher, Swimmer, HalfCheetah, Walker2d and Ant, but two to
+five for Hopper, three to five for Humanoid (6 to 18 pixels apart) and five to eight for HumanoidStandup, in a different
+order in each process (the first render was the same in two processes). For those, "equal" can only mean "one of the
+frames Gymnasium draws for that state" (DR-98's reading to confirm).
+
+### 18.2 The GPU's arithmetic, measured this round
+
+Each now has a probe in `tools/parity/mujoco/gpu_probe.py` that scores Gym.NET's model on the machine it runs on:
+
+| Behaviour | The reference GPU and driver | Score |
+|---|---|---|
+| 4-sample resolve | `(sum + 1) >> 2`, but an exact half just below 16, 32, ..., 112 rounds up (`MujocoFrame.ResolveFour`) | every one of the 1,021 sums; the old `(sum + 1) >> 2` missed exactly those seven halves |
+| Driver's matrix stack | `glMultMatrixf` and `glTranslatef` sum each element pairwise, `(a0b0 + a1b1) + (a2b2 + a3b3)`; `glScalef` plain products (`GlMath.MultiplyDriver`) | 6,400 of 6,400 elements; the sequential order 72%, fused orders about 50% |
+| `glFrustum` / `glOrtho` | the frustum's elements divide a double numerator by a denominator rounded to float32; the ortho's are double, rounded once (`GlMath.Frustum`, `GlMath.Ortho`) | 250 and 300 matrices, every element |
+| MuJoCo's own products | `mjr_mulMat44` sums sequentially (the shadow map's texture matrix keeps `GlMath.Multiply`) | from the source |
+| Vertex transform | `ftransform()` over `P·MV` computed on the driver's side, then `fma(m12, w, fma(m8, z, fma(m4, y, m0·x)))` per component (`GlMath.TransformGpu`); `P·(MV·v)` in the shader scored 55% | 6,400 of 6,400 components, through transform feedback |
+| Viewport reciprocal | faithful, not correctly rounded: 1,108,522 of the 2^23 mantissas one ulp off `RN(1/w)`, measured for all of them (`GlReciprocal`, the 151 KB `Assets/mujoco/gpu/rcp.bin`); a 128-segment quadratic interpolator whose fixed-point layout is not yet derived | 8,388,608 of 8,388,608 |
+| Window depth per vertex | `RN(z · rcp(w))` | 8,192 of 8,192 random clip depths; the correctly rounded quotient 71% |
+| Window position | `((x · rcp(w) + 1) · 0.5) · size` in float32, snapped to 1/256 of a pixel with ties to even (`GlContext.Triangle`); located through a screen-linear varying whose planes meet at the snapped vertex | 200 of 200 coordinates, w from 0.05 to 60 |
+| Tie rule | a sample exactly on an edge belongs to the triangle whose left or bottom edge it is, in OpenGL's y-up window (`GlContext.LeftOrBottom`); Gym.NET had Direct3D's top-left rule | 1,648 of 1,648 pixel centres on shared edges, 14 directions, both windings |
+| Interpolated depth | the plane is truncated toward zero where a cast rounds; on exact-slope triangles truncating the exact plane gave 94% to 100% per triangle, rounding about 47% (`GlContext.TruncateToFloat`) | see the open items |
+
+### 18.3 Where the families stand
+
+Pixels (or depth values) differing from Gymnasium's closest frame, of 230,400, at the reset and after the steps:
+
+| Family (v5) | RGB before (2026-11-12) | RGB now | Depth before | Depth now |
+|---|---|---|---|---|
+| InvertedPendulum | 153 / 133 | **0 / 0** | 105 / 124 | 32 / 45 |
+| InvertedDoublePendulum | 49 / 54 | 1 / **0** (v4: **0 / 0**) | 501 / 500 | 3 / 3 |
+| Reacher | 757 / 763 | 1 / 1 | 833 / 932 | 461 / 461 |
+| Pusher | 397 / 412 | 353 / 358 | 12 / 17 | 3 / 3 |
+| Swimmer | 5,590 / 5,585 | 5,533 / 5,527 | 532 / 542 | 30 / 40 |
+| HalfCheetah | 4,373 / 4,359 | 4,191 / 4,189 | 1,501 / 1,504 | 855 / 850 |
+| Walker2d | 23,899 / 24,104 | 23,701 / 23,946 | 2,023 / 2,034 | 820 / 812 |
+| Hopper | 32,251 / 32,249 | 32,124 / 32,082 | 3,818 / 3,840 | 32 / 24 |
+| Ant | 6,088 / 6,472 | 5,759 / 6,185 | 3,087 / 3,019 | 520 / 407 |
+| Humanoid | 36,334 / 36,576 | 36,128 / 36,362 | 524 / 539 | 13 / 22 |
+| HumanoidStandup | 34,750 / 34,902 | 34,504 / 34,679 | 1,992 / 1,974 | 530 / 513 |
+
+The baseline (`tests/Gym.Tests.Parity/Baselines/mujoco_frames.json`) and the MuJoCo goldens were re-recorded on
+2026-11-22 with these frames; InvertedPendulum's RGB cells now record 0, so the gate holds them to equality. The tie
+rule alone took Reacher from 173 pixels to 1 at both states, and every other family's edges by a few pixels.
+
+### 18.4 What is left, by cause
+
+The diagnostic splits the remaining RGB differences into edges (samples from several triangles) and interiors (one
+triangle): the textured floors' families are mostly interior (HalfCheetah 4,050 of 4,192, Walker2d 23,364 of 23,701),
+Reacher and Pusher mostly edges, the Humanoids and Hopper about half and half. Sample by sample against Gymnasium's
+buffer (Reacher, InvertedDoublePendulum), these causes show:
+
+- **Edge coverage**: near a shared edge inside a capsule's mesh the GPU gave a sample to the other triangle; the
+  measured tie rule settled every such sample in Reacher. Every clip-space triangle of InvertedDoublePendulum and
+  Reacher is now the GPU's bit for bit (transform feedback around MuJoCo's own `mjr_render`), and so is the window
+  position and its snap. InvertedDoublePendulum's last pixel is a sliver of 0.005 square pixels at the pole's cap that
+  the GPU draws and Gym.NET culls: its facing is the sign of a float32 shoelace sum, which rounds a sliver's area to
+  zero or the wrong side (the next step).
+- **Interior shading by one level**: the fixed-function lighting the driver compiles (normalization, the specular
+  power, the colour sum) and the attribute interpolation in the shader core, which uses the shader's own reciprocal and
+  special functions.
+- **Textures** (the floors): texture coordinates as the shader core interpolates them, the level of detail (still a
+  fitted derivative length, `lod_norm` 701 of 722), the GPU's mipmap chain (10, 4 and 2 texels off at levels 3 to 5) and
+  the trilinear blend.
+- **Depth**: the GPU evaluates the plane per 4×4-pixel tile from a tile value that can sit up to about a sixteenth of an
+  ulp below the exact plane (on exact-slope triangles every 4×4 tile showed one consistent deficit; 8×8 tiles did not),
+  and its slopes carry setup errors of one to three ulps on general triangles; neither is modelled yet.
+- **Shadows and the reflection**: not yet examined on their own.

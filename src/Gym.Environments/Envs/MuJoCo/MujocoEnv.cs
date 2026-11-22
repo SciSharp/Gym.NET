@@ -27,7 +27,7 @@ namespace Gym.Environments.Envs.MuJoCo {
     ///     <para>
     ///         Footgun: only Gymnasium's 14 bundled models exist (<see cref="MjModel.FromXmlPath"/>), so an
     ///         <c>xml_file</c> that is a path is refused rather than compiled. Frames are Gym.NET's own drawing of the scene,
-    ///         compared with Gymnasium's and measured, not required equal (DR-62, DR-67).
+    ///         compared with Gymnasium's and brought to equality family by family (DR-62, DR-98).
     ///     </para>
     ///     <para>
     ///         Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/envs/mujoco/mujoco_env.py">gymnasium/envs/mujoco/mujoco_env.py</see>.

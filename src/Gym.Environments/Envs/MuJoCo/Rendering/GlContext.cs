@@ -100,9 +100,9 @@ namespace Gym.Environments.Envs.MuJoCo.Rendering {
     /// <remarks>
     ///     <para>
     ///     Arithmetic is float32, as the GPU's. What the GPU leaves to the driver is chosen the common way where it could
-    ///     not be measured: vertex positions snapped to 1/256 of a pixel, the top-left fill rule, depth interpolated per
-    ///     sample. Each is a place where a frame can differ from the GPU's by a level or a pixel at an edge, which DR-67 and
-    ///     DR-71 measure.
+    ///     not be measured: vertex positions snapped to 1/256 of a pixel, depth interpolated per
+    ///     sample. Each is a place where a frame can differ from the GPU's by a level or a pixel at an edge, which the frame
+    ///     cells measure until it is closed (DR-71, DR-98).
     ///     </para>
     ///     <para>
     ///     Where the reference GPU (an NVIDIA RTX 4060 Ti, driver 616.56, in MuJoCo's own GL context) was measured, its
@@ -111,8 +111,10 @@ namespace Gym.Environments.Envs.MuJoCo.Rendering {
     ///     sample, its texture coordinates at the centre; one level of detail per 2×2 pixel quad, from the differences at
     ///     the quad's lower-left pixel, with each derivative's length a fixed-point <c>max + 0.3442·min</c> (a fit) and
     ///     the level read from the GPU's own logarithm table in 1/256 steps; bilinear weights rounded to 1/256; the 12-bit
-    ///     route a colour takes into the 8-bit buffer (<see cref="ToUnorm8"/>), integer blending, and the resolve's
-    ///     <c>(sum + 1) / 4</c>. <c>tools/parity/mujoco/gpu_probe.py</c>
+    ///     route a colour takes into the 8-bit buffer (<see cref="ToUnorm8"/>), integer blending, the resolve
+    ///     (<see cref="MujocoFrame.ResolveFour"/>), the driver's matrix stack and the vertex transform
+    ///     (<see cref="GlMath.MultiplyDriver"/>, <see cref="GlMath.TransformGpu"/>), the viewport stage's reciprocal
+    ///     (<see cref="GlReciprocal"/>) and depths truncated where a cast rounds. <c>tools/parity/mujoco/gpu_probe.py</c>
     ///     re-measures each on the machine it runs on and scores these models against it.
     ///     </para>
     ///     <para>
@@ -309,9 +311,12 @@ namespace Gym.Environments.Envs.MuJoCo.Rendering {
         /// <summary>Restores the modelview matrix (<c>glPopMatrix</c>).</summary>
         internal void PopMatrix() => Modelview = _stack.Pop();
 
-        /// <summary>Right-multiplies the modelview matrix (<c>glMultMatrixf</c>).</summary>
+        /// <summary>
+        ///     Right-multiplies the modelview matrix (<c>glMultMatrixf</c>, and <c>glTranslatef</c>, <c>glScalef</c> and
+        ///     <c>glRotatef</c> given as their matrices) with the reference driver's pairwise sums (<see cref="GlMath.MultiplyDriver"/>).
+        /// </summary>
         /// <param name="m">The matrix, column-major.</param>
-        internal void MultModelview(float[] m) => Modelview = GlMath.Multiply(Modelview, m);
+        internal void MultModelview(float[] m) => Modelview = GlMath.MultiplyDriver(Modelview, m);
 
         /// <summary>Sets light <paramref name="i"/>'s position (<c>glLightfv(GL_POSITION)</c>), transformed by the current modelview.</summary>
         /// <param name="i">The light.</param>
@@ -374,11 +379,12 @@ namespace Gym.Environments.Envs.MuJoCo.Rendering {
             }
 
             // phase 1: clip coordinates and outcodes of every vertex
-            float[] mv = Modelview, mvp = GlMath.Multiply(Projection, mv);
+            // the GPU's own order: the projection times the modelview on the driver's side, then fused per vertex
+            float[] mv = Modelview, mvp = GlMath.MultiplyDriver(Projection, mv);
             float[] pos = mesh.P;
             for (int v = 0; v < n; v++) {
                 ref Vtx o = ref _vertices[v];
-                GlMath.Transform(mvp, pos[3 * v], pos[3 * v + 1], pos[3 * v + 2], 1, out o.X, out o.Y, out o.Z, out o.W);
+                GlMath.TransformGpu(mvp, pos[3 * v], pos[3 * v + 1], pos[3 * v + 2], 1, out o.X, out o.Y, out o.Z, out o.W);
                 int code = 0;
                 if (o.X < -o.W)
                     code |= 1;
@@ -393,7 +399,7 @@ namespace Gym.Environments.Envs.MuJoCo.Rendering {
                 if (o.Z > o.W)
                     code |= 32;
                 if (ClipPlane) {
-                    GlMath.Transform(mv, pos[3 * v], pos[3 * v + 1], pos[3 * v + 2], 1, out float ex, out float ey, out float ez, out float ew);
+                    GlMath.TransformGpu(mv, pos[3 * v], pos[3 * v + 1], pos[3 * v + 2], 1, out float ex, out float ey, out float ez, out float ew);
                     o.Clip = _clipPlane[0] * ex + _clipPlane[1] * ey + _clipPlane[2] * ez + _clipPlane[3] * ew;
                     if (o.Clip < 0)
                         code |= 64;
@@ -401,6 +407,17 @@ namespace Gym.Environments.Envs.MuJoCo.Rendering {
 
                 _outcodes[v] = code;
                 _needed[v] = false;
+            }
+
+            // the diagnostic's record of every triangle as drawn, before the rejection below
+            if (DebugClipTriangles != null) {
+                int first = 0;
+                foreach (int size in mesh.Sizes) {
+                    RecordClip(first, first + 1, first + 2);
+                    if (size == 4)
+                        RecordClip(first, first + 2, first + 3);
+                    first += size;
+                }
             }
 
             // phase 2: a triangle wholly outside one half-space of the clip volume yields no pixel (for any w); only
@@ -428,6 +445,16 @@ namespace Gym.Environments.Envs.MuJoCo.Rendering {
                 idx[1] = _triangles[i + 1];
                 idx[2] = _triangles[i + 2];
                 Triangle(idx);
+            }
+
+            void RecordClip(int a, int b, int c) {
+                foreach (int k in (ReadOnlySpan<int>)[a, b, c]) {
+                    ref Vtx o = ref _vertices[k];
+                    DebugClipTriangles.Add(o.X);
+                    DebugClipTriangles.Add(o.Y);
+                    DebugClipTriangles.Add(o.Z);
+                    DebugClipTriangles.Add(o.W);
+                }
             }
 
             void Keep(int a, int b, int c) {
@@ -461,7 +488,7 @@ namespace Gym.Environments.Envs.MuJoCo.Rendering {
                     continue;
                 float x = pos[3 * v], y = pos[3 * v + 1], z = pos[3 * v + 2];
                 ref Vtx o = ref _vertices[v];
-                GlMath.Transform(mv, x, y, z, 1, out float ex, out float ey, out float ez, out float ew);
+                GlMath.TransformGpu(mv, x, y, z, 1, out float ex, out float ey, out float ez, out float ew);
 
                 // colour: the vertex's own (the haze), else the current one; lit when lighting is on
                 float cr = Cr, cg = Cg, cb = Cb, ca = Ca;
@@ -503,7 +530,7 @@ namespace Gym.Environments.Envs.MuJoCo.Rendering {
                     u = 0;
                 }
 
-                GlMath.Transform(TextureMatrix, s, t, u, 1, out o.S, out o.T, out o.U, out o.Q);
+                GlMath.TransformGpu(TextureMatrix, s, t, u, 1, out o.S, out o.T, out o.U, out o.Q);
 
                 // unit 1: eye-linear planes
                 if (ShadowMap != null) {
@@ -598,9 +625,34 @@ namespace Gym.Environments.Envs.MuJoCo.Rendering {
             a = Math.Clamp(ColorMaterial ? ca : 1, 0, 1);
         }
 
+        /// <summary>
+        ///     A diagnostic for the frame-parity work (DR-98): when set, the id of the triangle that last wrote each sample's
+        ///     colour into <see cref="DebugTarget"/> (triangles numbered from 1 in drawing order), so a pixel that differs
+        ///     from the GPU's can be told apart as an edge (samples from several triangles) or an interior (one triangle).
+        ///     <see langword="null"/> in every product frame, which then pays one null check per written sample.
+        /// </summary>
+        internal int[]? DebugTriangleIds;
+
+        /// <summary>The target <see cref="DebugTriangleIds"/> records, its length that target's sample count; others are not recorded.</summary>
+        internal GlTarget? DebugTarget;
+
+        /// <summary>The number of the triangle being drawn, counted while <see cref="DebugTriangleIds"/> is set.</summary>
+        private int _debugTriangle;
+
+        /// <summary>
+        ///     A diagnostic for the frame-parity work (DR-98): when set, every triangle a mesh draws, before any rejection
+        ///     or clipping, as its three vertices' clip coordinates (x, y, z, w each), in drawing order, the quads split as
+        ///     the GPU splits them; compared with the vertices MuJoCo's own renderer sends, captured by transform feedback.
+        ///     <see langword="null"/> in every product frame.
+        /// </summary>
+        internal List<float>? DebugClipTriangles;
+
         /// <summary>Clips one triangle against the near, far and user planes, culls it and rasterizes what remains.</summary>
         /// <param name="idx">Its three vertex indices.</param>
         private void Triangle(Span<int> idx) {
+            // counted before any rejection, so ids stay stable across a change that culls or clips differently
+            if (DebugTriangleIds != null)
+                _debugTriangle++;
             Span<Vtx> poly = stackalloc Vtx[12];
             Span<Vtx> tmp = stackalloc Vtx[12];
             poly[0] = _vertices[idx[0]];
@@ -625,8 +677,11 @@ namespace Gym.Environments.Envs.MuJoCo.Rendering {
             // window coordinates
             Span<float> wx = stackalloc float[12], wy = stackalloc float[12], wz = stackalloc float[12], iw = stackalloc float[12];
             for (int i = 0; i < count; i++) {
-                float invW = 1 / poly[i].W;
-                // snap to the rasterizer's 1/256 sub-pixel grid
+                // the GPU's own reciprocal, not the rounded one: its window depth is z times this, rounded (DR-98)
+                float invW = GlReciprocal.Of(poly[i].W);
+                // snap to the rasterizer's 1/256 sub-pixel grid, ties to even, from ((x rcp(w) + 1) 0.5) size in
+                // float32: where the reference GPU puts a vertex (gpu_probe.py's snap, 200 of 200 coordinates located;
+                // measured with the viewport at the origin, as MuJoCo's frames have it)
                 wx[i] = MathF.Round((_vx + (poly[i].X * invW + 1) * 0.5f * _vw) * 256) / 256;
                 wy[i] = MathF.Round((_vy + (poly[i].Y * invW + 1) * 0.5f * _vh) * 256) / 256;
                 wz[i] = poly[i].Z * invW;
@@ -694,7 +749,7 @@ namespace Gym.Environments.Envs.MuJoCo.Rendering {
         };
 
         /// <summary>
-        ///     Rasterizes one triangle of a clipped polygon: coverage per sample (top-left rule), depth per sample, the
+        ///     Rasterizes one triangle of a clipped polygon: coverage per sample (the left-or-bottom tie rule), depth per sample, the
         ///     fragment's colour once per pixel at its centre (perspective-correct), then the per-sample tests and writes.
         /// </summary>
         /// <param name="v">The polygon's vertices.</param>
@@ -733,8 +788,8 @@ namespace Gym.Environments.Envs.MuJoCo.Rendering {
                 X0 = x0, Y0 = y0, X1 = x1, Y1 = y1, X2 = x2, Y2 = y2, InvArea = 1 / area,
                 Z0 = wz[i0], Z1 = wz[i1], Z2 = wz[i2], W0 = iw[i0], W1 = iw[i1], W2 = iw[i2],
                 A = v[i0], B = v[i1], C = v[i2], MinX = minX, MaxX = maxX,
-                // edge k runs from vertex k+1 to vertex k+2; a sample exactly on it counts for top and left edges
-                Tl0 = TopLeft(x1, y1, x2, y2), Tl1 = TopLeft(x2, y2, x0, y0), Tl2 = TopLeft(x0, y0, x1, y1),
+                // edge k runs from vertex k+1 to vertex k+2; a sample exactly on it counts for left and bottom edges
+                Tl0 = LeftOrBottom(x1, y1, x2, y2), Tl1 = LeftOrBottom(x2, y2, x0, y0), Tl2 = LeftOrBottom(x0, y0, x1, y1),
                 // only colour writes and the alpha test read the fragment's colour; depth and stencil passes skip it
                 NeedsColor = (ColorMask && tg.Color != null) || AlphaTest,
             };
@@ -787,7 +842,7 @@ namespace Gym.Environments.Envs.MuJoCo.Rendering {
             /// <summary>The columns to scan.</summary>
             public int MinX, MaxX;
 
-            /// <summary>Whether each edge is a top or left edge.</summary>
+            /// <summary>Whether a sample exactly on each edge counts as inside (<see cref="LeftOrBottom"/>).</summary>
             public bool Tl0, Tl1, Tl2;
 
             /// <summary>Whether the fragment's colour is needed.</summary>
@@ -853,7 +908,7 @@ namespace Gym.Environments.Envs.MuJoCo.Rendering {
                         any = true;
                         // depth is affine in window space; the edge values are exact, so the depth is the same
                         // whichever way the sample was found
-                        sampleZ[s] = (float)((a0 * t.Z0 + a1 * t.Z1 + a2 * t.Z2) * t.InvArea) + t.Offset;
+                        sampleZ[s] = TruncateToFloat((a0 * t.Z0 + a1 * t.Z1 + a2 * t.Z2) * t.InvArea) + t.Offset;
                     }
 
                     if (!any)
@@ -901,6 +956,22 @@ namespace Gym.Environments.Envs.MuJoCo.Rendering {
                     }
                 }
             }
+        }
+
+        /// <summary>
+        ///     A depth computed in double, cut to float32 toward zero, as the reference GPU stores an interpolated depth: it
+        ///     truncates where a cast rounds to nearest (DR-98, measured 2026-11-21 on exact-slope triangles: truncating the
+        ///     exact plane reproduced 94% to 100% of each triangle's samples, rounding about 47%; the rest is the GPU's
+        ///     per-4×4-tile evaluation, not modelled yet).
+        /// </summary>
+        /// <param name="value">The depth.</param>
+        /// <returns>The float32 nearest to <paramref name="value"/> not farther from zero; NaN stays NaN.</returns>
+        private static float TruncateToFloat(double value) {
+            float f = (float)value;
+            // the cast rounded away from zero: step back one float toward zero
+            if (Math.Abs((double)f) > Math.Abs(value))
+                f = f > 0 ? MathF.BitDecrement(f) : MathF.BitIncrement(f);
+            return f;
         }
 
         /// <summary>
@@ -963,7 +1034,7 @@ namespace Gym.Environments.Envs.MuJoCo.Rendering {
 
         /// <summary>
         ///     Narrows [<paramref name="lo"/>, <paramref name="hi"/>] to the pixels whose sample at
-        ///     (<c>px + offX</c>, <paramref name="sy"/>) lies inside the triangle under the top-left rule: each edge bounds
+        ///     (<c>px + offX</c>, <paramref name="sy"/>) lies inside the triangle under the left-or-bottom tie rule: each edge bounds
         ///     the span from one side, its crossing found by division and then stepped to the exact boundary by evaluating
         ///     the edge function, which is exact (every coordinate is a multiple of 1/256).
         /// </summary>
@@ -983,7 +1054,7 @@ namespace Gym.Environments.Envs.MuJoCo.Rendering {
         /// <param name="ay">The edge's start y.</param>
         /// <param name="bx">The edge's end x.</param>
         /// <param name="by">The edge's end y.</param>
-        /// <param name="topLeft">Whether a sample exactly on the edge counts.</param>
+        /// <param name="topLeft">Whether a sample exactly on the edge counts (<see cref="LeftOrBottom"/>).</param>
         /// <param name="sy">The sample row's y.</param>
         /// <param name="offX">The sample's offset in its pixel.</param>
         /// <param name="lo">The first column, narrowed.</param>
@@ -1022,13 +1093,24 @@ namespace Gym.Environments.Envs.MuJoCo.Rendering {
             }
         }
 
-        /// <summary>Whether an edge from (x0, y0) to (x1, y1) of a counter-clockwise triangle (y up) is a top or left edge.</summary>
+        /// <summary>
+        ///     Whether a sample lying exactly on an edge from (x0, y0) to (x1, y1) of a counter-clockwise triangle (window
+        ///     coordinates, y up) belongs to the triangle: on a left edge, or on a bottom edge, as the reference GPU decides
+        ///     ties in MuJoCo's lower-left window (its own top-left rule applied in its y-down raster, DR-98).
+        /// </summary>
         /// <param name="x0">Start x.</param>
         /// <param name="y0">Start y.</param>
         /// <param name="x1">End x.</param>
         /// <param name="y1">End y.</param>
-        /// <returns>True for a left edge (running down) or a top edge (horizontal, running left).</returns>
-        private static bool TopLeft(double x0, double y0, double x1, double y1) => y1 < y0 || (y1 == y0 && x1 < x0);
+        /// <returns>True for a left edge (running down) or a bottom edge (horizontal, running right).</returns>
+        /// <remarks>
+        ///     Measured on 2026-11-22: pixel centres on a shared vertical edge go to the triangle on its right, on a shared
+        ///     horizontal edge to the triangle above it, for either winding, and on sloped edges as this rule names
+        ///     (<c>tools/parity/mujoco/gpu_probe.py</c>'s <c>ties</c>: 1,648 of 1,648 centres, 14 directions). MuJoCo's
+        ///     capsules seen level put horizontal edges through sample rows, where the former top-left reading gave
+        ///     Reacher's far rail 172 edge pixels of the wrong triangle.
+        /// </remarks>
+        private static bool LeftOrBottom(double x0, double y0, double x1, double y1) => y1 < y0 || (y1 == y0 && x1 > x0);
 
         /// <summary>
         ///     The fragment of one pixel: its colour, unit 0's texture modulating it, unit 1's shadow compare modulating it,
@@ -1090,7 +1172,7 @@ namespace Gym.Environments.Envs.MuJoCo.Rendering {
                     Texture.Sample2D(s / q, t / q, GlTexture.LodSteps(rho), out tr, out tg, out tb);
                 } else {
                     // a cube map is sampled at level 0: the skybox is always magnified on screen, and a cube-textured
-                    // geom shrinks below a texel per pixel only far away (an approximation DR-67's measurement covers)
+                    // geom shrinks below a texel per pixel only far away (an approximation the frame cells' baseline covers)
                     Texture.SampleCube(s, t, u, 0, out tr, out tg, out tb);
                 }
 
@@ -1252,6 +1334,8 @@ namespace Gym.Environments.Envs.MuJoCo.Rendering {
 
             if (!ColorMask || tg.Color == null)
                 return;
+            if (DebugTriangleIds != null && ReferenceEquals(tg, DebugTarget))
+                DebugTriangleIds[k] = _debugTriangle;
             int o = 4 * k;
             byte[] px = tg.Color;
             byte sr = ToUnorm8(r), sg = ToUnorm8(g), sb = ToUnorm8(b), sa = ToUnorm8(a);

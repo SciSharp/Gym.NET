@@ -11,8 +11,8 @@ namespace Gym.Environments.Envs.MuJoCo {
     /// <summary>
     ///     Draws a MuJoCo env's frames (<c>MujocoRenderer</c>): the camera resolved as Gymnasium resolves it (a named camera,
     ///     an id, or the free camera with the env's default configuration), and the render modes <c>rgb_array</c>,
-    ///     <c>depth_array</c>, <c>rgbd_tuple</c> and <c>human</c>. Gym.NET draws the scene itself (DR-62); its frames are
-    ///     compared with Gymnasium's and the differences measured, not required equal (DR-67).
+    ///     <c>depth_array</c>, <c>rgbd_tuple</c> and <c>human</c>. Gym.NET draws the scene itself (DR-62), reproducing the
+    ///     reference GPU's arithmetic so its frames equal Gymnasium's, env family by env family (DR-98).
     /// </summary>
     /// <remarks>
     ///     Reference: <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/envs/mujoco/mujoco_rendering.py#L701">gymnasium/envs/mujoco/mujoco_rendering.py</see>.
@@ -142,11 +142,13 @@ namespace Gym.Environments.Envs.MuJoCo {
         /// <exception cref="IndexError">A visual option whose flag index is not an <c>mjtVisFlag</c>, with NumPy's message.</exception>
         /// <remarks>
         ///     <para>
-        ///     Frames are measured against Gymnasium's GPU frames, not required equal (DR-67, DR-71): lighting, textures,
-        ///     the floor's reflection, shadows and multisampling follow MuJoCo's classic renderer in software, with the
-        ///     reference GPU's measured rounding, and the rest of the GPU's choices still decide some pixels at edges and on
-        ///     distant textures (on 2026-11-12, 0.07% of InvertedPendulum-v5's pixels to 16% of Humanoid-v5's, nearly all by
-        ///     one level; depths bit for bit but for a few ulps). A 480×480 frame costs about 0.05 to 0.5 s of one desktop
+        ///     Frames are drawn to equal Gymnasium's GPU frames (DR-98): lighting, textures, the floor's reflection, shadows
+        ///     and multisampling follow MuJoCo's classic renderer in software, with the reference GPU's measured arithmetic
+        ///     (its resolve, its driver's matrix stack, its vertex transform and reciprocal, its truncated depths). On
+        ///     2026-11-22 InvertedPendulum's RGB frames were equal byte for byte (v4 and v5, and InvertedDoublePendulum-v4's);
+        ///     the other families still differ at edges and on distant textures (to 16% of Humanoid-v5's pixels, nearly all
+        ///     by one level), and depths in a few hundred values by an ulp; the frame cells gate each family on its measured
+        ///     baseline until it is equal (DR-71). A 480×480 frame costs about 0.05 to 0.5 s of one desktop
         ///     core's time spread over all cores, the shadow map (4096² depths per shadow light) a good part of it, so an
         ///     <c>rgb_array</c> loop renders far slower than it steps.
         ///     </para>
