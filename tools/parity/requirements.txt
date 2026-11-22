@@ -33,7 +33,7 @@ mujoco==4.0.0
 # computes a compared value.
 imageio==2.38.1
 packaging==26.0
-pillow==11.3.0
+pillow==13.0.0
 # Gymnasium's own runtime dependencies (pyproject.toml, "dependencies"). cloudpickle and typing-extensions are the
 # versions on the reference machine. farama-notifications is not installed there (gymnasium/__init__.py imports it
 # inside try/except, and it only prints release notices), so it is pinned to its latest release, 0.0.6; it never
