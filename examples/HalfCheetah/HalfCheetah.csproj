@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- HalfCheetah-v5 (decision DR-74): one seeded episode on its autopilot, headless or in MuJoCo's window, through
-       Gymnasium.Make; and the playable HalfCheetah, which moved here from tools/parity/mujoco/halfcheetah_poc/play: Gym.NET's
+  <!-- HalfCheetah-v5 (decision DR-74): one seeded episode played by Farama's TQC expert (DR-103) or on its autopilot,
+       headless or in MuJoCo's window, through Gymnasium.Make; and the playable HalfCheetah, which moved here from tools/parity/mujoco/halfcheetah_poc/play: Gym.NET's
        MuJoCo engine (compiled in from src/Gym.Environments/MuJoCo) in a Gym.NET viewer window, keyboard-driven or on the
        autopilot, which Augmented Random Search trained on the same engine. Gym.NET.sln builds it, so an API change that
        breaks it fails the build. -->
@@ -28,10 +28,12 @@
     <ProjectReference Include="..\..\src\Gym.Environments\Gym.Environments.csproj" />
   </ItemGroup>
 
-  <!-- MuJoCo's compiled HalfCheetah (the embedded model of DR-63) and the trained autopilot, next to the program. -->
+  <!-- MuJoCo's compiled HalfCheetah (the embedded model of DR-63), the trained autopilot, and Farama's TQC expert (a copy
+       of tests/Gym.Tests/Agents/HalfCheetah-v5.json, DR-103), next to the program. -->
   <ItemGroup>
     <None Include="..\..\src\Gym.Environments\Assets\mujoco\half_cheetah.json" Link="half_cheetah.json" CopyToOutputDirectory="PreserveNewest" />
     <None Include="policy.json" CopyToOutputDirectory="PreserveNewest" Condition="Exists('policy.json')" />
+    <None Include="expert.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <!-- Gym.NET's pygame-compatible rasterizer draws the game's frames; its Avalonia viewer shows them and reports the keys. -->
@@ -46,7 +48,7 @@
     <PackageReference Include="NumSharp" Version="0.81.0" />
   </ItemGroup>
 
-  <!-- NumSharp.Build weaves [NDScoped] (DR-80): the autopilot's episode method releases every array the episode creates
+  <!-- NumSharp.Build weaves [NDScoped] (DR-80): the episode methods release every array the episode creates
        when it returns, the way the guides release what an env returns. A build-time package only, kept out of the output. -->
   <ItemGroup>
     <PackageReference Include="NumSharp.Build" Version="0.81.0" PrivateAssets="all" />

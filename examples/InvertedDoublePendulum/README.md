@@ -1,7 +1,7 @@
-# InvertedDoublePendulum: two poles, one linear policy
+# InvertedDoublePendulum: Farama's SAC expert
 
-Two poles stacked on a cart, simulated by Gym.NET's MuJoCo engine. A linear policy, trained by Augmented Random Search
-on the same engine, holds both upright.
+Two poles stacked on a cart, simulated by Gym.NET's MuJoCo engine. A published expert agent, Farama's own, holds both
+upright.
 
 ```bash
 dotnet run --project examples/InvertedDoublePendulum -c Release                   # one episode, headless
@@ -14,19 +14,26 @@ Output, the same on every run since the reset is seeded and the agent has no ran
 CPU with FMA: [the numbers](../README.md#the-numbers) says why that matters):
 
 ```
-InvertedDoublePendulum-v5, seed 0: 1000 steps, return 9359.6, truncated by the time limit
+InvertedDoublePendulum-v5, seed 0: 1000 steps, return 9355.8, truncated by the time limit
 ```
 
 ## The agent
 
-`policy.json` holds the policy. Each step it normalizes the 9 observation entries by the mean and scale seen in
-training, weighs them into one force, and clips it to [-1, 1]: `a = clip(W · (s - mean) / scale, -1, 1) · high`.
-`tools/showreel`'s `train` command found it in 2 minutes on 32 threads (Augmented Random Search V2-t, Mania, Guy and
-Recht 2018). It holds both poles for all 1,000 steps on seeds 0-4, and the file's `info` records the training settings
-and those returns.
+`policy.json` holds the agent: Farama's SAC (Soft Actor-Critic) expert, the agent the Farama Foundation, Gymnasium's
+maintainers, trained on this env to record the Minari datasets. It comes from Hugging Face,
+[farama-minari/InvertedDoublePendulum-v5-SAC-expert](https://huggingface.co/farama-minari/InvertedDoublePendulum-v5-SAC-expert)
+at revision `8e4db31`, imported by `tools/agents/import_agents.py`, and is a copy of
+[`tests/Gym.Tests/Agents/InvertedDoublePendulum-v5.json`](../../tests/Gym.Tests/Agents/InvertedDoublePendulum-v5.json),
+where the tests measure it. It is a Stable-Baselines3 network of two dense layers of 256 with relu: each step it casts
+the observation to float32, runs it through the network, and squashes the result into the motors' range with tanh, as
+Stable-Baselines3's deterministic `predict` does.
 
 Gymnasium sets no camera for this env, and MuJoCo's free camera shows the poles small, so `--render` and `--play` pass a
 closer `default_camera_config` (2.6 m away, looking at the poles' middle). It changes the view, never the dynamics.
+
+Over seeds 0-9 it scores 9,356.0 in Gym.NET (every seed holds both poles all 1,000 steps); the model card reports
+9356.02 +/- 0.06. The model repository states no licence; its training code is MIT. Gym.NET commits the weights with
+this attribution, on the maintainer's decision (DR-103).
 
 ## Watching and playing
 
@@ -45,9 +52,10 @@ episode ends; Escape or the window's close button quits.
 
 ## The API it shows
 
-- `Gymnasium.Make<NDArray, NDArray>(id, new { render_mode = "human", default_camera_config = ... })`: a dictionary
-  keyword argument, by MuJoCo's camera field names
-- `((Box)env.ActionSpace).High`: the action bounds the policy scales its outputs by
+- `ExpertPolicy.Load(path)` and `policy.Act(observation)`: the agent's network, a new float32 action each step (released
+  with the episode's other arrays by `[NDScoped]`)
+- `policy.MakeArguments(...)`: the agent's own constructor arguments plus the render mode, for `Gymnasium.Make<NDArray,
+  NDArray>(id, kwargs)`
 - `env.Reset(seed: s)` and `env.Step(action)`: their results own the arrays they hold (D19), so the example releases
   each one once the agent has acted on it
 

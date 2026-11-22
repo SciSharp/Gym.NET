@@ -5,24 +5,37 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Gym.Envs;
 using Gym.Observations;
 using Gym.Rendering.Avalonia;
-using Gym.Spaces;
 using NumSharp;
 
 namespace Gym.Examples.HumanoidStandup {
     /// <summary>
-    ///     Makes HumanoidStandup-v5's humanoid work its way up from the floor with a linear policy trained by Augmented
-    ///     Random Search. <c>dotnet run --project examples/HumanoidStandup -c Release</c> plays one seeded episode
-    ///     headless and prints its steps and return; <c>-- --render</c> plays it in a window.
+    ///     Plays HumanoidStandup-v5 with Farama's SAC expert, a published Stable-Baselines3 agent. <c>dotnet run
+    ///     --project examples/HumanoidStandup -c Release</c> plays one seeded episode headless and prints its steps and
+    ///     return; <c>-- --render</c> plays it in a window.
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///     <c>policy.json</c> holds the policy: the observation, normalized by the mean and scale seen in training,
-    ///     weighted into one command per motor and clipped to the motor's range (<see cref="LinearPolicy"/>).
-    ///     <c>tools/showreel</c>'s <c>train</c> command found it in 6 minutes on 32 threads (Augmented Random Search
-    ///     V2-t, Mania, Guy and Recht 2018); it is scored over all 1,000 steps (HumanoidStandup never ends early).
+    ///     <c>policy.json</c> holds the agent (<see cref="ExpertPolicy"/>): Farama's SAC expert, the agent the Farama
+    ///     Foundation, Gymnasium's maintainers, trained on this env to record the Minari datasets, imported from
+    ///     Hugging Face (<c>farama-minari/HumanoidStandup-v5-SAC-expert</c> at revision <c>a8a03ed</c>) by
+    ///     <c>tools/agents/import_agents.py</c>. A Stable-Baselines3 network of two dense layers of 256 with relu: each
+    ///     step it casts the observation to float32 and squashes the result into the motors' range with tanh. Over
+    ///     seeds 0-9 it scores 400,097.0 in Gym.NET (every seed stands up within a second and stays up); the model card
+    ///     reports 395485.91 +/- 33309.92.
+    ///     </para>
+    ///     <para>
+    ///     The expert was trained seeing positions and velocities only: the file's <c>make_kwargs</c> turns off
+    ///     HumanoidStandup's four other observation groups (inertias, velocities, actuator forces and contact forces),
+    ///     and <see cref="ExpertPolicy.MakeArguments"/> passes them to make. They change what the agent sees, never the
+    ///     dynamics.
+    ///     </para>
+    ///     <para>
+    ///     The model repository states no licence; its training code is MIT. Gym.NET commits the weights with this
+    ///     attribution, on the maintainer's decision (DR-103).
     ///     </para>
     ///     <para>
     ///     The default seed, 0, is the episode the front-page showreel plays (<c>tools/showreel</c>, DR-74).
@@ -86,33 +99,23 @@ namespace Gym.Examples.HumanoidStandup {
         /// </remarks>
         [NDScoped]
         private static (int Steps, double Return, string Ending) PlayEpisode(long seed, bool render) {
+            // The agent first: its file names the constructor arguments the env needs for the agent to see what it
+            // was trained on.
+            ExpertPolicy policy = ExpertPolicy.Load(Path.Combine(AppContext.BaseDirectory, "policy.json"));
             // make's stack: TimeLimit over OrderEnforcing over PassiveEnvChecker over the env. The render mode is a
             // constructor argument, fixed for the env's life, as in Gymnasium.
-            using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>(Id, render ? new { render_mode = "human" } : null);
-            LinearPolicy policy = LinearPolicy.Load(Path.Combine(AppContext.BaseDirectory, "policy.json"));
-            double[] high = ActionHigh(env);
+            using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>(Id, policy.MakeArguments(render));
             NDArray observation = env.Reset(seed: seed).Observation;
             int steps = 0;
             double total = 0;
             while (true) {
-                StepResult<NDArray> step = env.Step(policy.Act(observation, high));
+                StepResult<NDArray> step = env.Step(policy.Act(observation));
                 observation = step.Observation;
                 steps++;
                 total += step.Reward;
                 if (step.Terminated || step.Truncated)
                     return (steps, total, step.Terminated ? "terminated" : "truncated by the time limit");
             }
-        }
-
-        /// <summary>
-        ///     The action space's upper bound per motor, as float64: the policy scales its [-1, 1] outputs by it.
-        /// </summary>
-        /// <param name="env">The env, whose action space is a <see cref="Box"/>.</param>
-        /// <returns>One bound per motor.</returns>
-        private static double[] ActionHigh(IEnv env) {
-            // High is the space's own array: read a converted copy and leave the space's untouched.
-            using NDArray high = ((Box)env.ActionSpace).High.astype(NPTypeCode.Double);
-            return high.ToArray<double>();
         }
 
         /// <summary>Reads a whole-number option's value, or the fallback when the option is absent.</summary>
@@ -137,89 +140,202 @@ namespace Gym.Examples.HumanoidStandup {
     }
 
     /// <summary>
-    ///     A linear policy over normalized observations, the kind Augmented Random Search trains:
-    ///     <c>a_i = clip(sum_j W_ij (s_j - mean_j) / scale_j, -1, 1) * high_i</c>, rounded to float32.
+    ///     A published expert agent read from <c>policy.json</c> (DR-103): the deterministic actor network of a
+    ///     Stable-Baselines3 model, which maps an observation to the action its <c>predict(deterministic=True)</c>
+    ///     takes.
     /// </summary>
     /// <remarks>
-    ///     The arithmetic is the trainer's own, term by term in the same order (<c>tools/showreel/LinearPolicy.cs</c>):
-    ///     a different summation order, a BLAS dot product say, rounds differently, and over a 1,000-step episode of
-    ///     chaotic physics the trajectory drifts away from the one the policy was scored on.
+    ///     <para>
+    ///     The file holds the network's dense layers (base64 of little-endian float32 values, each weight row-major
+    ///     <c>outputs x inputs</c> as PyTorch's <c>nn.Linear</c> stores it), the activation after each, how the last
+    ///     layer's values become the action (<c>tanh-rescale</c> for SAC and TQC, <c>clip</c> for PPO), and the
+    ///     constructor arguments the env must be made with for the agent to see what it was trained on
+    ///     (<c>make_kwargs</c>). It is a copy of the agent in <c>tests/Gym.Tests/Agents</c>, written by
+    ///     <c>tools/agents/import_agents.py</c>, and this reader a copy of that folder's <c>ExpertPolicy</c>: every
+    ///     example keeps its agent's code to itself (DR-74).
+    ///     </para>
+    ///     <para>
+    ///     It computes as PyTorch does: the observation is cast to float32, each dot product is summed in float64, and
+    ///     every layer's output is rounded to float32. An action can still differ from PyTorch's in its last bit, and
+    ///     over a long episode of chaotic physics a last bit grows into a different trajectory, as good as the first.
+    ///     </para>
     /// </remarks>
-    internal sealed class LinearPolicy {
-        /// <summary>The weights, row-major: one row of <see cref="_inputs"/> per motor.</summary>
-        private readonly double[] _weights;
+    internal sealed class ExpertPolicy {
+        /// <summary>The widest layer the stack scratch holds; the published agents' widest is 400.</summary>
+        private const int MaxWidth = 1024;
 
-        /// <summary>The observation mean, subtracted before the weights.</summary>
-        private readonly double[] _mean;
+        /// <summary>The dense layers, input layer first.</summary>
+        private readonly Layer[] _layers;
 
-        /// <summary>The observation scale, divided by before the weights (a standard deviation plus 1e-8).</summary>
-        private readonly double[] _scale;
+        /// <summary>The action space's lower bounds, as the model saved them.</summary>
+        private readonly float[] _low;
 
-        /// <summary>The observation size.</summary>
-        private readonly int _inputs;
+        /// <summary>The action space's upper bounds.</summary>
+        private readonly float[] _high;
 
-        /// <summary>The number of motors.</summary>
-        private readonly int _outputs;
+        /// <summary>
+        ///     Whether the output is squashed by tanh and rescaled to the bounds (SAC, TQC), rather than clipped (PPO).
+        /// </summary>
+        private readonly bool _squash;
 
-        /// <summary>Creates a policy from its parts.</summary>
-        /// <param name="inputs">The observation size.</param>
-        /// <param name="outputs">The number of motors.</param>
-        /// <param name="weights">The row-major weights.</param>
-        /// <param name="mean">The observation mean.</param>
-        /// <param name="scale">The observation scale.</param>
-        private LinearPolicy(int inputs, int outputs, double[] weights, double[] mean, double[] scale) {
-            _inputs = inputs;
-            _outputs = outputs;
-            _weights = weights;
-            _mean = mean;
-            _scale = scale;
+        /// <summary>
+        ///     The constructor arguments the agent's env needs (<c>make_kwargs</c>); none for most agents.
+        /// </summary>
+        private readonly Dictionary<string, object?> _makeKwargs;
+
+        /// <summary>Creates an agent from its parsed parts; <see cref="Load"/> is the way in.</summary>
+        /// <param name="layers">The dense layers.</param>
+        /// <param name="low">The lower bounds.</param>
+        /// <param name="high">The upper bounds.</param>
+        /// <param name="squash">Whether the output is tanh-squashed.</param>
+        /// <param name="makeKwargs">The constructor arguments.</param>
+        private ExpertPolicy(Layer[] layers, float[] low, float[] high, bool squash, Dictionary<string, object?> makeKwargs) {
+            _layers = layers;
+            _low = low;
+            _high = high;
+            _squash = squash;
+            _makeKwargs = makeKwargs;
+        }
+
+        /// <summary>Reads the agent's file.</summary>
+        /// <param name="path">The <c>policy.json</c> file.</param>
+        /// <returns>The agent.</returns>
+        /// <exception cref="IOException">The file cannot be read.</exception>
+        /// <exception cref="JsonException">It is not JSON.</exception>
+        /// <exception cref="InvalidDataException">
+        ///     It is not a <c>gym.net-agent/1</c> file, a layer's sizes do not chain, an array has the wrong length, or
+        ///     an activation, output mode or constructor argument is of an unknown kind.
+        /// </exception>
+        public static ExpertPolicy Load(string path) {
+            JsonNode root = JsonNode.Parse(File.ReadAllText(path)) ?? throw new JsonException($"{path}: empty");
+            if (root["format"]?.GetValue<string>() != "gym.net-agent/1")
+                throw new InvalidDataException($"{path}: not a gym.net-agent/1 file");
+            Layer[] layers = root["layers"]!.AsArray().Select(n => Layer.Parse(n!, path)).ToArray();
+            for (int i = 1; i < layers.Length; i++)
+                if (layers[i].Inputs != layers[i - 1].Outputs)
+                    throw new InvalidDataException($"{path}: layer {i} takes {layers[i].Inputs} inputs, layer {i - 1} gives {layers[i - 1].Outputs}");
+            if (layers.Any(l => l.Outputs > MaxWidth))
+                throw new InvalidDataException($"{path}: a layer is wider than {MaxWidth}");
+            float[] Bounds(string name) {
+                if (root[name] is not JsonArray array || array.Count != layers[^1].Outputs)
+                    throw new InvalidDataException($"{path}: '{name}' must hold {layers[^1].Outputs} numbers");
+                return array.Select(v => (float)v!.GetValue<double>()).ToArray();
+            }
+
+            bool squash = root["output"]?.GetValue<string>() switch {
+                "tanh-rescale" => true,
+                "clip" => false,
+                var other => throw new InvalidDataException($"{path}: unknown output '{other}'"),
+            };
+            var kwargs = new Dictionary<string, object?>();
+            if (root["make_kwargs"] is JsonObject make)
+                foreach (var (name, value) in make)
+                    kwargs[name] = value?.GetValueKind() switch {
+                        JsonValueKind.True => true,
+                        JsonValueKind.False => false,
+                        JsonValueKind.Number => value.GetValue<double>(),
+                        JsonValueKind.String => value.GetValue<string>(),
+                        _ => throw new InvalidDataException($"{path}: make_kwargs '{name}' must be a bool, number or string"),
+                    };
+            return new ExpertPolicy(layers, Bounds("action_low"), Bounds("action_high"), squash, kwargs);
         }
 
         /// <summary>
-        ///     Reads a policy file: <c>inputs</c>, <c>outputs</c>, the row-major <c>weights</c>, <c>mean</c> and
-        ///     <c>scale</c>.
+        ///     The keyword arguments to make the env with: the agent's own (<c>make_kwargs</c>: HumanoidStandup's
+        ///     expert sees positions and velocities only), and for a window, human mode and the view's arguments.
         /// </summary>
-        /// <param name="path">The JSON file.</param>
-        /// <returns>The policy.</returns>
-        /// <exception cref="System.IO.IOException">The file cannot be read.</exception>
-        /// <exception cref="JsonException">It is not JSON.</exception>
-        /// <exception cref="KeyNotFoundException">A field is missing.</exception>
-        /// <exception cref="InvalidOperationException">A field has the wrong JSON type.</exception>
-        /// <exception cref="InvalidDataException">An array's length does not match the sizes.</exception>
-        public static LinearPolicy Load(string path) {
-            using JsonDocument document = JsonDocument.Parse(File.ReadAllText(path));
-            JsonElement root = document.RootElement;
-            int inputs = root.GetProperty("inputs").GetInt32(), outputs = root.GetProperty("outputs").GetInt32();
-            double[] Read(string name, int length) {
-                double[] values = root.GetProperty(name).EnumerateArray().Select(v => v.GetDouble()).ToArray();
-                return values.Length == length ? values : throw new InvalidDataException($"{path}: {name} has {values.Length} numbers, {length} expected");
+        /// <param name="human">Whether the env renders into a window (<c>render_mode="human"</c>).</param>
+        /// <param name="view">
+        ///     Arguments that change only what the window shows (a camera), added in human mode; or null.
+        /// </param>
+        /// <returns>A new dictionary for <c>Gymnasium.Make</c>.</returns>
+        public Dictionary<string, object?> MakeArguments(bool human, IReadOnlyDictionary<string, object?>? view = null) {
+            var arguments = new Dictionary<string, object?>(_makeKwargs);
+            if (human) {
+                arguments["render_mode"] = "human";
+                if (view is not null)
+                    foreach (var (name, value) in view)
+                        arguments[name] = value;
             }
-
-            return new LinearPolicy(inputs, outputs, Read("weights", inputs * outputs), Read("mean", inputs), Read("scale", inputs));
+            return arguments;
         }
 
         /// <summary>The action for an observation.</summary>
-        /// <param name="observation">The env's observation, read as float64.</param>
-        /// <param name="high">The action space's upper bound per motor.</param>
-        /// <returns>A new float32 array of one torque per motor; the caller disposes it.</returns>
-        /// <exception cref="ArgumentException">The observation's size is not the policy's.</exception>
-        public NDArray Act(NDArray observation, double[] high) {
-            double[] s;
-            using (NDArray values = observation.astype(NPTypeCode.Double))
-                s = values.ToArray<double>();
-            if (s.Length != _inputs)
-                throw new ArgumentException($"the policy reads {_inputs} numbers, the observation has {s.Length}", nameof(observation));
-            var action = new float[_outputs];
-            for (int i = 0; i < _outputs; i++) {
-                double sum = 0;
-                for (int j = 0; j < _inputs; j++)
-                    sum += _weights[i * _inputs + j] * ((s[j] - _mean[j]) / _scale[j]);
-                // Comparisons rather than Math.Clamp, so a NaN passes through as the trainer's arithmetic passes it.
-                double clipped = sum < -1.0 ? -1.0 : sum > 1.0 ? 1.0 : sum;
-                action[i] = (float)(clipped * high[i]);
+        /// <param name="observation">The env's observation (float64 for MuJoCo, float32 for Box2D).</param>
+        /// <returns>A new float32 array of one command per motor.</returns>
+        /// <exception cref="ArgumentException">The observation's length is not the network's.</exception>
+        public NDArray Act(NDArray observation) {
+            float[] input;
+            // Cast to float32 first, as Stable-Baselines3 casts what the env returns.
+            using (NDArray values = observation.astype(NPTypeCode.Single))
+                input = values.ToArray<float>();
+            if (input.Length != _layers[0].Inputs)
+                throw new ArgumentException($"the agent reads {_layers[0].Inputs} numbers, the observation has {input.Length}", nameof(observation));
+            // Two stack buffers alternate as layer input and output: a forward pass allocates nothing but the action.
+            Span<float> a = stackalloc float[MaxWidth], b = stackalloc float[MaxWidth];
+            scoped ReadOnlySpan<float> x = input;
+            for (int l = 0; l < _layers.Length; l++) {
+                Span<float> y = (l % 2 == 0 ? a : b)[.._layers[l].Outputs];
+                _layers[l].Forward(x, y);
+                x = y;
+            }
+            var action = new float[_low.Length];
+            // Stable-Baselines3's deterministic predict: unscale a tanh-squashed output, or clip an unsquashed one.
+            for (int i = 0; i < action.Length; i++)
+                action[i] = _squash ? _low[i] + 0.5f * (MathF.Tanh(x[i]) + 1f) * (_high[i] - _low[i]) : Math.Clamp(x[i], _low[i], _high[i]);
+            return np.array(action);
+        }
+
+        /// <summary>One dense layer: <c>y = activation(W x + b)</c> in float32, each sum taken in float64.</summary>
+        /// <param name="Inputs">Its input width.</param>
+        /// <param name="Outputs">Its output width.</param>
+        /// <param name="Weight">The weights, row-major <c>Outputs x Inputs</c>.</param>
+        /// <param name="Bias">The biases.</param>
+        /// <param name="Activation"><c>relu</c>, <c>tanh</c> or <c>none</c>.</param>
+        private sealed record Layer(int Inputs, int Outputs, float[] Weight, float[] Bias, string Activation) {
+            /// <summary>Computes the layer's output.</summary>
+            /// <param name="input">The input, <see cref="Inputs"/> values.</param>
+            /// <param name="output">Receives <see cref="Outputs"/> values.</param>
+            public void Forward(ReadOnlySpan<float> input, Span<float> output) {
+                for (int o = 0; o < Outputs; o++) {
+                    double sum = Bias[o];
+                    for (int i = 0; i < Inputs; i++)
+                        sum += (double)Weight[o * Inputs + i] * input[i];
+                    // Rounded to float32 before the activation, as a float32 tensor holds the pre-activation.
+                    float y = (float)sum;
+                    output[o] = Activation switch {
+                        "relu" => y > 0 ? y : 0,
+                        "tanh" => MathF.Tanh(y),
+                        _ => y,
+                    };
+                }
             }
 
-            return np.array(action);
+            /// <summary>Reads a layer from its JSON object.</summary>
+            /// <param name="node">The layer object.</param>
+            /// <param name="path">The file, for errors.</param>
+            /// <returns>The layer.</returns>
+            /// <exception cref="InvalidDataException">
+            ///     The sizes and the arrays disagree, or the activation is unknown.
+            /// </exception>
+            /// <exception cref="FormatException">An array is not base64.</exception>
+            public static Layer Parse(JsonNode node, string path) {
+                int inputs = node["inputs"]!.GetValue<int>(), outputs = node["outputs"]!.GetValue<int>();
+                string activation = node["activation"]!.GetValue<string>();
+                if (activation is not ("relu" or "tanh" or "none"))
+                    throw new InvalidDataException($"{path}: unknown activation '{activation}'");
+                float[] Decode(string field, int count) {
+                    byte[] bytes = Convert.FromBase64String(node[field]!.GetValue<string>());
+                    if (bytes.Length != count * 4)
+                        throw new InvalidDataException($"{path}: '{field}' holds {bytes.Length / 4} values, not {count}");
+                    var values = new float[count];
+                    // Little-endian in the file; .NET runs little-endian on every platform it supports.
+                    Buffer.BlockCopy(bytes, 0, values, 0, bytes.Length);
+                    return values;
+                }
+
+                return new Layer(inputs, outputs, Decode("weight", inputs * outputs), Decode("bias", outputs), activation);
+            }
         }
     }
 }

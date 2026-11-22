@@ -1,35 +1,35 @@
-# Pusher: steering the fingertip
+# Pusher: Farama's SAC expert
 
-A seven-joint arm has to push a puck to a goal on a table. The agent does not think in joints: it steers the fingertip,
-and lets the arm's Jacobian turn that into seven torques.
+A seven-joint arm has to push a puck to a goal on a table. A published expert agent, Farama's own, sweeps to the puck
+and pushes it into the goal.
 
 ```bash
 dotnet run --project examples/Pusher -c Release                   # one episode, headless
 dotnet run --project examples/Pusher -c Release -- --render       # the same episode in a window
-dotnet run --project examples/Pusher -c Release -- --episodes 5   # seeds 73-77, and their mean
+dotnet run --project examples/Pusher -c Release -- --episodes 5   # seeds 7-11, and their mean
 ```
 
 Output, the same on every run since the reset is seeded and the agent has no randomness of its own (measured on an x64
 CPU with FMA: [the numbers](../README.md#the-numbers) says why that matters):
 
 ```
-Pusher-v5, seed 73: 100 steps, return -39.0, truncated by the time limit
+Pusher-v5, seed 7: 100 steps, return -20.4, truncated by the time limit
 ```
 
 ## The agent
 
-Three phases: hover behind the puck, on the line from the goal through it; descend to the puck's height; push toward a
-point just past the puck. Losing the puck sideways sends the agent back to hovering. The torques are `Jᵀ (kp (target -
-tip) - kd · tip velocity) - 0.3 q̇`, clipped to the motors' ±2.
+`policy.json` holds the agent: Farama's SAC (Soft Actor-Critic) expert, the agent the Farama Foundation, Gymnasium's
+maintainers, trained on this env to record the Minari datasets. It comes from Hugging Face,
+[farama-minari/Pusher-v5-SAC-expert](https://huggingface.co/farama-minari/Pusher-v5-SAC-expert) at revision `3e10360`,
+imported by `tools/agents/import_agents.py`, and is a copy of
+[`tests/Gym.Tests/Agents/Pusher-v5.json`](../../tests/Gym.Tests/Agents/Pusher-v5.json), where the tests measure it. It
+is a Stable-Baselines3 network of two dense layers of 256 with relu: each step it casts the observation to float32, runs
+it through the network, and squashes the result into the motors' range with tanh, as Stable-Baselines3's deterministic
+`predict` does.
 
-The fingertip's 3×7 Jacobian comes from finite differences of the forward kinematics, on a scratch copy of the
-simulation (`MjData`), and every position is read from that copy. After a step, MuJoCo's body positions (`xpos`) still
-describe the step's start while the joint positions (`qpos`) have moved on, so differencing one against the other gives
-a wrong Jacobian.
-
-It does not solve Pusher: the point behind the puck often lies inside the reach the arm's joint limits forbid. Over
-seeds 0-199 its best episode, seed 73 (the default), leaves the puck 0.145 from the goal. A linear policy trained by
-Augmented Random Search barely moved the arm (-46.7).
+Over seeds 0-9 it scores -28.0 in Gym.NET (seed 7, the default, puts the puck in the goal for -20.4); the model card
+reports -22.05 +/- 2.69. The model repository states no licence; its training code is MIT. Gym.NET commits the weights
+with this attribution, on the maintainer's decision (DR-103).
 
 ## Watching and playing
 
@@ -41,9 +41,10 @@ default: when the window falls behind real time, D turns "render every frame" of
 
 ## The API it shows
 
-- `(MujocoEnv)env.Unwrapped`: the env under `make`'s wrappers, with its `Model` and `Data`
-- `new MjData(model)`, `Mujoco.MjSetState`, `Mujoco.MjKinematics`, `data.Body(name).Xpos`: MuJoCo's own functions, under
-  Gym.NET's names (DR-68)
+- `ExpertPolicy.Load(path)` and `policy.Act(observation)`: the agent's network, a new float32 action each step (released
+  with the episode's other arrays by `[NDScoped]`)
+- `policy.MakeArguments(...)`: the agent's own constructor arguments plus the render mode, for `Gymnasium.Make<NDArray,
+  NDArray>(id, kwargs)`
 - `env.Reset(seed: s)` and `env.Step(action)`: their results own the arrays they hold (D19), so the example releases
   each one once the agent has acted on it
 
@@ -59,3 +60,5 @@ dotnet add package Gym.NET.Rendering.Avalonia  # only for --render and --play
 
 and drop the `Import` of `Gym.NET.Environments.targets` from the project file: the package brings it, and it registers
 the built-in environment ids before `Main` runs.
+
+Copy `policy.json` along with the code.

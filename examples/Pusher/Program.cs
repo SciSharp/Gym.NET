@@ -2,40 +2,37 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Linq;
-using Gym.Environments.Envs.MuJoCo;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using Gym.Envs;
-using Gym.MuJoCo;
 using Gym.Observations;
 using Gym.Rendering.Avalonia;
 using NumSharp;
 
 namespace Gym.Examples.Pusher {
     /// <summary>
-    ///     Sweeps Pusher-v5's arm to the puck and nudges it toward the goal with operational-space control of the
-    ///     fingertip. <c>dotnet run --project examples/Pusher -c Release</c> plays one seeded episode headless and
-    ///     prints its steps and return; <c>-- --render</c> plays it in a window.
+    ///     Plays Pusher-v5 with Farama's SAC expert, a published Stable-Baselines3 agent. <c>dotnet run --project
+    ///     examples/Pusher -c Release</c> plays one seeded episode headless and prints its steps and return; <c>--
+    ///     --render</c> plays it in a window.
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///     The agent steers the fingertip (the body <c>tips_arm</c>) rather than the seven joints: hover behind the
-    ///     puck on the line from the goal through it, descend, then push toward a point just past the puck; losing the
-    ///     puck sideways sends it back to hovering. The torques are <c>J^T (kp (target - tip) - kd tip_velocity) - 0.3
-    ///     q_dot</c>, clipped to the motors' ±2, with the fingertip's 3x7 Jacobian taken by finite differences of the
-    ///     kinematics.
+    ///     <c>policy.json</c> holds the agent (<see cref="ExpertPolicy"/>): Farama's SAC expert, the agent the Farama
+    ///     Foundation, Gymnasium's maintainers, trained on this env to record the Minari datasets, imported from
+    ///     Hugging Face (<c>farama-minari/Pusher-v5-SAC-expert</c> at revision <c>3e10360</c>) by
+    ///     <c>tools/agents/import_agents.py</c>. A Stable-Baselines3 network of two dense layers of 256 with relu: each
+    ///     step it casts the observation to float32 and squashes the result into the motors' range with tanh. Over
+    ///     seeds 0-9 it scores -28.0 in Gym.NET (seed 7, the default, puts the puck in the goal for -20.4); the model
+    ///     card reports -22.05 +/- 2.69.
     ///     </para>
     ///     <para>
-    ///     The Jacobian uses a scratch copy of the simulation (<c>MjData</c>) and reads every position from it: after a
-    ///     step, MuJoCo's body positions (<c>xpos</c>) still describe the step's start while the joint positions
-    ///     (<c>qpos</c>) have moved on, so differencing one against the other gives a wrong Jacobian.
+    ///     The model repository states no licence; its training code is MIT. Gym.NET commits the weights with this
+    ///     attribution, on the maintainer's decision (DR-103).
     ///     </para>
     ///     <para>
-    ///     It does not solve Pusher: the point behind the puck often lies inside the reach the arm's joint limits
-    ///     forbid. Over seeds 0-199 its best episode, seed 73, leaves the puck 0.145 from the goal (return -39.0),
-    ///     where a linear policy trained by Augmented Random Search barely moved the arm (-46.7).
-    ///     </para>
-    ///     <para>
-    ///     The default seed, 73, is the episode the front-page showreel plays (<c>tools/showreel</c>, DR-74).
+    ///     The default seed, 7, is the episode the front-page showreel plays (<c>tools/showreel</c>, DR-74).
     ///     </para>
     /// </remarks>
     internal static class Program {
@@ -43,7 +40,7 @@ namespace Gym.Examples.Pusher {
         private const string Id = "Pusher-v5";
 
         /// <summary>The first reset seed when <c>--seed</c> is not given: the episode the showreel plays.</summary>
-        private const long DefaultSeed = 73;
+        private const long DefaultSeed = 7;
 
         /// <summary>Plays the episodes the arguments ask for with the agent.</summary>
         /// <param name="args">
@@ -96,137 +93,22 @@ namespace Gym.Examples.Pusher {
         /// </remarks>
         [NDScoped]
         private static (int Steps, double Return, string Ending) PlayEpisode(long seed, bool render) {
+            // The agent first: its file names the constructor arguments the env needs for the agent to see what it
+            // was trained on.
+            ExpertPolicy policy = ExpertPolicy.Load(Path.Combine(AppContext.BaseDirectory, "policy.json"));
             // make's stack: TimeLimit over OrderEnforcing over PassiveEnvChecker over the env. The render mode is a
             // constructor argument, fixed for the env's life, as in Gymnasium.
-            using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>(Id, render ? new { render_mode = "human" } : null);
-            // The agent keeps its phase and a scratch simulation for the episode, then releases the scratch arrays.
-            using var agent = new PusherAgent();
+            using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>(Id, policy.MakeArguments(render));
             NDArray observation = env.Reset(seed: seed).Observation;
             int steps = 0;
             double total = 0;
             while (true) {
-                StepResult<NDArray> step = env.Step(agent.Act((MujocoEnv)env.Unwrapped));
+                StepResult<NDArray> step = env.Step(policy.Act(observation));
                 observation = step.Observation;
                 steps++;
                 total += step.Reward;
                 if (step.Terminated || step.Truncated)
                     return (steps, total, step.Terminated ? "terminated" : "truncated by the time limit");
-            }
-        }
-
-        /// <summary>
-        ///     The agent: operational-space control of the fingertip through three phases, hover behind the puck,
-        ///     descend, push (see the program's remarks). One instance per episode: it keeps the phase and a scratch
-        ///     simulation.
-        /// </summary>
-        private sealed class PusherAgent : IDisposable {
-            /// <summary>The position gain on the fingertip's error.</summary>
-            private const double Kp = 20;
-
-            /// <summary>The damping gain on the fingertip's velocity.</summary>
-            private const double Kd = 2;
-
-            /// <summary>How far behind the puck, away from the goal, the push starts.</summary>
-            private const double Behind = 0.07;
-
-            /// <summary>How high above the puck the fingertip hovers before it descends.</summary>
-            private const double Hover = 0.06;
-
-            /// <summary>The phase: 0 hover behind the puck, 1 descend, 2 push.</summary>
-            private int _phase;
-
-            /// <summary>A scratch copy of the simulation for the kinematics, created at the first step.</summary>
-            private MjData? _scratch;
-
-            /// <summary>The torques for the arm's current state.</summary>
-            /// <param name="pusher">The unwrapped env, whose model and data are read, never written.</param>
-            /// <returns>A new float32 array of seven torques in [-2, 2]; the caller disposes it.</returns>
-            public NDArray Act(MujocoEnv pusher) {
-                MjModel model = pusher.Model;
-                _scratch ??= new MjData(model);
-                double[] q, qd;
-                using (NDArray qpos = pusher.Data.Qpos)
-                    q = qpos.ToArray<double>();
-                using (NDArray qvel = pusher.Data.Qvel)
-                    qd = qvel.ToArray<double>();
-                Kinematics(model, q);
-                double[] tip = Position("tips_arm"), puck = Position("object"), goal = Position("goal");
-                // The fingertip's 3x7 Jacobian by forward differences: nudge one joint at a time and see where the tip goes.
-                var jacobian = new double[3, 7];
-                for (int i = 0; i < 7; i++) {
-                    double[] nudged = (double[])q.Clone();
-                    nudged[i] += 1e-5;
-                    Kinematics(model, nudged);
-                    double[] moved = Position("tips_arm");
-                    for (int k = 0; k < 3; k++)
-                        jacobian[k, i] = (moved[k] - tip[k]) / 1e-5;
-                }
-                // The push direction: from the goal through the puck, so pushing along it moves the puck goalward.
-                double ux = puck[0] - goal[0], uy = puck[1] - goal[1], length = Math.Sqrt(ux * ux + uy * uy) + 1e-9;
-                ux /= length;
-                uy /= length;
-                double bx = puck[0] + Behind * ux, by = puck[1] + Behind * uy, z = puck[2];
-                double[] target;
-                if (_phase == 0) {
-                    target = new[] { bx, by, z + Hover };
-                    if (Distance(tip, target) < 0.03)
-                        _phase = 1;
-                } else if (_phase == 1) {
-                    target = new[] { bx, by, z };
-                    if (Distance(tip, target) < 0.02)
-                        _phase = 2;
-                } else {
-                    target = new[] { puck[0] - 0.05 * ux, puck[1] - 0.05 * uy, z };
-                    double tx = tip[0] - puck[0], ty = tip[1] - puck[1];
-                    double along = tx * ux + ty * uy, side = Math.Abs(-tx * uy + ty * ux);
-                    // Losing the puck sideways, or overtaking it, starts the approach over.
-                    if (side > 0.05 || along < 0)
-                        _phase = 0;
-                }
-                var velocity = new double[3];
-                for (int k = 0; k < 3; k++)
-                    for (int i = 0; i < 7; i++)
-                        velocity[k] += jacobian[k, i] * qd[i];
-                var action = new float[7];
-                for (int i = 0; i < 7; i++) {
-                    // J^T (kp error - kd velocity), plus joint damping that keeps the redundant joints from flailing.
-                    double torque = -0.3 * qd[i];
-                    for (int k = 0; k < 3; k++)
-                        torque += jacobian[k, i] * (Kp * (target[k] - tip[k]) - Kd * velocity[k]);
-                    action[i] = (float)Math.Clamp(torque, -2, 2);
-                }
-
-                return np.array(action);
-            }
-
-            /// <summary>Sets the scratch copy's joint positions and recomputes its body positions.</summary>
-            /// <param name="model">The model.</param>
-            /// <param name="q">The joint positions.</param>
-            private void Kinematics(MjModel model, double[] q) {
-                using (NDArray state = np.array(q))
-                    Mujoco.MjSetState(model, _scratch!, state, MjtState.Qpos);
-                Mujoco.MjKinematics(model, _scratch!);
-            }
-
-            /// <summary>A body frame's world position in the scratch copy.</summary>
-            /// <param name="body">The body's name in Pusher's model.</param>
-            /// <returns>x, y, z.</returns>
-            private double[] Position(string body) {
-                using NDArray x = _scratch!.Body(body).Xpos;
-                return x.ToArray<double>();
-            }
-
-            /// <summary>The Euclidean distance between two points.</summary>
-            /// <param name="a">One point.</param>
-            /// <param name="b">The other.</param>
-            /// <returns>The distance.</returns>
-            private static double Distance(double[] a, double[] b) =>
-                Math.Sqrt((a[0] - b[0]) * (a[0] - b[0]) + (a[1] - b[1]) * (a[1] - b[1]) + (a[2] - b[2]) * (a[2] - b[2]));
-
-            /// <summary>Releases the scratch copy's arrays.</summary>
-            public void Dispose() {
-                _scratch?.Dispose();
-                _scratch = null;
             }
         }
 
@@ -248,6 +130,206 @@ namespace Gym.Examples.Pusher {
                 return true;
             Console.Error.WriteLine($"{name} needs a non-negative whole number");
             return false;
+        }
+    }
+
+    /// <summary>
+    ///     A published expert agent read from <c>policy.json</c> (DR-103): the deterministic actor network of a
+    ///     Stable-Baselines3 model, which maps an observation to the action its <c>predict(deterministic=True)</c>
+    ///     takes.
+    /// </summary>
+    /// <remarks>
+    ///     <para>
+    ///     The file holds the network's dense layers (base64 of little-endian float32 values, each weight row-major
+    ///     <c>outputs x inputs</c> as PyTorch's <c>nn.Linear</c> stores it), the activation after each, how the last
+    ///     layer's values become the action (<c>tanh-rescale</c> for SAC and TQC, <c>clip</c> for PPO), and the
+    ///     constructor arguments the env must be made with for the agent to see what it was trained on
+    ///     (<c>make_kwargs</c>). It is a copy of the agent in <c>tests/Gym.Tests/Agents</c>, written by
+    ///     <c>tools/agents/import_agents.py</c>, and this reader a copy of that folder's <c>ExpertPolicy</c>: every
+    ///     example keeps its agent's code to itself (DR-74).
+    ///     </para>
+    ///     <para>
+    ///     It computes as PyTorch does: the observation is cast to float32, each dot product is summed in float64, and
+    ///     every layer's output is rounded to float32. An action can still differ from PyTorch's in its last bit, and
+    ///     over a long episode of chaotic physics a last bit grows into a different trajectory, as good as the first.
+    ///     </para>
+    /// </remarks>
+    internal sealed class ExpertPolicy {
+        /// <summary>The widest layer the stack scratch holds; the published agents' widest is 400.</summary>
+        private const int MaxWidth = 1024;
+
+        /// <summary>The dense layers, input layer first.</summary>
+        private readonly Layer[] _layers;
+
+        /// <summary>The action space's lower bounds, as the model saved them.</summary>
+        private readonly float[] _low;
+
+        /// <summary>The action space's upper bounds.</summary>
+        private readonly float[] _high;
+
+        /// <summary>
+        ///     Whether the output is squashed by tanh and rescaled to the bounds (SAC, TQC), rather than clipped (PPO).
+        /// </summary>
+        private readonly bool _squash;
+
+        /// <summary>
+        ///     The constructor arguments the agent's env needs (<c>make_kwargs</c>); none for most agents.
+        /// </summary>
+        private readonly Dictionary<string, object?> _makeKwargs;
+
+        /// <summary>Creates an agent from its parsed parts; <see cref="Load"/> is the way in.</summary>
+        /// <param name="layers">The dense layers.</param>
+        /// <param name="low">The lower bounds.</param>
+        /// <param name="high">The upper bounds.</param>
+        /// <param name="squash">Whether the output is tanh-squashed.</param>
+        /// <param name="makeKwargs">The constructor arguments.</param>
+        private ExpertPolicy(Layer[] layers, float[] low, float[] high, bool squash, Dictionary<string, object?> makeKwargs) {
+            _layers = layers;
+            _low = low;
+            _high = high;
+            _squash = squash;
+            _makeKwargs = makeKwargs;
+        }
+
+        /// <summary>Reads the agent's file.</summary>
+        /// <param name="path">The <c>policy.json</c> file.</param>
+        /// <returns>The agent.</returns>
+        /// <exception cref="IOException">The file cannot be read.</exception>
+        /// <exception cref="JsonException">It is not JSON.</exception>
+        /// <exception cref="InvalidDataException">
+        ///     It is not a <c>gym.net-agent/1</c> file, a layer's sizes do not chain, an array has the wrong length, or
+        ///     an activation, output mode or constructor argument is of an unknown kind.
+        /// </exception>
+        public static ExpertPolicy Load(string path) {
+            JsonNode root = JsonNode.Parse(File.ReadAllText(path)) ?? throw new JsonException($"{path}: empty");
+            if (root["format"]?.GetValue<string>() != "gym.net-agent/1")
+                throw new InvalidDataException($"{path}: not a gym.net-agent/1 file");
+            Layer[] layers = root["layers"]!.AsArray().Select(n => Layer.Parse(n!, path)).ToArray();
+            for (int i = 1; i < layers.Length; i++)
+                if (layers[i].Inputs != layers[i - 1].Outputs)
+                    throw new InvalidDataException($"{path}: layer {i} takes {layers[i].Inputs} inputs, layer {i - 1} gives {layers[i - 1].Outputs}");
+            if (layers.Any(l => l.Outputs > MaxWidth))
+                throw new InvalidDataException($"{path}: a layer is wider than {MaxWidth}");
+            float[] Bounds(string name) {
+                if (root[name] is not JsonArray array || array.Count != layers[^1].Outputs)
+                    throw new InvalidDataException($"{path}: '{name}' must hold {layers[^1].Outputs} numbers");
+                return array.Select(v => (float)v!.GetValue<double>()).ToArray();
+            }
+
+            bool squash = root["output"]?.GetValue<string>() switch {
+                "tanh-rescale" => true,
+                "clip" => false,
+                var other => throw new InvalidDataException($"{path}: unknown output '{other}'"),
+            };
+            var kwargs = new Dictionary<string, object?>();
+            if (root["make_kwargs"] is JsonObject make)
+                foreach (var (name, value) in make)
+                    kwargs[name] = value?.GetValueKind() switch {
+                        JsonValueKind.True => true,
+                        JsonValueKind.False => false,
+                        JsonValueKind.Number => value.GetValue<double>(),
+                        JsonValueKind.String => value.GetValue<string>(),
+                        _ => throw new InvalidDataException($"{path}: make_kwargs '{name}' must be a bool, number or string"),
+                    };
+            return new ExpertPolicy(layers, Bounds("action_low"), Bounds("action_high"), squash, kwargs);
+        }
+
+        /// <summary>
+        ///     The keyword arguments to make the env with: the agent's own (<c>make_kwargs</c>: HumanoidStandup's
+        ///     expert sees positions and velocities only), and for a window, human mode and the view's arguments.
+        /// </summary>
+        /// <param name="human">Whether the env renders into a window (<c>render_mode="human"</c>).</param>
+        /// <param name="view">
+        ///     Arguments that change only what the window shows (a camera), added in human mode; or null.
+        /// </param>
+        /// <returns>A new dictionary for <c>Gymnasium.Make</c>.</returns>
+        public Dictionary<string, object?> MakeArguments(bool human, IReadOnlyDictionary<string, object?>? view = null) {
+            var arguments = new Dictionary<string, object?>(_makeKwargs);
+            if (human) {
+                arguments["render_mode"] = "human";
+                if (view is not null)
+                    foreach (var (name, value) in view)
+                        arguments[name] = value;
+            }
+            return arguments;
+        }
+
+        /// <summary>The action for an observation.</summary>
+        /// <param name="observation">The env's observation (float64 for MuJoCo, float32 for Box2D).</param>
+        /// <returns>A new float32 array of one command per motor.</returns>
+        /// <exception cref="ArgumentException">The observation's length is not the network's.</exception>
+        public NDArray Act(NDArray observation) {
+            float[] input;
+            // Cast to float32 first, as Stable-Baselines3 casts what the env returns.
+            using (NDArray values = observation.astype(NPTypeCode.Single))
+                input = values.ToArray<float>();
+            if (input.Length != _layers[0].Inputs)
+                throw new ArgumentException($"the agent reads {_layers[0].Inputs} numbers, the observation has {input.Length}", nameof(observation));
+            // Two stack buffers alternate as layer input and output: a forward pass allocates nothing but the action.
+            Span<float> a = stackalloc float[MaxWidth], b = stackalloc float[MaxWidth];
+            scoped ReadOnlySpan<float> x = input;
+            for (int l = 0; l < _layers.Length; l++) {
+                Span<float> y = (l % 2 == 0 ? a : b)[.._layers[l].Outputs];
+                _layers[l].Forward(x, y);
+                x = y;
+            }
+            var action = new float[_low.Length];
+            // Stable-Baselines3's deterministic predict: unscale a tanh-squashed output, or clip an unsquashed one.
+            for (int i = 0; i < action.Length; i++)
+                action[i] = _squash ? _low[i] + 0.5f * (MathF.Tanh(x[i]) + 1f) * (_high[i] - _low[i]) : Math.Clamp(x[i], _low[i], _high[i]);
+            return np.array(action);
+        }
+
+        /// <summary>One dense layer: <c>y = activation(W x + b)</c> in float32, each sum taken in float64.</summary>
+        /// <param name="Inputs">Its input width.</param>
+        /// <param name="Outputs">Its output width.</param>
+        /// <param name="Weight">The weights, row-major <c>Outputs x Inputs</c>.</param>
+        /// <param name="Bias">The biases.</param>
+        /// <param name="Activation"><c>relu</c>, <c>tanh</c> or <c>none</c>.</param>
+        private sealed record Layer(int Inputs, int Outputs, float[] Weight, float[] Bias, string Activation) {
+            /// <summary>Computes the layer's output.</summary>
+            /// <param name="input">The input, <see cref="Inputs"/> values.</param>
+            /// <param name="output">Receives <see cref="Outputs"/> values.</param>
+            public void Forward(ReadOnlySpan<float> input, Span<float> output) {
+                for (int o = 0; o < Outputs; o++) {
+                    double sum = Bias[o];
+                    for (int i = 0; i < Inputs; i++)
+                        sum += (double)Weight[o * Inputs + i] * input[i];
+                    // Rounded to float32 before the activation, as a float32 tensor holds the pre-activation.
+                    float y = (float)sum;
+                    output[o] = Activation switch {
+                        "relu" => y > 0 ? y : 0,
+                        "tanh" => MathF.Tanh(y),
+                        _ => y,
+                    };
+                }
+            }
+
+            /// <summary>Reads a layer from its JSON object.</summary>
+            /// <param name="node">The layer object.</param>
+            /// <param name="path">The file, for errors.</param>
+            /// <returns>The layer.</returns>
+            /// <exception cref="InvalidDataException">
+            ///     The sizes and the arrays disagree, or the activation is unknown.
+            /// </exception>
+            /// <exception cref="FormatException">An array is not base64.</exception>
+            public static Layer Parse(JsonNode node, string path) {
+                int inputs = node["inputs"]!.GetValue<int>(), outputs = node["outputs"]!.GetValue<int>();
+                string activation = node["activation"]!.GetValue<string>();
+                if (activation is not ("relu" or "tanh" or "none"))
+                    throw new InvalidDataException($"{path}: unknown activation '{activation}'");
+                float[] Decode(string field, int count) {
+                    byte[] bytes = Convert.FromBase64String(node[field]!.GetValue<string>());
+                    if (bytes.Length != count * 4)
+                        throw new InvalidDataException($"{path}: '{field}' holds {bytes.Length / 4} values, not {count}");
+                    var values = new float[count];
+                    // Little-endian in the file; .NET runs little-endian on every platform it supports.
+                    Buffer.BlockCopy(bytes, 0, values, 0, bytes.Length);
+                    return values;
+                }
+
+                return new Layer(inputs, outputs, Decode("weight", inputs * outputs), Decode("bias", outputs), activation);
+            }
         }
     }
 }

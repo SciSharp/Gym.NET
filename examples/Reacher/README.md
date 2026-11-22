@@ -1,7 +1,7 @@
-# Reacher: inverse kinematics
+# Reacher: Farama's SAC expert
 
-A two-link arm on a table has to put its fingertip on a target that appears somewhere new each episode. The agent solves
-the geometry exactly, then drives the joints to the answer.
+A two-link arm on a table has to put its fingertip on a target that appears somewhere new each episode. A published
+expert agent, Farama's own, reaches it.
 
 ```bash
 dotnet run --project examples/Reacher -c Release                   # one episode, headless
@@ -14,19 +14,23 @@ Output, the same on every run since the reset is seeded and the agent has no ran
 CPU with FMA: [the numbers](../README.md#the-numbers) says why that matters):
 
 ```
-Reacher-v5, seed 0: 50 steps, return -3.8, truncated by the time limit
+Reacher-v5, seed 0: 50 steps, return -2.8, truncated by the time limit
 ```
 
 ## The agent
 
-The arm's inverse kinematics (links 0.1 and 0.11 long) gives the joint angles that put the fingertip on the target.
-There are two solutions, elbow one way or the other; the agent takes the one nearer the arm's current pose. A PD
-controller (gain 0.5, damping 0.1) then drives each joint to its angle, the error wrapped to [-π, π] so the joint turns
-the shorter way round.
+`policy.json` holds the agent: Farama's SAC (Soft Actor-Critic) expert, the agent the Farama Foundation, Gymnasium's
+maintainers, trained on this env to record the Minari datasets. It comes from Hugging Face,
+[farama-minari/Reacher-v5-SAC-expert](https://huggingface.co/farama-minari/Reacher-v5-SAC-expert) at revision `ad8fadf`,
+imported by `tools/agents/import_agents.py`, and is a copy of
+[`tests/Gym.Tests/Agents/Reacher-v5.json`](../../tests/Gym.Tests/Agents/Reacher-v5.json), where the tests measure it. It
+is a Stable-Baselines3 network of two dense layers of 256 with relu: each step it casts the observation to float32, runs
+it through the network, and squashes the result into the motors' range with tanh, as Stable-Baselines3's deterministic
+`predict` does.
 
-Over seeds 0-19 the return is -4.14 per target on average (-7.2 to -0.7): it is the distance to the target summed over
-50 steps, plus a small control cost, so even a perfect reach pays for the way there. A linear policy trained by
-Augmented Random Search stopped improving near -9.
+Over seeds 0-9 it scores -3.4 in Gym.NET (from -5.9 to -1); the model card reports -3.28 +/- 1.38. The model repository
+states no licence; its training code is MIT. Gym.NET commits the weights with this attribution, on the maintainer's
+decision (DR-103).
 
 ## Watching and playing
 
@@ -45,7 +49,10 @@ episode ends; Escape or the window's close button quits.
 
 ## The API it shows
 
-- `Gymnasium.Make<NDArray, NDArray>("Reacher-v5", kwargs)`: `TimeLimit` of 50 steps; Reacher never terminates
+- `ExpertPolicy.Load(path)` and `policy.Act(observation)`: the agent's network, a new float32 action each step (released
+  with the episode's other arrays by `[NDScoped]`)
+- `policy.MakeArguments(...)`: the agent's own constructor arguments plus the render mode, for `Gymnasium.Make<NDArray,
+  NDArray>(id, kwargs)`
 - `Play.Run` with a generated key map: every combination of the keys held (Gymnasium's `play` looks up the exact set)
 - `env.Reset(seed: s)` and `env.Step(action)`: their results own the arrays they hold (D19), so the example releases
   each one once the agent has acted on it
@@ -62,3 +69,5 @@ dotnet add package Gym.NET.Rendering.Avalonia  # only for --render and --play
 
 and drop the `Import` of `Gym.NET.Environments.targets` from the project file: the package brings it, and it registers
 the built-in environment ids before `Main` runs.
+
+Copy `policy.json` along with the code.
