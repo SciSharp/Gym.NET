@@ -20,16 +20,18 @@ using Gym.MuJoCo;
 namespace MujocoPoc.Play;
 
 /// <summary>
-///     HalfCheetah-v5 on its autopilot, a linear policy trained by Augmented Random Search: <c>dotnet run --project
-///     examples/HalfCheetah -c Release</c> plays one seeded episode headless through <c>Gymnasium.Make</c> and prints its steps
-///     and return; <c>-- --render</c> plays it in MuJoCo's window, and <c>-- --play</c> opens the playable HalfCheetah, where
-///     the keyboard drives the six motors and Tab hands them to the autopilot. Also trains the autopilot, records it to a
-///     video, and prints its exact episode returns for comparison with Gymnasium on MuJoCo (replay_in_gymnasium.py).
+///     HalfCheetah-v5 played by Farama's TQC expert (DR-109): <c>dotnet run --project examples/HalfCheetah -c Release</c>
+///     plays one seeded episode headless through <c>Gymnasium.Make</c> and prints its steps and return; <c>-- --render</c>
+///     plays it in MuJoCo's window, <c>-- --autopilot</c> plays it on the autopilot instead (a linear policy trained by
+///     Augmented Random Search), and <c>-- --play</c> opens the playable HalfCheetah, where the keyboard drives the six
+///     motors and Tab hands them to the autopilot. Also trains the autopilot, records it to a video, and prints its exact
+///     episode returns for comparison with Gymnasium on MuJoCo (replay_in_gymnasium.py).
 /// </summary>
 /// <remarks>
 ///     Usage:
 ///     <code>
-///     HalfCheetah [--seed N] [--episodes N] [--render]    the autopilot through Gymnasium.Make (default; DR-74)
+///     HalfCheetah [--seed N] [--episodes N] [--render]    Farama's TQC expert through Gymnasium.Make (default; DR-74, DR-109)
+///     HalfCheetah --autopilot [--seed N] [--episodes N] [--render]    the same, on the autopilot
 ///     HalfCheetah --play [--seed N]                        the game, with the keyboard driving
 ///     HalfCheetah play [--seed N] [--manual]               the game, with the autopilot driving until Tab
 ///     HalfCheetah train [--iterations N] [--threads N] [--seed N] [--out policy.json]
@@ -37,8 +39,8 @@ namespace MujocoPoc.Play;
 ///     HalfCheetah frames FOLDER [--steps N] [--every N] [--seed N]
 ///     HalfCheetah score [--seeds A-B]
 ///     </code>
-///     The model (half_cheetah.json, MuJoCo's compiled HalfCheetah as Gym.Environments embeds it) and the autopilot (policy.json) are read from
-///     the program's folder; <c>--policy FILE</c> picks another autopilot.
+///     The model (half_cheetah.json, MuJoCo's compiled HalfCheetah as Gym.Environments embeds it), the expert (expert.json) and the
+///     autopilot (policy.json) are read from the program's folder; <c>--expert FILE</c> and <c>--policy FILE</c> pick others.
 ///     <para>
 ///     The game moved here from <c>tools/parity/mujoco/halfcheetah_poc/play</c> (DR-74): it steps its own copy of the engine
 ///     and draws its own side view, cheap enough for real time. The default mode, the flags every example takes, plays the
@@ -62,10 +64,15 @@ internal static class Program {
         string folder = AppContext.BaseDirectory;
         MjModel model = MjModel.Load(Path.Combine(folder, "half_cheetah.json"));
         string policyPath = options.Text("policy", Path.Combine(folder, "policy.json"));
+        string expertPath = options.Text("expert", Path.Combine(folder, "expert.json"));
         try {
             switch (command) {
                 case "episode":
-                    return Episodes(policyPath, options.Int("seed", 0), options.Int("episodes", 1), options.Flag("render"));
+                    // The expert plays by default (DR-109); --autopilot keeps the linear policy whose returns Gymnasium
+                    // reproduces to the last bit (replay_in_gymnasium.py).
+                    return options.Flag("autopilot")
+                        ? Episodes(policyPath, options.Int("seed", 0), options.Int("episodes", 1), options.Flag("render"))
+                        : ExpertEpisodes(expertPath, options.Int("seed", 0), options.Int("episodes", 1), options.Flag("render"));
                 case "play":
                     // --play hands the motors to the keyboard from the start; the play command keeps the autopilot driving.
                     bool manual = options.Flag("manual") || !commanded;
@@ -92,7 +99,65 @@ internal static class Program {
     }
 
     /// <summary>
-    ///     The mode every example shares (DR-74): plays seeded episodes of HalfCheetah-v5 on the autopilot through
+    ///     The mode every example shares (DR-74), as the expert plays it (DR-109): seeded episodes of HalfCheetah-v5 played
+    ///     by Farama's TQC expert through <c>Gymnasium.Make</c>, headless or in MuJoCo's window, each one's steps and return
+    ///     printed.
+    /// </summary>
+    /// <param name="expertPath">The expert's file, a copy of <c>tests/Gym.Tests/Agents/HalfCheetah-v5.json</c>.</param>
+    /// <param name="seed">The first reset seed.</param>
+    /// <param name="episodes">How many episodes, on consecutive seeds.</param>
+    /// <param name="render">Whether to show them in MuJoCo's window, human mode with Gymnasium's controls (DR-70).</param>
+    /// <returns>0.</returns>
+    /// <exception cref="IOException">The expert's file cannot be read.</exception>
+    /// <exception cref="InvalidDataException">The file is not a <c>gym.net-agent/1</c> agent.</exception>
+    /// <remarks>
+    ///     Seed 0 returns about 17,600, three times the autopilot's 5,797: at full gallop the runner covers 17 m a second.
+    ///     Each episode is one <see cref="PlayExpertEpisode"/> call, whose scope releases its arrays when it returns.
+    /// </remarks>
+    private static int ExpertEpisodes(string expertPath, int seed, int episodes, bool render) {
+        ExpertPolicy expert = ExpertPolicy.Load(expertPath);
+        // Human mode draws inside every reset and step into the app-wide viewer (DR-20).
+        if (render)
+            Gymnasium.HumanViewerFactory = AvaloniaEnvViewer.Factory;
+        double sum = 0;
+        for (int episode = 0; episode < episodes; episode++) {
+            (int steps, double total) = PlayExpertEpisode(expert, seed + episode, render);
+            sum += total;
+            Console.WriteLine($"HalfCheetah-v5, seed {seed + episode}: {steps} steps, return {total:F1}, truncated by the time limit");
+        }
+        if (episodes > 1)
+            Console.WriteLine($"Mean return over {episodes} episodes: {sum / episodes:F1}");
+        return 0;
+    }
+
+    /// <summary>One episode of HalfCheetah-v5 played by the expert, through <c>Gymnasium.Make</c>.</summary>
+    /// <param name="expert">The expert.</param>
+    /// <param name="seed">The reset seed.</param>
+    /// <param name="render">Whether to show the episode in MuJoCo's window.</param>
+    /// <returns>The steps taken and the return.</returns>
+    /// <remarks>
+    ///     <c>[NDScoped]</c> (DR-80): NumSharp.Build releases every array the episode creates (the results, the actions)
+    ///     when it returns. The env is built and disposed inside it, the guides' rule for an env in a scoped method.
+    /// </remarks>
+    [NDScoped]
+    private static (int Steps, double Return) PlayExpertEpisode(ExpertPolicy expert, int seed, bool render) {
+        using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("HalfCheetah-v5", expert.MakeArguments(render));
+        NDArray observation = env.Reset(seed: seed).Observation;
+        int steps = 0;
+        double total = 0;
+        while (true) {
+            StepResult<NDArray> step = env.Step(expert.Act(observation));
+            observation = step.Observation;
+            steps++;
+            total += step.Reward;
+            // HalfCheetah never terminates: every episode is cut by the 1,000-step time limit.
+            if (step.Terminated || step.Truncated)
+                return (steps, total);
+        }
+    }
+
+    /// <summary>
+    ///     The same mode on the autopilot (<c>--autopilot</c>): seeded episodes of HalfCheetah-v5 on the autopilot through
     ///     <c>Gymnasium.Make</c>, the product's env rather than this program's game, headless or in MuJoCo's window, and prints
     ///     each one's steps and return.
     /// </summary>

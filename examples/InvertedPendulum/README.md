@@ -1,7 +1,7 @@
-# InvertedPendulum: MuJoCo's cart-pole, balanced by state feedback
+# InvertedPendulum: Farama's SAC expert
 
 A pole hinged on a cart that slides on a rail, simulated by Gym.NET's own MuJoCo engine (bit for bit with MuJoCo 4.0.0).
-The agent keeps the pole upright and the cart near the middle.
+A published expert agent, Farama's own, keeps the pole upright.
 
 ```bash
 dotnet run --project examples/InvertedPendulum -c Release                   # one episode, headless
@@ -19,10 +19,18 @@ InvertedPendulum-v5, seed 0: 1000 steps, return 1000.0, truncated by the time li
 
 ## The agent
 
-The force on the cart is linear in the state: `u = 5.330 x + 8.469 θ + 1.109 ẋ + 0.634 θ̇`, clipped to the motor's ±3.
-Random search over the four gains found these: they hold the pole for all 1,000 steps on seeds 0-9, with the cart near
-the middle (mean |x| 0.003). A linear policy trained by Augmented Random Search balanced too, but let the cart drift to
-the end of its rail.
+`policy.json` holds the agent: Farama's SAC (Soft Actor-Critic) expert, the agent the Farama Foundation, Gymnasium's
+maintainers, trained on this env to record the Minari datasets. It comes from Hugging Face,
+[farama-minari/InvertedPendulum-v5-SAC-expert](https://huggingface.co/farama-minari/InvertedPendulum-v5-SAC-expert) at
+revision `d67981f`, imported by `tools/agents/import_agents.py`, and is a copy of
+[`tests/Gym.Tests/Agents/InvertedPendulum-v5.json`](../../tests/Gym.Tests/Agents/InvertedPendulum-v5.json), where the
+tests measure it. It is a Stable-Baselines3 network of two dense layers of 256 with relu: each step it casts the
+observation to float32, runs it through the network, and squashes the result into the motors' range with tanh, as
+Stable-Baselines3's deterministic `predict` does.
+
+Over seeds 0-9 it scores 1,000.0 in Gym.NET (every seed balances all 1,000 steps); the model card reports 1000.00 +/-
+0.00. The model repository states no licence; its training code is MIT. Gym.NET commits the weights with this
+attribution, on the maintainer's decision (DR-109).
 
 ## Watching and playing
 
@@ -41,7 +49,10 @@ episode ends; Escape or the window's close button quits.
 
 ## The API it shows
 
-- `Gymnasium.Make<NDArray, NDArray>("InvertedPendulum-v5", kwargs)`: a MuJoCo env, `TimeLimit` of 1,000 steps
+- `ExpertPolicy.Load(path)` and `policy.Act(observation)`: the agent's network, a new float32 action each step (released
+  with the episode's other arrays by `[NDScoped]`)
+- `policy.MakeArguments(...)`: the agent's own constructor arguments plus the render mode, for `Gymnasium.Make<NDArray,
+  NDArray>(id, kwargs)`
 - Human mode opens MuJoCo's window, with Gymnasium's controls (DR-70)
 - `env.Reset(seed: s)` and `env.Step(action)`: their results own the arrays they hold (D19), so the example releases
   each one once the agent has acted on it
@@ -58,3 +69,5 @@ dotnet add package Gym.NET.Rendering.Avalonia  # only for --render and --play
 
 and drop the `Import` of `Gym.NET.Environments.targets` from the project file: the package brings it, and it registers
 the built-in environment ids before `Main` runs.
+
+Copy `policy.json` along with the code.

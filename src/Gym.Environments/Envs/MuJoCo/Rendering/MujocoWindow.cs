@@ -40,7 +40,8 @@ namespace Gym.Environments.Envs.MuJoCo.Rendering {
     ///     </para>
     ///     <para>
     ///     Where Gymnasium leaves GLFW's behaviour, Gym.NET reads it as follows (recorded with DR-70): the frame is drawn at
-    ///     the viewer's client size in the viewer's own unit, so the pointer needs no framebuffer scale; the window's buffer
+    ///     the viewer's client size, which both built-in viewers report in physical pixels and show one screen pixel per
+    ///     frame pixel (DR-99), so the pointer, reported in the same pixels, needs no framebuffer scale; the window's buffer
     ///     is single-sampled with 24-bit depths, as GLFW's default framebuffer; the swap's wait for the display
     ///     (<c>swap_interval(1)</c>) is a 60 Hz <see cref="Clock"/>; a missing width or height opens a 960 × 540 window,
     ///     half a 1920 × 1080 monitor, since a viewer factory cannot report the monitor's size; T creates the folder of

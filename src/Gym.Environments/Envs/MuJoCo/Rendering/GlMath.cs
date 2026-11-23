@@ -7,16 +7,57 @@ namespace Gym.Environments.Envs.MuJoCo.Rendering {
     ///     (<c>mjr_lookAt</c>, <c>mjr_reflect</c>, <c>mjr_orthoVec</c>).
     /// </summary>
     /// <remarks>
-    ///     Float32 throughout, as the GPU and MuJoCo's <c>float</c> helpers compute. <c>glFrustum</c> and <c>glOrtho</c>
-    ///     take doubles in OpenGL; the driver builds the matrix in double and stores it as float, which is done here too.
-    ///     Reference: <see href="https://github.com/google-deepmind/mujoco/blob/4.0.0/src/render/classic/render_util.c">render_util.c</see>.
+    ///     <para>
+    ///     Float32 throughout, as the driver and MuJoCo's <c>float</c> helpers compute, with each one's own order of
+    ///     operations, measured against the reference driver (NVIDIA 616.56) by reading its matrix stack back with
+    ///     <c>glGetFloatv</c> after random calls (2026-11-21, DR-98): <c>glMultMatrixf</c> and <c>glTranslatef</c> sum each
+    ///     element's four products pairwise, <c>(a₀b₀ + a₁b₁) + (a₂b₂ + a₃b₃)</c> (<see cref="MultiplyDriver"/>, every element
+    ///     of 400 trials; the sequential sum got 72%, any fused order about half); <c>glScalef</c> is plain products;
+    ///     <c>glFrustum</c> divides a numerator kept in double by a denominator rounded to float32 (<see cref="Frustum"/>,
+    ///     every element of 250 matrices); <c>glOrtho</c> computes each element in double and rounds it once
+    ///     (<see cref="Ortho"/>, every element of 300). MuJoCo's own <c>mjr_mulMat44</c> sums sequentially from zero
+    ///     (<see cref="Multiply"/>), so the shadow map's texture matrix, which MuJoCo multiplies itself, keeps that order.
+    ///     </para>
+    ///     <para>
+    ///     Footgun: the two products are not interchangeable; each must be the one the code it stands for uses, or a
+    ///     matrix differs in its last bits and a vertex can land on the other side of a pixel's sample.
+    ///     </para>
+    ///     <para>Reference: <see href="https://github.com/google-deepmind/mujoco/blob/4.0.0/src/render/classic/render_util.c">render_util.c</see>.</para>
     /// </remarks>
     internal static class GlMath {
         /// <summary>The identity.</summary>
         /// <returns>A new identity matrix.</returns>
         internal static float[] Identity() => [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
 
-        /// <summary>The product <c>a·b</c> (<c>mjr_mulMat44</c>'s order of sums).</summary>
+        /// <summary>
+        ///     The product <c>a·b</c> as the reference driver's matrix stack computes it (<c>glMultMatrixf</c>,
+        ///     <c>glTranslatef</c>, the frustum's and ortho's products): each element's four products summed pairwise,
+        ///     <c>(a₀b₀ + a₁b₁) + (a₂b₂ + a₃b₃)</c>, every operation rounded to float32.
+        /// </summary>
+        /// <param name="a">The current matrix.</param>
+        /// <param name="b">The matrix it is multiplied by.</param>
+        /// <returns>A new matrix.</returns>
+        /// <remarks>
+        ///     The order was measured on the reference driver (see the class remarks); a translation's column then comes
+        ///     out as <c>(m₀x + m₄y) + (m₈z + m₁₂)</c>, as its own <c>glTranslatef</c> gives it.
+        /// </remarks>
+        internal static float[] MultiplyDriver(float[] a, float[] b) {
+            var res = new float[16];
+            for (int r = 0; r < 4; r++) {
+                for (int c = 0; c < 4; c++) {
+                    float p0 = a[r] * b[4 * c], p1 = a[r + 4] * b[1 + 4 * c], p2 = a[r + 8] * b[2 + 4 * c], p3 = a[r + 12] * b[3 + 4 * c];
+                    res[r + 4 * c] = (p0 + p1) + (p2 + p3);
+                }
+            }
+
+            return res;
+        }
+
+        /// <summary>
+        ///     The product <c>a·b</c> in <c>mjr_mulMat44</c>'s order: each element summed sequentially from zero, every
+        ///     operation rounded to float32. For the matrices MuJoCo multiplies itself (the shadow map's texture matrix);
+        ///     the driver's own stack is <see cref="MultiplyDriver"/>.
+        /// </summary>
         /// <param name="a">The left matrix.</param>
         /// <param name="b">The right matrix.</param>
         /// <returns>A new matrix.</returns>
@@ -49,6 +90,33 @@ namespace Gym.Environments.Envs.MuJoCo.Rendering {
             oy = m[1] * x + m[5] * y + m[9] * z + m[13] * w;
             oz = m[2] * x + m[6] * y + m[10] * z + m[14] * w;
             ow = m[3] * x + m[7] * y + m[11] * z + m[15] * w;
+        }
+
+        /// <summary>
+        ///     Transforms a homogeneous point as the reference GPU's vertex stage does: each component a fused
+        ///     multiply-add chain in x, y, z, w order from the first product, <c>fma(m₁₂, w, fma(m₈, z, fma(m₄, y, m₀·x)))</c>,
+        ///     one rounding per step. For the coordinates the GPU computes itself (clip, eye and texture coordinates); the
+        ///     fixed-function position is this over the projection times the modelview from <see cref="MultiplyDriver"/>.
+        /// </summary>
+        /// <param name="m">The matrix, column-major.</param>
+        /// <param name="x">x.</param>
+        /// <param name="y">y.</param>
+        /// <param name="z">z.</param>
+        /// <param name="w">w.</param>
+        /// <param name="ox">The result's x.</param>
+        /// <param name="oy">The result's y.</param>
+        /// <param name="oz">The result's z.</param>
+        /// <param name="ow">The result's w.</param>
+        /// <remarks>
+        ///     Measured on 2026-11-21 (DR-98) by capturing <c>ftransform()</c>, which GLSL defines as the fixed-function
+        ///     position, through transform feedback: every component of 6,400 random vertices under 200 random matrix pairs;
+        ///     transforming by the modelview and then the projection, or summing without fusion, got 44% to 84%.
+        /// </remarks>
+        internal static void TransformGpu(float[] m, float x, float y, float z, float w, out float ox, out float oy, out float oz, out float ow) {
+            ox = MathF.FusedMultiplyAdd(m[12], w, MathF.FusedMultiplyAdd(m[8], z, MathF.FusedMultiplyAdd(m[4], y, m[0] * x)));
+            oy = MathF.FusedMultiplyAdd(m[13], w, MathF.FusedMultiplyAdd(m[9], z, MathF.FusedMultiplyAdd(m[5], y, m[1] * x)));
+            oz = MathF.FusedMultiplyAdd(m[14], w, MathF.FusedMultiplyAdd(m[10], z, MathF.FusedMultiplyAdd(m[6], y, m[2] * x)));
+            ow = MathF.FusedMultiplyAdd(m[15], w, MathF.FusedMultiplyAdd(m[11], z, MathF.FusedMultiplyAdd(m[7], y, m[3] * x)));
         }
 
         /// <summary>A plane (a row vector) times a matrix: how OpenGL stores eye planes and clip planes (<c>p·M⁻¹</c>).</summary>
@@ -153,22 +221,34 @@ namespace Gym.Environments.Envs.MuJoCo.Rendering {
             ];
         }
 
-        /// <summary>A perspective frustum (<c>glFrustum</c>), built in double.</summary>
+        /// <summary>
+        ///     A perspective frustum (<c>glFrustum</c>) as the reference driver builds it: each element a numerator kept in
+        ///     double over a denominator (<c>r - l</c>, <c>t - b</c>, <c>f - n</c>) rounded to float32, the quotient rounded
+        ///     once to float32 (every element of 250 matrices with double arguments, 2026-11-21; dividing in double alone got
+        ///     about 83%).
+        /// </summary>
         /// <param name="l">Left.</param>
         /// <param name="r">Right.</param>
         /// <param name="b">Bottom.</param>
         /// <param name="t">Top.</param>
         /// <param name="n">Near.</param>
         /// <param name="f">Far.</param>
-        /// <returns>A new matrix.</returns>
-        internal static float[] Frustum(double l, double r, double b, double t, double n, double f) => [
-            (float)(2 * n / (r - l)), 0, 0, 0,
-            0, (float)(2 * n / (t - b)), 0, 0,
-            (float)((r + l) / (r - l)), (float)((t + b) / (t - b)), (float)(-(f + n) / (f - n)), -1,
-            0, 0, (float)(-2 * f * n / (f - n)), 0,
-        ];
+        /// <returns>A new matrix, to be multiplied into the stack with <see cref="MultiplyDriver"/>.</returns>
+        internal static float[] Frustum(double l, double r, double b, double t, double n, double f) {
+            // the denominators as the driver keeps them: rounded to float32, then used in double
+            double rl = (float)(r - l), tb = (float)(t - b), fn = (float)(f - n);
+            return [
+                (float)(2 * n / rl), 0, 0, 0,
+                0, (float)(2 * n / tb), 0, 0,
+                (float)((r + l) / rl), (float)((t + b) / tb), (float)(-(f + n) / fn), -1,
+                0, 0, (float)(-2 * f * n / fn), 0,
+            ];
+        }
 
-        /// <summary>An orthographic projection (<c>glOrtho</c>), built in double.</summary>
+        /// <summary>
+        ///     An orthographic projection (<c>glOrtho</c>) as the reference driver builds it: each element computed in double
+        ///     from the double arguments and rounded once to float32 (every element of 300 matrices, 2026-11-21).
+        /// </summary>
         /// <param name="l">Left.</param>
         /// <param name="r">Right.</param>
         /// <param name="b">Bottom.</param>
@@ -188,7 +268,7 @@ namespace Gym.Environments.Envs.MuJoCo.Rendering {
         ///     near maps to depth 1, far to 0.
         /// </summary>
         /// <returns>A new matrix.</returns>
-        internal static float[] ReverseZ() => Multiply(Translate(0, 0, 0.5f), Scale(1, 1, -0.5f));
+        internal static float[] ReverseZ() => MultiplyDriver(Translate(0, 0, 0.5f), Scale(1, 1, -0.5f));
 
         /// <summary>Normalizes a 3-vector as <c>mjr_normalizeVec</c> does (a tiny one becomes +z).</summary>
         /// <param name="v">The vector, normalized in place.</param>

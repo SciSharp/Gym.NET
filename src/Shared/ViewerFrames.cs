@@ -47,5 +47,44 @@ namespace Gym.Rendering {
 
             return Image.LoadPixelData<Rgb24>(bytes, (int)frame.shape[1], (int)frame.shape[0]);
         }
+
+        /// <summary>
+        ///     A frame as opaque 32-bit BGRA pixels, rows top first with no padding: the layout both toolkits take without a
+        ///     conversion of their own (Avalonia's <c>Bgra8888</c>, GDI+'s <c>Format32bppRgb</c>), so the window shows the
+        ///     frame's very bytes (DR-99). The alpha byte is 255 everywhere.
+        /// </summary>
+        /// <param name="frame">The frame, <c>(H, W, 3)</c>; another dtype is cast to uint8, as <see cref="ToImage"/> does. Read, never kept.</param>
+        /// <param name="width">The frame's width in pixels.</param>
+        /// <param name="height">The frame's height in pixels.</param>
+        /// <returns>A new array of <c>4 × width × height</c> bytes the caller owns.</returns>
+        /// <exception cref="ArgumentNullException">Thrown when <paramref name="frame"/> is <see langword="null"/>.</exception>
+        /// <exception cref="ArgumentException">Thrown for a frame that is not <c>(H, W, 3)</c>.</exception>
+        /// <remarks>
+        ///     Footgun: the result is the frame's copy at the time of the call; a viewer that keeps it to redraw later (a move
+        ///     to a monitor of another scale) redraws that copy, never the caller's array, which the caller may reuse.
+        /// </remarks>
+        public static byte[] ToBgra(NDArray frame, out int width, out int height) {
+            Check(frame);
+            byte[] rgb;
+            if (frame.typecode == NPTypeCode.Byte) {
+                // ToArray copies in C order whatever the frame's strides (a transposed view included).
+                rgb = frame.ToArray<byte>();
+            } else {
+                using NDArray cast = frame.astype(np.uint8);
+                rgb = cast.ToArray<byte>();
+            }
+
+            width = (int)frame.shape[1];
+            height = (int)frame.shape[0];
+            var bgra = new byte[4 * width * height];
+            for (int i = 0, o = 0; i < rgb.Length; i += 3, o += 4) {
+                bgra[o] = rgb[i + 2];
+                bgra[o + 1] = rgb[i + 1];
+                bgra[o + 2] = rgb[i];
+                bgra[o + 3] = 255;
+            }
+
+            return bgra;
+        }
     }
 }

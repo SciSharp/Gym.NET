@@ -77,10 +77,13 @@
        embedded, so the package carries them. Each is named assets/<path> with forward slashes on every OS (RecursiveDir
        uses the OS separator), which is the name EnvAssets.Load asks for. CarRacing's score glyphs (DR-48) are recorded
        data, Assets/fonts/*.json, embedded under the same naming for ScoreFont; so are Gymnasium's 14 MuJoCo models as
-       MuJoCo 4.0.0 compiles them (DR-63, DR-64), Assets/mujoco/*.json with their textures, for MjModel.FromXmlPath. -->
+       MuJoCo 4.0.0 compiles them (DR-63, DR-64), Assets/mujoco/*.json with their textures, for MjModel.FromXmlPath.
+       The MuJoCo renderer's measured GPU tables (DR-98) are binary data under the same naming, Assets/mujoco/gpu/*.bin,
+       written by tools/parity/mujoco/gpu_probe.py (the viewport stage's reciprocal, for GlMath.RcpGpu). -->
   <ItemGroup>
     <EmbeddedResource Include="Assets\**\*.png" LogicalName="assets/$([System.String]::Copy('%(RecursiveDir)').Replace('\','/'))%(Filename)%(Extension)" />
     <EmbeddedResource Include="Assets\**\*.json" LogicalName="assets/$([System.String]::Copy('%(RecursiveDir)').Replace('\','/'))%(Filename)%(Extension)" />
+    <EmbeddedResource Include="Assets\**\*.bin" LogicalName="assets/$([System.String]::Copy('%(RecursiveDir)').Replace('\','/'))%(Filename)%(Extension)" />
   </ItemGroup>
 
   <!-- The package's icon, packed at its root (NuGet's PackageIcon), replaces the deprecated PackageIconUrl, as

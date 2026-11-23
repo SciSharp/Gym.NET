@@ -4,15 +4,11 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.Drawing;
-using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using Gym.Environments;
 using NumSharp;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
-using Image = SixLabors.ImageSharp.Image;
 
 namespace Gym.Rendering.WinForm {
     /// <summary>
@@ -39,10 +35,20 @@ namespace Gym.Rendering.WinForm {
     ///     <c>WinFormEnvViewer</c> calls as <c>viewer.Close()</c>, is WinForms' own: it leaves the thread running and, with
     ///     input on, is reported as the user's close.
     ///     </para>
+    ///     <para>
+    ///     One screen pixel per frame pixel at any display scaling (DR-99): the form's thread is made per-monitor DPI aware
+    ///     before the form exists, so its client area, the mouse and the resizes are in physical pixels, WinForms' own
+    ///     auto-scaling is off, and a move to a monitor of another scale keeps the client area at the frame's size. The
+    ///     screen then shows the frame's own bytes, where a DPI-unaware window (pygame's, or this one before) is stretched
+    ///     by Windows on a scaled display. On such a display the window looks smaller than a scaled app's.
+    ///     </para>
     /// </remarks>
     public partial class WinFormEnvViewer : Form, IInteractiveEnvViewer, IAsyncEnvViewer {
-        /// <summary>The size of the last frame's BMP stream, to size the next one's buffer.</summary>
-        private int _lastSize = 0;
+        /// <summary>
+        ///     The client size the form keeps, in physical pixels: the frame size it was opened for, then the size of each
+        ///     frame shown, so a move to a monitor of another scale restores it (<see cref="OnDpiChanged"/>). Form's thread only.
+        /// </summary>
+        private System.Drawing.Size _frameSize;
 
         /// <summary>Set once the form is shown (<see cref="OnShown"/>); released as the form closes.</summary>
         private readonly ManualResetEventSlim _ready = new ManualResetEventSlim();
@@ -127,11 +133,15 @@ namespace Gym.Rendering.WinForm {
         /// <param name="created">Called on the form's thread once the form exists, before its message loop starts.</param>
         private static void Start(int width, int height, string title, Action<WinFormEnvViewer> created) {
             var thread = new Thread(() => {
+                // Before any window of this thread exists: the form's coordinates become physical pixels whatever the
+                // process declared, so the client area below is the frame's size on screen at any scaling (DR-99).
+                MakeThreadPerMonitorDpiAware();
                 var v = new WinFormEnvViewer(width + 12, height + 12, title);
                 // The picture shows a frame at its own size from the top-left corner (it does not scale), so the client
                 // area takes the frame's size; the outer size above only seeds the form. A title bar and borders take more
                 // than 12 pixels on Windows 10 and 11, which cropped about 27 rows off every frame's bottom before.
-                v.ClientSize = new System.Drawing.Size(width, height);
+                v._frameSize = new System.Drawing.Size(width, height);
+                v.ClientSize = v._frameSize;
                 created(v);
                 if (SystemInformation.UserInteractive) {
                     Application.Run(v);
@@ -153,6 +163,9 @@ namespace Gym.Rendering.WinForm {
         /// <param name="title">The title, or <see langword="null"/> to keep the designer's.</param>
         public WinFormEnvViewer(int width, int height, string title = null) {
             InitializeComponent();
+            // The designer's font scaling would grow the form and its picture by the display's scale on a scaled display,
+            // so the picture would no longer be the frame's size; the frame is shown pixel for pixel instead (DR-99).
+            AutoScaleMode = AutoScaleMode.None;
             Height = height;
             Width = width;
             if (title != null)
@@ -176,13 +189,13 @@ namespace Gym.Rendering.WinForm {
         /// <exception cref="ArgumentException">Thrown for a frame that is not <c>(H, W, 3)</c>.</exception>
         public void Render(NDArray frame) {
             // Copied on the caller's thread, so the caller may reuse the frame however the form's thread is scheduled.
-            Image<Rgb24> image = ViewerFrames.ToImage(frame);
+            byte[] bgra = ViewerFrames.ToBgra(frame, out int width, out int height);
             if (InvokeRequired) {
-                Invoke(new Action(() => Show(image)));
+                Invoke(new Action(() => Show(bgra, width, height)));
                 return;
             }
 
-            Show(image);
+            Show(bgra, width, height);
         }
 
         /// <summary>
@@ -197,16 +210,16 @@ namespace Gym.Rendering.WinForm {
         /// <exception cref="OperationCanceledException">Thrown, or through the task, when <paramref name="cancellationToken"/> is cancelled first.</exception>
         public ValueTask RenderAsync(NDArray frame, CancellationToken cancellationToken = default) {
             cancellationToken.ThrowIfCancellationRequested();
-            Image<Rgb24> image = ViewerFrames.ToImage(frame);
+            byte[] bgra = ViewerFrames.ToBgra(frame, out int width, out int height);
             if (!InvokeRequired) {
-                Show(image);
+                Show(bgra, width, height);
                 return default;
             }
 
             var shown = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             BeginInvoke(new Action(() => {
                 try {
-                    Show(image);
+                    Show(bgra, width, height);
                     shown.SetResult();
                 } catch (Exception e) {
                     shown.SetException(e);
@@ -215,17 +228,71 @@ namespace Gym.Rendering.WinForm {
             return new ValueTask(shown.Task.WaitAsync(cancellationToken));
         }
 
-        /// <summary>Puts an image into <see cref="PictureFrame"/> as a bitmap, disposing the image and the frame it replaces; on the form's thread.</summary>
-        /// <param name="image">The frame's image, which this disposes.</param>
-        private void Show(Image<Rgb24> image) {
-            using (image)
-            using (var ms = new MemoryStream(_lastSize)) {
-                image.SaveAsBmp(ms);
-                _lastSize = (int) ms.Length;
-                Clear();
-                PictureFrame.Image = new Bitmap(ms);
+        /// <summary>
+        ///     Puts a frame into <see cref="PictureFrame"/> as a new 32-bit bitmap of its pixels, disposing the bitmap it
+        ///     replaces, and remembers its size as the client size to keep; on the form's thread.
+        /// </summary>
+        /// <param name="bgra">The frame as opaque BGRA rows (<see cref="ViewerFrames.ToBgra"/>), copied into the bitmap.</param>
+        /// <param name="width">The frame's width.</param>
+        /// <param name="height">The frame's height.</param>
+        /// <remarks>
+        ///     The bitmap is filled row by row through <see cref="Bitmap.LockBits(System.Drawing.Rectangle, System.Drawing.Imaging.ImageLockMode, System.Drawing.Imaging.PixelFormat)"/>,
+        ///     GDI+'s stride kept, so its pixels are the frame's bytes; the picture box draws it unscaled at its top-left
+        ///     corner, which at one screen pixel per pixel (DR-99) leaves the screen holding the frame's bytes.
+        /// </remarks>
+        private void Show(byte[] bgra, int width, int height) {
+            var bitmap = new Bitmap(width, height, System.Drawing.Imaging.PixelFormat.Format32bppRgb);
+            System.Drawing.Imaging.BitmapData data = bitmap.LockBits(new System.Drawing.Rectangle(0, 0, width, height),
+                System.Drawing.Imaging.ImageLockMode.WriteOnly, System.Drawing.Imaging.PixelFormat.Format32bppRgb);
+            try {
+                // GDI+ may pad rows beyond 4 × width, so each row goes to its own stride
+                for (int row = 0; row < height; row++)
+                    System.Runtime.InteropServices.Marshal.Copy(bgra, row * width * 4, data.Scan0 + row * data.Stride, width * 4);
+            } finally {
+                bitmap.UnlockBits(data);
+            }
+
+            Clear();
+            PictureFrame.Image = bitmap;
+            _frameSize = new System.Drawing.Size(width, height);
+        }
+
+        /// <summary>
+        ///     Keeps the client area at the frame's size in physical pixels when the form moves to a monitor of another scale
+        ///     (DR-99): Windows proposes a window scaled by the new DPI, which would stretch the picture's area around an
+        ///     unscaled frame.
+        /// </summary>
+        /// <param name="e">The DPI change, passed on first.</param>
+        protected override void OnDpiChanged(DpiChangedEventArgs e) {
+            base.OnDpiChanged(e);
+            if (!_frameSize.IsEmpty)
+                ClientSize = _frameSize;
+        }
+
+        /// <summary>
+        ///     Makes the calling thread per-monitor DPI aware (version 2), so the windows it creates from now on are laid out
+        ///     and drawn in physical pixels whatever the process declared (DR-99). Windows before 10 1703 lack version 2 and
+        ///     keep the process's awareness.
+        /// </summary>
+        private static void MakeThreadPerMonitorDpiAware() {
+            try {
+                SetThreadDpiAwarenessContext(DpiAwarenessContextPerMonitorAwareV2);
+            } catch (EntryPointNotFoundException) {
+                // Windows 10 before 1607 has no thread DPI context: the process's awareness stays in force
             }
         }
+
+        /// <summary>
+        ///     <c>DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2</c>: physical pixels per monitor, with the non-client area and
+        ///     dialogs scaled by Windows.
+        /// </summary>
+        private static readonly IntPtr DpiAwarenessContextPerMonitorAwareV2 = new IntPtr(-4);
+
+        /// <summary>Win32's <c>SetThreadDpiAwarenessContext</c>: the DPI awareness of the windows the calling thread creates.</summary>
+        /// <param name="dpiContext">The awareness context.</param>
+        /// <returns>The previous context, or zero when the context is invalid.</returns>
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern IntPtr SetThreadDpiAwarenessContext(IntPtr dpiContext);
 
         /// <summary>Raises the <see cref="E:System.Windows.Forms.Form.Shown" /> event.</summary>
         /// <param name="e">A <see cref="T:System.EventArgs" /> that contains the event data. </param>

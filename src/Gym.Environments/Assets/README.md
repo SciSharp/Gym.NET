@@ -14,10 +14,11 @@ hashes in step when a re-pin re-copies the files.
 Each file is embedded under the resource name `assets/<path>` (forward slashes on every OS), read through
 `EnvAssets.Load` and decoded with `ImageIO.Load(Stream)`.
 
-Three kinds of file are not copies but recordings: `fonts/freesansbold-42.json`, CarRacing's score glyphs, recorded from
+Four kinds of file are not copies but recordings: `fonts/freesansbold-42.json`, CarRacing's score glyphs, recorded from
 pygame-ce (see [fonts](#fonts) below), `mujoco/*.json` with `mujoco/textures/*.png`, Gymnasium's MuJoCo models as
-the pinned MuJoCo compiles them (see [mujoco](#mujoco) below), and `mujoco/fonts/normal150.json`, MuJoCo's own overlay
-font (see [mujoco fonts](#mujoco-fonts) below). Their tables record the source each was made from.
+the pinned MuJoCo compiles them (see [mujoco](#mujoco) below), `mujoco/fonts/normal150.json`, MuJoCo's own overlay
+font (see [mujoco fonts](#mujoco-fonts) below), and `mujoco/gpu/*.bin`, the reference GPU's measured arithmetic (see
+[mujoco gpu](#mujoco-gpu) below). Their tables record the source each was made from.
 
 ## classic_control
 
@@ -209,3 +210,17 @@ The parity cell `MujocoWindowLiveParityTests.GymNet_Overlay_IsMujocosMjrOverlay`
 this font and with MuJoCo's own `mjr_overlay` and requires the pixels equal, so a MuJoCo re-pin that changes the font
 fails there. Re-convert from the new tag's file, downloaded into a folder of its own:
 `python -I tools/parity/mujoco/convert_font.py <normal150.inc> src/Gym.Environments/Assets/mujoco/fonts/normal150.json`.
+
+## mujoco gpu
+
+What the reference GPU computes where OpenGL leaves the arithmetic open, measured on that GPU and read by Gym.NET's
+MuJoCo renderer, so its frames equal the GPU frames Gymnasium returns (DR-98). Not copies of anything: each file is
+written by `tools/parity/mujoco/gpu_probe.py`, which also checks the embedded file against the GPU it runs on.
+
+| File | Measured on | Contents | SHA-256 |
+|---|---|---|---|
+| `mujoco/gpu/rcp.bin` | NVIDIA GeForce RTX 4060 Ti, driver 616.56, 2026-11-21 | The viewport stage's reciprocal `1/w`: for each of the 2^23 float32 mantissas, the GPU's result minus the correctly rounded one in ulps (-1, 0 or 1; 1,108,522 nonzero), two bits each, raw deflate after the header `GYMRCP1\0`; read by `GlReciprocal` | `7af85ece88b865f93c6783dd9edd85b5f6b9ec3c1a0f4585d0c5afd5d699757b` |
+
+Re-measure on the reference GPU (a new driver can change it):
+`python -I tools/parity/mujoco/gpu_probe.py --rcp-table src/Gym.Environments/Assets/mujoco/gpu/rcp.bin`; without the
+option the probe reports whether the embedded table still holds.

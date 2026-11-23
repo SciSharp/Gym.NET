@@ -8,8 +8,20 @@ the reference GPU's choices, measured with this script on 2026-11-12 (NVIDIA GeF
                 (GlContext.ToUnorm8)
     blend       the source colour and alpha are stored to 8 bits first, then blended exactly in integers, rounded
                 (GlContext.WriteSample)
-    resolve     the 4-sample resolve blit averages the samples' levels rounding a quarter up from three, a half down:
-                (sum + 1) >> 2 (MujocoFrame.ReadPixels)
+    resolve     the 4-sample resolve blit averages the samples' levels rounding a quarter up from three, a half down,
+                but the halves just below 16, 32, ..., 112 up (MujocoFrame.ResolveFour; every one of the 1,021 sums,
+                measured 2026-11-21)
+    matrices    the driver's stack: glMultMatrixf and glTranslatef sum pairwise, (a0 b0 + a1 b1) + (a2 b2 + a3 b3);
+                glFrustum divides double numerators by float32-rounded denominators; glOrtho is double, rounded once
+                (GlMath.MultiplyDriver, GlMath.Frustum, GlMath.Ortho)
+    vertex      the fixed-function position is fma(m12, w, fma(m8, z, fma(m4, y, m0 x))) over P * MV
+                (GlMath.TransformGpu)
+    rcp         the viewport stage's 1/w is faithful but not correctly rounded: 13% of mantissas one ulp off, measured
+                for all 2^23 into Assets/mujoco/gpu/rcp.bin (GlReciprocal.Of); z / w is RN(z * rcp(w))
+    snap        a vertex's window position is ((x rcp(w) + 1) 0.5) size in float32, snapped to 1/256 of a pixel with
+                ties to even (GlContext.Triangle), located through a screen-linear varying to 1e-4 of a pixel
+    ties        a sample exactly on an edge belongs to the triangle whose left or bottom edge it is, in OpenGL's y-up
+                window (GlContext.LeftOrBottom; measured 2026-11-22)
     centroid    an edge pixel's colour is evaluated at its first covered sample, texture coordinates at the pixel centre
                 (GlContext.RasterRows)
     split       GL_QUADS draws (0, 1, 2) and (0, 2, 3)
@@ -31,6 +43,8 @@ Usage (with the parity stack's interpreter, which has mujoco 4.0.0 and PyOpenGL)
 
 Args (command line):
     --out: where the dense level-of-detail table is written as log2_table.json; nothing is written without it.
+    --rcp-table: where the viewport reciprocal's table is written (Assets/mujoco/gpu/rcp.bin); without it, the
+        embedded table is checked against this GPU.
 
 Returns (exit code): 0 when every exact model reproduces every measured value (lod_norm and mipmaps report their known,
 fitted shortfalls without failing); 1 otherwise.
@@ -58,6 +72,18 @@ void main() {
     ivec2 p = ivec2(gl_FragCoord.xy);
     gl_FragColor = texelFetch(ms, ivec2(p.x / 4, p.y), p.x % 4);
 }
+"""
+# writes sample s of each pixel from a lookup texture holding four samples per pixel side by side
+WRITE_SAMPLE = """
+#version 330 compatibility
+uniform sampler2D lut;
+uniform int s;
+void main() { ivec2 p = ivec2(gl_FragCoord.xy); gl_FragColor = texelFetch(lut, ivec2(p.x * 4 + s, p.y), 0); }
+"""
+# the fixed-function position, which GLSL defines ftransform() to reproduce exactly
+FTRANSFORM = """
+#version 120
+void main() { gl_Position = ftransform(); }
 """
 
 
@@ -421,10 +447,446 @@ def probe_multisample(ctx: Context) -> bool:
     smp = fetch_samples(ctx, tex, prog)[..., :3]
     total = smp.sum(axis=2)
     mixed = (smp.max(axis=2) != smp.min(axis=2)).any(axis=2)
-    ok = ((total + 1) // 4 == resolved).all(axis=2)
-    report("resolve", int(ok[mixed].sum()), int(mixed.sum()), False,
-           "pixels whose samples differ: (sum + 1) >> 2; the rest round a few halves up")
+    ok = (resolve4(total) == resolved).all(axis=2)
+    report("resolve", int(ok[mixed].sum()), int(mixed.sum()), True,
+           "pixels whose samples differ, against MujocoFrame.ResolveFour")
     return good & report("resolve.eq", int(ok[~mixed].sum()), int((~mixed).sum()), True, "pixels whose samples agree")
+def resolve4(total):
+    """Gym.NET's model of the 4-sample resolve (MujocoFrame.ResolveFour), by the sum of the four levels.
+
+    Args:
+        total: the sums, any integer array.
+    Returns:
+        The resolved levels: (sum + 1) >> 2, with the exact halves just below 16, 32, ..., 112 rounded up.
+    """
+    level = (total + 1) >> 2
+    up = ((total & 3) == 2) & ((total >> 2) < 127) & (((total >> 2) & 15) == 15)
+    return level + up
+
+
+def probe_resolve_sums(ctx: Context) -> bool:
+    """Every possible sum of four sample levels through the resolve blit: samples written one at a time through the
+    sample mask from a lookup texture, the multisample texture resolved by glBlitFramebuffer as mjr_readPixels does.
+
+    Args:
+        ctx: the context.
+    Returns:
+        Whether MujocoFrame.ResolveFour reproduced every resolved level.
+    """
+    rng = np.random.default_rng(11)
+    w, h = 256, 128
+    vals = rng.integers(0, 256, size=(h, w, 4, 4))
+    near = np.clip(rng.integers(0, 255, size=(h, w, 1, 4)) + rng.integers(0, 2, size=(h, w, 4, 4)), 0, 255)
+    vals = np.where((rng.integers(0, 2, size=(h, w)) == 1)[..., None, None], near, vals)
+    vals[..., 3] = 255
+    lut = GL.glGenTextures(1)
+    GL.glBindTexture(GL.GL_TEXTURE_2D, lut)
+    GL.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_MIN_FILTER, GL.GL_NEAREST)
+    GL.glTexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_MAG_FILTER, GL.GL_NEAREST)
+    GL.glTexImage2D(GL.GL_TEXTURE_2D, 0, GL.GL_RGBA8, w * 4, h, 0, GL.GL_RGBA, GL.GL_UNSIGNED_BYTE,
+                    np.ascontiguousarray(vals.reshape(h, w * 4, 4).astype(np.uint8)).tobytes())
+    tex, fbo, _ = ms_texture()
+    write = shaders.compileProgram(shaders.compileShader(WRITE_SAMPLE, GL.GL_FRAGMENT_SHADER))
+    GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, fbo)
+    GL.glViewport(0, 0, w, h)
+    GL.glMatrixMode(GL.GL_PROJECTION)
+    GL.glLoadIdentity()
+    GL.glOrtho(0, w, 0, h, -1, 1)
+    GL.glClear(GL.GL_COLOR_BUFFER_BIT)
+    GL.glUseProgram(write)
+    GL.glActiveTexture(GL.GL_TEXTURE0)
+    GL.glBindTexture(GL.GL_TEXTURE_2D, lut)
+    GL.glUniform1i(GL.glGetUniformLocation(write, "lut"), 0)
+    GL.glEnable(GL.GL_SAMPLE_MASK)
+    for s in range(4):
+        GL.glSampleMaski(0, 1 << s)
+        GL.glUniform1i(GL.glGetUniformLocation(write, "s"), s)
+        quad(0, 0, w, h)
+    GL.glDisable(GL.GL_SAMPLE_MASK)
+    GL.glUseProgram(0)
+    GL.glBindFramebuffer(GL.GL_READ_FRAMEBUFFER, fbo)
+    GL.glBindFramebuffer(GL.GL_DRAW_FRAMEBUFFER, ctx.fbo)
+    GL.glBlitFramebuffer(0, 0, w, h, 0, 0, w, h, GL.GL_COLOR_BUFFER_BIT, GL.GL_NEAREST)
+    GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, ctx.fbo)
+    resolved = Context.read(w, h)[..., :3]
+    total = vals[..., :3].sum(axis=2)
+    ok = resolve4(total) == resolved
+    sums = len(np.unique(total))
+    return report("resolve4", int(ok.sum()), ok.size, True, f"every channel, {sums} distinct sums of the 1,021 possible")
+
+
+def pair_product(a, b):
+    """GlMath.MultiplyDriver: the driver's 4x4 product, each element's four products summed pairwise in float32.
+
+    Args:
+        a: the current matrix, column-major float32[16].
+        b: the matrix it is multiplied by.
+    Returns:
+        The product, float32[16].
+    """
+    f32 = np.float32
+    out = np.zeros(16, np.float32)
+    for c in range(4):
+        for r in range(4):
+            p = [f32(a[k * 4 + r] * b[c * 4 + k]) for k in range(4)]
+            out[c * 4 + r] = f32(f32(p[0] + p[1]) + f32(p[2] + p[3]))
+    return out
+
+
+def probe_matrix_stack() -> bool:
+    """The driver's matrix stack read back with glGetFloatv after random glTranslatef, glMultMatrixf, glFrustum and
+    glOrtho calls, against GlMath.MultiplyDriver's pairwise sums and GlMath.Frustum's and GlMath.Ortho's elements.
+
+    Returns:
+        Whether every element matched.
+    """
+    rng = np.random.default_rng(1)
+    f32 = np.float32
+    ok = total = 0
+    GL.glMatrixMode(GL.GL_MODELVIEW)
+    for _ in range(100):
+        a, b = rng.uniform(-3, 3, 16).astype(np.float32), rng.uniform(-3, 3, 16).astype(np.float32)
+        GL.glLoadMatrixf(a)
+        GL.glMultMatrixf(b)
+        ok += int((pair_product(a, b) == np.array(GL.glGetFloatv(GL.GL_MODELVIEW_MATRIX), np.float32).reshape(16)).sum())
+        v = rng.uniform(-5, 5, 3).astype(np.float32)
+        t = np.array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, v[0], v[1], v[2], 1], np.float32)
+        GL.glLoadMatrixf(a)
+        GL.glTranslatef(float(v[0]), float(v[1]), float(v[2]))
+        ok += int((pair_product(a, t) == np.array(GL.glGetFloatv(GL.GL_MODELVIEW_MATRIX), np.float32).reshape(16)).sum())
+        total += 32
+    ts = np.array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, -0.5, 0, 0, 0, 0.5, 1], np.float32)
+    GL.glMatrixMode(GL.GL_PROJECTION)
+    for k in range(200):
+        n, f = sorted(rng.uniform(0.001, 60, 2))
+        if k % 2 == 0:
+            w, h = rng.uniform(0.001, 0.2, 2)
+            l, r, b, t = -w, w, -h, h
+            rl, tb, fn = float(f32(r - l)), float(f32(t - b)), float(f32(f - n))
+            m = np.array([2 * n / rl, 0, 0, 0, 0, 2 * n / tb, 0, 0, (r + l) / rl, (t + b) / tb, -(f + n) / fn, -1,
+                          0, 0, -2 * f * n / fn, 0], np.float64).astype(np.float32)
+        else:
+            c = rng.uniform(0.5, 20)
+            l, r, b, t = -c, c, -c, c
+            m = np.array([2 / (r - l), 0, 0, 0, 0, 2 / (t - b), 0, 0, 0, 0, -2 / (f - n), 0,
+                          -(r + l) / (r - l), -(t + b) / (t - b), -(f + n) / (f - n), 1], np.float64).astype(np.float32)
+        GL.glLoadIdentity()
+        GL.glTranslatef(0.0, 0.0, 0.5)
+        GL.glScalef(1.0, 1.0, -0.5)
+        (GL.glFrustum if k % 2 == 0 else GL.glOrtho)(float(l), float(r), float(b), float(t), float(n), float(f))
+        ok += int((pair_product(ts, m) == np.array(GL.glGetFloatv(GL.GL_PROJECTION_MATRIX), np.float32).reshape(16)).sum())
+        total += 16
+    GL.glLoadIdentity()
+    GL.glMatrixMode(GL.GL_MODELVIEW)
+    GL.glLoadIdentity()
+    return report("matrices", ok, total, True, "glMultMatrixf/glTranslatef pairwise, glFrustum/glOrtho elements")
+
+
+def probe_vertex() -> bool:
+    """The fixed-function position (GLSL's ftransform(), captured by transform feedback) against GlMath.TransformGpu
+    over the projection times the modelview.
+
+    Returns:
+        Whether every component matched.
+    """
+    import ctypes
+    rng = np.random.default_rng(2)
+    prog = GL.glCreateProgram()
+    GL.glAttachShader(prog, shaders.compileShader(FTRANSFORM, GL.GL_VERTEX_SHADER))
+    names = (ctypes.c_char_p * 1)(b"gl_Position")
+    GL.glTransformFeedbackVaryings(prog, 1, ctypes.cast(names, ctypes.POINTER(ctypes.POINTER(GL.GLchar))), GL.GL_INTERLEAVED_ATTRIBS)
+    GL.glLinkProgram(prog)
+    GL.glEnable(GL.GL_RASTERIZER_DISCARD)
+    buf = GL.glGenBuffers(1)
+    f32 = np.float32
+    ok = total = 0
+    for _ in range(100):
+        p = np.zeros(16, np.float32)
+        p[0], p[5] = rng.uniform(1, 10, 2)
+        p[8], p[9] = rng.uniform(-0.5, 0.5, 2)
+        p[10], p[11], p[14] = rng.uniform(0.4, 0.6), -1, rng.uniform(0.001, 0.1)
+        mv = rng.uniform(-2, 2, 16).astype(np.float32)
+        mv[3] = mv[7] = mv[11] = 0
+        mv[15] = 1
+        v = rng.uniform(-3, 3, (16, 3)).astype(np.float32)
+        GL.glMatrixMode(GL.GL_PROJECTION)
+        GL.glLoadMatrixf(p)
+        GL.glMatrixMode(GL.GL_MODELVIEW)
+        GL.glLoadMatrixf(mv)
+        GL.glBindBuffer(GL.GL_TRANSFORM_FEEDBACK_BUFFER, buf)
+        GL.glBufferData(GL.GL_TRANSFORM_FEEDBACK_BUFFER, 16 * 16, None, GL.GL_STATIC_READ)
+        GL.glBindBufferBase(GL.GL_TRANSFORM_FEEDBACK_BUFFER, 0, buf)
+        GL.glUseProgram(prog)
+        GL.glBeginTransformFeedback(GL.GL_POINTS)
+        GL.glBegin(GL.GL_POINTS)
+        for x, y, z in v:
+            GL.glVertex3f(float(x), float(y), float(z))
+        GL.glEnd()
+        GL.glEndTransformFeedback()
+        GL.glUseProgram(0)
+        got = np.frombuffer(GL.glGetBufferSubData(GL.GL_TRANSFORM_FEEDBACK_BUFFER, 0, 256), np.float32).reshape(16, 4)
+        mvp = pair_product(p, mv)
+        for (x, y, z), g in zip(v, got):
+            for r in range(4):
+                # fma(m12, 1, fma(m8, z, fma(m4, y, m0 x))): each fused step is exact in float64, then rounded once
+                acc = f32(mvp[r] * x)
+                acc = f32(float(mvp[4 + r]) * float(y) + float(acc))
+                acc = f32(float(mvp[8 + r]) * float(z) + float(acc))
+                acc = f32(float(mvp[12 + r]) + float(acc))
+                ok += int(acc == g[r])
+                total += 1
+    GL.glDisable(GL.GL_RASTERIZER_DISCARD)
+    GL.glMatrixMode(GL.GL_PROJECTION)
+    GL.glLoadIdentity()
+    GL.glMatrixMode(GL.GL_MODELVIEW)
+    GL.glLoadIdentity()
+    return report("vertex", ok, total, True, "ftransform() = fused x, y, z, w chain over P*MV")
+
+
+def measure_rcp() -> np.ndarray:
+    """The viewport stage's reciprocal 1/w for every mantissa: points at (x, y, 1, w) store rcp(w) as their depth.
+
+    Returns:
+        The 2^23 reciprocals of w = 1 + k * 2^-23, float32.
+    """
+    import ctypes
+    w_px, h_px = 4096, 2048
+    fbo = GL.glGenFramebuffers(1)
+    GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, fbo)
+    rb = GL.glGenRenderbuffers(1)
+    GL.glBindRenderbuffer(GL.GL_RENDERBUFFER, rb)
+    GL.glRenderbufferStorage(GL.GL_RENDERBUFFER, GL.GL_DEPTH32F_STENCIL8, w_px, h_px)
+    GL.glFramebufferRenderbuffer(GL.GL_FRAMEBUFFER, GL.GL_DEPTH_STENCIL_ATTACHMENT, GL.GL_RENDERBUFFER, rb)
+    GL.glDrawBuffer(GL.GL_NONE)
+    GL.glReadBuffer(GL.GL_NONE)
+    GL.glClipControl(GL.GL_LOWER_LEFT, GL.GL_ZERO_TO_ONE)
+    GL.glViewport(0, 0, w_px, h_px)
+    GL.glPointSize(1.0)
+    GL.glMatrixMode(GL.GL_PROJECTION)
+    GL.glLoadIdentity()
+    GL.glMatrixMode(GL.GL_MODELVIEW)
+    GL.glLoadIdentity()
+    GL.glClearDepth(0)
+    GL.glClear(GL.GL_DEPTH_BUFFER_BIT)
+    GL.glEnable(GL.GL_DEPTH_TEST)
+    GL.glDepthFunc(GL.GL_ALWAYS)
+    k = np.arange(w_px * h_px, dtype=np.int64)
+    w = (1.0 + k / 2.0 ** 23).astype(np.float32)
+    verts = np.empty((w_px * h_px, 4), np.float32)
+    verts[:, 0] = (((k % w_px) + 0.5) / w_px * 2 - 1) * w
+    verts[:, 1] = (((k // w_px) + 0.5) / h_px * 2 - 1) * w
+    verts[:, 2] = 1.0
+    verts[:, 3] = w
+    vbo = GL.glGenBuffers(1)
+    GL.glBindBuffer(GL.GL_ARRAY_BUFFER, vbo)
+    GL.glBufferData(GL.GL_ARRAY_BUFFER, verts.nbytes, verts, GL.GL_STATIC_DRAW)
+    GL.glEnableClientState(GL.GL_VERTEX_ARRAY)
+    GL.glVertexPointer(4, GL.GL_FLOAT, 0, ctypes.c_void_p(0))
+    GL.glDrawArrays(GL.GL_POINTS, 0, w_px * h_px)
+    GL.glDisableClientState(GL.GL_VERTEX_ARRAY)
+    depth = np.frombuffer(GL.glReadPixels(0, 0, w_px, h_px, GL.GL_DEPTH_COMPONENT, GL.GL_FLOAT), np.float32).reshape(-1).copy()
+    GL.glClipControl(GL.GL_LOWER_LEFT, GL.GL_NEGATIVE_ONE_TO_ONE)
+    GL.glDisable(GL.GL_DEPTH_TEST)
+    GL.glBindBuffer(GL.GL_ARRAY_BUFFER, 0)
+    return depth
+
+
+def probe_rcp(table_path) -> bool:
+    """The viewport stage's reciprocal against the embedded table (Assets/mujoco/gpu/rcp.bin), and, with table_path,
+    writes that table: per mantissa of w, the hardware's 1/w minus the correctly rounded one in ulps (-1, 0 or 1), two
+    bits each (code = delta + 1, four to a byte, the first in the low bits), raw-deflated after an 8-byte header.
+
+    Args:
+        table_path: where to write the table, or None.
+    Returns:
+        Whether the table (written or embedded) reproduced every reciprocal.
+    """
+    import zlib
+    hw = measure_rcp()
+    k = np.arange(2 ** 23)
+    rn = (np.float32(1) / (1.0 + k / 2.0 ** 23).astype(np.float32)).astype(np.float32)
+    delta = hw.view(np.int32).astype(np.int64) - rn.view(np.int32).astype(np.int64)
+    if not np.all(np.abs(delta) <= 1):
+        return report("rcp", 0, 1, True, "a reciprocal more than one ulp from the rounded one: the table cannot hold it")
+    code = (delta + 1).astype(np.uint8)
+    packed = (code[0::4] | (code[1::4] << 2) | (code[2::4] << 4) | (code[3::4] << 6)).astype(np.uint8)
+    if table_path:
+        comp = zlib.compressobj(9, zlib.DEFLATED, -15)
+        blob = b"GYMRCP1\0" + comp.compress(packed.tobytes()) + comp.flush()
+        with open(table_path, "wb") as f:
+            f.write(blob)
+    path = table_path or os.path.join(REPO, "src", "Gym.Environments", "Assets", "mujoco", "gpu", "rcp.bin")
+    with open(path, "rb") as f:
+        stored = np.frombuffer(zlib.decompress(f.read()[8:], -15), np.uint8)
+    ok = int(np.sum(stored == packed)) * 4 if stored.size == packed.size else 0
+    return report("rcp", ok, 2 ** 23, True, f"1/w per mantissa, {int((delta != 0).sum())} one ulp off the rounded value")
+
+
+def rcp_table() -> np.ndarray:
+    """The embedded viewport reciprocal table (Assets/mujoco/gpu/rcp.bin) unpacked: per mantissa, the hardware's 1/w
+    minus the correctly rounded one, in ulps.
+
+    Returns:
+        2^23 int64 deltas (-1, 0 or 1).
+    Raises:
+        OSError: when the table is missing.
+    """
+    import zlib
+    with open(os.path.join(REPO, "src", "Gym.Environments", "Assets", "mujoco", "gpu", "rcp.bin"), "rb") as f:
+        packed = np.frombuffer(zlib.decompress(f.read()[8:], -15), np.uint8)
+    codes = np.empty(packed.size * 4, np.int64)
+    for k in range(4):
+        codes[k::4] = (packed >> (2 * k)) & 3
+    return codes - 1
+
+
+def rcp_gpu(w: np.float32, deltas: np.ndarray) -> np.float32:
+    """Gym.NET's model of the viewport stage's 1/w (GlReciprocal.Of) for a positive normal float32.
+
+    Args:
+        w: the clip w.
+        deltas: rcp_table()'s deltas.
+    Returns:
+        The rounded reciprocal of w's mantissa moved by the table's delta, scaled back by w's exponent.
+    """
+    bits = int(np.array([w], np.float32).view(np.int32)[0])
+    e = ((bits >> 23) & 0xFF) - 127
+    m = np.array([(bits & 0x7FFFFF) | (127 << 23)], np.int32).view(np.float32)[0]
+    r = np.array([np.float32(1) / m], np.float32).view(np.int32)[0] + deltas[bits & 0x7FFFFF]
+    return np.float32(float(np.array([r], np.int32).view(np.float32)[0]) * 2.0 ** (-e))
+
+
+SNAP_VS = """
+#version 330 compatibility
+noperspective out float lam;
+void main() { gl_Position = gl_Vertex; lam = gl_MultiTexCoord0.x; }
+"""
+SNAP_FS = """
+#version 330 compatibility
+noperspective in float lam;
+out vec4 color;
+void main() { color = vec4(lam, 0, 0, 1); }
+"""
+
+
+def probe_snap() -> bool:
+    """Where the rasterizer puts a vertex given in clip coordinates, against GlContext.Triangle's window transform.
+
+    For each trial a vertex V gets random clip coordinates (w from 0.05 to 60); two triangles (V, P1, P2) and
+    (V, P3, P4), their far vertices at exact window positions on the 1/256 grid, are drawn with a noperspective varying
+    that is 1 at V and 0 at the others, stored as float32. The varying is a plane over each triangle's pixels that
+    reaches 1 on a line through V, so fitting both planes and intersecting the two lines locates the GPU's snapped V to
+    about 1e-4 of a pixel, well inside the grid's 1/256.
+
+    Returns:
+        Whether the model, ((x * rcp(w) + 1) * 0.5) * size in float32 rounded to 1/256 with ties to even, put every
+        located vertex on the GPU's grid point.
+    """
+    f32 = np.float32
+    sw, sh = 1024, 512
+    deltas = rcp_table()
+    rng = np.random.default_rng(7)
+    fbo = GL.glGenFramebuffers(1)
+    GL.glBindFramebuffer(GL.GL_FRAMEBUFFER, fbo)
+    rb = GL.glGenRenderbuffers(1)
+    GL.glBindRenderbuffer(GL.GL_RENDERBUFFER, rb)
+    GL.glRenderbufferStorage(GL.GL_RENDERBUFFER, GL.GL_R32F, sw, sh)
+    GL.glFramebufferRenderbuffer(GL.GL_FRAMEBUFFER, GL.GL_COLOR_ATTACHMENT0, GL.GL_RENDERBUFFER, rb)
+    GL.glDrawBuffer(GL.GL_COLOR_ATTACHMENT0)
+    GL.glReadBuffer(GL.GL_COLOR_ATTACHMENT0)
+    # MuJoCo's clip control: the window depth is z / w, and the transform below is the one its frames go through
+    GL.glClipControl(GL.GL_LOWER_LEFT, GL.GL_ZERO_TO_ONE)
+    GL.glViewport(0, 0, sw, sh)
+    for cap in (GL.GL_LIGHTING, GL.GL_BLEND, GL.GL_CULL_FACE, GL.GL_DITHER, GL.GL_DEPTH_TEST, GL.GL_MULTISAMPLE):
+        GL.glDisable(cap)
+    prog = shaders.compileProgram(shaders.compileShader(SNAP_VS, GL.GL_VERTEX_SHADER),
+                                  shaders.compileShader(SNAP_FS, GL.GL_FRAGMENT_SHADER))
+    ok = total = 0
+    worst = 0.0
+    for _ in range(100):
+        wv = f32(np.exp(rng.uniform(np.log(0.05), np.log(60))))
+        xw, yw = rng.uniform(300, 700), rng.uniform(150, 350)
+        xc, yc, zc = f32((xw / sw * 2 - 1) * wv), f32((yw / sh * 2 - 1) * wv), f32(wv * 0.5)
+        base = rng.uniform(0, 2 * np.pi)
+        far = []
+        for a in (base, base + 0.9, base + 2.2, base + 3.1):
+            r = rng.uniform(120, 160)
+            far.append((np.round((xw + r * np.cos(a)) * 256) / 256, np.round((yw + r * np.sin(a)) * 256) / 256))
+        lines = []
+        for pa, pb in ((far[0], far[1]), (far[2], far[3])):
+            GL.glClearColor(-1, 0, 0, 0)
+            GL.glClear(GL.GL_COLOR_BUFFER_BIT)
+            GL.glUseProgram(prog)
+            GL.glBegin(GL.GL_TRIANGLES)
+            GL.glTexCoord1f(1.0)
+            GL.glVertex4f(float(xc), float(yc), float(zc), float(wv))
+            for px, py in (pa, pb):
+                GL.glTexCoord1f(0.0)
+                GL.glVertex4f(float(f32(px / sw * 2 - 1)), float(f32(py / sh * 2 - 1)), 0.5, 1.0)
+            GL.glEnd()
+            GL.glUseProgram(0)
+            img = np.frombuffer(GL.glReadPixels(0, 0, sw, sh, GL.GL_RED, GL.GL_FLOAT), np.float32).reshape(sh, sw)
+            ys, xs = np.nonzero(img >= 0)
+            A = np.c_[xs + 0.5, ys + 0.5, np.ones(xs.size)]
+            coef, *_ = np.linalg.lstsq(A, img[ys, xs].astype(np.float64), rcond=None)
+            lines.append(coef)
+        (a1, b1, c1), (a2, b2, c2) = lines
+        vx, vy = np.linalg.solve(np.array([[a1, b1], [a2, b2]]), np.array([1 - c1, 1 - c2]))
+        worst = max(worst, abs(vx * 256 - round(vx * 256)), abs(vy * 256 - round(vy * 256)))
+        inv = rcp_gpu(wv, deltas)
+        for c, size, got in ((xc, sw, vx), (yc, sh, vy)):
+            win = f32(f32(f32(f32(c * inv) + f32(1)) * f32(0.5)) * f32(size))
+            ok += int(int(np.round(float(win) * 256)) == round(got * 256))
+            total += 1
+    GL.glClipControl(GL.GL_LOWER_LEFT, GL.GL_NEGATIVE_ONE_TO_ONE)
+    return report("snap", ok, total, True,
+                  f"window x and y of vertices at w 0.05 to 60 (located within {worst:.4f} of a 1/256 step)")
+
+
+def probe_ties(ctx: Context) -> bool:
+    """Which triangle owns a pixel centre lying exactly on the edge two triangles share, against
+    GlContext.LeftOrBottom: horizontal, vertical and sloped edges through rows of pixel centres, both windings.
+
+    Args:
+        ctx: the context (single-sampled, so the sample is the pixel centre; window coordinates are exact through its
+            orthographic projection).
+    Returns:
+        Whether every centre on a shared edge went to the triangle the rule names.
+    """
+    rng = np.random.default_rng(8)
+    ok = total = 0
+    directions = [(1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (-1, 1), (1, -1), (-1, -1), (2, 1), (1, 2), (-2, 1),
+                  (1, -2), (3, -1), (-1, -3)]
+    for dx, dy in directions:
+        for ccw in (True, False):
+            steps = 40 // max(abs(dx), abs(dy))
+            ax, ay = 200.5 + rng.integers(-20, 20), 200.5 + rng.integers(-20, 20)
+            bx, by = ax + steps * dx, ay + steps * dy
+            # the two third vertices, one on each side of the edge from A to B, 30 pixels away along its normal
+            nl = math.hypot(dx, dy)
+            left = (ax + (bx - ax) / 2 - 30 * dy / nl, ay + (by - ay) / 2 + 30 * dx / nl)
+            right = (ax + (bx - ax) / 2 + 30 * dy / nl, ay + (by - ay) / 2 - 30 * dx / nl)
+            for third in (left, right):
+                tri = [(ax, ay), (bx, by), third]
+                area = (bx - ax) * (third[1] - ay) - (third[0] - ax) * (by - ay)
+                if (area > 0) != ccw:
+                    tri = [tri[0], tri[2], tri[1]]
+                ctx.reset()
+                GL.glBegin(GL.GL_TRIANGLES)
+                for x, y in tri:
+                    GL.glVertex2f(float(x), float(y))
+                GL.glEnd()
+                img = ctx.read()
+                # the shared edge oriented as the counter-clockwise triangle walks it
+                ex0, ey0, ex1, ey1 = (ax, ay, bx, by) if area > 0 else (bx, by, ax, ay)
+                owns = ey1 < ey0 or (ey1 == ey0 and ex1 > ex0)
+                for j in range(1, steps):
+                    px, py = int(ax + j * dx), int(ay + j * dy)
+                    ok += int((img[py, px, 0] > 0) == owns)
+                    total += 1
+    ctx.reset()
+    return report("ties", ok, total, True, "pixel centres on shared edges, 14 directions, both windings")
+
 
 
 def probe_split(ctx: Context) -> bool:
@@ -800,6 +1262,7 @@ def main() -> int:
     """
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--out", default=None, help="a directory for log2_table.json")
+    parser.add_argument("--rcp-table", default=None, help="writes the viewport reciprocal's table (Assets/mujoco/gpu/rcp.bin)")
     args = parser.parse_args()
     ctx = Context()
     print(f"GPU: {GL.glGetString(GL.GL_RENDERER).decode()} | OpenGL {GL.glGetString(GL.GL_VERSION).decode()}")
@@ -807,6 +1270,7 @@ def main() -> int:
     good = probe_store(ctx)
     good &= probe_blend(ctx)
     good &= probe_multisample(ctx)
+    good &= probe_resolve_sums(ctx)
     good &= probe_split(ctx)
     good &= probe_lighting(ctx)
     good &= probe_bilinear(ctx)
@@ -814,6 +1278,12 @@ def main() -> int:
     good &= table_ok
     good &= probe_lod_norm(ctx, table)
     good &= probe_lod_quad(ctx, table)
+    good &= probe_matrix_stack()
+    good &= probe_vertex()
+    good &= probe_rcp(args.rcp_table)
+    good &= probe_snap()
+    good &= probe_ties(ctx)
+    # last: closing its Gymnasium env terminates GLFW, and every context with it
     good &= probe_mipmaps()
     print("every exact model held" if good else "some exact model missed: Gym.NET's frames will drift on this GPU")
     return 0 if good else 1

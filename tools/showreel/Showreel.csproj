@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- The front-page showreel: plays every visually distinct built-in env under a scripted or trained policy, composes
-       the synthwave video (docs/media/gym-net-showreel.mp4), the README's animation, its 51 s cut as animated WebP
+  <!-- The front-page showreel: plays every visually distinct built-in env under a scripted policy or a published expert
+       agent, composes the video (docs/media/gym-net-showreel.mp4), the README's animation, its cut as animated WebP
        (docs/media/gym-net-hero.webp), and the docs site's cartridge gallery (docs/website-src/images/envs), and proves
        its parity segment against Gymnasium running in Python. Not part of Gym.NET.sln; nothing ships from here.
        README.md has the commands. -->
@@ -25,11 +25,19 @@
     <ProjectReference Include="..\..\src\Gym.Environments\Gym.Environments.csproj" />
   </ItemGroup>
 
-  <!-- The Python half of the parity segment, run as a separate process, and the MuJoCo policies the recipes play
-       (trained by the train command) sit next to the program. -->
+  <!-- The Python half of the parity segment, run as a separate process, and the ARS policies the train command writes
+       sit next to the program. -->
   <ItemGroup>
     <None Include="gymnasium_replay.py" CopyToOutputDirectory="PreserveNewest" />
     <None Include="policies\*.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <!-- The expert agents the MuJoCo envs and the hardcore walker play (DR-109), and their reader, taken from their home
+       in the unit tests, so the showreel plays exactly the agents the tests measure: agents\<id>.json next to the
+       program. -->
+  <ItemGroup>
+    <Compile Include="..\..\tests\Gym.Tests\Agents\ExpertPolicy.cs" Link="Agents\ExpertPolicy.cs" />
+    <None Include="..\..\tests\Gym.Tests\Agents\*.json" Link="agents\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <!-- What the Gym.NET.Environments package's buildTransitive targets do for a C# app (DR-17): register the built-in

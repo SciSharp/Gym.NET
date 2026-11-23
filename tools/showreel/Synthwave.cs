@@ -17,7 +17,7 @@ namespace Gym.Showreel;
 ///     The palette and the procedural mountains come from fixed seeds and constants, so two runs draw identical pixels.
 ///     </para>
 /// </remarks>
-internal sealed class Synthwave {
+internal sealed class Synthwave : IBackdrop {
     /// <summary>Seconds for the grid floor to scroll one line spacing: the floor's loop period.</summary>
     public const double GridPeriod = 0.75;
 

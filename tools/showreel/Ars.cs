@@ -15,7 +15,8 @@ namespace Gym.Showreel;
 /// <summary>
 ///     Augmented Random Search, V2-t (Mania, Guy and Recht, "Simple random search provides a competitive approach to
 ///     reinforcement learning", 2018): trains a <see cref="LinearPolicy"/> on any registered env with a Box action space,
-///     through <c>Gymnasium.Make</c>, rollouts in parallel. The showreel's MuJoCo policies come from it.
+///     through <c>Gymnasium.Make</c>, rollouts in parallel. The showreel's MuJoCo envs played its policies until DR-109
+///     gave them published expert agents; the policies stay in <c>tools/showreel/policies</c> as the record.
 /// </summary>
 /// <remarks>
 ///     <para>

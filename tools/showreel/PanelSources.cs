@@ -25,7 +25,10 @@ internal interface IPanelSource : IDisposable {
     RgbImage FrameAt(double t);
 }
 
-/// <summary>A panel source playing an <see cref="EpisodeRecipe"/> live, at its speed from a start time.</summary>
+/// <summary>
+///     A panel source playing an <see cref="EpisodeRecipe"/> live, at its speed from a start time, optionally
+///     fast-forwarding from a later tick on.
+/// </summary>
 internal sealed class EpisodeSource : IPanelSource {
     /// <summary>The player.</summary>
     private readonly EpisodePlayer _player;
@@ -39,16 +42,30 @@ internal sealed class EpisodeSource : IPanelSource {
     /// <summary>The tick shown at <see cref="_start"/> (non-zero to join an episode mid-way).</summary>
     private readonly int _startTick;
 
+    /// <summary>The tick from which the episode plays <see cref="_skipSpeed"/> times faster, or <see cref="int.MaxValue"/> for never.</summary>
+    private readonly int _skipFrom;
+
+    /// <summary>The factor on <see cref="_ticksPerSecond"/> from <see cref="_skipFrom"/> on.</summary>
+    private readonly double _skipSpeed;
+
     /// <summary>Creates the player and advances it to the start tick (stepping without rendering).</summary>
     /// <param name="recipe">The episode.</param>
     /// <param name="start">Storyboard seconds at which it starts playing.</param>
     /// <param name="speed">Factor on the recipe's own speed.</param>
     /// <param name="startTick">The tick to join at; 0 plays from the reset.</param>
-    public EpisodeSource(EpisodeRecipe recipe, double start, double speed, int startTick) {
+    /// <param name="skipFrom">
+    ///     The tick from which to play <paramref name="skipSpeed"/> times faster, or <see langword="null"/> to keep one
+    ///     speed: LunarLander's 4 s scene plays its descent at its own speed, then skips through the 180 steps it rests on
+    ///     the pad, so the LANDED! verdict still lands on screen (DR-107).
+    /// </param>
+    /// <param name="skipSpeed">The factor from <paramref name="skipFrom"/> on; above 1 fast-forwards.</param>
+    public EpisodeSource(EpisodeRecipe recipe, double start, double speed, int startTick, int? skipFrom = null, double skipSpeed = 1) {
         _player = new EpisodePlayer(recipe);
         _start = start;
         _ticksPerSecond = recipe.StepsPerSecond * speed;
         _startTick = startTick;
+        _skipFrom = skipFrom is int from && from > startTick ? from : int.MaxValue;
+        _skipSpeed = skipSpeed;
         _player.AdvanceTo(startTick);
     }
 
@@ -62,11 +79,20 @@ internal sealed class EpisodeSource : IPanelSource {
     public string? Stamp => _player.Stamp;
 
     /// <inheritdoc />
-    public double StampAge => (_player.Tick - _player.StampTick) / _ticksPerSecond;
+    /// <remarks>
+    ///     Ticks after <see cref="_skipFrom"/> pass <see cref="_skipSpeed"/> times faster, so they count for that much
+    ///     less time: the stamp pops in over its 0.35 s whatever the speed it was earned at.
+    /// </remarks>
+    public double StampAge => (_player.Tick - _player.StampTick) / (_player.StampTick >= _skipFrom ? _ticksPerSecond * _skipSpeed : _ticksPerSecond);
 
     /// <inheritdoc />
     public RgbImage FrameAt(double t) {
-        int tick = _startTick + (int)Math.Floor(Math.Max(0, t - _start) * _ticksPerSecond);
+        double elapsed = Math.Max(0, t - _start);
+        // Seconds the source spends before the fast-forward starts; past them, ticks advance at the faster rate.
+        double untilSkip = _skipFrom == int.MaxValue ? double.PositiveInfinity : (_skipFrom - _startTick) / _ticksPerSecond;
+        int tick = elapsed <= untilSkip
+            ? _startTick + (int)Math.Floor(elapsed * _ticksPerSecond)
+            : _skipFrom + (int)Math.Floor((elapsed - untilSkip) * _ticksPerSecond * _skipSpeed);
         _player.AdvanceTo(tick);
         return _player.Frame;
     }

@@ -70,7 +70,8 @@ internal static class Gallery {
         var entries = new List<Dictionary<string, object>>();
         foreach (EpisodeRecipe recipe in Episodes.All) {
             var (ticks, seed, steps, ret, stamp, wins, losses, action, observation) = Measure(recipe);
-            int loopTicks = Math.Min(ticks, (int)(recipe.StepsPerSecond * MaxSeconds));
+            // The loop stops at the recipe's own limit too, before a fast expert runs off its model's floor.
+            int loopTicks = Math.Min(Math.Min(ticks, (int)(recipe.StepsPerSecond * MaxSeconds)), recipe.LoopTicks ?? int.MaxValue);
             int frames = (int)Math.Ceiling(loopTicks / recipe.StepsPerSecond * Fps) + (int)(HoldSeconds * Fps);
             int screenFrames = (int)Math.Ceiling(loopTicks / recipe.StepsPerSecond * ScreenFps) + (int)(HoldSeconds * ScreenFps);
             using var player = new EpisodePlayer(recipe);
@@ -136,8 +137,9 @@ internal static class Gallery {
 
     /// <summary>
     ///     The C# line that makes the env as the gallery's loop was rendered: <c>render_mode</c> and the recipe's string
-    ///     keyword arguments (the locomotion envs' <c>camera_name="track"</c>) in an anonymous object; a dictionary argument
-    ///     (InvertedDoublePendulum's camera) is named in a trailing comment instead, since spelling it out would bury the call.
+    ///     and boolean keyword arguments (the locomotion envs' <c>camera_name="track"</c>, HumanoidStandup's observation
+    ///     flags) in an anonymous object; a dictionary argument (InvertedDoublePendulum's and Pusher's cameras) is named in
+    ///     a trailing comment instead, since spelling it out would bury the call.
     /// </summary>
     /// <param name="recipe">The recipe.</param>
     /// <returns>The statement, e.g. <c>using IEnv env = Gymnasium.Make("Hopper-v5", new { render_mode = "rgb_array", camera_name = "track" });</c>.</returns>
@@ -147,6 +149,9 @@ internal static class Gallery {
         foreach (var (name, value) in recipe.Kwargs ?? new Dictionary<string, object?>()) {
             if (value is string text)
                 arguments.Add($"{name} = \"{text}\"");
+            // HumanoidStandup's observation flags: the expert needs them, so the card spells them out.
+            else if (value is bool flag)
+                arguments.Add($"{name} = {(flag ? "true" : "false")}");
             else
                 omitted.Add(name);
         }
