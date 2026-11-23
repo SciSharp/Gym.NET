@@ -533,6 +533,13 @@ article .gn-env-banner ~ h2#quick-start {
   color: var(--bs-secondary-color);
 }
 
+/* A square frame (Pendulum's and Acrobot's 500x500) at its own size: at the 640 px the wide frames take it would
+   stand 640 px tall, most of a screen, for no more detail. The caption after it keeps its width. */
+.gn-figure.gn-figure-narrow,
+.gn-figure-narrow + .gn-figure-caption {
+  max-width: 500px;
+}
+
 /* Episode anatomy (DR-115): the episode's video and its live readout beside the chart main.js draws from the trace,
    at the chart's own width so its text stays 11 px. The chart is a screen, dark in both themes. */
 .gn-anatomy {

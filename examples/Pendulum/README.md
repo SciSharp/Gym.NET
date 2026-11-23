@@ -8,6 +8,7 @@ dotnet run --project examples/Pendulum -c Release                   # one episod
 dotnet run --project examples/Pendulum -c Release -- --render       # the same episode in a window
 dotnet run --project examples/Pendulum -c Release -- --play         # you play it, from the keyboard
 dotnet run --project examples/Pendulum -c Release -- --episodes 5   # seeds 5-9, and their mean
+dotnet run --project examples/Pendulum -c Release -- --record docs/environments/classic_control/media   # the docs page's media
 ```
 
 Output, the same on every run since the reset is seeded and the agent has no randomness of its own (measured on an x64
@@ -36,6 +37,23 @@ episode ends; Escape or the window's close button quits.
 | A | Full torque one way (-2) |
 | D | Full torque the other way (+2) |
 | Nothing held | No torque |
+
+## Recording the docs page's media
+
+`--record <folder>` plays the seed-5 episode once more (whatever `--seed` says) and writes the media of Pendulum's page
+on the docs site (DR-112) into the folder, `docs/environments/classic_control/media` for the site:
+
+| File | What it is |
+|---|---|
+| `Pendulum-v1.episode.mp4` | The whole episode, one frame per step at the env's 30 frames a second (201 frames: the reset and 200 steps), H.264 through Gymnasium's `RecordVideo` and `FfmpegVideoWriter` |
+| `Pendulum-v1.episode.json` | Every step: the angle from upright (`atan2` of the observation's sine and cosine) and the angular velocity the agent acted on, its torque, the controller's regime (0 pump, 1 brake, 2 hold) and the reward, for the page's anatomy chart; the state after the last step as `final` |
+| `Pendulum-v1.figure.png`, `.figure.json` | The frame after 10 steps, the rod swinging up the right side under full torque, which the page annotates, and where its labels point: the pivot, the rod's end and the arrow's size, in the frame's pixels |
+
+```
+Pendulum-v1, seed 5: 200 steps, return -114.1, recorded into docs/environments/classic_control/media
+```
+
+ffmpeg must be on PATH to record; every other mode runs without it.
 
 ## The API it shows
 

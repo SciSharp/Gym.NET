@@ -12,3 +12,5 @@
     href: classic_control/mountain_car.md
   - name: Mountain Car Continuous
     href: classic_control/mountain_car_continuous.md
+  - name: Pendulum
+    href: classic_control/pendulum.md

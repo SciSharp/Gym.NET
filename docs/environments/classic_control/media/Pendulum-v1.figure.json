@@ -1,0 +1,21 @@
+{
+  "id": "Pendulum-v1",
+  "step": 10,
+  "width": 500,
+  "height": 500,
+  "pixelsPerMetre": 113.6364,
+  "state": {
+    "theta": -2.00818,
+    "theta_dot": 5.84169
+  },
+  "torque": 2,
+  "pivot": [
+    250,
+    250
+  ],
+  "end": [
+    352.94,
+    298.13
+  ],
+  "arrowSide": 113.64
+}
