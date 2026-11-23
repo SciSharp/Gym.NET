@@ -74,9 +74,10 @@ An example whose env has a page on the docs site records that page's media (DR-1
 seeded episode once more and writes `<id>.episode.mp4` (the whole episode, one frame per step at the env's render fps,
 through `RecordVideo` and `FfmpegVideoWriter`), `<id>.episode.json` (every step's state, action and reward, for the
 page's anatomy chart) and `<id>.figure.png` with `<id>.figure.json` (the frame How it works annotates, and the pixels
-its labels point at). Classic control's five record so far, into `docs/environments/classic_control/media`, and toy
-text's FrozenLake, FrozenLake8x8, CliffWalking and Taxi, into `docs/environments/toy_text/media`; a grid world's also
-writes `<id>.board.png`, the reset's frame, which the page's anatomy draws the episode's path on (DR-131):
+its labels point at). Classic control's five record, into `docs/environments/classic_control/media`, and toy text's
+five, into `docs/environments/toy_text/media`; a grid world's (FrozenLake, FrozenLake8x8, CliffWalking, Taxi) also
+writes `<id>.board.png`, the reset's frame, which the page's anatomy draws the episode's path on (DR-131), and
+Blackjack records the page's own hand, seed 1,574,758, rather than its default seed (DR-128):
 
 ```bash
 dotnet run --project examples/Acrobot -c Release -- --record docs/environments/classic_control/media

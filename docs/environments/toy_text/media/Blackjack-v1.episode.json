@@ -1,0 +1,1 @@
+{"id":"Blackjack-v1","seed":1574758,"steps":7,"return":1,"fps":4,"agent":"basic strategy (examples/Blackjack)","columns":["step","sum","dealer","usable","action","reward"],"rows":[[0,4,1,0,1,0],[1,15,1,1,1,0],[2,17,1,1,1,0],[3,13,1,0,1,0],[4,15,1,0,1,0],[5,16,1,0,1,0],[6,21,1,0,0,1]],"final":[21,1,0]}

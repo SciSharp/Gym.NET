@@ -470,7 +470,7 @@ DR-125, so this round takes the ids after both.
 
 | ID | Design | Approved | Options not taken | Applies to |
 |---|---|---|---|---|
-| DR-128 | Blackjack's episode (amends DR-112 for Blackjack) | **"Find a handcrafted seed of incredible few gameplay seconds or even emulate a interesting scenario"**: the page plays one hand of the example's basic strategy, chosen by searching Blackjack-v1's seeds 0 to 1,999,999 for the longest hand that wins on exactly 21. Seed 1,574,758 wins it: eight cards against the dealer's ace, a soft 17 turning hard on the way, the dealer standing on a soft 17. That makes 9 frames, 2.25 s at 4 fps. `examples/Blackjack --record` plays that seed; the example's default seed stays the showreel's 40. *Read as* (to confirm): "emulate" as choosing the seed that deals the scenario, since the env draws every card from its seeded generator and nothing in it is altered | The example's five default hands back to back (seeds 40-44); one hand from seed 40 (2 frames); a longer hand from seed 81 (4 frames) | `examples/Blackjack`, `docs/environments/toy_text` |
+| DR-128 | Blackjack's episode (amends DR-112 for Blackjack) | **"Find a handcrafted seed of incredible few gameplay seconds or even emulate a interesting scenario"**: the page plays one hand of the example's basic strategy, chosen by searching Blackjack-v1's seeds 0 to 1,999,999 for the longest hand that wins on exactly 21. Seed 1,574,758 wins it: eight cards against the dealer's ace, a soft 17 turning hard on the way, the dealer standing on a soft 17. That makes 8 frames, 2 s at 4 fps: 7 steps, six hits and a stick (corrected in E5; the row first said 9 frames and 2.25 s, counting the eight cards instead of the steps). `examples/Blackjack --record` plays that seed; the example's default seed stays the showreel's 40. *Read as* (to confirm): "emulate" as choosing the seed that deals the scenario, since the env draws every card from its seeded generator and nothing in it is altered | The example's five default hands back to back (seeds 40-44); one hand from seed 40 (2 frames); a longer hand from seed 81 (4 frames) | `examples/Blackjack`, `docs/environments/toy_text` |
 | DR-129 | The round-38 ids both branches use | **"Renumber journey1's at the merge"**: `master`'s DR-124 and DR-125 (`1f613ed`, 14:43, first) stay. When `journey1` merges, its DR-124…DR-127 (`3024093`, 15:13) and every reference to them in its code, tests and docs move above `master`'s highest id | Renumbering `master`'s two to DR-128 and DR-129 now | `DESIGN_REVIEW.md` on both branches, the merge |
 | DR-130 | RLPy's notice for Acrobot | **"Leave as is"**: `THIRD-PARTY-NOTICES.md` keeps Gymnasium's MIT notice for every environment, and Acrobot's page names RLPy as the origin of Gymnasium's `acrobot.py`, with its BSD 3-Clause licence | A section with RLPy's notice, pinned to `rlpy/rlpy` `af25d20` | `THIRD-PARTY-NOTICES.md`, `docs/environments/classic_control/acrobot.md` |
 | DR-131 | Toy text's Episode anatomy (extends DR-115) | **"The path on the board"**: for the grid worlds (FrozenLake, CliffWalking, Taxi) the chart draws the episode's moves over the env's own first frame, a slip in orange, and a ring on the current cell follows the video; the step strips stay beside it. `main.js` gains a "board" band. Blackjack keeps the time series | The time series of the row and the column, with the strips | `main.js`, the toy-text pages |
@@ -870,3 +870,36 @@ Effects of approved designs that only showed up in code. None changes a design; 
   - The Arguments sections' make calls are compiled regions on every page, CartPole's included.
   - Gymnasium's `acrobot.py` carries RLPy's notice (Copyright 2013, RLPy, BSD 3-Clause), which `THIRD-PARTY-NOTICES.md`
     does not list beside Gymnasium's MIT notice. The page names it; the notices file is the maintainer's to amend.
+- **DR-125, DR-128 and DR-131, toy text's pages** (E5, 2026-11-23). Blackjack, Cliff Walking, Frozen Lake (with its
+  8x8 section) and Taxi follow the template, and their five examples gained `--record`. Every figure and board equals
+  Gymnasium's own frame of the same moment, 0 differing pixels. What the four pages found:
+  - The board band (DR-131) first followed the video's `currentTime`, which runs up to a frame ahead of the picture on
+    screen: at toy text's 4 fps that put the ring a whole cell ahead of the sprite. The cursor, the ring and the readout
+    now follow `requestVideoFrameCallback`'s presented frame. A headless check matched, in every presented frame, the
+    sprite's cell found from its pixels against the trace's cell and the ring's: 0 mismatches on all four boards.
+  - The frames are pixel art, and a non-integer scale blurs it, so each page shows its frame at a scale that keeps the
+    art pixels whole: Frozen Lake's 256 px at 2x (`.gn-figure-pixel`), Cliff Walking's 768x256 strip up to its own size
+    (`.gn-figure-wide`, its anatomy's video above the chart with `.gn-anatomy-wide`), Taxi's 536x456 at its own size
+    (`.gn-figure-medium`), Blackjack's 384x376 table, drawn in 4-pixel art pixels, at 1.25x (`.gn-figure-art`).
+  - Taxi-v4's registered threshold, 8 ("optimum = 8.46" in Gymnasium's registration), is above what any policy
+    averages: over the 300 starting states the reset draws, the shortest deliveries average a return of 7.93
+    (793/100), and only 163 starts can return 8 or more. The page says so in its infobox and a warning; the facts test
+    still checks the registered 8.
+  - DR-128's hand is 7 steps, so 8 frames and 2 s, not the 9 frames and 2.25 s the row first said; the row is corrected.
+  - Cliff Walking's Q-learning sample draws its exploration from NumSharp's `np.random.default_rng(0)`, which is
+    NumPy's generator bit for bit, so the C# and the Python twin learn the same table: both print −30.19, and the test
+    pins the whole run (its 500 returns sum to −27,360). Example 6.6 states epsilon 0.1 and no discount; the step size of
+    0.5 is not the example's (the book's 0.5 is the windy gridworld's), and the page says so. SARSA, in the prose, learns
+    paths that climb to the top row (17 steps from 76 of 100 seeds), and its online returns (−26.0 against Q-learning's
+    −49.9) are the book's figure's.
+  - CliffWalkingSlippery-v1's value-iteration plan never falls: it aims so that no slide can reach the cliff (left into
+    the edge at the start), and averages 65 steps over 1,000 seeds, where the solid cliff's plan falls 34 times an
+    episode on slippery ground.
+  - The facts test learned four things: "no step limit" for ids registered without a `TimeLimit` (Cliff Walking's,
+    Blackjack's), thresholds stated per id (Frozen Lake's two lakes), defaults written as fractions (`1/3`), and a
+    section's own trace (FrozenLake8x8's), whose seed and steps the page must state.
+  - Taxi's action mask is the step result's own array, released with it, so the masked random sample draws the next
+    action while that step is alive. Blackjack's observation is a tuple of arrays the result owns, which
+    `BlackjackObservation` shares: its samples read the numbers out before the result goes. Blackjack's samples file
+    enables nullable annotations below the quick start's four lines, for `object?[]`.
+  - Gymnasium's Cliff Walking docstring names the info key `p`; the env sends `prob`, as the page says.

@@ -1,0 +1,57 @@
+{
+  "id": "Blackjack-v1",
+  "seed": 1574758,
+  "step": 2,
+  "width": 384,
+  "height": 376,
+  "observation": [
+    17,
+    1,
+    1
+  ],
+  "player": [
+    2,
+    2,
+    1,
+    2
+  ],
+  "dealer": [
+    1,
+    6
+  ],
+  "faceUp": "AS",
+  "layout": {
+    "screen": [
+      384,
+      376
+    ],
+    "dealerLabel": [
+      40,
+      32
+    ],
+    "dealerCard": [
+      96,
+      72
+    ],
+    "hiddenCard": [
+      208,
+      72
+    ],
+    "playerLabel": [
+      40,
+      208
+    ],
+    "playerSumTop": 248,
+    "usableAceTop": 328,
+    "card": [
+      80,
+      112
+    ],
+    "bigDigit": [
+      36,
+      60
+    ],
+    "bigDigitGap": 12,
+    "artPixel": 4
+  }
+}

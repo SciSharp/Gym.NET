@@ -8,6 +8,7 @@ dotnet run --project examples/Blackjack -c Release                   # one episo
 dotnet run --project examples/Blackjack -c Release -- --render       # the same episode in a window
 dotnet run --project examples/Blackjack -c Release -- --play         # you play it, from the keyboard
 dotnet run --project examples/Blackjack -c Release -- --episodes 5   # seeds 40-44, and their mean
+dotnet run --project examples/Blackjack -c Release -- --record docs/environments/toy_text/media   # the docs page's media
 ```
 
 Output, the same on every run since the reset is seeded and the agent has no randomness of its own (measured on an x64
@@ -36,6 +37,26 @@ episode ends; Escape or the window's close button quits.
 |---|---|
 | H | Hit |
 | S | Stick |
+
+## Recording the docs page's media
+
+`--record <folder>` plays the hand Blackjack's page shows (DR-128), seed 1,574,758 whatever `--seed` says, and writes
+the page's media on the docs site (DR-112) into the folder, `docs/environments/toy_text/media` for the site. The
+showreel's seed 40 deals a one-step win, a single frame; seed 1,574,758 is the longest hand this strategy wins on
+exactly 21 among seeds 0 to 1,999,999: two 2s against the dealer's ace, six hits through a soft 15 and a soft 17 that
+turns hard, and a stick on 21 against the dealer's soft 17.
+
+| File | What it is |
+|---|---|
+| `Blackjack-v1.episode.mp4` | The whole hand, one frame per step at the env's 4 frames a second (8 frames: the deal and 7 steps), H.264 through Gymnasium's `RecordVideo` and `FfmpegVideoWriter` |
+| `Blackjack-v1.episode.json` | Every step: the observation acted on (the player's sum, the dealer's face-up card, the usable ace), the action and the reward; the observation after the stick as `final` |
+| `Blackjack-v1.figure.png`, `.figure.json` | The frame after 2 steps, the player's soft 17 against the dealer's ace, which the page annotates, and what its labels point at: the observation, the hands behind it (which the table never draws), the face-up card's name and Gymnasium's table layout |
+
+```
+Blackjack-v1, seed 1574758: 7 steps, return 1.0, recorded into docs/environments/toy_text/media
+```
+
+ffmpeg must be on PATH to record; every other mode runs without it.
 
 ## The API it shows
 

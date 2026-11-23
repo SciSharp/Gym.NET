@@ -552,6 +552,18 @@ article .gn-env-banner ~ h2#quick-start {
   image-rendering: pixelated;
 }
 
+/* A table drawn in 4-pixel art pixels (Blackjack's 384x376, every element placed on a multiple of 4) at 1.25 times its
+   size: each art pixel becomes exactly 5 screen pixels, so nearest-neighbour scaling keeps it crisp, where the 640 px
+   box would make some art pixels 6 wide and some 7. */
+.gn-figure.gn-figure-art,
+.gn-figure-art + .gn-figure-caption {
+  max-width: 480px;
+}
+
+.gn-figure-art img {
+  image-rendering: pixelated;
+}
+
 /* A pixel-art frame a little narrower than the 640 px (Taxi's 536x456) at its own size: at 640 each of its pixels
    would come out 1.19 wide, some one screen pixel and some two, and the walls and lettering would blur. */
 .gn-figure.gn-figure-medium,
