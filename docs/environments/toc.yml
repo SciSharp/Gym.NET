@@ -4,3 +4,7 @@
 # this file; docs/docfx.json's second content group publishes the folder as docs/environments/ on the site.
 - name: Overview
   href: index.md
+- name: Classic control
+  items:
+  - name: CartPole
+    href: classic_control/cart_pole.md

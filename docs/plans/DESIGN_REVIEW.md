@@ -796,3 +796,30 @@ Effects of approved designs that only showed up in code. None changes a design; 
   keeps to two lines, ranges and numbers with their units joined by no-break spaces, and the one row that took three
   (the hardcore walker's YOU SEE) was shortened. The tool's regeneration left every loop, still and logo byte for byte
   as it was; only `envs.json` changed.
+- **DR-103 and DR-111…DR-116, the page on the site** (E3, 2026-11-23). CartPole's page follows the approved draft. The
+  site builds it as DocFX builds any page, so the draft's hand-made parts took DocFX's own:
+  - The C# | Python switches are DocFX's tab groups. Choosing Python in one example chooses it in all.
+  - The footgun note is DocFX's `[!WARNING]` alert.
+  - The infobox, figure caption and readout use Bootstrap's theme colours, so the page reads in the light theme too.
+    The banner and the chart stay dark like the gallery.
+
+  The article is narrower than the draft's (689 px at 1280 beside DocFX's 230 px "In this article" column, against
+  792), so the samples keep their lines within about 80 characters, with comments on their own lines.
+
+  The quick start shows its usings through a two-part line range of the samples file, which the facts test pins. The
+  samples live in the namespace `Gym.Docs.EnvPageSamples`, where DR-06's `Gym.Tests.Gymnasium` cannot shadow the facade.
+
+  The anatomy chart is drawn by one generic renderer in `main.js`:
+  - the page declares the chart's bands (lines over trace columns with ranges and ticks, or a strip of a discrete
+    column) and the readout's fields as JSON beside its video;
+  - the script draws them from the recorded trace at the chart's own width, so later pages need no script of their
+    own.
+
+  The episode, figure and trace come from `examples/CartPole --record` (DR-112). They equal the approved draft's data
+  cell for cell and its step-125 frame pixel for pixel; the draft's "±0.62 m" was imprecise (the cart reaches 0.62 m
+  right of the centre and 0.47 m left), and the page says so.
+
+  The facts test (`EnvDocPagesTests`) compares a Box's printed bounds with runs of spaces collapsed, as HTML shows
+  them: NumPy aligns the bounds in columns. It caught each of three planted errors, one at a time: a step limit, the
+  quick start's range and an argument's default. All seven Python twins ran against Gymnasium 1.4.0 (a venv with the
+  parity stack's pins).

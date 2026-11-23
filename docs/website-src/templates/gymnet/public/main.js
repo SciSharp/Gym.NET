@@ -1,13 +1,16 @@
 // Gym.NET DocFX template customization (https://dotnet.github.io/docfx/docs/template.html).
 //
-// The modern template imports this module's default export through its options() hook. It adds three behaviours:
-//   1. pixel text: every <canvas class="gn-pixel" data-text="..."> is drawn in the showreel's 5x7 font;
+// The modern template imports this module's default export through its options() hook. It adds four behaviours:
+//   1. pixel text: every <canvas class="gn-pixel" data-text="..."> is drawn in the showreel's 5x7 font (the gallery's
+//      lettering and the env pages' banners);
 //   2. the 8-bit "select your environment" gallery (on the landing page and the Environments page, one shared include,
-//      website-src/includes/arcade.md), filled from images/envs/envs.json, which the
-//      showreel tool (tools/showreel) writes together with the looping clips (the cartridges' 8-bit WebPs and the
-//      "now playing" screen's full-size MP4s);
+//      website-src/includes/arcade.md), filled from images/envs/envs.json, which the showreel tool (tools/showreel)
+//      writes together with the looping clips (the cartridges' 8-bit WebPs and the "now playing" screen's full-size
+//      MP4s), with each cartridge's game manual (DR-102);
 //   3. links docfx could not resolve (repository files outside the site, such as CLAUDE.md or LICENSE) are pointed at
-//      GitHub, so pages copied from docs/ keep working links on the site.
+//      GitHub, so pages copied from docs/ keep working links on the site;
+//   4. the env pages' episode anatomy (DR-115): a chart of the recorded episode, drawn from its step trace, with a
+//      cursor and a readout that follow the playing video.
 
 /**
  * The classic 5x7 dot-matrix font for ASCII 32-95, five column bytes per glyph, bit 0 the top row. The same table as
@@ -504,6 +507,188 @@ async function installArcade() {
   }, 4500)
 }
 
+/** The SVG namespace, for the anatomy charts' elements. @type {string} */
+const SVG_NS = 'http://www.w3.org/2000/svg'
+
+/**
+ * Creates an SVG element with attributes and appends it to a parent.
+ * @param {string} tag The element name.
+ * @param {Record<string, string | number>} attrs Its attributes.
+ * @param {Element} parent Where it goes.
+ * @returns {SVGElement} The element.
+ */
+function svgElement(tag, attrs, parent) {
+  const element = document.createElementNS(SVG_NS, tag)
+  for (const [name, value] of Object.entries(attrs)) {
+    element.setAttribute(name, String(value))
+  }
+  parent.appendChild(element)
+  return element
+}
+
+/**
+ * Formats a number for the anatomy readout: fixed digits, a true minus sign, and the units the spec names.
+ * @param {number} value The value.
+ * @param {number} digits Digits after the point.
+ * @returns {string} The text.
+ */
+function formatReadout(value, digits) {
+  return value.toFixed(digits).replace('-', '−')
+}
+
+/**
+ * Builds the env pages' episode anatomy (DR-115): the recorded episode beside a chart of every step, with a cursor
+ * that follows the playing video and a live readout. Each `.gn-anatomy` element names the example's step trace
+ * (`data-trace`, the `<id>.episode.json` that `--record` writes, DR-112), holds the video, and
+ * carries its chart's description as JSON in a `script.gn-anatomy-spec`:
+ * `bands`, stacked top to bottom, each either lines (`series` of trace columns, a `range`, `ticks`,
+ * an optional `scale` such as radians to degrees) or a `strip` of one discrete column's values as coloured
+ * ticks; and `readout`, the fields shown under the video.
+ * The chart is drawn at the width it is shown and drawn again when that changes, so its 11 px text stays 11 px.
+ * The trace's frame convention: video frame `f` shows the state after `f` steps, which is row `f`'s
+ * observation (the one acted on at step `f`), or the trace's `final` state after the last step; the return
+ * shown is the sum of the first `f` rewards. Pages without an anatomy section are untouched, and a trace that
+ * cannot be fetched leaves the video playing without a chart.
+ * @returns {Promise<void>} Settles when every chart on the page is built (or skipped).
+ */
+async function installAnatomy() {
+  for (const box of document.querySelectorAll('.gn-anatomy')) {
+    const video = box.querySelector('video')
+    const chartBox = box.querySelector('.gn-anatomy-chart')
+    const readout = box.querySelector('.gn-anatomy-readout')
+    const legend = box.querySelector('.gn-anatomy-legend')
+    let spec
+    let trace
+    try {
+      spec = JSON.parse(box.querySelector('script.gn-anatomy-spec').textContent)
+      const response = await fetch(new URL(box.dataset.trace, window.location.href))
+      if (!response.ok) {
+        continue
+      }
+      trace = await response.json()
+    } catch {
+      // A missing trace or a broken spec leaves the section as the video alone, never a half-drawn chart.
+      continue
+    }
+    const column = Object.fromEntries(trace.columns.map((name, i) => [name, i]))
+    const steps = trace.rows.length
+    // The return after f steps, for every f from 0 to the episode's length.
+    const returns = [0]
+    for (const row of trace.rows) {
+      returns.push(returns[returns.length - 1] + row[column.reward])
+    }
+    /**
+     * The value of a trace column in the state video frame f shows: row f's, or after the last step the final state,
+     * whose values follow the columns after "step" in order (the observation's columns).
+     * @param {string} name The column.
+     * @param {number} f The frame, 0 to steps.
+     * @returns {number | undefined} The value; undefined for a column the final state does not have (the action).
+     */
+    const valueAt = (name, f) => {
+      if (f < steps) {
+        return trace.rows[f][column[name]]
+      }
+      const index = column[name] - 1
+      return trace.final && index >= 0 && index < trace.final.length ? trace.final[index] : undefined
+    }
+
+    const padLeft = 52
+    const padRight = 10
+    let cursor = null
+    let x = () => 0
+    /** Draws the chart at the box's current width; the cursor is redrawn by the frame loop. @returns {void} */
+    const draw = () => {
+      const width = Math.max(240, Math.round(chartBox.clientWidth))
+      chartBox.replaceChildren()
+      const heights = spec.bands.map((band) => (band.strip ? 16 : band.height ?? 110))
+      const height = heights.reduce((a, b) => a + b, 0) + (spec.bands.length - 1) * 14 + 32
+      const svg = svgElement('svg', { viewBox: `0 0 ${width} ${height}`, width, height, 'font-family': 'system-ui, sans-serif', 'font-size': 11, fill: '#adb5bd', role: 'img', 'aria-label': spec.label ?? 'The episode, step by step' }, chartBox)
+      x = (step) => padLeft + (step / steps) * (width - padLeft - padRight)
+      let top = 8
+      spec.bands.forEach((band, b) => {
+        const h = heights[b]
+        if (band.strip) {
+          // One tick per step, coloured by the step's value of the column (an action: which way the push went).
+          const colours = band.strip.colors
+          for (let i = 0; i < steps; i++) {
+            svgElement('rect', { x: x(i).toFixed(2), y: top, width: Math.max(1, (width - padLeft - padRight) / steps).toFixed(2), height: h - 4, fill: colours[String(trace.rows[i][column[band.strip.column]])] ?? '#5c636a' }, svg)
+          }
+          svgElement('text', { x: 4, y: top + h - 6 }, svg).textContent = band.label
+        } else {
+          const [lo, hi] = band.range
+          const scale = band.scale ?? 1
+          const y = (v) => top + (1 - (v * scale - lo) / (hi - lo)) * h
+          for (const tick of band.ticks ?? []) {
+            const ty = top + (1 - (tick - lo) / (hi - lo)) * h
+            svgElement('line', { x1: padLeft, x2: width - padRight, y1: ty.toFixed(1), y2: ty.toFixed(1), stroke: tick === 0 ? '#495057' : '#343a40' }, svg)
+            svgElement('text', { x: 4, y: (ty + 4).toFixed(1) }, svg).textContent = `${String(tick).replace('-', '\u2212')}${band.unit ?? ''}`
+          }
+          for (const series of band.series) {
+            const points = trace.rows.map((row, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(row[column[series.column]]).toFixed(1)}`).join('')
+            const attrs = { d: points, fill: 'none', stroke: series.color, 'stroke-width': series.width ?? 1.6 }
+            if (series.dash) {
+              attrs['stroke-dasharray'] = '4 3'
+            }
+            svgElement('path', attrs, svg)
+          }
+        }
+        top += h + 14
+      })
+      // Step numbers along the bottom, the first anchored left and the last right so neither leaves the chart.
+      const marks = 5
+      for (let m = 0; m <= marks; m++) {
+        const step = Math.round((steps * m) / marks)
+        svgElement('text', { x: x(step).toFixed(1), y: height - 6, 'text-anchor': m === 0 ? 'start' : m === marks ? 'end' : 'middle' }, svg).textContent = String(step)
+      }
+      cursor = svgElement('line', { x1: x(0), x2: x(0), y1: 4, y2: height - 18, stroke: '#fff', 'stroke-width': 1.2 }, svg)
+    }
+
+    if (legend) {
+      legend.replaceChildren(...spec.bands.flatMap((band) => (band.strip ? [band.strip] : band.series)).map((item) => {
+        const entry = document.createElement('span')
+        const swatch = document.createElement('i')
+        // A strip's swatch shows its colours side by side; a line's, its colour.
+        swatch.style.background = item.colors ? `linear-gradient(90deg, ${Object.values(item.colors).join(', ')})` : item.color
+        entry.append(swatch, item.name)
+        return entry
+      }))
+    }
+    draw()
+    // Redrawn at the new width; the frame loop below moves the new cursor on its next frame.
+    new ResizeObserver(() => draw()).observe(chartBox)
+
+    let shown = -1
+    /** Moves the cursor and the readout to the video's current frame, once per animation frame. @returns {void} */
+    const follow = () => {
+      const f = Math.min(steps, Math.max(0, Math.floor(video.currentTime * trace.fps)))
+      if (f !== shown && cursor) {
+        shown = f
+        const at = Math.min(f, steps - 1)
+        cursor.setAttribute('x1', x(at).toFixed(1))
+        cursor.setAttribute('x2', x(at).toFixed(1))
+        if (readout) {
+          readout.replaceChildren(...spec.readout.flatMap((field, n) => {
+            const label = document.createTextNode(`${n ? ' · ' : ''}${field.label} `)
+            const value = document.createElement('b')
+            if (field.column === '@step') {
+              value.textContent = String(f)
+            } else if (field.column === '@return') {
+              value.textContent = formatReadout(returns[f], field.digits ?? 1)
+            } else {
+              const raw = valueAt(field.column, f)
+              value.textContent = raw === undefined ? '—' : field.map ? field.map[String(raw)] ?? String(raw) : formatReadout(raw * (field.scale ?? 1), field.digits ?? 2)
+            }
+            // The unit carries its own spacing, as the spec writes it: " m" after a length, "°" right after an angle.
+            return field.unit ? [label, value, document.createTextNode(field.unit)] : [label, value]
+          }))
+        }
+      }
+      window.requestAnimationFrame(follow)
+    }
+    window.requestAnimationFrame(follow)
+  }
+}
+
 /**
  * Points links that docfx left unresolved at GitHub. The docs pages are the repository's own docs/ files at the same
  * paths, so a relative link to a repository file the site does not publish (CLAUDE.md, LICENSE, a plan, a source file)
@@ -544,6 +729,7 @@ export default {
   start: () => {
     paintStaticPixelText()
     installArcade()
+    installAnatomy()
     rewriteRepoLinks()
   }
 }

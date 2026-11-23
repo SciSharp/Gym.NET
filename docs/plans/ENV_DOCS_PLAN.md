@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Planned 2026-11-22; the page designed whole on 2026-11-23. E1 (the Environments section) and E2 (the game-manual panel) are done; E3 to E8 are not started. The designs are approved in [`DESIGN_REVIEW.md`](DESIGN_REVIEW.md), round 33 (DR-102…DR-106) and round 35 (DR-111…DR-116) |
+| **Status** | Planned 2026-11-22; the page designed whole on 2026-11-23. E1 (the Environments section), E2 (the game-manual panel) and E3 (CartPole's page, the template, the facts test) are done; E3 waits for the maintainer's review before E4 to E8 start. The designs are approved in [`DESIGN_REVIEW.md`](DESIGN_REVIEW.md), round 33 (DR-102…DR-106) and round 35 (DR-111…DR-116) |
 | **Asked for** | The maintainer: "We need to plan for envs docs properly. the SELECT YOUR ENV side menu needs to be improved AND a button linking to proper docfx env doc page. We will need to decide how env doc page looks and contains. including indepth, external links, original source ported from (you can find the sessions using am cli), A GIF playing 1/2 width of the doc article, api, code examples, observable, reward, alllllll other" |
 | **Delivers** | 23 environment pages on the docs site, one per page of Gymnasium's environment docs; an Environments page holding the gallery beside the pages' sidebar; the gallery's NOW PLAYING panel as a game manual whose button opens the env's page |
 | **Gates** | A step starts only when its designs are approved (they are: DR-102…DR-106, DR-111…DR-116). A question none of them answers goes back to the maintainer first |
@@ -186,7 +186,12 @@ names the file that recorded it.
   wrong fails the unit gate.
 - **Code samples** are written in compiled files under `tests/Gym.Tests/Docs/EnvPageSamples/` and included into the
   pages with DocFX's code-snippet syntax (`[!code-csharp[](...#region)]`), so the unit gate runs every one; the Python
-  twins are run against Gymnasium in the parity venv when written.
+  twins are run against Gymnasium in the parity venv when written. A samples file starts with the quick start's three
+  usings and a blank line, which the quick start shows with its region through a two-part range
+  (`?range=1-4,<region>&dedent=12`); the facts test checks that the range still covers exactly those lines. The
+  samples' namespace is `Gym.Docs.EnvPageSamples`, outside `Gym.Tests`, where DR-06's `Gym.Tests.Gymnasium`
+  namespace would shadow the `Gymnasium` facade the samples call. Code lines stay within about 80 characters: in
+  DocFX's layout the article is 689 px wide at 1280 (807 at 1440), and a longer line scrolls.
 - **The site build**: `docfx docs/docfx.json` with no new warnings; every internal link resolves; external links
   answer 200 at release; the headless checks of DR-101 extended to the manual panel (READ THE MANUAL and Enter open
   the right page and anchor) and the Environments page.
@@ -200,7 +205,7 @@ pushed when the maintainer says so.
 |---|---|---|
 | E1 | The Environments section: `docs/environments/index.md` with the gallery (the shared include, `website-src/includes/arcade.md`), `toc.yml` with Overview (each family's entries come with its pages, E3 to E7), the navbar and docfx.json content entries; cartridge labels that wrap where the docs layout's shelf is narrow. **Done 2026-11-23** | DR-104, DR-106 |
 | E2 | The manual panel: 24 cartridges' manual lines in `Episodes.cs`, `envs.json`'s new fields, `main.js`/`main.css`, Enter, the sticky floor re-measured. **Done 2026-11-23** | DR-102 |
-| E3 | CartPole's page whole: the banner, the infobox and its CSS, the full-width quick start, the figure and the math, the code tabs and the anatomy chart's script in the `gymnet` template, every section, its samples; `examples/CartPole`'s `--record` and its media; every example's `Program.cs` renamed `<Env>Program.cs`; the facts test, the samples' test file. Reviewed by the maintainer before the rest | DR-103, DR-105, DR-111…DR-116 |
+| E3 | CartPole's page whole: the banner, the infobox and its CSS, the full-width quick start, the figure and the math, the code tabs and the anatomy chart's script in the `gymnet` template, every section, its samples; `examples/CartPole`'s `--record` and its media; every example's `Program.cs` renamed `<Env>Program.cs`; the facts test, the samples' test file. Reviewed by the maintainer before the rest. **Done 2026-11-23, awaiting that review** | DR-103, DR-105, DR-111…DR-116 |
 | E4 | Classic control: Acrobot, Mountain Car, Mountain Car Continuous (its episode's source asked first, 2.4), Pendulum; their examples' `--record` | DR-103…DR-105, DR-111…DR-116 |
 | E5 | Toy text: Blackjack, Cliff Walking, Frozen Lake (with the 8x8 section's loop), Taxi; their examples' `--record`, and the grid figure (DR-114's reading to confirm) | |
 | E6 | Box2D: Bipedal Walker (with Hardcore), Car Racing, Lunar Lander (with Continuous); their examples' `--record` with the bodies' pixels | |
