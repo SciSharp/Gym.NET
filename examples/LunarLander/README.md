@@ -8,6 +8,7 @@ dotnet run --project examples/LunarLander -c Release                   # one epi
 dotnet run --project examples/LunarLander -c Release -- --render       # the same episode in a window
 dotnet run --project examples/LunarLander -c Release -- --play         # you play it, from the keyboard
 dotnet run --project examples/LunarLander -c Release -- --episodes 5   # seeds 7-11, and their mean
+dotnet run --project examples/LunarLander -c Release -- --record docs/environments/box2d/media   # the docs page's media
 ```
 
 Output, the same on every run since the reset is seeded and the agent has no randomness of its own (measured on an x64
@@ -36,6 +37,23 @@ episode ends; Escape or the window's close button quits.
 | A | Left orientation engine |
 | D | Right orientation engine |
 | Nothing held | Engines off |
+
+## Recording the docs page's media
+
+`--record <folder>` plays the seed-7 episode once more (whatever `--seed` says) and writes the media of Lunar Lander's
+page on the docs site (DR-112) into the folder, `docs/environments/box2d/media` for the site:
+
+| File | What it is |
+|---|---|
+| `LunarLander-v3.episode.mp4` | The whole episode, one frame per step at the env's 50 frames a second (300 frames: the reset and 299 steps), H.264 through Gymnasium's `RecordVideo` and `FfmpegVideoWriter` |
+| `LunarLander-v3.episode.json` | Every step: the observation acted on (x, y, the velocities, the angle and its velocity, the right and left legs' contact flags), the engine fired and the reward; the observation after the last step as `final` |
+| `LunarLander-v3.figure.png`, `.figure.json` | The frame after 60 steps, the lander tilted left of the pad and about to fire its left engine, taken from the recorder rather than rendered again (a render ages the exhaust), which the page annotates, and what its labels point at, in the frame's pixels: the lander, its legs, the flags and the observation's origin |
+
+```
+LunarLander-v3, seed 7: 299 steps, return 248.6, recorded into docs/environments/box2d/media
+```
+
+ffmpeg must be on PATH to record; every other mode runs without it.
 
 ## The API it shows
 

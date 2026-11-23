@@ -16,6 +16,10 @@
     href: classic_control/mountain_car_continuous.md
   - name: Pendulum
     href: classic_control/pendulum.md
+- name: Box2D
+  items:
+  - name: Lunar Lander
+    href: box2d/lunar_lander.md
 - name: Toy text
   items:
   - name: Blackjack
