@@ -62,6 +62,9 @@ namespace Gym.Examples.FrozenLake8x8 {
         /// <exception cref="InvalidOperationException">
         ///     <c>--record</c> could not run ffmpeg, which <see cref="FfmpegVideoWriter"/> needs on PATH.
         /// </exception>
+        /// <exception cref="System.IO.IOException">
+        ///     <c>--record</c> could not create the folder or write one of its files.
+        /// </exception>
         private static int Main(string[] args) {
             if (!TryNumber(args, "--seed", DefaultSeed, out long seed) || !TryNumber(args, "--episodes", 1, out long episodes))
                 return 2;

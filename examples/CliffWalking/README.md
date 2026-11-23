@@ -8,6 +8,7 @@ dotnet run --project examples/CliffWalking -c Release                   # one ep
 dotnet run --project examples/CliffWalking -c Release -- --render       # the same episode in a window
 dotnet run --project examples/CliffWalking -c Release -- --play         # you play it, from the keyboard
 dotnet run --project examples/CliffWalking -c Release -- --episodes 5   # seeds 0-4, and their mean
+dotnet run --project examples/CliffWalking -c Release -- --record docs/environments/toy_text/media   # the docs page's media
 ```
 
 Output, the same on every run since the reset is seeded and the agent has no randomness of its own (measured on an x64
@@ -35,6 +36,24 @@ episode ends; Escape or the window's close button quits.
 | Key | Does |
 |---|---|
 | Arrow keys | Move up, right, down or left |
+
+## Recording the docs page's media
+
+`--record <folder>` plays the seed-0 episode once more (whatever `--seed` says) and writes the media of Cliff Walking's
+page on the docs site (DR-112) into the folder, `docs/environments/toy_text/media` for the site:
+
+| File | What it is |
+|---|---|
+| `CliffWalking-v1.episode.mp4` | The whole episode, one frame per step at the env's 4 frames a second (14 frames: the reset and 13 steps), H.264 through Gymnasium's `RecordVideo` and `FfmpegVideoWriter` |
+| `CliffWalking-v1.episode.json` | Every step: the cell the agent acted on (its row, column and state number), its move and the reward (-100 for a fall); the cell after the last step as `final` |
+| `CliffWalking-v1.board.png` | The grid as the reset shows it, which the page's anatomy draws the path over (DR-131) |
+| `CliffWalking-v1.figure.png`, `.figure.json` | The frame after 6 steps, the walker halfway along the cliff's edge on cell 29, which the page annotates, and what its labels point at: the grid, the walker's cell, each move's aimed cell, landing cell and reward, the start, the goal and the cliff, all read from the env's transition table |
+
+```
+CliffWalking-v1, seed 0: 13 steps, return -13.0, recorded into docs/environments/toy_text/media
+```
+
+ffmpeg must be on PATH to record; every other mode runs without it.
 
 ## The API it shows
 

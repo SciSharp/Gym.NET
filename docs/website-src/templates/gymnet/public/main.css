@@ -552,6 +552,14 @@ article .gn-env-banner ~ h2#quick-start {
   image-rendering: pixelated;
 }
 
+/* A frame wider than the 640 px the others take (CliffWalking's 768x256, a strip three times as wide as it is tall),
+   up to its own size: at 640 px its 64 px cells would shrink to 53 and its labels with them, while the strip stays
+   short enough to cost little height at full width. Where the article is narrower it shrinks to fit, as any figure. */
+.gn-figure.gn-figure-wide,
+.gn-figure-wide + .gn-figure-caption {
+  max-width: 768px;
+}
+
 /* Episode anatomy (DR-115): the episode's video and its live readout beside the chart main.js draws from the trace,
    at the chart's own width so its text stays 11 px. The chart is a screen, dark in both themes. */
 .gn-anatomy {
@@ -566,6 +574,13 @@ article .gn-env-banner ~ h2#quick-start {
   .gn-anatomy {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+/* A wide frame's anatomy (CliffWalking's 3:1 strip): the video above the chart, at the article's width, as narrow
+   screens show every anatomy. In the 300 px column the 768 px frame would come out 100 px tall, its walker a few
+   pixels high. */
+.gn-anatomy.gn-anatomy-wide {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .gn-anatomy video {

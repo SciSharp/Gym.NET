@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!-- CliffWalking-v1 played by value iteration over its transition table (decision DR-74): one seeded episode headless, or in a
-       window, or played from the keyboard. It references the source projects so it always builds against the current tree (Gym.NET.sln
+       window, or played from the keyboard, or recorded for the docs page (DR-112). It references the source projects so it always builds against the current tree (Gym.NET.sln
        builds it, so an API change that breaks it fails the build); a copy outside this repository replaces the three
        ProjectReferences with PackageReferences to Gym.NET.Environments and Gym.NET.Rendering.Avalonia, and drops the
        Import below (the package brings it). -->
@@ -25,6 +25,12 @@
        returns, the way the guides release what an env returns. A build-time package only, kept out of the output. -->
   <ItemGroup>
     <PackageReference Include="NumSharp.Build" Version="0.81.0" PrivateAssets="all" />
+  </ItemGroup>
+
+  <!-- Used directly: the record mode saves How it works' frame and the anatomy's board as PNGs for Cliff Walking's docs
+       page (DR-112). 2.1.13, the version the whole repository pins (decision D18). -->
+  <ItemGroup>
+    <PackageReference Include="SixLabors.ImageSharp" Version="2.1.13" />
   </ItemGroup>
 
   <!-- What the Gym.NET.Environments package's buildTransitive targets do for a C# app (DR-17): compile a module

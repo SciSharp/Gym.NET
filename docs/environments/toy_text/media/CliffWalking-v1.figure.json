@@ -1,0 +1,54 @@
+{
+  "id": "CliffWalking-v1",
+  "step": 6,
+  "width": 768,
+  "height": 256,
+  "cell": [
+    64,
+    64
+  ],
+  "nrow": 4,
+  "ncol": 12,
+  "state": 29,
+  "action": 1,
+  "moves": [
+    {
+      "action": 0,
+      "aimed": 17,
+      "next": 17,
+      "reward": -1
+    },
+    {
+      "action": 1,
+      "aimed": 30,
+      "next": 30,
+      "reward": -1
+    },
+    {
+      "action": 2,
+      "aimed": 41,
+      "next": 36,
+      "reward": -100
+    },
+    {
+      "action": 3,
+      "aimed": 28,
+      "next": 28,
+      "reward": -1
+    }
+  ],
+  "start": 36,
+  "goal": 47,
+  "cliff": [
+    37,
+    38,
+    39,
+    40,
+    41,
+    42,
+    43,
+    44,
+    45,
+    46
+  ]
+}
