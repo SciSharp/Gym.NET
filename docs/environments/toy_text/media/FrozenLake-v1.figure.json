@@ -1,0 +1,31 @@
+{
+  "id": "FrozenLake-v1",
+  "step": 40,
+  "width": 256,
+  "height": 256,
+  "cell": [
+    64,
+    64
+  ],
+  "nrow": 4,
+  "ncol": 4,
+  "state": 14,
+  "action": 1,
+  "aimed": 14,
+  "slips": [
+    13,
+    15
+  ],
+  "start": [
+    0
+  ],
+  "holes": [
+    5,
+    7,
+    11,
+    12
+  ],
+  "goals": [
+    15
+  ]
+}

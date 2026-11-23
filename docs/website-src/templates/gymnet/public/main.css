@@ -540,6 +540,18 @@ article .gn-env-banner ~ h2#quick-start {
   max-width: 500px;
 }
 
+/* A small pixel-art frame (FrozenLake's 256x256) at exactly twice its size, its pixels kept square instead of blurred:
+   at any other scale some pixels would come out wider than others. Its labels' SVG is laid out in the doubled
+   coordinates, so their text keeps its size on screen. */
+.gn-figure.gn-figure-pixel,
+.gn-figure-pixel + .gn-figure-caption {
+  max-width: 512px;
+}
+
+.gn-figure-pixel img {
+  image-rendering: pixelated;
+}
+
 /* Episode anatomy (DR-115): the episode's video and its live readout beside the chart main.js draws from the trace,
    at the chart's own width so its text stays 11 px. The chart is a screen, dark in both themes. */
 .gn-anatomy {

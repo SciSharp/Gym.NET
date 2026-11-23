@@ -94,9 +94,10 @@ namespace Gym.Tests.Docs {
                 string name = Path.GetFileName(path);
                 Dictionary<string, string> facts = Facts(page);
 
-                // Ids: "<code>CartPole-v1</code> 500 steps", one per id the page covers.
-                var ids = Regex.Matches(facts["Ids"], "<code>([A-Za-z0-9]+-v[0-9]+)</code>\\s*([0-9,]+) steps")
-                    .Select(m => (Id: m.Groups[1].Value, Steps: long.Parse(m.Groups[2].Value, NumberStyles.AllowThousands, CultureInfo.InvariantCulture)))
+                // Ids: "<code>CartPole-v1</code> 500 steps", one per id the page covers; an id registered without a
+                // TimeLimit (CliffWalking's, Blackjack's) says "no step limit".
+                var ids = Regex.Matches(facts["Ids"], "<code>([A-Za-z0-9]+-v[0-9]+)</code>\\s*(?:([0-9,]+) steps|no step limit)")
+                    .Select(m => (Id: m.Groups[1].Value, Steps: m.Groups[2].Success ? long.Parse(m.Groups[2].Value, NumberStyles.AllowThousands, CultureInfo.InvariantCulture) : (long?)null))
                     .ToList();
                 Assert.IsTrue(ids.Count > 0, $"{name}: the Ids row names no id");
                 foreach (var (id, steps) in ids)
@@ -104,11 +105,17 @@ namespace Gym.Tests.Docs {
                 string first = ids[0].Id;
                 EnvSpec spec = Gym.Gymnasium.Spec(first);
 
-                // Thresholds: "solved at 475 (v1), 195 (v0)" names each version's; "solved at 4,800" the first id's. A
+                // Thresholds: "solved at 0.7 (FrozenLake-v1), 0.85 (FrozenLake8x8-v1)" names each id's, where two ids
+                // share a version; "solved at 475 (v1), 195 (v0)" each version's; "solved at 4,800" the first id's. A
                 // threshold may be negative (MountainCar's −110, Acrobot's −100), written with the typographic minus.
+                var byId = Regex.Matches(facts["Reward"], "([−-]?[0-9][0-9,.]*) \\(([A-Za-z0-9]+-v[0-9]+)\\)")
+                    .ToDictionary(m => m.Groups[2].Value, m => Number(m.Groups[1].Value));
                 var byVersion = Regex.Matches(facts["Reward"], "([−-]?[0-9][0-9,.]*) \\((v[0-9]+)\\)")
                     .ToDictionary(m => m.Groups[2].Value, m => Number(m.Groups[1].Value));
-                if (byVersion.Count > 0) {
+                if (byId.Count > 0) {
+                    foreach (var (id, _) in ids)
+                        Assert.AreEqual(byId.TryGetValue(id, out double stated) ? (double?)stated : null, Gym.Gymnasium.Spec(id).RewardThreshold, $"{name}: {id}'s threshold");
+                } else if (byVersion.Count > 0) {
                     foreach (var (id, _) in ids) {
                         string version = id[(id.LastIndexOf("-v", StringComparison.Ordinal) + 1)..];
                         if (byVersion.TryGetValue(version, out double threshold))
@@ -207,7 +214,17 @@ namespace Gym.Tests.Docs {
                 foreach (string file in media)
                     Assert.IsTrue(File.Exists(Path.Combine(folder, file)), $"{name}: {file} is missing");
 
-                string trace = media.Single(m => m.EndsWith(".episode.json", StringComparison.Ordinal));
+                // The infobox's episode is the first id's; a variant's section may play its own (FrozenLake8x8's), whose
+                // seed and steps the page must state too.
+                string firstId = Regex.Match(Facts(page)["Ids"], "<code>([A-Za-z0-9]+-v[0-9]+)</code>").Groups[1].Value;
+                var traces = media.Where(m => m.EndsWith(".episode.json", StringComparison.Ordinal)).ToList();
+                string trace = traces.Single(m => m == $"media/{firstId}.episode.json");
+                foreach (string other in traces.Where(m => m != trace)) {
+                    using JsonDocument variant = JsonDocument.Parse(File.ReadAllText(Path.Combine(folder, other)));
+                    string claim = string.Create(CultureInfo.InvariantCulture,
+                        $"seed {variant.RootElement.GetProperty("seed").GetInt64()}, {variant.RootElement.GetProperty("steps").GetInt64():N0} steps");
+                    StringAssert.Contains(page, claim, $"{name}: {other}'s seed and steps are not stated");
+                }
                 using JsonDocument episode = JsonDocument.Parse(File.ReadAllText(Path.Combine(folder, trace)));
                 Match caption = Regex.Match(page, "class=\"gn-infobox-caption\">(.*?)</p>", RegexOptions.Singleline);
                 Assert.IsTrue(caption.Success, $"{name}: no infobox caption");
@@ -293,12 +310,18 @@ namespace Gym.Tests.Docs {
 
         /// <summary>Whether a parameter's default value is the one a page states in its Arguments table.</summary>
         /// <param name="value">The parameter's default.</param>
-        /// <param name="stated">The page's text: <c>null</c>, <c>true</c>, a number, or a quoted string.</param>
+        /// <param name="stated">
+        ///     The page's text: <c>null</c>, <c>true</c>, a number, a fraction of whole numbers (<c>1/3</c>, which the page
+        ///     writes for FrozenLake's <c>1.0 / 3.0</c> and compares as the same double division), or a quoted string.
+        /// </param>
         /// <returns>Whether they agree.</returns>
         private static bool DefaultMatches(object? value, string stated) => value switch {
             null => stated == "null",
             bool b => stated == (b ? "true" : "false"),
             string s => stated == $"\"{s}\"",
+            IConvertible number when Regex.Match(stated, "^([0-9]+)/([0-9]+)$") is { Success: true } fraction =>
+                Convert.ToDouble(number, CultureInfo.InvariantCulture)
+                == double.Parse(fraction.Groups[1].Value, CultureInfo.InvariantCulture) / double.Parse(fraction.Groups[2].Value, CultureInfo.InvariantCulture),
             IConvertible number => double.TryParse(stated, NumberStyles.Float, CultureInfo.InvariantCulture, out double d)
                 && Convert.ToDouble(number, CultureInfo.InvariantCulture) == d,
             _ => false,

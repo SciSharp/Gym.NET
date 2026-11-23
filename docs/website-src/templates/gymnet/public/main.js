@@ -511,6 +511,12 @@ async function installArcade() {
 const SVG_NS = 'http://www.w3.org/2000/svg'
 
 /**
+ * How many anatomy boards this page has drawn: each board's arrowhead markers take ids from it, since a page can hold
+ * two boards (FrozenLake's 4x4 and its 8x8 section) whose markers would otherwise collide. @type {number}
+ */
+let boardCount = 0
+
+/**
  * Creates an SVG element with attributes and appends it to a parent.
  * @param {string} tag The element name.
  * @param {Record<string, string | number>} attrs Its attributes.
@@ -543,7 +549,11 @@ function formatReadout(value, digits) {
  * carries its chart's description as JSON in a `script.gn-anatomy-spec`:
  * `bands`, stacked top to bottom, each either lines (`series` of trace columns, a `range`, `ticks`,
  * an optional `scale` such as radians to degrees) or a `strip` of one discrete column's values as coloured
- * ticks; and `readout`, the fields shown under the video.
+ * ticks, or for a grid world (DR-131) one `board`: the env's frame (`image`, its pixel `size`, the top-left
+ * `origin` and the `cell` size of its grid) with the episode's moves drawn between the cells two trace columns
+ * name (`row`, `col`), each coloured by a discrete column (`path`: a slip in orange), and a ring on the cell the
+ * video shows; and `readout`, the fields shown under the video. The board is drawn as its own picture above
+ * the time bands, so the steps' cursor never crosses it.
  * The chart is drawn at the width it is shown and drawn again when that changes, so its 11 px text stays 11 px.
  * The trace's frame convention: video frame `f` shows the state after `f` steps, which is row `f`'s
  * observation (the one acted on at step `f`), or the trace's `final` state after the last step; the return
@@ -596,16 +606,85 @@ async function installAnatomy() {
     const padRight = 10
     let cursor = null
     let x = () => 0
+    // The board (DR-131) is drawn apart from the bands that run along the steps; a page has one board at most.
+    const boardBand = spec.bands.find((band) => band.board)
+    const timeBands = spec.bands.filter((band) => !band.board)
+    const boardId = boardBand ? boardCount++ : -1
+    // The frame on screen, -1 before the first one: the board's ring goes back to it when a resize redraws the board.
+    let shown = -1
+    /** Puts the board's ring on the cell of frame f; replaced by each drawing of the board. @type {(f: number) => void} */
+    let placeRing = () => {}
+    /**
+     * Draws the board at the chart's width: the frame scaled to the band's height (or narrower, to fit), every move
+     * of the episode as an arrow from its cell to the next one's (a move that stays in place has no arrow; its strip
+     * still shows it), each spread a little from the others so repeated passes stay visible, and the ring.
+     * @param {number} width The chart's width in CSS pixels.
+     * @returns {void}
+     */
+    const drawBoard = (width) => {
+      const board = boardBand.board
+      const [imageWidth, imageHeight] = board.size
+      let drawnHeight = boardBand.height ?? 220
+      let drawnWidth = (drawnHeight * imageWidth) / imageHeight
+      if (drawnWidth > width - 8) {
+        drawnWidth = width - 8
+        drawnHeight = (drawnWidth * imageHeight) / imageWidth
+      }
+      const scale = drawnWidth / imageWidth
+      const left = (width - drawnWidth) / 2
+      const svg = svgElement('svg', { viewBox: `0 0 ${width} ${drawnHeight + 8}`, width, height: drawnHeight + 8, role: 'img', 'aria-label': board.name ?? 'The episode on the board' }, chartBox)
+      svgElement('image', { href: new URL(board.image, window.location.href).href, x: left.toFixed(1), y: 4, width: drawnWidth.toFixed(1), height: drawnHeight.toFixed(1), preserveAspectRatio: 'none' }, svg)
+      /** The centre of the cell frame f shows, in the board's drawn pixels. @param {number} f The frame. @returns {number[]} x and y. */
+      const centre = (f) => [
+        left + (board.origin[0] + (valueAt(board.col, f) + 0.5) * board.cell[0]) * scale,
+        4 + (board.origin[1] + (valueAt(board.row, f) + 0.5) * board.cell[1]) * scale
+      ]
+      // One arrowhead per colour the path uses, each filled like its line.
+      const defs = svgElement('defs', {}, svg)
+      const markers = {}
+      Object.entries(board.path.colors).forEach(([value, colour], n) => {
+        const id = `gn-board-${boardId}-${n}`
+        const marker = svgElement('marker', { id, viewBox: '0 0 10 10', refX: 9, refY: 5, markerWidth: 4, markerHeight: 4, orient: 'auto' }, defs)
+        svgElement('path', { d: 'M0,0 L10,5 L0,10 z', fill: colour }, marker)
+        markers[value] = id
+      })
+      const spread = Math.max(1.5, 2.5 * scale)
+      for (let i = 0; i < steps; i++) {
+        const [ax, ay] = centre(i)
+        const [bx, by] = centre(i + 1)
+        if (Math.abs(ax - bx) + Math.abs(ay - by) < 0.5) {
+          continue
+        }
+        const offset = ((i % 5) - 2) * spread
+        const value = String(trace.rows[i][column[board.path.column]])
+        svgElement('line', { x1: (ax + offset).toFixed(1), y1: (ay + offset).toFixed(1), x2: (bx + offset).toFixed(1), y2: (by + offset).toFixed(1), stroke: board.path.colors[value] ?? '#adb5bd', 'stroke-width': 3, 'stroke-opacity': 0.8, 'marker-end': markers[value] ? `url(#${markers[value]})` : '' }, svg)
+      }
+      // The ring: a white circle under a magenta one, readable on ice, on the dark holes and on the taxi's road.
+      const radius = Math.max(6, 0.32 * Math.min(board.cell[0], board.cell[1]) * scale)
+      const halo = svgElement('circle', { r: radius.toFixed(1), fill: 'none', stroke: '#fff', 'stroke-width': 3.5 }, svg)
+      const ring = svgElement('circle', { r: radius.toFixed(1), fill: 'none', stroke: '#c2189b', 'stroke-width': 1.8 }, svg)
+      placeRing = (f) => {
+        const [cx, cy] = centre(f)
+        for (const circle of [halo, ring]) {
+          circle.setAttribute('cx', cx.toFixed(1))
+          circle.setAttribute('cy', cy.toFixed(1))
+        }
+      }
+      placeRing(Math.max(0, shown))
+    }
     /** Draws the chart at the box's current width; the cursor is redrawn by the frame loop. @returns {void} */
     const draw = () => {
       const width = Math.max(240, Math.round(chartBox.clientWidth))
       chartBox.replaceChildren()
-      const heights = spec.bands.map((band) => (band.strip ? 16 : band.height ?? 110))
-      const height = heights.reduce((a, b) => a + b, 0) + (spec.bands.length - 1) * 14 + 32
+      if (boardBand) {
+        drawBoard(width)
+      }
+      const heights = timeBands.map((band) => (band.strip ? 16 : band.height ?? 110))
+      const height = heights.reduce((a, b) => a + b, 0) + (timeBands.length - 1) * 14 + 32
       const svg = svgElement('svg', { viewBox: `0 0 ${width} ${height}`, width, height, 'font-family': 'system-ui, sans-serif', 'font-size': 11, fill: '#adb5bd', role: 'img', 'aria-label': spec.label ?? 'The episode, step by step' }, chartBox)
       x = (step) => padLeft + (step / steps) * (width - padLeft - padRight)
       let top = 8
-      spec.bands.forEach((band, b) => {
+      timeBands.forEach((band, b) => {
         const h = heights[b]
         if (band.strip) {
           // One tick per step, coloured by the step's value of the column (an action: which way the push went).
@@ -644,7 +723,7 @@ async function installAnatomy() {
     }
 
     if (legend) {
-      legend.replaceChildren(...spec.bands.flatMap((band) => (band.strip ? [band.strip] : band.series)).map((item) => {
+      legend.replaceChildren(...spec.bands.flatMap((band) => (band.board ? [{ name: band.board.name, colors: band.board.path.colors }] : band.strip ? [band.strip] : band.series)).map((item) => {
         const entry = document.createElement('span')
         const swatch = document.createElement('i')
         // A strip's swatch shows its colours side by side; a line's, its colour.
@@ -657,15 +736,25 @@ async function installAnatomy() {
     // Redrawn at the new width; the frame loop below moves the new cursor on its next frame.
     new ResizeObserver(() => draw()).observe(chartBox)
 
-    let shown = -1
-    /** Moves the cursor and the readout to the video's current frame, once per animation frame. @returns {void} */
-    const follow = () => {
-      const f = Math.min(steps, Math.max(0, Math.floor(video.currentTime * trace.fps)))
+    /**
+     * The step a video time shows: frame f is stamped f / fps, and a hair of slack keeps a timestamp a rounding error
+     * below its frame's from reading as the frame before.
+     * @param {number} seconds The time in the video.
+     * @returns {number} The frame, 0 to steps.
+     */
+    const frameAt = (seconds) => Math.min(steps, Math.max(0, Math.floor(seconds * trace.fps + 1e-6)))
+    /**
+     * Moves the cursor, the board's ring and the readout to frame f, when it is not the one they show already.
+     * @param {number} f The frame on screen.
+     * @returns {void}
+     */
+    const show = (f) => {
       if (f !== shown && cursor) {
         shown = f
         const at = Math.min(f, steps - 1)
         cursor.setAttribute('x1', x(at).toFixed(1))
         cursor.setAttribute('x2', x(at).toFixed(1))
+        placeRing(f)
         if (readout) {
           readout.replaceChildren(...spec.readout.flatMap((field, n) => {
             const label = document.createTextNode(`${n ? ' · ' : ''}${field.label} `)
@@ -683,9 +772,24 @@ async function installAnatomy() {
           }))
         }
       }
+    }
+    if ('requestVideoFrameCallback' in video) {
+      // The presented frame's own timestamp: currentTime runs ahead of the picture by up to a frame, which at the toy
+      // texts' 4 fps put the ring a cell ahead of the elf.
+      const onFrame = (now, metadata) => {
+        show(frameAt(metadata.mediaTime))
+        video.requestVideoFrameCallback(onFrame)
+      }
+      video.requestVideoFrameCallback(onFrame)
+      show(frameAt(video.currentTime))
+    } else {
+      /** Follows currentTime once per animation frame, where the callback does not exist. @returns {void} */
+      const follow = () => {
+        show(frameAt(video.currentTime))
+        window.requestAnimationFrame(follow)
+      }
       window.requestAnimationFrame(follow)
     }
-    window.requestAnimationFrame(follow)
   }
 }
 

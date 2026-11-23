@@ -16,3 +16,7 @@
     href: classic_control/mountain_car_continuous.md
   - name: Pendulum
     href: classic_control/pendulum.md
+- name: Toy text
+  items:
+  - name: Frozen Lake
+    href: toy_text/frozen_lake.md
