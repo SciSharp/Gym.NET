@@ -8,6 +8,7 @@ dotnet run --project examples/BipedalWalker -c Release                   # one e
 dotnet run --project examples/BipedalWalker -c Release -- --render       # the same episode in a window
 dotnet run --project examples/BipedalWalker -c Release -- --play         # you play it, from the keyboard
 dotnet run --project examples/BipedalWalker -c Release -- --episodes 5   # seeds 0-4, and their mean
+dotnet run --project examples/BipedalWalker -c Release -- --record docs/environments/box2d/media   # the docs page's media
 ```
 
 Output, the same on every run since the reset is seeded and the agent has no randomness of its own (measured on an x64
@@ -20,8 +21,10 @@ BipedalWalker-v3, seed 0: 1598 steps, return 314.5, reached the end of the cours
 ## The agent
 
 A state machine with three phases per leg: one leg stays straight to carry the body while the other lifts, swings
-forward and comes down; then they swap. A PD controller on the hips keeps the hull level, using the lidar readings only
-to time the steps. It walks slowly but surely: seed 0 crosses the whole course.
+forward and comes down; then they swap. A PD controller on the hips keeps the hull level. It times its phases by the
+joints' angles, the speed and the feet's contact flags, and never reads the lidar. Seed 0 crosses the whole course,
+but it is a lucky course: over seeds 0-99 the gait reaches the end 4 times and falls 91 times, a mean return of
+48.8.
 
 ## Watching and playing
 
@@ -37,6 +40,23 @@ episode ends; Escape or the window's close button quits.
 | U / J | The second hip |
 | I / K | The second knee |
 | Nothing held | Every motor off |
+
+## Recording the docs page's media
+
+`--record <folder>` plays the seed-0 episode once more (whatever `--seed` says) and writes the media of Bipedal
+Walker's page on the docs site (DR-112) into the folder, `docs/environments/box2d/media` for the site:
+
+| File | What it is |
+|---|---|
+| `BipedalWalker-v3.episode.mp4` | The whole episode, one frame per step at the env's 50 frames a second (1,599 frames: the reset and 1,598 steps), H.264 through Gymnasium's `RecordVideo` and `FfmpegVideoWriter` |
+| `BipedalWalker-v3.episode.json` | Every step: the state acted on (the hull's angle and velocities, both hips and knees, the feet's contact flags, the hull's x), the four commands at full precision (`action_dtype` float64) and the reward; the state after the last step as `final` |
+| `BipedalWalker-v3.figure.png`, `.figure.json` | The frame after 400 steps, one leg on the ground and the other swinging, taken from the recorder rather than rendered again (a render moves the lidar's sweep on), which the page annotates, and what its labels point at, in the frame's pixels: the hull and its angle, the four leg segments and where each lidar ray stops |
+
+```
+BipedalWalker-v3, seed 0: 1598 steps, return 314.5, recorded into docs/environments/box2d/media
+```
+
+ffmpeg must be on PATH to record; every other mode runs without it.
 
 ## The API it shows
 

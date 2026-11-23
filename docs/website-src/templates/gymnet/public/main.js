@@ -533,13 +533,17 @@ function svgElement(tag, attrs, parent) {
 }
 
 /**
- * Formats a number for the anatomy readout: fixed digits, a true minus sign, and the units the spec names.
+ * Formats a number for the anatomy readout: fixed digits, a true minus sign, and the units the spec names. A small
+ * negative value that rounds to zero shows as 0, not −0: toFixed keeps the sign (−0.3 at 0 digits is "-0"), which the
+ * walker's and the lander's angle readouts showed while their hulls stood level.
  * @param {number} value The value.
  * @param {number} digits Digits after the point.
  * @returns {string} The text.
  */
 function formatReadout(value, digits) {
-  return value.toFixed(digits).replace('-', '−')
+  const text = value.toFixed(digits)
+  // "-0", "-0.0", "-0.00": every digit a zero, so the sign carries no information.
+  return (/^-0(\.0*)?$/.test(text) ? text.slice(1) : text).replace('-', '−')
 }
 
 /**

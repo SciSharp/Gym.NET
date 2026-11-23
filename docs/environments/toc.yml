@@ -18,6 +18,8 @@
     href: classic_control/pendulum.md
 - name: Box2D
   items:
+  - name: Bipedal Walker
+    href: box2d/bipedal_walker.md
   - name: Lunar Lander
     href: box2d/lunar_lander.md
 - name: Toy text

@@ -6,20 +6,25 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Gym.Box2D;
 using Gym.Environments.Envs.Box2D;
 using Gym.Envs;
 using Gym.Observations;
 using Gym.Rendering.Avalonia;
 using Gym.Spaces;
 using Gym.Utils;
+using Gym.Wrappers;
 using NumSharp;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.PixelFormats;
 
 namespace Gym.Examples.BipedalWalkerHardcore {
     /// <summary>
     ///     Plays BipedalWalkerHardcore-v3 with RL Zoo's TQC expert, a published Stable-Baselines3 agent. <c>dotnet run
     ///     --project examples/BipedalWalkerHardcore -c Release</c> plays one seeded episode headless and prints its
-    ///     steps and return; <c>-- --render</c> plays it in a window, and <c>-- --play</c> hands the four motors to the
-    ///     keyboard.
+    ///     steps and return; <c>-- --render</c> plays it in a window, <c>-- --play</c> hands the four motors to the
+    ///     keyboard, and <c>-- --record &lt;folder&gt;</c> records the episode for the hardcore section of Bipedal
+    ///     Walker's page on the docs site (DR-112).
     /// </summary>
     /// <remarks>
     ///     <para>
@@ -47,24 +52,52 @@ namespace Gym.Examples.BipedalWalkerHardcore {
         private const long DefaultSeed = 7;
 
         /// <summary>
-        ///     Plays the episodes the arguments ask for with the agent, or hands the env to the keyboard.
+        ///     The moment the hardcore section of Bipedal Walker's page shows (DR-114): the frame after this many steps of
+        ///     the seed-7 episode, the walker at the foot of a staircase with a stump and a pit ahead, the course's three
+        ///     obstacles in one frame.
+        /// </summary>
+        private const int FigureStep = 110;
+
+        /// <summary>
+        ///     Plays the episodes the arguments ask for with the agent, or hands the env to the keyboard, or records the
+        ///     docs page's media.
         /// </summary>
         /// <param name="args">
         ///     <c>--seed N</c> starts from reset seed N; <c>--episodes N</c> plays N episodes on consecutive seeds and
         ///     prints their mean; <c>--render</c> shows them in a window; <c>--play</c> lets you play the env from the
-        ///     keyboard instead, until Escape or the window's close button. Other arguments are ignored.
+        ///     keyboard instead, until Escape or the window's close button; <c>--record &lt;folder&gt;</c> records the
+        ///     page's episode, seed 7 whatever <c>--seed</c> says (<see cref="Record"/>). Other arguments are ignored.
         /// </param>
         /// <returns>
-        ///     0 when the episodes were played or the keyboard game ended, 2 when an option's value is not a whole
-        ///     number.
+        ///     0 when the episodes were played, the keyboard game ended or the recording was written, 2 when an option's
+        ///     value is not a whole number or <c>--record</c> names no folder.
         /// </returns>
         /// <exception cref="Gym.Exceptions.DependencyNotInstalled">
         ///     Not thrown in practice: <c>--render</c> and <c>--play</c> set Avalonia's viewer before the env first
         ///     draws.
         /// </exception>
+        /// <exception cref="InvalidOperationException">
+        ///     <c>--record</c> could not run ffmpeg, which <see cref="FfmpegVideoWriter"/> needs on PATH.
+        /// </exception>
+        /// <exception cref="System.IO.IOException">
+        ///     <c>--record</c> could not create the folder or write one of its files, or <c>policy.json</c> is missing.
+        /// </exception>
         private static int Main(string[] args) {
             if (!TryNumber(args, "--seed", DefaultSeed, out long seed) || !TryNumber(args, "--episodes", 1, out long episodes))
                 return 2;
+            int record = Array.IndexOf(args, "--record");
+            if (record >= 0) {
+                // The folder is required: the page's media live in the docs tree, and a default would write them where no
+                // page reads them.
+                if (record + 1 >= args.Length || args[record + 1].StartsWith("--", StringComparison.Ordinal)) {
+                    Console.Error.WriteLine("--record needs a folder, e.g. --record docs/environments/box2d/media");
+                    return 2;
+                }
+                (int recordedSteps, double recordedReturn) = Record(args[record + 1]);
+                Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
+                    $"{Id}, seed {DefaultSeed}: {recordedSteps} steps, return {recordedReturn:F1}, recorded into {args[record + 1]}"));
+                return 0;
+            }
             bool render = args.Contains("--render");
             if (args.Contains("--play")) {
                 // play draws the env's frames into a window of the app-wide viewer and reads the keys from it.
@@ -120,6 +153,161 @@ namespace Gym.Examples.BipedalWalkerHardcore {
                 if (step.Terminated || step.Truncated)
                     return (steps, total, step.Terminated ? total > 0 ? "reached the end of the course" : "fell over" : "truncated by the time limit");
             }
+        }
+
+        /// <summary>
+        ///     Records the seed-7 episode for the hardcore section of Bipedal Walker's page on the docs site (DR-112): the
+        ///     whole episode as <c>BipedalWalkerHardcore-v3.episode.mp4</c>, one frame per step at the env's 50 frames a
+        ///     second, through Gymnasium's <see cref="RecordVideo{TObs, TAct}"/> and <see cref="FfmpegVideoWriter"/>;
+        ///     every step as <c>BipedalWalkerHardcore-v3.episode.json</c>; and the section's frame as
+        ///     <c>BipedalWalkerHardcore-v3.figure.png</c> with <c>BipedalWalkerHardcore-v3.figure.json</c>.
+        /// </summary>
+        /// <param name="folder">The output folder, <c>docs/environments/box2d/media</c> for the site; created if missing.</param>
+        /// <returns>The steps taken and the return.</returns>
+        /// <exception cref="InvalidOperationException">ffmpeg could not be run, or wrote no video.</exception>
+        /// <exception cref="IOException">A file cannot be written, or <c>policy.json</c> cannot be read.</exception>
+        /// <remarks>
+        ///     <para>
+        ///     Each JSON row is the state the agent acted on, its four commands and the reward: <c>step, hull_angle, vx, vy,
+        ///     hip1, knee1, contact1, hip2, knee2, contact2, x, a0, a1, a2, a3, reward</c>, the columns of BipedalWalker's
+        ///     own trace (<c>examples/BipedalWalker</c>), so the page's two charts read alike. The first ten values are the
+        ///     observation's items 0, 2, 3, 4, 6 (less the env's +1), 8, 9, 11 (less its +1) and 13, rounded to 5
+        ///     decimals, and the hull's world x, which the observation leaves out. The commands are the network's float32
+        ///     values, each written as the float64 that holds it exactly, so the trace replays the episode bit for bit
+        ///     (<c>action_dtype</c> says to cast them back). The video's frame <c>t</c> shows the state of row <c>t</c>,
+        ///     and its last frame the state after the last step, which the JSON keeps as <c>final</c>.
+        ///     </para>
+        ///     <para>
+        ///     RecordVideo names its file <c>BipedalWalkerHardcore-v3-episode-0.mp4</c> and writes it when the env closes;
+        ///     it records into a scratch folder inside <paramref name="folder"/> and the file is moved to the page's name,
+        ///     so a recording that fails halfway leaves the published video as it was.
+        ///     </para>
+        /// </remarks>
+        [NDScoped]   // releases every array the episode creates when it returns (DR-80); the envs are disposed inside
+        private static (int Steps, double Return) Record(string folder) {
+            Directory.CreateDirectory(folder);
+            string scratch = Path.Combine(folder, ".recording");
+            var rows = new List<double[]>();
+            double total = 0;
+            double[] final;
+            ExpertPolicy policy = ExpertPolicy.Load(Path.Combine(AppContext.BaseDirectory, "policy.json"));
+            // The agent's own constructor arguments (none for this agent) with the recorder's render mode: RecordVideo
+            // reads rgb_array frames.
+            Dictionary<string, object?> arguments = policy.MakeArguments(human: false);
+            arguments["render_mode"] = "rgb_array";
+            using (Env<NDArray, NDArray> made = Gymnasium.Make<NDArray, NDArray>(Id, arguments))
+            using (var env = new RecordVideo<NDArray, NDArray>(made, scratch, episodeTrigger: _ => true, namePrefix: Id,
+                       videoWriter: new FfmpegVideoWriter())) {
+                var walker = (BipedalWalkerEnv)env.Unwrapped;
+                NDArray observation = env.Reset(seed: DefaultSeed).Observation;
+                for (int t = 0; ; t++) {
+                    NDArray action = policy.Act(observation);
+                    // float32 to float64 is exact, so the JSON's number casts back to the very float32 the agent chose.
+                    double[] commands = action.ToArray<float>().Select(v => (double)v).ToArray();
+                    // The frame now on screen shows the state the agent is about to act on (row t): the recorder's last,
+                    // not rendered again, since every render moves the lidar's animation on.
+                    if (t == FigureStep)
+                        SaveFigure(env, folder, walker, observation);
+                    double[] state = State(observation, walker);
+                    StepResult<NDArray> step = env.Step(action);
+                    total += step.Reward;
+                    rows.Add(state.Prepend(t).Concat(commands).Append(Math.Round(step.Reward, 5)).ToArray());
+                    observation = step.Observation;
+                    if (step.Terminated || step.Truncated)
+                        break;
+                }
+                final = State(observation, walker);
+                // RecordVideo writes the episode's video when it stops recording, which closing the env does.
+                env.Close();
+            }
+            string recorded = Path.Combine(scratch, $"{Id}-episode-0.mp4");
+            if (!File.Exists(recorded))
+                throw new InvalidOperationException($"RecordVideo wrote no {recorded}; is ffmpeg on PATH?");
+            File.Move(recorded, Path.Combine(folder, $"{Id}.episode.mp4"), overwrite: true);
+            Directory.Delete(scratch, recursive: true);
+            File.WriteAllText(Path.Combine(folder, $"{Id}.episode.json"), JsonSerializer.Serialize(new {
+                id = Id, seed = DefaultSeed, steps = rows.Count, @return = total, fps = BipedalWalkerEnv.Fps,
+                agent = "RL Zoo's TQC expert (examples/BipedalWalkerHardcore)", action_dtype = "float32",
+                columns = new[] { "step", "hull_angle", "vx", "vy", "hip1", "knee1", "contact1", "hip2", "knee2", "contact2", "x", "a0", "a1", "a2", "a3", "reward" },
+                rows,
+                final,
+            }) + "\n");
+            return (rows.Count, total);
+        }
+
+        /// <summary>
+        ///     The trace's view of a state: the observation's hull angle, velocities, joint angles and contacts, rounded to
+        ///     5 decimals, the knees without the env's +1, and the hull's world x.
+        /// </summary>
+        /// <param name="observation">The float32 observation, shape <c>(24,)</c>.</param>
+        /// <param name="walker">The unwrapped env, whose hull is where the observation was taken.</param>
+        /// <returns>Ten values: hull_angle, vx, vy, hip1, knee1, contact1, hip2, knee2, contact2, x.</returns>
+        private static double[] State(NDArray observation, BipedalWalkerEnv walker) {
+            float[] o = observation.ToArray<float>();
+            double R(double v) => Math.Round(v, 5);
+            return new[] { R(o[0]), R(o[2]), R(o[3]), R(o[4]), R(o[6] - 1.0), o[8], R(o[9]), R(o[11] - 1.0), o[13], R(walker.Hull!.Position.x) };
+        }
+
+        /// <summary>
+        ///     Saves the hardcore section's frame (the recorder's last, the state now) as
+        ///     <c>BipedalWalkerHardcore-v3.figure.png</c>, and what its labels point at as
+        ///     <c>BipedalWalkerHardcore-v3.figure.json</c>, in the frame's pixels: the hull and its angle, the four leg
+        ///     segments, where each of the ten lidar rays stops, and the corners of every obstacle in view.
+        /// </summary>
+        /// <param name="env">
+        ///     The recording env, whose last recorded frame is the figure. It is not rendered again: each render moves the
+        ///     lidar's animation on (one ray is drawn a frame, in turn), so a second render would change this frame's ray and
+        ///     every later one.
+        /// </param>
+        /// <param name="folder">The output folder.</param>
+        /// <param name="walker">The unwrapped env, for its bodies, its terrain and its scroll.</param>
+        /// <param name="observation">The observation the frame shows, whose items 14 to 23 are the lidar's fractions.</param>
+        /// <exception cref="IOException">A file cannot be written.</exception>
+        /// <remarks>
+        ///     <para>
+        ///     The frame is the last 600 columns of a surface drawn at <c>SCALE</c> pixels a unit and flipped upside down,
+        ///     so a world point <c>(x, y)</c> is the pixel <c>((x - scroll) 30, 400 - 30 y)</c>. Ray <c>i</c> runs from the
+        ///     hull's centre toward <c>(x + sin(0.15 i) R, y - cos(0.15 i) R)</c>, <c>R = 160 / 30</c>, and stops at the
+        ///     observation's fraction <c>14 + i</c> of the way. Reference:
+        ///     <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/envs/box2d/bipedal_walker.py#L556-L563">gymnasium/envs/box2d/bipedal_walker.py</see>.
+        ///     </para>
+        ///     <para>
+        ///     The obstacles are the terrain's polygon bodies (the ground's segments are edges): a stump's square, the two
+        ///     walls of a pit, a staircase's steps. Their kind is not stored by the env (Gymnasium's generator keeps none),
+        ///     so the JSON gives each one's corners and the page tells them apart by their sizes. Reference:
+        ///     <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/envs/box2d/bipedal_walker.py#L283-L391">gymnasium/envs/box2d/bipedal_walker.py</see>.
+        ///     </para>
+        /// </remarks>
+        private static void SaveFigure(RecordVideo<NDArray, NDArray> env, string folder, BipedalWalkerEnv walker, NDArray observation) {
+            NDArray frame = env.RecordedFrames[^1];
+            int height = (int)frame.shape[0], width = (int)frame.shape[1];
+            using (var image = Image.LoadPixelData<Rgb24>(frame.ToArray<byte>(), width, height))
+                image.SaveAsPng(Path.Combine(folder, $"{Id}.figure.png"));
+            double scroll = walker.Scroll;
+            double[] Pixel(double x, double y) => new[] { Math.Round((x - scroll) * BipedalWalkerEnv.Scale, 2), Math.Round(height - y * BipedalWalkerEnv.Scale, 2) };
+            var hull = walker.Hull!;
+            float[] o = observation.ToArray<float>();
+            // Every obstacle with a corner on screen, left to right: a body's polygon is in its own frame, so each corner
+            // goes through the body's transform (an identity for the terrain's static bodies, applied all the same).
+            double[][][] obstacles = walker.Terrain
+                .SelectMany(body => body.Fixtures.Select(f => f.Shape).OfType<b2PolygonShape>()
+                    .Select(polygon => polygon.Vertices.Select(v => body.Transform * v).Select(w => Pixel(w.x, w.y)).ToArray()))
+                .Where(corners => corners.Any(c => c[0] >= 0 && c[0] <= width))
+                .OrderBy(corners => corners.Min(c => c[0]))
+                .ToArray();
+            File.WriteAllText(Path.Combine(folder, $"{Id}.figure.json"), JsonSerializer.Serialize(new {
+                id = Id, step = FigureStep, width, height, scale = BipedalWalkerEnv.Scale, scroll = Math.Round(scroll, 5),
+                observation = o.Select(v => Math.Round((double)v, 5)).ToArray(),
+                hull = Pixel(hull.Position.x, hull.Position.y), angle = Math.Round((double)hull.Angle, 5),
+                legs = walker.Legs.Select(l => Pixel(l.Position.x, l.Position.y)).ToArray(),
+                lidar = Enumerable.Range(0, 10).Select(i => {
+                    double fraction = o[14 + i];
+                    double ex = hull.Position.x + Math.Sin(1.5 * i / 10.0) * BipedalWalkerEnv.LidarRange * fraction;
+                    double ey = hull.Position.y - Math.Cos(1.5 * i / 10.0) * BipedalWalkerEnv.LidarRange * fraction;
+                    return Pixel(ex, ey);
+                }).ToArray(),
+                obstacles,
+            }, new JsonSerializerOptions { WriteIndented = true }) + "\n");
         }
 
         /// <summary>

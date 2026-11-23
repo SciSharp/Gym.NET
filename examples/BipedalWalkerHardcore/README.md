@@ -8,6 +8,7 @@ dotnet run --project examples/BipedalWalkerHardcore -c Release                  
 dotnet run --project examples/BipedalWalkerHardcore -c Release -- --render       # the same episode in a window
 dotnet run --project examples/BipedalWalkerHardcore -c Release -- --play         # you play it, from the keyboard
 dotnet run --project examples/BipedalWalkerHardcore -c Release -- --episodes 5   # seeds 7-11, and their mean
+dotnet run --project examples/BipedalWalkerHardcore -c Release -- --record docs/environments/box2d/media   # the docs page's media
 ```
 
 Output, the same on every run since the reset is seeded and the agent has no randomness of its own (measured on an x64
@@ -46,6 +47,24 @@ episode ends; Escape or the window's close button quits.
 | U / J | The second hip |
 | I / K | The second knee |
 | Nothing held | Every motor off |
+
+## Recording the docs page's media
+
+`--record <folder>` plays the seed-7 episode once more (whatever `--seed` says) and writes the media of the hardcore
+section of Bipedal Walker's page on the docs site (DR-112) into the folder, `docs/environments/box2d/media` for the
+site:
+
+| File | What it is |
+|---|---|
+| `BipedalWalkerHardcore-v3.episode.mp4` | The whole episode, one frame per step at the env's 50 frames a second (969 frames: the reset and 968 steps), H.264 through Gymnasium's `RecordVideo` and `FfmpegVideoWriter` |
+| `BipedalWalkerHardcore-v3.episode.json` | Every step: the state acted on (BipedalWalker's trace columns: the hull's angle and velocities, both hips and knees, the feet's contact flags, the hull's x), the agent's four float32 commands (`action_dtype` float32, each written as the float64 that holds it exactly) and the reward; the state after the last step as `final` |
+| `BipedalWalkerHardcore-v3.figure.png`, `.figure.json` | The frame after 110 steps, the walker at the foot of a staircase with a stump and a pit ahead, taken from the recorder rather than rendered again (a render moves the lidar's sweep on), and what its labels point at, in the frame's pixels: the hull, the legs, where each lidar ray stops and the corners of every obstacle in view |
+
+```
+BipedalWalkerHardcore-v3, seed 7: 968 steps, return 308.4, recorded into docs/environments/box2d/media
+```
+
+ffmpeg must be on PATH to record; every other mode runs without it.
 
 ## The API it shows
 
