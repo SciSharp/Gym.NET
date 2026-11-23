@@ -2,10 +2,10 @@
 
 | | |
 |---|---|
-| **Status** | Planned 2026-11-22; the page designed whole on 2026-11-23. E1 (the Environments section), E2 (the game-manual panel) and E3 (CartPole's page, the template, the facts test) are done; E3 waits for the maintainer's review before E4 to E8 start. The designs are approved in [`DESIGN_REVIEW.md`](DESIGN_REVIEW.md), round 33 (DR-102…DR-106) and round 35 (DR-111…DR-116) |
+| **Status** | Planned 2026-11-22; the page designed whole on 2026-11-23. E1 (the Environments section), E2 (the game-manual panel) and E3 (CartPole's page, the template, the facts test) are done; the maintainer answered E3 with "Lets continue", and E4 (classic control) is under way. The designs are approved in [`DESIGN_REVIEW.md`](DESIGN_REVIEW.md), round 33 (DR-102…DR-106), round 35 (DR-111…DR-116) and round 38 (DR-124, DR-125) |
 | **Asked for** | The maintainer: "We need to plan for envs docs properly. the SELECT YOUR ENV side menu needs to be improved AND a button linking to proper docfx env doc page. We will need to decide how env doc page looks and contains. including indepth, external links, original source ported from (you can find the sessions using am cli), A GIF playing 1/2 width of the doc article, api, code examples, observable, reward, alllllll other" |
 | **Delivers** | 23 environment pages on the docs site, one per page of Gymnasium's environment docs; an Environments page holding the gallery beside the pages' sidebar; the gallery's NOW PLAYING panel as a game manual whose button opens the env's page |
-| **Gates** | A step starts only when its designs are approved (they are: DR-102…DR-106, DR-111…DR-116). A question none of them answers goes back to the maintainer first |
+| **Gates** | A step starts only when its designs are approved (they are: DR-102…DR-106, DR-111…DR-116, DR-124, DR-125). A question none of them answers goes back to the maintainer first |
 
 ---
 
@@ -101,11 +101,10 @@ held for MuJoCo. This section is the specification they settled.
 | each MuJoCo env | its v4 id: what v5 changed, and that the frames are identical (measured: 0 differing pixels from the same seed, InvertedDoublePendulum's only through v4's camera, which Gymnasium's v5 leaves unused); `Pusher-v4` refuses on MuJoCo 3+, as Gymnasium's does | none |
 
 `MountainCarContinuous-v0` keeps its own page, as in Gymnasium (it differs from MountainCar-v0 in the flag, at 0.45
-instead of 0.5, and in its continuous action). It has no cartridge and no example. DR-104 gave it a loop from a
-docs-only recipe in `tools/showreel/Episodes.cs` (energy pumping with the continuous force), written by the `gallery`
-command without a cartridge entry in `envs.json`. Since DR-112, the pages' episodes come from the examples, so this
-page needs one of two sources. **Open, to ask before E4**: a new `examples/MountainCarContinuous`, which records it as
-the others do, or DR-104's showreel recipe as the one exception.
+instead of 0.5, and in its continuous action). It has no cartridge. DR-104 gave it a loop from a docs-only recipe in
+`tools/showreel/Episodes.cs`; since DR-112 the pages' episodes come from the examples, and the maintainer chose a new
+example for it (DR-124): `examples/MountainCarContinuous`, an energy-pumping controller with the continuous force,
+which records its page's media as the others do. The gallery still has no cartridge for it.
 
 ### 2.5 Reference sources
 
@@ -206,8 +205,8 @@ pushed when the maintainer says so.
 | E1 | The Environments section: `docs/environments/index.md` with the gallery (the shared include, `website-src/includes/arcade.md`), `toc.yml` with Overview (each family's entries come with its pages, E3 to E7), the navbar and docfx.json content entries; cartridge labels that wrap where the docs layout's shelf is narrow. **Done 2026-11-23** | DR-104, DR-106 |
 | E2 | The manual panel: 24 cartridges' manual lines in `Episodes.cs`, `envs.json`'s new fields, `main.js`/`main.css`, Enter, the sticky floor re-measured. **Done 2026-11-23** | DR-102 |
 | E3 | CartPole's page whole: the banner, the infobox and its CSS, the full-width quick start, the figure and the math, the code tabs and the anatomy chart's script in the `gymnet` template, every section, its samples; `examples/CartPole`'s `--record` and its media; every example's `Program.cs` renamed `<Env>Program.cs`; the facts test, the samples' test file. Reviewed by the maintainer before the rest. **Done 2026-11-23, awaiting that review** | DR-103, DR-105, DR-111…DR-116 |
-| E4 | Classic control: Acrobot, Mountain Car, Mountain Car Continuous (its episode's source asked first, 2.4), Pendulum; their examples' `--record` | DR-103…DR-105, DR-111…DR-116 |
-| E5 | Toy text: Blackjack, Cliff Walking, Frozen Lake (with the 8x8 section's loop), Taxi; their examples' `--record`, and the grid figure (DR-114's reading to confirm) | |
+| E4 | Classic control: Acrobot, Mountain Car, Mountain Car Continuous (with its new example, DR-124), Pendulum; their examples' `--record` | DR-103…DR-105, DR-111…DR-116, DR-124 |
+| E5 | Toy text: Blackjack, Cliff Walking, Frozen Lake (with the 8x8 section's loop), Taxi; their examples' `--record`, and the grid figure (the env's frame, labelled: DR-125) | DR-125 |
 | E6 | Box2D: Bipedal Walker (with Hardcore), Car Racing, Lunar Lander (with Continuous); their examples' `--record` with the bodies' pixels | |
 | E7 | MuJoCo: the 11 pages with their v4 sections, cameras and depth rendering; their examples' `--record` with the joints projected (HalfCheetah's mockup is the model) | |
 | E8 | The Performance rows not measured yet; the external links checked; the headless pass over every page and button | |
