@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Planned 2026-11-22; the page designed whole on 2026-11-23; nothing implemented yet. The designs are approved in [`DESIGN_REVIEW.md`](DESIGN_REVIEW.md), round 33 (DR-102…DR-106) and round 35 (DR-111…DR-116) |
+| **Status** | Planned 2026-11-22; the page designed whole on 2026-11-23. E1 (the Environments section) is done; E2 to E8 are not started. The designs are approved in [`DESIGN_REVIEW.md`](DESIGN_REVIEW.md), round 33 (DR-102…DR-106) and round 35 (DR-111…DR-116) |
 | **Asked for** | The maintainer: "We need to plan for envs docs properly. the SELECT YOUR ENV side menu needs to be improved AND a button linking to proper docfx env doc page. We will need to decide how env doc page looks and contains. including indepth, external links, original source ported from (you can find the sessions using am cli), A GIF playing 1/2 width of the doc article, api, code examples, observable, reward, alllllll other" |
 | **Delivers** | 23 environment pages on the docs site, one per page of Gymnasium's environment docs; an Environments page holding the gallery beside the pages' sidebar; the gallery's NOW PLAYING panel as a game manual whose button opens the env's page |
 | **Gates** | A step starts only when its designs are approved (they are: DR-102…DR-106, DR-111…DR-116). A question none of them answers goes back to the maintainer first |
@@ -190,7 +190,7 @@ pushed when the maintainer says so.
 
 | Step | Work | Designs |
 |---|---|---|
-| E1 | The Environments section: `docs/environments/index.md` with the gallery (the shared include), `toc.yml` with the 23 pages by family, the navbar and docfx.json content entries | DR-104, DR-106 |
+| E1 | The Environments section: `docs/environments/index.md` with the gallery (the shared include, `website-src/includes/arcade.md`), `toc.yml` with Overview (each family's entries come with its pages, E3 to E7), the navbar and docfx.json content entries; cartridge labels that wrap where the docs layout's shelf is narrow. **Done 2026-11-23** | DR-104, DR-106 |
 | E2 | The manual panel: 24 cartridges' manual lines in `Episodes.cs`, `envs.json`'s new fields, `main.js`/`main.css`, Enter, the sticky floor re-measured | DR-102 |
 | E3 | CartPole's page whole: the banner, the infobox and its CSS, the full-width quick start, the figure and the math, the code tabs and the anatomy chart's script in the `gymnet` template, every section, its samples; `examples/CartPole`'s `--record` and its media; every example's `Program.cs` renamed `<Env>Program.cs`; the facts test, the samples' test file. Reviewed by the maintainer before the rest | DR-103, DR-105, DR-111…DR-116 |
 | E4 | Classic control: Acrobot, Mountain Car, Mountain Car Continuous (its episode's source asked first, 2.4), Pendulum; their examples' `--record` | DR-103…DR-105, DR-111…DR-116 |

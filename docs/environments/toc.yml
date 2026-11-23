@@ -1,0 +1,6 @@
+# The Environments section's sidebar (DR-106): its Overview is the gallery page, then the environment pages by family,
+# one page per page of Gymnasium's environment docs (DR-104). A family's entries are added with its pages (steps E3 to E7
+# of docs/plans/ENV_DOCS_PLAN.md), so the sidebar never links to a page that does not exist yet. Links are relative to
+# this file; docs/docfx.json's second content group publishes the folder as docs/environments/ on the site.
+- name: Overview
+  href: index.md

@@ -2,8 +2,10 @@
  *
  * The modern template runs on Bootstrap 5.3 variables; this file sets Gym.NET's neon accents, then styles the landing
  * page (index.md): the showreel video, the intro, the 8-bit "select your environment" gallery that main.js fills from
- * images/envs/envs.json, and the documentation cards. The gallery and the video stay dark in both themes: they are
- * screens, not page surfaces.
+ * images/envs/envs.json, and the documentation cards. The same gallery is the Environments page
+ * (docs/environments/index.md, DR-106), inside the docs layout's narrower article: its shelf then has two columns
+ * beside the 440 px panel from about 1260 px wide, one below. The gallery and the video stay dark in both themes: they
+ * are screens, not page surfaces.
  */
 
 :root {
@@ -168,9 +170,10 @@
   }
 }
 
-/* Side by side, the "now playing" column follows the reader down the cartridge shelf: it sticks 16 px under the landing
-   page's sticky header (60 px tall in DocFX's modern template) and stays inside the gallery body, whose bottom edge
-   pushes it back up past the last row, so it never leaves the "select your environment" screen. It works because the
+/* Side by side, the "now playing" column follows the reader down the cartridge shelf: it sticks 16 px under the page's
+   sticky header (60 px tall in DocFX's modern template from 768 px wide, in the landing and docs layouts alike) and
+   stays inside the gallery body, whose bottom edge pushes it back up past the last row, so it never leaves the
+   "select your environment" screen. It works because the
    column is a grid item aligned to the start of a row as tall as the shelf, and no ancestor up to the viewport clips
    overflow; an overflow other than visible on any of them would quietly turn the stickiness off. Only on windows tall
    enough for the whole panel: the tallest (Pusher's and HalfCheetah's, whose blurb and make() call wrap to more lines)

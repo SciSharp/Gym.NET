@@ -156,9 +156,12 @@ refs/Gym.NET/
 │
 ├── docs/                          # README.md (index), architecture.md, guides/ (getting_started, creating_custom_environments,
 │                                  #   migrating_to_1.0, development_and_testing), releases/RELEASE_1.0.0.md, plans/;
-│                                  #   media/ (the showreel); docfx.json + website-src/ (the DocFX site: landing page, template
-│                                  #   templates/gymnet, gallery images; `docfx docs/docfx.json` after building
-│                                  #   src/Gym.SourceGenerators in Release, which DocFX loads; deployed by .github/workflows/docs.yml)
+│                                  #   media/ (the showreel); environments/ (the site's Environments section: index.md, the
+│                                  #   gallery beside the sidebar of toc.yml, and the env pages by family, ENV_DOCS_PLAN.md);
+│                                  #   docfx.json + website-src/ (the DocFX site: landing page, template templates/gymnet,
+│                                  #   gallery images, includes/arcade.md the gallery both pages include; `docfx docs/docfx.json`
+│                                  #   after building src/Gym.SourceGenerators in Release, which DocFX loads; deployed by
+│                                  #   .github/workflows/docs.yml)
 │
 └── refs/
     └── Gymnasium/                 # Submodule: Farama-Foundation/Gymnasium (Python Master SOT)

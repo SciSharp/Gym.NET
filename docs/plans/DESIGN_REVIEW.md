@@ -771,3 +771,13 @@ Effects of approved designs that only showed up in code. None changes a design; 
   and MuJoCo's own `mjv_updateScene` decorations (float32 bit for bit). They found two defects before the commit:
   `mjv_moveCamera`'s final clamps (elevation within ±89°, the azimuth wrap, the distance range) were missing, and
   `mju_quatZ2Vec`'s cross product with +z has signed zeros of its own, which reach the frames' and arrows' matrices.
+- **DR-106, the gallery in the docs layout** (E1, 2026-11-23): the Environments page holds the same gallery inside the
+  docs layout's article, with the sidebar on its left and no "In this article" column (`_disableAffix`), so the shelf
+  keeps two cartridge columns beside the 440 px panel from about 1260 px wide (one below; the article is about 860 px
+  at 1280). Each cartridge is then 165 px wide, and its label's room (139 px) is narrower than the two longest ids at
+  one canvas pixel per font pixel: InvertedDoublePendulum-v5 needs 149 px, BipedalWalkerHardcore-v3 143 px. Scaled
+  down by `max-width`, their 5x7 letters lost whole columns. Those two labels now wrap onto two lines at the capital
+  nearest the middle (INVERTEDDOUBLE / PENDULUM-V5, BIPEDALWALKER / HARDCORE-V3), measured against the cartridge's
+  width whenever the shelf resizes; on the landing page's three columns (209 px each at 1440) every id still fits on
+  one line. The sidebar lists Overview alone until the family steps add their pages (E3 to E7), so it never links to a
+  page that does not exist.

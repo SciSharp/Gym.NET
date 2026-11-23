@@ -32,11 +32,11 @@
       {
         "src": "website-src",
         "files": ["**/*.{md,yml}"],
-        "exclude": ["_site/**", "obj/**", "templates/**"],
+        "exclude": ["_site/**", "obj/**", "templates/**", "includes/**"],
         "dest": "."
       },
       {
-        "files": ["README.md", "architecture.md", "guides/*.md", "releases/*.md"],
+        "files": ["README.md", "architecture.md", "guides/*.md", "releases/*.md", "environments/**/*.md", "environments/**/toc.yml"],
         "dest": "docs"
       }
     ],

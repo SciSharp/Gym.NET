@@ -2,7 +2,8 @@
 //
 // The modern template imports this module's default export through its options() hook. It adds three behaviours:
 //   1. pixel text: every <canvas class="gn-pixel" data-text="..."> is drawn in the showreel's 5x7 font;
-//   2. the landing page's 8-bit "select your environment" gallery, filled from images/envs/envs.json, which the
+//   2. the 8-bit "select your environment" gallery (on the landing page and the Environments page, one shared include,
+//      website-src/includes/arcade.md), filled from images/envs/envs.json, which the
 //      showreel tool (tools/showreel) writes together with the looping clips (the cartridges' 8-bit WebPs and the
 //      "now playing" screen's full-size MP4s);
 //   3. links docfx could not resolve (repository files outside the site, such as CLAUDE.md or LICENSE) are pointed at
@@ -99,6 +100,30 @@ function paintPixelText(canvas, text, scale, color, shadow) {
 }
 
 /**
+ * The text of a cartridge's label for the room it has: the id on one line when it fits at one canvas pixel per font
+ * pixel, else two lines split at the capital nearest the id's middle (InvertedDouble / Pendulum-v5), as a printed
+ * label wraps. A label never shrinks to fit instead: a canvas drawn narrower than its own pixels loses whole columns of
+ * its 5x7 letters. Only the longest ids wrap, and only on narrow shelves (the Environments page's two columns).
+ * @param {string} id The env's id.
+ * @param {number} room The label's width in CSS pixels (the cartridge's content box).
+ * @returns {string} The text to paint, with "\n" where it wraps; the id itself when it fits or has no capital to
+ *   split at.
+ */
+function cartLabel(id, room) {
+  if (id.length * CELL - 1 <= room) {
+    return id
+  }
+  let split = -1
+  for (let i = 1; i < id.length; i++) {
+    // A capital after a lower-case letter or digit starts a word of the id; the one nearest the middle balances the lines.
+    if (/[A-Z]/.test(id[i]) && /[a-z0-9]/.test(id[i - 1]) && (split < 0 || Math.abs(i - id.length / 2) < Math.abs(split - id.length / 2))) {
+      split = i
+    }
+  }
+  return split > 0 ? `${id.slice(0, split)}\n${id.slice(split)}` : id
+}
+
+/**
  * Paints every static pixel-text canvas on the page from its data attributes (data-text, data-scale, data-color,
  * data-shadow). Canvases without data-text are drawn by the gallery instead.
  * @returns {void}
@@ -119,7 +144,8 @@ function siteRoot() {
 }
 
 /**
- * Builds the 8-bit gallery on the landing page: one cartridge per environment (its loop scaled up in chunky pixels), a
+ * Builds the 8-bit gallery on the page that holds it (the landing page or the Environments page): one cartridge per
+ * environment (its loop scaled up in chunky pixels, its id as the label, wrapped where the shelf is narrow), a
  * "now playing" screen with the chosen env's full-size loop, a HUD with the showreel episode's seed, steps and return,
  * and the make() call. It runs in attract mode (the cursor moves on by itself every few seconds) until the reader
  * hovers, clicks or uses the arrow keys. Does nothing on pages without the gallery, or when the manifest cannot be
@@ -168,12 +194,36 @@ async function installArcade() {
     const name = document.createElement('canvas')
     name.className = 'gn-pixel gn-cart-name'
     paintPixelText(name, env.id, 1, '#000')
+    // The text painted now; fitLabels compares against it, so a label that fits is not painted twice.
+    name.dataset.label = env.id
     button.append(art, name)
     button.addEventListener('click', () => select(i, true))
     button.addEventListener('mouseenter', () => select(i, true))
     carts.appendChild(button)
     return button
   })
+
+  /**
+   * Repaints each cartridge's label for the width its cartridge now has (cartLabel): one line where the id fits, two
+   * where it would be squeezed. Painting only on a change keeps a resize from redrawing all 24 labels every frame.
+   * @returns {void}
+   */
+  function fitLabels() {
+    // Every cartridge has the same width and padding (one grid track each), so the first one's content box is all.
+    const style = getComputedStyle(buttons[0])
+    const room = buttons[0].clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight)
+    buttons.forEach((button, i) => {
+      const name = button.querySelector('.gn-cart-name')
+      const text = cartLabel(envs[i].id, room)
+      if (name.dataset.label !== text) {
+        name.dataset.label = text
+        paintPixelText(name, text, 1, '#000')
+      }
+    })
+  }
+  fitLabels()
+  // The shelf's columns change with the window (and with the docs layout's sidebar), so the labels follow its width.
+  new ResizeObserver(fitLabels).observe(carts)
   let current = -1
   let attract = true
   // H.264 in MP4 plays in every current browser except Chromium builds without the proprietary codecs. The codecs string
