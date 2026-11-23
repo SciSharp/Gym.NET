@@ -66,11 +66,20 @@ namespace Gym.Tests.Docs {
                 .ToDictionary(m => m.Groups[1].Value.Trim(), m => m.Groups[2].Value);
         }
 
-        /// <summary>The HTML-decoded text of every <c>&lt;code&gt;</c> span in a fragment, in order.</summary>
+        /// <summary>
+        ///     The HTML-decoded text of every <c>&lt;code&gt;</c> span in a fragment, in order, without the <c>&lt;wbr&gt;</c>
+        ///     break hints a page puts inside a long one.
+        /// </summary>
         /// <param name="html">The fragment.</param>
         /// <returns>The code texts.</returns>
+        /// <remarks>
+        ///     A long make call (<c>Gymnasium.Make("MountainCarContinuous-v0")</c>) has no break opportunity before its id's
+        ///     hyphen, so in the infobox's half-width column it pushed the table past the box; a <c>&lt;wbr&gt;</c> after
+        ///     the parenthesis lets it wrap there, and the text compared is the call without it.
+        /// </remarks>
         private static List<string> Codes(string html) =>
-            Regex.Matches(html, "<code>(.*?)</code>").Select(m => WebUtility.HtmlDecode(m.Groups[1].Value)).ToList();
+            Regex.Matches(html, "<code>(.*?)</code>")
+                .Select(m => WebUtility.HtmlDecode(Regex.Replace(m.Groups[1].Value, "<wbr\\s*/?>", ""))).ToList();
 
         /// <summary>
         ///     The facts table against the registry and the env: every id and its step limit, the thresholds, both spaces

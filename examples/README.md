@@ -1,7 +1,8 @@
 # Examples
 
-One project per environment the front-page showreel plays (DR-74): each plays its env with an agent, the same one the
-showreel shows, through Gym.NET's public API. CartPole also learns a policy from scratch, with the cross-entropy method.
+One project per environment the front-page showreel plays (DR-74), and one more, MountainCarContinuous, whose docs page
+needed an episode of its own (DR-124): each plays its env with an agent, the showreel's where it has one, through
+Gym.NET's public API. CartPole also learns a policy from scratch, with the cross-entropy method.
 
 ```bash
 dotnet run --project examples/Hopper -c Release                    # one seeded episode, headless: steps and return
@@ -23,6 +24,7 @@ returns. The env is built and disposed inside that method, the guides' rule for 
 | **Classic control** | | | |
 | [CartPole](CartPole) | The cross-entropy method (learned in seconds); `--controller`: hand-written state feedback around a swaying set point | Seed 3: 500 steps, return 500 | A / D |
 | [MountainCar](MountainCar) | Accelerate the way the car moves (energy pumping) | Seed 4: the flag in 122 steps | ← / → |
+| [MountainCarContinuous](MountainCarContinuous) | Full force the way the car moves, left from rest (energy pumping); `--force F` | Seed 4: the flag in 78 steps, return 92.2 | ← / → |
 | [Pendulum](Pendulum) | Energy pumping, then a PD controller near the top | Seed 5: 200 steps, return -114.1 | A / D |
 | [Acrobot](Acrobot) | Torque the second joint the way it turns | Seed 1: over the line in 65 steps | A / D |
 | **MuJoCo, control** | | | |

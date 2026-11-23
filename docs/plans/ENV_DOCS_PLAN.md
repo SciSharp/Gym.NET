@@ -104,7 +104,10 @@ held for MuJoCo. This section is the specification they settled.
 instead of 0.5, and in its continuous action). It has no cartridge. DR-104 gave it a loop from a docs-only recipe in
 `tools/showreel/Episodes.cs`; since DR-112 the pages' episodes come from the examples, and the maintainer chose a new
 example for it (DR-124): `examples/MountainCarContinuous`, an energy-pumping controller with the continuous force,
-which records its page's media as the others do. The gallery still has no cartridge for it.
+which records its page's media as the others do. The gallery still has no cartridge for it. Built in E4: full force the
+way the car moves and left from rest, which reaches the flag from seeds 0-99 in 75 to 86 steps (mean return 92.03,
+above the registry's 90; pushing right from rest, as MountainCar's rule does, averages 89.37); `--force F` replays it
+gentler (0.5: 96.10). The page's episode is seed 4, MountainCar's start: 78 steps, return 92.2, by way of the wall.
 
 ### 2.5 Reference sources
 
@@ -205,11 +208,11 @@ pushed when the maintainer says so.
 | E1 | The Environments section: `docs/environments/index.md` with the gallery (the shared include, `website-src/includes/arcade.md`), `toc.yml` with Overview (each family's entries come with its pages, E3 to E7), the navbar and docfx.json content entries; cartridge labels that wrap where the docs layout's shelf is narrow. **Done 2026-11-23** | DR-104, DR-106 |
 | E2 | The manual panel: 24 cartridges' manual lines in `Episodes.cs`, `envs.json`'s new fields, `main.js`/`main.css`, Enter, the sticky floor re-measured. **Done 2026-11-23** | DR-102 |
 | E3 | CartPole's page whole: the banner, the infobox and its CSS, the full-width quick start, the figure and the math, the code tabs and the anatomy chart's script in the `gymnet` template, every section, its samples; `examples/CartPole`'s `--record` and its media; every example's `Program.cs` renamed `<Env>Program.cs`; the facts test, the samples' test file. Reviewed by the maintainer before the rest. **Done 2026-11-23, awaiting that review** | DR-103, DR-105, DR-111…DR-116 |
-| E4 | Classic control: Acrobot, Mountain Car, Mountain Car Continuous (with its new example, DR-124), Pendulum; their examples' `--record`. Mountain Car's page done 2026-11-23 (its figure: step 80, the top of the back-swing; the facts test now reads negative thresholds) | DR-103…DR-105, DR-111…DR-116, DR-124 |
+| E4 | Classic control: Acrobot, Mountain Car, Mountain Car Continuous (with its new example, DR-124), Pendulum; their examples' `--record`. Mountain Car's page done 2026-11-23 (its figure: step 80, the top of the back-swing; the facts test now reads negative thresholds); Mountain Car Continuous's page and example done 2026-11-23 (figure: step 75 on the right slope; a long make call wraps after `Make(` through `<wbr>`, which the facts test ignores) | DR-103…DR-105, DR-111…DR-116, DR-124 |
 | E5 | Toy text: Blackjack, Cliff Walking, Frozen Lake (with the 8x8 section's loop), Taxi; their examples' `--record`, and the grid figure (the env's frame, labelled: DR-125) | DR-125 |
 | E6 | Box2D: Bipedal Walker (with Hardcore), Car Racing, Lunar Lander (with Continuous); their examples' `--record` with the bodies' pixels | |
 | E7 | MuJoCo: the 11 pages with their v4 sections, cameras and depth rendering; their examples' `--record` with the joints projected (HalfCheetah's mockup is the model) | |
-| E8 | The Performance rows not measured yet; the external links checked; the headless pass over every page and button | |
+| E8 | The Performance rows not measured yet (MountainCarContinuous-v0's page says so and cites MountainCar-v0's); the external links checked; the headless pass over every page and button | |
 
 ## 6. Risks
 

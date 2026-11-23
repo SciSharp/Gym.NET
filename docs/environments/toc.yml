@@ -10,3 +10,5 @@
     href: classic_control/cart_pole.md
   - name: Mountain Car
     href: classic_control/mountain_car.md
+  - name: Mountain Car Continuous
+    href: classic_control/mountain_car_continuous.md

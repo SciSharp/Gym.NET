@@ -365,9 +365,10 @@ each env resets itself after its episode ends (next-step autoreset), as Gymnasiu
 
 ## Variants
 
-MountainCarContinuous-v0 has its own page, as in Gymnasium: the same valley with a continuous engine, a force in
-[−1, 1], the flag at 0.45 and a reward of 100 for reaching it. Gym.NET builds both ids from one class,
-`MountainCarEnv`, whose `Continuous` tells them apart.
+[Mountain Car Continuous](mountain_car_continuous.md), MountainCarContinuous-v0, has its own page, as in Gymnasium:
+the same valley with a continuous engine, a force in [−1, 1], the flag at 0.45 and a reward of 100 for reaching it,
+less 0.1 times the squared force every step. Gym.NET builds both ids from one class, `MountainCarEnv`, whose
+`Continuous` tells them apart.
 
 ## Parity with Gymnasium
 

@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- MountainCarContinuous-v0 played by an energy-pumping rule with the continuous force (decision DR-124): one seeded
+       episode headless, or in a window, or played from the keyboard, or recorded for its docs page. It references the
+       source projects so it always builds against the current tree (Gym.NET.sln builds it, so an API change that breaks
+       it fails the build); a copy outside this repository replaces the three ProjectReferences with PackageReferences to
+       Gym.NET.Environments and Gym.NET.Rendering.Avalonia, and drops the Import below (the package brings it). -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+    <RootNamespace>Gym.Examples.MountainCarContinuous</RootNamespace>
+    <AssemblyName>MountainCarContinuous</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Gym\Gym.csproj" />
+    <ProjectReference Include="..\..\src\Gym.Environments\Gym.Environments.csproj" />
+    <ProjectReference Include="..\..\src\Gym.Rendering.Avalonia\Gym.Rendering.Avalonia.csproj" />
+  </ItemGroup>
+
+  <!-- NumSharp.Build weaves [NDScoped] (DR-80): the episode methods release every array the episode creates when they
+       return, the way the guides release what an env returns. A build-time package only, kept out of the output. -->
+  <ItemGroup>
+    <PackageReference Include="NumSharp.Build" Version="0.81.0" PrivateAssets="all" />
+  </ItemGroup>
+
+  <!-- Used directly: the record mode saves How it works' frame as a PNG for the env's docs page (DR-112). 2.1.13, the
+       version the whole repository pins (decision D18). -->
+  <ItemGroup>
+    <PackageReference Include="SixLabors.ImageSharp" Version="2.1.13" />
+  </ItemGroup>
+
+  <!-- What the Gym.NET.Environments package's buildTransitive targets do for a C# app (DR-17): compile a module
+       initializer that registers the built-in env ids before Main, so Gymnasium.Make("MountainCarContinuous-v0") works
+       with no set-up call. A ProjectReference does not bring buildTransitive files, so the example imports it by path. -->
+  <Import Project="..\..\src\Gym.Environments\buildTransitive\Gym.NET.Environments.targets" />
+
+</Project>

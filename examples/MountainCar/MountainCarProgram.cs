@@ -257,14 +257,16 @@ namespace Gym.Examples.MountainCar {
                 image.SaveAsPng(Path.Combine(folder, $"{Id}.figure.png"));
             }
             // The renderer draws in pygame's upward coordinates and flips the frame, so a height h above the bottom edge is
-            // the frame's row 400 - h.
-            const double Scale = 600 / 1.8, Clearance = 10, HalfCar = 20 / 2.0, FrameHeight = 400;
+            // the frame's row 400 - h. The scale is the renderer's own expression: 0.6 - (-1.2) is 1.7999999999999998 in
+            // float64, so 600 / 1.8 would be a different double, and int() of a column can land one pixel off with it
+            // (the continuous flag at 0.45 is column 550, not 549).
+            const double Scale = 600 / (0.6 - -1.2), Clearance = 10, HalfCar = 20 / 2.0, FrameHeight = 400;
             static double Column(double x) => (x + 1.2) * Scale;
             static double Row(double x) => FrameHeight - (Math.Sin(3 * x) * 0.45 + 0.55) * Scale;
             double position = s[0], angle = Math.Cos(3 * position);
             // pygame's rotate_rad turns (0, 10) into (-10 sin a, 10 cos a), upward; the flip negates the vertical part.
             double carX = Column(position) - HalfCar * Math.Sin(angle), carY = Row(position) - Clearance - HalfCar * Math.Cos(angle);
-            long flagX = (long)Math.Floor((0.5 + 1.2) * Scale), flagBottom = (long)Math.Floor((Math.Sin(3 * 0.5) * 0.45 + 0.55) * Scale);
+            long flagX = (long)Math.Floor(Column(0.5)), flagBottom = (long)Math.Floor((Math.Sin(3 * 0.5) * 0.45 + 0.55) * Scale);
             double valley = -Math.PI / 6;
             static double[] Point(double column, double row) => new[] { Math.Round(column, 2), Math.Round(row, 2) };
             File.WriteAllText(Path.Combine(folder, $"{Id}.figure.json"), JsonSerializer.Serialize(new {
