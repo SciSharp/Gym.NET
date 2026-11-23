@@ -781,3 +781,18 @@ Effects of approved designs that only showed up in code. None changes a design; 
   width whenever the shelf resizes; on the landing page's three columns (209 px each at 1440) every id still fits on
   one line. The sidebar lists Overview alone until the family steps add their pages (E3 to E7), so it never links to a
   page that does not exist.
+- **DR-102, the game manual in the panel** (E2, 2026-11-23): READ THE MANUAL leads to pages written family by family
+  (E3 to E7), so the panel shows it, and Enter's hint, only for a cartridge whose page the Environments sidebar lists
+  (`docs/environments/toc.json`, read beside the manifest); until then a cartridge shows its four manual lines and its
+  three links alone. The pages take Gymnasium's slugs, `docs/environments/<family>/<page>.html` (`EpisodeRecipe.Page`,
+  and `Anchor` for the two variants). Since DR-101 the NOW PLAYING label was 454 px wide for InvertedDoublePendulum-v5
+  and 442 px for BipedalWalkerHardcore-v3 in the 440 px panel, scaled down and short of letter columns, on the
+  published site too; it now puts the id on a second line where the label does not fit. The blurb left the panel but
+  describes the loop to screen readers, and the panel is a live region only once the reader picks a cartridge (attract
+  mode would have read a whole manual aloud every 4.5 s). Measured over the 24 envs, the panel was 570 px at most
+  before the manual (round 34's blurbs had already outgrown DR-101's 516 px) and is 724 px at most once READ THE MANUAL
+  shows (BipedalWalkerHardcore-v3, its label and every row on two lines; 671 px without the button), so the sticky
+  floor moved from 660 px to 840 px of window height; between them the panel scrolls with the page. Each manual row
+  keeps to two lines, ranges and numbers with their units joined by no-break spaces, and the one row that took three
+  (the hardcore walker's YOU SEE) was shortened. The tool's regeneration left every loop, still and logo byte for byte
+  as it was; only `envs.json` changed.

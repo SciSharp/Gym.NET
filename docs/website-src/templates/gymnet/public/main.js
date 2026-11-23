@@ -144,12 +144,88 @@ function siteRoot() {
 }
 
 /**
+ * The "NOW PLAYING" label's text for the room the panel has: on one line where it fits at the label's two canvas pixels
+ * per font pixel, else with the id on a second line. Like a cartridge label (cartLabel), it wraps rather than shrink:
+ * the two longest ids made the one-line label 454 and 442 px wide in a 440 px panel, and scaled down its letters lost
+ * whole columns.
+ * @param {string} id The env's id.
+ * @param {number} room The panel's content width in CSS pixels.
+ * @returns {string} The text to paint, with "\n" where it wraps.
+ */
+function nowPlayingText(id, room) {
+  const line = `NOW PLAYING: ${id}`
+  return (line.length * CELL - 1) * 2 <= room ? line : `NOW PLAYING:\n${id}`
+}
+
+/**
+ * A game-manual line with its numbers held to what they measure: a range ("−1 to 1"), and a count or size and its
+ * unit ("1,000 steps", "0.2 rad", "0.7 m"), are joined by no-break spaces, so a row never wraps between them (the
+ * panel once broke "each from −1 to" from its "1"). Typography only: the words are the manifest's.
+ * @param {string} text A manual line.
+ * @returns {string} The line with those spaces made unbreakable.
+ */
+function keepTogether(text) {
+  return text
+    .replace(/(\d) (to [−+-]?\d)/g, '$1\u00a0$2')
+    .replace(/\bto ([−+-]?\d)/g, 'to\u00a0$1')
+    .replace(/(\d) (steps?|rad|m)\b/g, '$1\u00a0$2')
+}
+
+/**
+ * The family line under "NOW PLAYING", in the gallery's words: Gymnasium's family names as the site writes them.
+ * @param {string} family The manifest's family, Gymnasium's folder name (classic_control, box2d, toy_text, mujoco).
+ * @returns {string} The line, e.g. "CLASSIC CONTROL"; an unknown family is shown with its underscores as spaces.
+ */
+function familyName(family) {
+  return { classic_control: 'CLASSIC CONTROL', box2d: 'BOX2D', toy_text: 'TOY TEXT', mujoco: 'MUJOCO' }[family] ?? family.replace(/_/g, ' ').toUpperCase()
+}
+
+/**
+ * The env pages the site has, from the Environments sidebar's table of contents (DocFX's docs/environments/toc.json).
+ * READ THE MANUAL shows only for a cartridge whose page is listed there: the pages are written family by family, and
+ * a button leading to a page not written yet would be a dead end. The sidebar lists exactly the pages that exist, so it
+ * is the one list to trust.
+ * @param {URL} root The site's root.
+ * @returns {Promise<Set<string>>} Each listed page's absolute URL, without any #section; empty when the table cannot be
+ *   read (offline, or a site built before the Environments section), which hides every manual button.
+ */
+async function writtenPages(root) {
+  const pages = new Set()
+  try {
+    const toc = new URL('docs/environments/toc.json', root)
+    const response = await fetch(toc)
+    if (!response.ok) {
+      return pages
+    }
+    /**
+     * Adds every href of a toc level and the levels under it (a family's entries sit in its items).
+     * @param {{href?: string, items?: object[]}[] | undefined} items The level's entries.
+     * @returns {void}
+     */
+    const walk = (items) => {
+      for (const item of items ?? []) {
+        if (item.href) {
+          // Entries are relative to the toc file's folder; a hash would only name a section of the same page.
+          pages.add(new URL(item.href, toc).href.split('#')[0])
+        }
+        walk(item.items)
+      }
+    }
+    walk((await response.json()).items)
+  } catch {
+    // Unreadable or not JSON: no page is known, so no button leads anywhere.
+  }
+  return pages
+}
+
+/**
  * Builds the 8-bit gallery on the page that holds it (the landing page or the Environments page): one cartridge per
- * environment (its loop scaled up in chunky pixels, its id as the label, wrapped where the shelf is narrow), a
- * "now playing" screen with the chosen env's full-size loop, a HUD with the showreel episode's seed, steps and return,
- * and the make() call. It runs in attract mode (the cursor moves on by itself every few seconds) until the reader
- * hovers, clicks or uses the arrow keys. Does nothing on pages without the gallery, or when the manifest cannot be
- * fetched.
+ * environment (its loop scaled up in chunky pixels, its id as the label, wrapped where the shelf is narrow), and a
+ * "now playing" panel with the chosen env's family, its full-size loop, a HUD with the showreel episode's seed, steps
+ * and return, its game manual (DR-102: HOW TO PLAY in game words, READ THE MANUAL opening the env's page, links to its
+ * example, Gymnasium's page and the API). It runs in attract mode (the cursor moves on by itself every few seconds)
+ * until the reader hovers, clicks or uses the arrow keys; Enter opens the selected env's page. Does nothing on pages
+ * without the gallery, or when the manifest cannot be fetched.
  * @returns {Promise<void>} Settles when the gallery is built (or skipped).
  */
 async function installArcade() {
@@ -158,6 +234,8 @@ async function installArcade() {
     return
   }
   const root = siteRoot()
+  // The page list is fetched beside the manifest, so it costs no extra wait; it never fails (an empty set at worst).
+  const pagesLoaded = writtenPages(root)
   let envs
   try {
     const response = await fetch(new URL('images/envs/envs.json', root))
@@ -169,13 +247,36 @@ async function installArcade() {
     // Offline or opened from the file system: the noscript list and the video still describe the envs.
     return
   }
+  const pages = await pagesLoaded
   const carts = arcade.querySelector('.gn-carts')
+  const now = arcade.querySelector('.gn-now')
   const label = arcade.querySelector('.gn-now-label')
+  const family = arcade.querySelector('.gn-family')
   const screenVideo = arcade.querySelector('.gn-screen-video')
   const screenImg = arcade.querySelector('.gn-screen-img')
   const hud = arcade.querySelector('.gn-hud')
-  const blurb = arcade.querySelector('.gn-blurb')
-  const snippet = arcade.querySelector('.gn-snippet code')
+  const manualRows = arcade.querySelectorAll('.gn-manual-rows dd[data-manual]')
+  const manualButton = arcade.querySelector('.gn-manual-button')
+  // Quiet until the reader picks a cartridge (select turns it back to polite): attract mode is not news.
+  now.setAttribute('aria-live', 'off')
+  const linksLine = arcade.querySelector('.gn-links')
+  const links = linksLine.querySelectorAll('a[data-link]')
+  const enterHint = arcade.querySelector('.gn-enter')
+
+  /**
+   * The address READ THE MANUAL opens for an env: its page (with the variant's section) when the site has that page,
+   * else nothing.
+   * @param {{docs?: string}} env The env's manifest entry; a manifest written before the manual existed has no docs.
+   * @returns {string | null} The absolute URL, or null when there is no page to open.
+   */
+  function manualHref(env) {
+    if (!env.docs) {
+      return null
+    }
+    const page = new URL(env.docs, root)
+    return pages.has(page.href.split('#')[0]) ? page.href : null
+  }
+
   const buttons = envs.map((env, i) => {
     const button = document.createElement('button')
     button.type = 'button'
@@ -203,9 +304,12 @@ async function installArcade() {
     return button
   })
 
+  let current = -1
+
   /**
-   * Repaints each cartridge's label for the width its cartridge now has (cartLabel): one line where the id fits, two
-   * where it would be squeezed. Painting only on a change keeps a resize from redrawing all 24 labels every frame.
+   * Repaints each cartridge's label for the width its cartridge now has (cartLabel), and the NOW PLAYING label for the
+   * panel's width (nowPlayingText): one line where the text fits, two where it would be squeezed. Painting only on a
+   * change keeps a resize from redrawing all 24 labels every frame.
    * @returns {void}
    */
   function fitLabels() {
@@ -220,11 +324,27 @@ async function installArcade() {
         paintPixelText(name, text, 1, '#000')
       }
     })
+    paintNowPlaying()
+  }
+
+  /**
+   * Paints the NOW PLAYING label for the selected env at the panel's current width, unless it already shows that text.
+   * @returns {void}
+   */
+  function paintNowPlaying() {
+    if (current < 0) {
+      return
+    }
+    const text = nowPlayingText(envs[current].id, now.clientWidth)
+    if (label.dataset.label !== text) {
+      label.dataset.label = text
+      paintPixelText(label, text, 2, '#3cbcfc')
+    }
   }
   fitLabels()
-  // The shelf's columns change with the window (and with the docs layout's sidebar), so the labels follow its width.
-  new ResizeObserver(fitLabels).observe(carts)
-  let current = -1
+  // The shelf's columns and the panel's width change with the window (and with the docs layout's sidebar), so the
+  // labels follow the gallery body's width; selecting the first env below paints the panel's label the first time.
+  new ResizeObserver(fitLabels).observe(arcade.querySelector('.gn-arcade-body'))
   let attract = true
   // H.264 in MP4 plays in every current browser except Chromium builds without the proprietary codecs. The codecs string
   // names the screen loops' own profile (High; level 3.0 is the highest any of them needs), so the answer is about these
@@ -246,7 +366,8 @@ async function installArcade() {
    * @returns {void}
    */
   function showOnScreen(env) {
-    const description = `${env.id}, played by the showreel's policy`
+    // The blurb left the panel for the manual (DR-102); it stays the loop's description for screen readers.
+    const description = env.blurb ? `${env.id}: ${env.blurb}` : `${env.id}, played by the showreel's policy`
     if (env.screen && playsScreenLoops && !autoplayRefused && !brokenLoops.has(env.id)) {
       screenImg.hidden = true
       screenImg.removeAttribute('src')
@@ -289,7 +410,8 @@ async function installArcade() {
   })
 
   /**
-   * Shows an env on the "now playing" screen and moves the cartridge cursor to it.
+   * Shows an env on the "now playing" panel and moves the cartridge cursor to it: the label, the family, the loop, the
+   * HUD, the game manual's four lines, READ THE MANUAL (only when the env's page exists) and the links.
    * @param {number} i The env's index in the manifest.
    * @param {boolean} byReader Whether the reader chose it (which ends attract mode).
    * @returns {void}
@@ -297,6 +419,9 @@ async function installArcade() {
   function select(i, byReader) {
     if (byReader) {
       attract = false
+      // The panel is a live region only once the reader drives it: in attract mode it changes every few seconds, and a
+      // screen reader would read out a whole manual each time.
+      now.setAttribute('aria-live', 'polite')
     }
     if (i === current) {
       return
@@ -304,20 +429,53 @@ async function installArcade() {
     current = i
     const env = envs[i]
     buttons.forEach((b, n) => b.setAttribute('aria-selected', String(n === i)))
-    paintPixelText(label, `NOW PLAYING: ${env.id}`, 2, '#3cbcfc')
+    paintNowPlaying()
+    paintPixelText(family, familyName(env.family ?? ''), 1, '#f8b800')
     showOnScreen(env)
     const result = env.result ? `  ${env.result}` : ''
     paintPixelText(hud, `SEED ${env.seed}  STEPS ${env.steps}\nRETURN ${env.return}${result}`, 2, '#fcfcfc')
-    blurb.textContent = `${env.blurb} Actions: ${env.actionSpace}.`
-    // The manifest carries the exact call the loop was rendered with (the locomotion envs name their track camera);
-    // the fallback keeps a manifest written before that field from showing nothing.
-    snippet.textContent = env.make?.startsWith('using ')
-      ? env.make
-      : `using IEnv env = Gymnasium.Make("${env.id}", new { render_mode = "rgb_array" });`
+    // The manual's lines are plain text from the manifest (textContent, never markup); a manifest written before the
+    // manual existed leaves them empty.
+    for (const row of manualRows) {
+      row.textContent = keepTogether(env.manual?.[row.dataset.manual] ?? '')
+    }
+    const href = manualHref(env)
+    manualButton.hidden = !href
+    enterHint.hidden = !href
+    if (href) {
+      manualButton.href = href
+      manualButton.setAttribute('aria-label', `Read the manual: ${env.id}`)
+    } else {
+      manualButton.removeAttribute('href')
+    }
+    // A manifest written before the links existed carries none of them: the whole line is hidden then, not left as
+    // words that lead nowhere.
+    linksLine.hidden = ![...links].some((link) => env[link.dataset.link])
+    for (const link of links) {
+      const target = env[link.dataset.link]
+      link.hidden = !target
+      if (target) {
+        link.href = new URL(target, root).href
+      }
+    }
   }
 
-  // Arrow keys move the cursor through the grid while focus is inside the gallery; Home and End jump to the ends.
+  // Arrow keys move the cursor through the grid while focus is inside the gallery; Home and End jump to the ends;
+  // Enter opens the selected env's page.
   arcade.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      // A focused link (the example, Gymnasium's page, the API, READ THE MANUAL itself) follows its own address.
+      if (e.target instanceof Element && e.target.closest('a')) {
+        return
+      }
+      const href = current >= 0 ? manualHref(envs[current]) : null
+      if (href) {
+        // A cartridge is a button, whose default Enter is a click that only selects it again.
+        e.preventDefault()
+        window.location.href = href
+      }
+      return
+    }
     const columns = Math.max(1, Math.round(carts.clientWidth / (buttons[0].offsetWidth + 12)))
     const moves = { ArrowRight: 1, ArrowLeft: -1, ArrowDown: columns, ArrowUp: -columns }
     let next = current

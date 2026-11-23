@@ -176,11 +176,12 @@
    "select your environment" screen. It works because the
    column is a grid item aligned to the start of a row as tall as the shelf, and no ancestor up to the viewport clips
    overflow; an overflow other than visible on any of them would quietly turn the stickiness off. Only on windows tall
-   enough for the whole panel: the tallest (Pusher's and HalfCheetah's, whose blurb and make() call wrap to more lines)
-   measured 516 px in Chrome on Windows, so 76 + 516 px plus about two lines of slack for other fonts' wrapping gives the
-   660 px floor. On a shorter window the stuck panel would hide its own last lines, the make() call, until the shelf
-   ended, so there it scrolls with the page as before. */
-@media (min-width: 992px) and (min-height: 660px) {
+   enough for the whole panel: with the game manual (DR-102) the tallest is BipedalWalkerHardcore-v3's, 724 px in Chrome
+   on Windows once READ THE MANUAL shows (its NOW PLAYING label takes two lines and each manual row two), so 76 + 724 px
+   plus about two lines of slack for other fonts' wrapping gives the 840 px floor (660 px before the manual, for DR-101's
+   516 px panel). On a shorter window the stuck panel would hide its own last lines, READ THE MANUAL among them, until
+   the shelf ended, so there it scrolls with the page. */
+@media (min-width: 992px) and (min-height: 840px) {
   .gn-now {
     position: sticky;
     top: 76px;
@@ -315,17 +316,89 @@
   margin-top: 12px;
 }
 
-.gn-blurb {
-  margin: 12px 0 10px;
-  color: #c9c9e8;
-  font-size: 0.95rem;
+/* The family under NOW PLAYING, in the label's gold. */
+.gn-family {
+  margin: 4px 0 8px;
 }
 
-.gn-snippet {
+/* The game manual (DR-102): HOW TO PLAY in a white-bordered black box, like the back of a game box, its four rows each
+   a pixel-lettered name beside a line of plain text. Bootstrap's definition-list margins and bold terms are undone: the
+   rows are a grid, the names are canvases. */
+.gn-manual {
+  border: 3px solid #fcfcfc;
+  background: #000;
+  padding: 10px 12px;
+  margin: 12px 0 10px;
+}
+
+.gn-manual-title {
+  margin-bottom: 8px;
+}
+
+.gn-manual-rows {
   margin: 0;
-  font-size: 0.8rem;
-  white-space: pre-wrap;
-  word-break: break-word;
+}
+
+.gn-manual-rows > div {
+  display: grid;
+  grid-template-columns: 78px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  padding: 4px 0;
+  border-top: 1px dashed #2e2e66;
+}
+
+.gn-manual-rows > div:first-child {
+  border-top: 0;
+}
+
+.gn-manual-rows dt {
+  margin: 0;
+  font-weight: normal;
+}
+
+.gn-manual-rows dt canvas {
+  margin-top: 4px;
+}
+
+.gn-manual-rows dd {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #e6e6ff;
+}
+
+/* READ THE MANUAL: a gold 8-bit button, bevelled like the cartridges, its label pixel-lettered in black. main.js shows it
+   only for an env whose page exists ([hidden] otherwise, which Bootstrap makes display: none). */
+.gn-manual-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 9px 12px;
+  border: 3px solid #000;
+  background: #f8b800;
+  box-shadow: inset -4px -4px 0 #ac7c00, inset 4px 4px 0 #fce4a0;
+  text-decoration: none;
+}
+
+.gn-manual-button:hover {
+  background: #fcc838;
+}
+
+.gn-manual-button:focus-visible {
+  outline: 3px solid var(--gn-cyan);
+  outline-offset: 3px;
+}
+
+.gn-links {
+  margin: 8px 0 0;
+  font-size: 12.5px;
+  color: #9a9ac0;
+}
+
+.gn-links a {
+  color: #3cbcfc;
 }
 
 /* ----------------------------------------------------------------------------------------- documentation map --- */

@@ -14,7 +14,17 @@
     "poster": "images/envs/CartPole-v1.png",
     "width": 120,
     "height": 80,
-    "screen": "images/envs/CartPole-v1.mp4"
+    "screen": "images/envs/CartPole-v1.mp4",
+    "manual": {
+      "controls": "◀ ▶ push the cart left or right",
+      "youSee": "the cart's position and speed, the pole's angle and spin",
+      "score": "+1 for every step the pole stays up",
+      "gameOver": "the pole leans past 12°, the cart leaves the track, or 500 steps"
+    },
+    "docs": "docs/environments/classic_control/cart_pole.html",
+    "gymnasium": "https://gymnasium.farama.org/v1.4.0/environments/classic_control/cart_pole/",
+    "example": "https://github.com/SciSharp/Gym.NET/tree/master/examples/CartPole",
+    "api": "api/Gym.Environments.Envs.Classic.CartPoleEnv.html"
   },
   {
     "id": "MountainCar-v0",
@@ -31,7 +41,17 @@
     "poster": "images/envs/MountainCar-v0.png",
     "width": 120,
     "height": 80,
-    "screen": "images/envs/MountainCar-v0.mp4"
+    "screen": "images/envs/MountainCar-v0.mp4",
+    "manual": {
+      "controls": "◀ push left, coast, or ▶ push right",
+      "youSee": "the car's position along the track and its speed",
+      "score": "−1 for every step until the flag",
+      "gameOver": "the car reaches the flag on the right hilltop, or 200 steps"
+    },
+    "docs": "docs/environments/classic_control/mountain_car.html",
+    "gymnasium": "https://gymnasium.farama.org/v1.4.0/environments/classic_control/mountain_car/",
+    "example": "https://github.com/SciSharp/Gym.NET/tree/master/examples/MountainCar",
+    "api": "api/Gym.Environments.Envs.Classic.MountainCarEnv.html"
   },
   {
     "id": "Pendulum-v1",
@@ -48,7 +68,17 @@
     "poster": "images/envs/Pendulum-v1.png",
     "width": 100,
     "height": 100,
-    "screen": "images/envs/Pendulum-v1.mp4"
+    "screen": "images/envs/Pendulum-v1.mp4",
+    "manual": {
+      "controls": "a twist on the pivot, from −2 to 2",
+      "youSee": "which way the pendulum points (its angle's cosine and sine) and how fast it spins",
+      "score": "0 at best: minus how far it is from upright, how fast it spins and how hard you twist",
+      "gameOver": "never early: 200 steps"
+    },
+    "docs": "docs/environments/classic_control/pendulum.html",
+    "gymnasium": "https://gymnasium.farama.org/v1.4.0/environments/classic_control/pendulum/",
+    "example": "https://github.com/SciSharp/Gym.NET/tree/master/examples/Pendulum",
+    "api": "api/Gym.Environments.Envs.Classic.PendulumEnv.html"
   },
   {
     "id": "Acrobot-v1",
@@ -65,7 +95,17 @@
     "poster": "images/envs/Acrobot-v1.png",
     "width": 100,
     "height": 100,
-    "screen": "images/envs/Acrobot-v1.mp4"
+    "screen": "images/envs/Acrobot-v1.mp4",
+    "manual": {
+      "controls": "twist the joint between the links: −1, 0 or +1",
+      "youSee": "both joints' angles (cosine and sine) and how fast each turns",
+      "score": "−1 for every step until the tip is above the line",
+      "gameOver": "the tip swings above the line, or 500 steps"
+    },
+    "docs": "docs/environments/classic_control/acrobot.html",
+    "gymnasium": "https://gymnasium.farama.org/v1.4.0/environments/classic_control/acrobot/",
+    "example": "https://github.com/SciSharp/Gym.NET/tree/master/examples/Acrobot",
+    "api": "api/Gym.Environments.Envs.Classic.AcrobotEnv.html"
   },
   {
     "id": "InvertedPendulum-v5",
@@ -82,7 +122,17 @@
     "poster": "images/envs/InvertedPendulum-v5.png",
     "width": 96,
     "height": 96,
-    "screen": "images/envs/InvertedPendulum-v5.mp4"
+    "screen": "images/envs/InvertedPendulum-v5.mp4",
+    "manual": {
+      "controls": "push the cart, from −3 to 3",
+      "youSee": "the cart's position and speed, the pole's angle and spin",
+      "score": "+1 for every step the pole stays within 0.2 rad of upright",
+      "gameOver": "the pole leans past 0.2 rad, or 1,000 steps"
+    },
+    "docs": "docs/environments/mujoco/inverted_pendulum.html",
+    "gymnasium": "https://gymnasium.farama.org/v1.4.0/environments/mujoco/inverted_pendulum/",
+    "example": "https://github.com/SciSharp/Gym.NET/tree/master/examples/InvertedPendulum",
+    "api": "api/Gym.Environments.Envs.MuJoCo.InvertedPendulumEnvV5.html"
   },
   {
     "id": "InvertedDoublePendulum-v5",
@@ -99,7 +149,17 @@
     "poster": "images/envs/InvertedDoublePendulum-v5.png",
     "width": 96,
     "height": 96,
-    "screen": "images/envs/InvertedDoublePendulum-v5.mp4"
+    "screen": "images/envs/InvertedDoublePendulum-v5.mp4",
+    "manual": {
+      "controls": "push the cart, from −1 to 1",
+      "youSee": "the cart's position, both poles' angles (sine and cosine), every speed, the force on the cart",
+      "score": "+10 for every step it stays up, less for a low tip and for spinning poles",
+      "gameOver": "the tip drops to 1 m (it stands 1.2 m tall), or 1,000 steps"
+    },
+    "docs": "docs/environments/mujoco/inverted_double_pendulum.html",
+    "gymnasium": "https://gymnasium.farama.org/v1.4.0/environments/mujoco/inverted_double_pendulum/",
+    "example": "https://github.com/SciSharp/Gym.NET/tree/master/examples/InvertedDoublePendulum",
+    "api": "api/Gym.Environments.Envs.MuJoCo.InvertedDoublePendulumEnvV5.html"
   },
   {
     "id": "Reacher-v5",
@@ -116,7 +176,17 @@
     "poster": "images/envs/Reacher-v5.png",
     "width": 96,
     "height": 96,
-    "screen": "images/envs/Reacher-v5.mp4"
+    "screen": "images/envs/Reacher-v5.mp4",
+    "manual": {
+      "controls": "twist the two joints, each from −1 to 1",
+      "youSee": "the arm's angles and speeds, where the target is, and the gap from fingertip to target",
+      "score": "minus the fingertip's distance from the target, minus the effort",
+      "gameOver": "never early: 50 steps"
+    },
+    "docs": "docs/environments/mujoco/reacher.html",
+    "gymnasium": "https://gymnasium.farama.org/v1.4.0/environments/mujoco/reacher/",
+    "example": "https://github.com/SciSharp/Gym.NET/tree/master/examples/Reacher",
+    "api": "api/Gym.Environments.Envs.MuJoCo.ReacherEnvV5.html"
   },
   {
     "id": "Pusher-v5",
@@ -133,7 +203,17 @@
     "poster": "images/envs/Pusher-v5.png",
     "width": 96,
     "height": 96,
-    "screen": "images/envs/Pusher-v5.mp4"
+    "screen": "images/envs/Pusher-v5.mp4",
+    "manual": {
+      "controls": "seven twists, shoulder to wrist, each from −2 to 2",
+      "youSee": "the arm's angles and speeds, and where the fingertip, the puck and the goal are",
+      "score": "minus the puck's distance from the goal, half the fingertip's distance from the puck, and the effort",
+      "gameOver": "never early: 100 steps"
+    },
+    "docs": "docs/environments/mujoco/pusher.html",
+    "gymnasium": "https://gymnasium.farama.org/v1.4.0/environments/mujoco/pusher/",
+    "example": "https://github.com/SciSharp/Gym.NET/tree/master/examples/Pusher",
+    "api": "api/Gym.Environments.Envs.MuJoCo.PusherEnvV5.html"
   },
   {
     "id": "LunarLander-v3",
@@ -150,7 +230,17 @@
     "poster": "images/envs/LunarLander-v3.png",
     "width": 120,
     "height": 80,
-    "screen": "images/envs/LunarLander-v3.mp4"
+    "screen": "images/envs/LunarLander-v3.mp4",
+    "manual": {
+      "controls": "fire the left engine, the main engine or the right engine, or do nothing",
+      "youSee": "position, speed, tilt and spin, and which legs touch the ground",
+      "score": "nearer, slower and level scores, +10 per leg down, firing costs points; +100 landed, −100 crashed",
+      "gameOver": "it crashes, flies off the screen, or comes to rest; 1,000 steps"
+    },
+    "docs": "docs/environments/box2d/lunar_lander.html",
+    "gymnasium": "https://gymnasium.farama.org/v1.4.0/environments/box2d/lunar_lander/",
+    "example": "https://github.com/SciSharp/Gym.NET/tree/master/examples/LunarLander",
+    "api": "api/Gym.Environments.Envs.Box2D.LunarLanderEnv.html"
   },
   {
     "id": "BipedalWalker-v3",
@@ -167,7 +257,17 @@
     "poster": "images/envs/BipedalWalker-v3.png",
     "width": 120,
     "height": 80,
-    "screen": "images/envs/BipedalWalker-v3.mp4"
+    "screen": "images/envs/BipedalWalker-v3.mp4",
+    "manual": {
+      "controls": "four motors: both hips and both knees, each from −1 to 1",
+      "youSee": "the hull's tilt and speeds, each joint, which feet touch, and 10 lidar distances ahead",
+      "score": "about 300 for walking to the far end, minus torque and tilt; −100 for a fall",
+      "gameOver": "the hull hits the ground or the walker reaches the end; 1,600 steps"
+    },
+    "docs": "docs/environments/box2d/bipedal_walker.html",
+    "gymnasium": "https://gymnasium.farama.org/v1.4.0/environments/box2d/bipedal_walker/",
+    "example": "https://github.com/SciSharp/Gym.NET/tree/master/examples/BipedalWalker",
+    "api": "api/Gym.Environments.Envs.Box2D.BipedalWalkerEnv.html"
   },
   {
     "id": "BipedalWalkerHardcore-v3",
@@ -184,7 +284,17 @@
     "poster": "images/envs/BipedalWalkerHardcore-v3.png",
     "width": 120,
     "height": 80,
-    "screen": "images/envs/BipedalWalkerHardcore-v3.mp4"
+    "screen": "images/envs/BipedalWalkerHardcore-v3.mp4",
+    "manual": {
+      "controls": "four motors: both hips and both knees, each from −1 to 1",
+      "youSee": "the hull, each joint, which feet touch, and 10 lidar rays that see the stumps, pits and stairs ahead",
+      "score": "about 300 for walking to the far end, minus torque and tilt; −100 for a fall",
+      "gameOver": "the hull hits the ground or the walker reaches the end; 2,000 steps"
+    },
+    "docs": "docs/environments/box2d/bipedal_walker.html#hardcore",
+    "gymnasium": "https://gymnasium.farama.org/v1.4.0/environments/box2d/bipedal_walker/",
+    "example": "https://github.com/SciSharp/Gym.NET/tree/master/examples/BipedalWalkerHardcore",
+    "api": "api/Gym.Environments.Envs.Box2D.BipedalWalkerEnv.html"
   },
   {
     "id": "CarRacing-v3",
@@ -201,7 +311,17 @@
     "poster": "images/envs/CarRacing-v3.png",
     "width": 120,
     "height": 80,
-    "screen": "images/envs/CarRacing-v3.mp4"
+    "screen": "images/envs/CarRacing-v3.mp4",
+    "manual": {
+      "controls": "steer left or right, gas, brake",
+      "youSee": "a 96×96 colour picture from above: the car, the road and the gauges",
+      "score": "1,000 shared among the road's tiles, each paid when first reached; −0.1 every frame",
+      "gameOver": "the lap is done (95% of the road), or the car leaves the playfield (−100); 1,000 steps"
+    },
+    "docs": "docs/environments/box2d/car_racing.html",
+    "gymnasium": "https://gymnasium.farama.org/v1.4.0/environments/box2d/car_racing/",
+    "example": "https://github.com/SciSharp/Gym.NET/tree/master/examples/CarRacing",
+    "api": "api/Gym.Environments.Envs.Box2D.CarRacingEnv.html"
   },
   {
     "id": "HalfCheetah-v5",
@@ -218,7 +338,17 @@
     "poster": "images/envs/HalfCheetah-v5.png",
     "width": 96,
     "height": 96,
-    "screen": "images/envs/HalfCheetah-v5.mp4"
+    "screen": "images/envs/HalfCheetah-v5.mp4",
+    "manual": {
+      "controls": "six torques: thigh, shin and foot of each leg",
+      "youSee": "the body's height and pitch, every joint's angle, every speed",
+      "score": "forward speed, minus 0.1 × the torques squared",
+      "gameOver": "never early, not even upside down: 1,000 steps"
+    },
+    "docs": "docs/environments/mujoco/half_cheetah.html",
+    "gymnasium": "https://gymnasium.farama.org/v1.4.0/environments/mujoco/half_cheetah/",
+    "example": "https://github.com/SciSharp/Gym.NET/tree/master/examples/HalfCheetah",
+    "api": "api/Gym.Environments.Envs.MuJoCo.HalfCheetahEnvV5.html"
   },
   {
     "id": "Hopper-v5",
@@ -235,7 +365,17 @@
     "poster": "images/envs/Hopper-v5.png",
     "width": 96,
     "height": 96,
-    "screen": "images/envs/Hopper-v5.mp4"
+    "screen": "images/envs/Hopper-v5.mp4",
+    "manual": {
+      "controls": "three torques: thigh, leg and foot",
+      "youSee": "the torso's height and tilt, the joints' angles, every speed",
+      "score": "+1 for staying up, plus forward speed, minus the effort",
+      "gameOver": "it falls (the torso below 0.7 m or tilted past 0.2 rad); 1,000 steps"
+    },
+    "docs": "docs/environments/mujoco/hopper.html",
+    "gymnasium": "https://gymnasium.farama.org/v1.4.0/environments/mujoco/hopper/",
+    "example": "https://github.com/SciSharp/Gym.NET/tree/master/examples/Hopper",
+    "api": "api/Gym.Environments.Envs.MuJoCo.HopperEnvV5.html"
   },
   {
     "id": "Walker2d-v5",
@@ -252,7 +392,17 @@
     "poster": "images/envs/Walker2d-v5.png",
     "width": 96,
     "height": 96,
-    "screen": "images/envs/Walker2d-v5.mp4"
+    "screen": "images/envs/Walker2d-v5.mp4",
+    "manual": {
+      "controls": "six torques: thigh, leg and foot of each leg",
+      "youSee": "the torso's height and tilt, the joints' angles, every speed",
+      "score": "+1 for staying up, plus forward speed, minus the effort",
+      "gameOver": "it falls (the torso below 0.8 m or above 2 m, or tilted past 1 rad); 1,000 steps"
+    },
+    "docs": "docs/environments/mujoco/walker2d.html",
+    "gymnasium": "https://gymnasium.farama.org/v1.4.0/environments/mujoco/walker2d/",
+    "example": "https://github.com/SciSharp/Gym.NET/tree/master/examples/Walker2d",
+    "api": "api/Gym.Environments.Envs.MuJoCo.Walker2dEnvV5.html"
   },
   {
     "id": "Ant-v5",
@@ -269,7 +419,17 @@
     "poster": "images/envs/Ant-v5.png",
     "width": 96,
     "height": 96,
-    "screen": "images/envs/Ant-v5.mp4"
+    "screen": "images/envs/Ant-v5.mp4",
+    "manual": {
+      "controls": "eight torques: hip and ankle of each of four legs",
+      "youSee": "the torso's height and orientation, the joints, every speed, the contact forces (105 numbers)",
+      "score": "+1 for staying healthy, plus forward speed, minus the effort and the contact forces",
+      "gameOver": "the torso leaves 0.2 to 1 m of height (a flip or a leap); 1,000 steps"
+    },
+    "docs": "docs/environments/mujoco/ant.html",
+    "gymnasium": "https://gymnasium.farama.org/v1.4.0/environments/mujoco/ant/",
+    "example": "https://github.com/SciSharp/Gym.NET/tree/master/examples/Ant",
+    "api": "api/Gym.Environments.Envs.MuJoCo.AntEnvV5.html"
   },
   {
     "id": "Humanoid-v5",
@@ -286,7 +446,17 @@
     "poster": "images/envs/Humanoid-v5.png",
     "width": 96,
     "height": 96,
-    "screen": "images/envs/Humanoid-v5.mp4"
+    "screen": "images/envs/Humanoid-v5.mp4",
+    "manual": {
+      "controls": "seventeen torques: abdomen, hips, knees, shoulders and elbows",
+      "youSee": "the body's pose and speeds, each part's mass and motion, the forces on it (348 numbers)",
+      "score": "+5 for staying up, plus 1.25 × forward speed, minus the effort and the impacts",
+      "gameOver": "the torso drops below 1 m or rises above 2 m; 1,000 steps"
+    },
+    "docs": "docs/environments/mujoco/humanoid.html",
+    "gymnasium": "https://gymnasium.farama.org/v1.4.0/environments/mujoco/humanoid/",
+    "example": "https://github.com/SciSharp/Gym.NET/tree/master/examples/Humanoid",
+    "api": "api/Gym.Environments.Envs.MuJoCo.HumanoidEnvV5.html"
   },
   {
     "id": "HumanoidStandup-v5",
@@ -303,7 +473,17 @@
     "poster": "images/envs/HumanoidStandup-v5.png",
     "width": 96,
     "height": 96,
-    "screen": "images/envs/HumanoidStandup-v5.mp4"
+    "screen": "images/envs/HumanoidStandup-v5.mp4",
+    "manual": {
+      "controls": "seventeen torques, each from −0.4 to 0.4",
+      "youSee": "the body's pose and speeds, each part's mass and motion, the forces on it (348 numbers)",
+      "score": "the torso's height every step (the higher, the more), minus the effort and the impacts",
+      "gameOver": "never early: 1,000 steps"
+    },
+    "docs": "docs/environments/mujoco/humanoid_standup.html",
+    "gymnasium": "https://gymnasium.farama.org/v1.4.0/environments/mujoco/humanoid_standup/",
+    "example": "https://github.com/SciSharp/Gym.NET/tree/master/examples/HumanoidStandup",
+    "api": "api/Gym.Environments.Envs.MuJoCo.HumanoidStandupEnvV5.html"
   },
   {
     "id": "Swimmer-v5",
@@ -320,7 +500,17 @@
     "poster": "images/envs/Swimmer-v5.png",
     "width": 96,
     "height": 96,
-    "screen": "images/envs/Swimmer-v5.mp4"
+    "screen": "images/envs/Swimmer-v5.mp4",
+    "manual": {
+      "controls": "two torques, one for each joint",
+      "youSee": "the front's angle, both joints' angles, every speed",
+      "score": "forward speed, minus a tiny effort cost",
+      "gameOver": "never early: 1,000 steps"
+    },
+    "docs": "docs/environments/mujoco/swimmer.html",
+    "gymnasium": "https://gymnasium.farama.org/v1.4.0/environments/mujoco/swimmer/",
+    "example": "https://github.com/SciSharp/Gym.NET/tree/master/examples/Swimmer",
+    "api": "api/Gym.Environments.Envs.MuJoCo.SwimmerEnvV5.html"
   },
   {
     "id": "Blackjack-v1",
@@ -337,7 +527,17 @@
     "poster": "images/envs/Blackjack-v1.png",
     "width": 77,
     "height": 75,
-    "screen": "images/envs/Blackjack-v1.mp4"
+    "screen": "images/envs/Blackjack-v1.mp4",
+    "manual": {
+      "controls": "hit (take a card) or stick",
+      "youSee": "your sum, the dealer's face-up card, and whether you hold a usable ace",
+      "score": "+1 for a win, −1 for a loss, 0 for a draw, when the hand ends",
+      "gameOver": "you stick or go bust"
+    },
+    "docs": "docs/environments/toy_text/blackjack.html",
+    "gymnasium": "https://gymnasium.farama.org/v1.4.0/environments/toy_text/blackjack/",
+    "example": "https://github.com/SciSharp/Gym.NET/tree/master/examples/Blackjack",
+    "api": "api/Gym.Environments.Envs.ToyText.BlackjackEnv.html"
   },
   {
     "id": "FrozenLake-v1",
@@ -354,7 +554,17 @@
     "poster": "images/envs/FrozenLake-v1.png",
     "width": 51,
     "height": 51,
-    "screen": "images/envs/FrozenLake-v1.mp4"
+    "screen": "images/envs/FrozenLake-v1.mp4",
+    "manual": {
+      "controls": "◀ ▼ ▶ ▲ walk, but the ice may slide you sideways",
+      "youSee": "the square you stand on, 0 to 15",
+      "score": "+1 for reaching the goal, 0 otherwise",
+      "gameOver": "you fall into a hole or reach the goal; 100 steps"
+    },
+    "docs": "docs/environments/toy_text/frozen_lake.html",
+    "gymnasium": "https://gymnasium.farama.org/v1.4.0/environments/toy_text/frozen_lake/",
+    "example": "https://github.com/SciSharp/Gym.NET/tree/master/examples/FrozenLake",
+    "api": "api/Gym.Environments.Envs.ToyText.FrozenLakeEnv.html"
   },
   {
     "id": "FrozenLake8x8-v1",
@@ -371,7 +581,17 @@
     "poster": "images/envs/FrozenLake8x8-v1.png",
     "width": 102,
     "height": 102,
-    "screen": "images/envs/FrozenLake8x8-v1.mp4"
+    "screen": "images/envs/FrozenLake8x8-v1.mp4",
+    "manual": {
+      "controls": "◀ ▼ ▶ ▲ walk, but the ice may slide you sideways",
+      "youSee": "the square you stand on, 0 to 63",
+      "score": "+1 for reaching the goal, 0 otherwise",
+      "gameOver": "you fall into a hole or reach the goal; 200 steps"
+    },
+    "docs": "docs/environments/toy_text/frozen_lake.html#8x8",
+    "gymnasium": "https://gymnasium.farama.org/v1.4.0/environments/toy_text/frozen_lake/",
+    "example": "https://github.com/SciSharp/Gym.NET/tree/master/examples/FrozenLake8x8",
+    "api": "api/Gym.Environments.Envs.ToyText.FrozenLakeEnv.html"
   },
   {
     "id": "CliffWalking-v1",
@@ -388,7 +608,17 @@
     "poster": "images/envs/CliffWalking-v1.png",
     "width": 154,
     "height": 51,
-    "screen": "images/envs/CliffWalking-v1.mp4"
+    "screen": "images/envs/CliffWalking-v1.mp4",
+    "manual": {
+      "controls": "▲ ▶ ▼ ◀ walk",
+      "youSee": "the square you stand on, 0 to 47",
+      "score": "−1 for every step, −100 for stepping off the cliff, which sends you back to the start",
+      "gameOver": "you reach the goal; there is no step limit"
+    },
+    "docs": "docs/environments/toy_text/cliff_walking.html",
+    "gymnasium": "https://gymnasium.farama.org/v1.4.0/environments/toy_text/cliff_walking/",
+    "example": "https://github.com/SciSharp/Gym.NET/tree/master/examples/CliffWalking",
+    "api": "api/Gym.Environments.Envs.ToyText.CliffWalkingEnv.html"
   },
   {
     "id": "Taxi-v4",
@@ -405,6 +635,16 @@
     "poster": "images/envs/Taxi-v4.png",
     "width": 107,
     "height": 91,
-    "screen": "images/envs/Taxi-v4.mp4"
+    "screen": "images/envs/Taxi-v4.mp4",
+    "manual": {
+      "controls": "drive ▼ ▲ ▶ ◀, pick up, drop off",
+      "youSee": "one of 500 numbers: the taxi's square, where the passenger waits and where they are going",
+      "score": "−1 for every step, +20 for the delivery, −10 for a wrong pickup or drop-off",
+      "gameOver": "the passenger is delivered, or 200 steps"
+    },
+    "docs": "docs/environments/toy_text/taxi.html",
+    "gymnasium": "https://gymnasium.farama.org/v1.4.0/environments/toy_text/taxi/",
+    "example": "https://github.com/SciSharp/Gym.NET/tree/master/examples/Taxi",
+    "api": "api/Gym.Environments.Envs.ToyText.TaxiEnv.html"
   }
 ]

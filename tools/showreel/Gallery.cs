@@ -12,8 +12,8 @@ namespace Gym.Showreel;
 /// <summary>
 ///     The docs site's cartridge gallery (the 8-bit "select your environment" screen under the video): for every recipe a
 ///     looping WebP at a fifth of the frame size for its cartridge, the same moments at the env's full frame size and
-///     twice the frame rate as an MP4 for the "now playing" screen, a poster PNG, and <c>envs.json</c> describing them,
-///     plus the site's logo and icon in the video's chrome lettering.
+///     twice the frame rate as an MP4 for the "now playing" screen, a poster PNG, and <c>envs.json</c> describing them
+///     with each cartridge's game manual and links (DR-102), plus the site's logo and icon in the video's chrome lettering.
 /// </summary>
 /// <remarks>
 ///     <para>
@@ -55,11 +55,21 @@ internal static class Gallery {
     /// <summary>Seconds the final frame is held before the loop restarts.</summary>
     private const double HoldSeconds = 1.2;
 
+    /// <summary>Gymnasium's docs, at the release Gym.NET follows; each env's page there is <c>environments/&lt;family&gt;/&lt;page&gt;/</c>.</summary>
+    private const string GymnasiumDocs = "https://gymnasium.farama.org/v1.4.0/";
+
+    /// <summary>The repository's tree on GitHub, where each env's example lives (<c>examples/&lt;Name&gt;</c>, DR-74).</summary>
+    private const string RepositoryTree = "https://github.com/SciSharp/Gym.NET/tree/master/";
+
     /// <summary>Writes every loop (cartridge and screen), poster and the manifest into a folder.</summary>
     /// <param name="folder">The output folder, e.g. <c>docs/website-src/images/envs</c>; created if missing.</param>
     /// <param name="ffmpeg">The ffmpeg executable.</param>
     /// <param name="log">Progress lines.</param>
-    /// <exception cref="InvalidOperationException">ffmpeg failed (for instance an env whose frame has an odd side, which H.264's 4:2:0 refuses).</exception>
+    /// <exception cref="InvalidOperationException">
+    ///     ffmpeg failed (for instance an env whose frame has an odd side, which H.264's 4:2:0 refuses), or a recipe has no
+    ///     game manual or page (<see cref="EpisodeRecipe.Manual"/>, <see cref="EpisodeRecipe.Page"/>), checked before its
+    ///     episode is played so a missing line costs no rendering.
+    /// </exception>
     /// <exception cref="IOException">A file cannot be written.</exception>
     /// <remarks>
     ///     Each recipe is played once, its frames sent to both encoders as they are rendered: the MuJoCo frames are the
@@ -69,7 +79,11 @@ internal static class Gallery {
         Directory.CreateDirectory(folder);
         var entries = new List<Dictionary<string, object>>();
         foreach (EpisodeRecipe recipe in Episodes.All) {
-            var (ticks, seed, steps, ret, stamp, wins, losses, action, observation) = Measure(recipe);
+            // The NOW PLAYING panel shows every cartridge's manual and links (DR-102): a recipe without them would leave the
+            // panel's HOW TO PLAY box empty, so the run stops on it rather than publish the gap.
+            GameManual manual = recipe.Manual ?? throw new InvalidOperationException($"{recipe.Id}: the recipe has no game manual (EpisodeRecipe.Manual)");
+            string page = recipe.Page ?? throw new InvalidOperationException($"{recipe.Id}: the recipe names no page (EpisodeRecipe.Page)");
+            var (ticks, seed, steps, ret, stamp, wins, losses, action, observation, envType) = Measure(recipe);
             // The loop stops at the recipe's own limit too, before a fast expert runs off its model's floor.
             int loopTicks = Math.Min(Math.Min(ticks, (int)(recipe.StepsPerSecond * MaxSeconds)), recipe.LoopTicks ?? int.MaxValue);
             int frames = (int)Math.Ceiling(loopTicks / recipe.StepsPerSecond * Fps) + (int)(HoldSeconds * Fps);
@@ -128,6 +142,22 @@ internal static class Gallery {
                 ["width"] = w,
                 ["height"] = h,
                 ["screen"] = $"images/envs/{recipe.Id}.mp4",
+                // The HOW TO PLAY box (DR-102), in the order the panel shows it.
+                ["manual"] = new Dictionary<string, object> {
+                    ["controls"] = manual.Controls,
+                    ["youSee"] = manual.YouSee,
+                    ["score"] = manual.Score,
+                    ["gameOver"] = manual.GameOver,
+                },
+                // READ THE MANUAL: the env's page on this site, by its Gymnasium slug (DR-104), site-relative like the loops,
+                // with the variant's section where the cartridge is one (#hardcore, #8x8). The page shows the button only
+                // once the Environments sidebar lists the page, so a cartridge never links to a page not written yet.
+                ["docs"] = $"docs/environments/{recipe.Family}/{page}.html{(recipe.Anchor is null ? "" : "#" + recipe.Anchor)}",
+                ["gymnasium"] = $"{GymnasiumDocs}environments/{recipe.Family}/{page}/",
+                // Every cartridge has an example of its own, named as its id without the version (DR-74).
+                ["example"] = $"{RepositoryTree}examples/{recipe.Id[..recipe.Id.LastIndexOf("-v", StringComparison.Ordinal)]}",
+                // DocFX names a type's API page by its full name (docfx.json's flattened namespace layout).
+                ["api"] = $"api/{envType.FullName}.html",
             });
         }
         // Relaxed escaping keeps the quotes in the make snippets readable; the file is fetched as JSON, never inlined in HTML.
@@ -161,22 +191,24 @@ internal static class Gallery {
 
     /// <summary>
     ///     Plays a recipe to its end without rendering, for the manifest: ticks to the end, the last hand's seed, steps and
-    ///     return, its stamp, the hands won and lost, and the spaces as Gymnasium prints them.
+    ///     return, its stamp, the hands won and lost, the spaces as Gymnasium prints them, and the env's class.
     /// </summary>
     /// <param name="recipe">The episode.</param>
-    /// <returns>The measurements.</returns>
+    /// <returns>The measurements; <c>EnvType</c> is the class <c>make</c> builds under its wrappers, whose API page the panel links.</returns>
     /// <remarks>
     ///     A multi-hand recipe (Reacher's four targets, Blackjack's five hands) resets each hand with the next seed, so the
     ///     last hand's seed is the recipe's plus the hand's index: the card names the episode its numbers come from.
     /// </remarks>
-    private static (int Ticks, long Seed, int Steps, double Return, string? Stamp, int Wins, int Losses, string Action, string Observation) Measure(EpisodeRecipe recipe) {
+    private static (int Ticks, long Seed, int Steps, double Return, string? Stamp, int Wins, int Losses, string Action, string Observation, Type EnvType) Measure(EpisodeRecipe recipe) {
         using var player = new EpisodePlayer(recipe);
         // TimeLimit ends every id within 2,000 steps; the cap only guards against a recipe that never finishes.
         while (!player.Finished && player.Tick < 5_000)
             player.AdvanceTo(player.Tick + 1);
         using IEnv env = Gymnasium.Make(recipe.Id);
+        // The unwrapped env, not make's outermost TimeLimit: the API page documents the env's own class (a variant id such
+        // as FrozenLake8x8-v1 is the same class with other arguments).
         return (player.Tick, recipe.Seed + player.Hand, player.Step, player.Return, player.Stamp, player.Wins, player.Losses,
-            env.ActionSpace.ToString()!, env.ObservationSpace.ToString()!);
+            env.ActionSpace.ToString()!, env.ObservationSpace.ToString()!, env.Unwrapped.GetType());
     }
 
     /// <summary>

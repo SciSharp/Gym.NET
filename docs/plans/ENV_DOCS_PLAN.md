@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | Planned 2026-11-22; the page designed whole on 2026-11-23. E1 (the Environments section) is done; E2 to E8 are not started. The designs are approved in [`DESIGN_REVIEW.md`](DESIGN_REVIEW.md), round 33 (DR-102…DR-106) and round 35 (DR-111…DR-116) |
+| **Status** | Planned 2026-11-22; the page designed whole on 2026-11-23. E1 (the Environments section) and E2 (the game-manual panel) are done; E3 to E8 are not started. The designs are approved in [`DESIGN_REVIEW.md`](DESIGN_REVIEW.md), round 33 (DR-102…DR-106) and round 35 (DR-111…DR-116) |
 | **Asked for** | The maintainer: "We need to plan for envs docs properly. the SELECT YOUR ENV side menu needs to be improved AND a button linking to proper docfx env doc page. We will need to decide how env doc page looks and contains. including indepth, external links, original source ported from (you can find the sessions using am cli), A GIF playing 1/2 width of the doc article, api, code examples, observable, reward, alllllll other" |
 | **Delivers** | 23 environment pages on the docs site, one per page of Gymnasium's environment docs; an Environments page holding the gallery beside the pages' sidebar; the gallery's NOW PLAYING panel as a game manual whose button opens the env's page |
 | **Gates** | A step starts only when its designs are approved (they are: DR-102…DR-106, DR-111…DR-116). A question none of them answers goes back to the maintainer first |
@@ -154,15 +154,23 @@ names the file that recorded it.
 
 ## 3. The gallery (DR-102, DR-106)
 
-- **The manual panel.** Under the screen and its HUD: a HOW TO PLAY box with four rows in plain game words (CONTROLS,
-  YOU SEE, SCORE, GAME OVER), the READ THE MANUAL button, and a line of links (example, Gymnasium's page, API). The
-  blurb and the make line leave the panel (the page's infobox has the make call).
-- **Data.** Each cartridge's four manual lines are written beside its blurb in `tools/showreel/Episodes.cs`, and the
-  `gallery` command writes them into `envs.json` (`manual`), with `docs` (the page, and the anchor for
-  BipedalWalkerHardcore-v3 and FrozenLake8x8-v1), `example` and `gymnasium`.
+- **The manual panel.** Under NOW PLAYING, the env's family in the label's gold; under the screen and its HUD, a HOW
+  TO PLAY box with four rows in plain game words (CONTROLS, YOU SEE, SCORE, GAME OVER), the READ THE MANUAL button,
+  and a line of links (example, Gymnasium's page, API). The blurb and the make line leave the panel (the page's
+  infobox has the make call); the blurb stays as the loop's description for screen readers.
+- **Data.** Each cartridge's four manual lines are written beside its blurb in `tools/showreel/Episodes.cs`
+  (`GameManual`), and the `gallery` command writes them into `envs.json` (`manual`), with `docs` (the page, and the
+  anchor for BipedalWalkerHardcore-v3 and FrozenLake8x8-v1), `example`, `gymnasium` and `api`. The pages take
+  Gymnasium's slugs (`Page`): `docs/environments/classic_control/cart_pole.html` beside Gymnasium's
+  `environments/classic_control/cart_pole/`.
+- **Only written pages.** READ THE MANUAL, and Enter's hint, show only for a cartridge whose page the Environments
+  sidebar lists (`docs/environments/toc.json`, read beside the manifest): the pages come family by family (E3 to E7),
+  and the button never leads to a page not written yet.
 - **Keys.** Enter opens the selected env's page while focus is in the gallery; the arrows keep moving the cursor.
-- **Sticky floor.** The manual makes the panel taller than DR-101's tallest (516 px): re-measure every env's panel
-  and move the 660 px floor with it.
+- **Sticky floor.** The manual makes the panel taller than DR-101's tallest (516 px), so every env's panel was measured
+  again (E2): the tallest is BipedalWalkerHardcore-v3's, 724 px once READ THE MANUAL shows (671 px while no page
+  exists), and the floor moved from 660 px to 840 px of window height. Each manual row keeps to two lines in the
+  440 px panel (a range and a number with its unit never break apart), which holds it there; a longer line raises it.
 - **The Environments page.** `docs/environments/index.md` holds the same gallery: the arcade's markup moves to one
   include file used by both pages, and `main.js` already fills any `.gn-arcade` it finds. In the docs layout the shelf
   narrows to two columns beside the 440 px panel. The navbar's Environments and the sidebar's Overview open it.
@@ -191,7 +199,7 @@ pushed when the maintainer says so.
 | Step | Work | Designs |
 |---|---|---|
 | E1 | The Environments section: `docs/environments/index.md` with the gallery (the shared include, `website-src/includes/arcade.md`), `toc.yml` with Overview (each family's entries come with its pages, E3 to E7), the navbar and docfx.json content entries; cartridge labels that wrap where the docs layout's shelf is narrow. **Done 2026-11-23** | DR-104, DR-106 |
-| E2 | The manual panel: 24 cartridges' manual lines in `Episodes.cs`, `envs.json`'s new fields, `main.js`/`main.css`, Enter, the sticky floor re-measured | DR-102 |
+| E2 | The manual panel: 24 cartridges' manual lines in `Episodes.cs`, `envs.json`'s new fields, `main.js`/`main.css`, Enter, the sticky floor re-measured. **Done 2026-11-23** | DR-102 |
 | E3 | CartPole's page whole: the banner, the infobox and its CSS, the full-width quick start, the figure and the math, the code tabs and the anatomy chart's script in the `gymnet` template, every section, its samples; `examples/CartPole`'s `--record` and its media; every example's `Program.cs` renamed `<Env>Program.cs`; the facts test, the samples' test file. Reviewed by the maintainer before the rest | DR-103, DR-105, DR-111…DR-116 |
 | E4 | Classic control: Acrobot, Mountain Car, Mountain Car Continuous (its episode's source asked first, 2.4), Pendulum; their examples' `--record` | DR-103…DR-105, DR-111…DR-116 |
 | E5 | Toy text: Blackjack, Cliff Walking, Frozen Lake (with the 8x8 section's loop), Taxi; their examples' `--record`, and the grid figure (DR-114's reading to confirm) | |

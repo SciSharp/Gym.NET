@@ -57,6 +57,22 @@ internal sealed record DelegatePolicy(Func<IEnv, object?, object> Rule) : IPolic
 internal sealed record PosterShot(double Seconds, int Left, int Top, int Width, int Height, int PixelWidth, int PixelHeight);
 
 /// <summary>
+///     The gallery's HOW TO PLAY box for one cartridge (DR-102): the env's spaces, reward and ending told in game words, the
+///     way the back of a game box tells them. The docs site shows the four lines under the NOW PLAYING screen; the exact
+///     spaces, formulas and limits are on the env's page, which READ THE MANUAL opens.
+/// </summary>
+/// <param name="Controls">What an action does (the action space), e.g. "◀ ▶ push the cart left or right".</param>
+/// <param name="YouSee">What an observation holds (the observation space), in words, not indices.</param>
+/// <param name="Score">How a step or an episode is scored (the reward).</param>
+/// <param name="GameOver">What ends an episode (termination) and the step limit <c>make</c> adds (truncation).</param>
+/// <remarks>
+///     Footgun: these lines are prose, not data the code checks. Each was written from Gymnasium 1.4.0's source for its
+///     id (the spaces, the reward's terms and weights, the ending conditions, the registry's step limit); when an env's
+///     behaviour or registration changes, its line here must change with it.
+/// </remarks>
+internal sealed record GameManual(string Controls, string YouSee, string Score, string GameOver);
+
+/// <summary>
 ///     One episode the showreel plays: a registered id, a seed, the policy that plays it, how fast it plays, and the stamp
 ///     its ending earns.
 /// </summary>
@@ -91,6 +107,20 @@ internal sealed record PosterShot(double Seconds, int Left, int Top, int Width, 
 ///     a MuJoCo model's finite floor, past which a panel shows grey void: HalfCheetah's at step 96 (17 m/s), Humanoid's
 ///     near step 350, so their loops stop at 90 and 300. The video's scenes end before those steps on their own.
 /// </param>
+/// <param name="Manual">
+///     The gallery's HOW TO PLAY lines for this cartridge (DR-102). Every recipe the gallery writes needs one: the
+///     <c>gallery</c> command refuses a recipe without it rather than show an empty manual.
+/// </param>
+/// <param name="Page">
+///     The env's page, by the slug of its page in Gymnasium's docs (<c>cart_pole</c>, <c>half_cheetah</c>): Gym.NET's page
+///     is <c>docs/environments/&lt;family&gt;/&lt;page&gt;.md</c> on the docs site, beside Gymnasium's
+///     <c>environments/&lt;family&gt;/&lt;page&gt;/</c> (DR-104). Required by the <c>gallery</c> command, like
+///     <paramref name="Manual"/>.
+/// </param>
+/// <param name="Anchor">
+///     The section of that page the cartridge opens, or null for the page's top: <c>hardcore</c> for
+///     BipedalWalkerHardcore-v3 and <c>8x8</c> for FrozenLake8x8-v1, the two variants with their own cartridges (DR-104).
+/// </param>
 internal sealed record EpisodeRecipe(
     string Id,
     string Family,
@@ -105,7 +135,10 @@ internal sealed record EpisodeRecipe(
     IReadOnlyDictionary<string, object?>? Kwargs = null,
     bool RenderEveryStep = false,
     PosterShot? Poster = null,
-    int? LoopTicks = null) {
+    int? LoopTicks = null,
+    GameManual? Manual = null,
+    string? Page = null,
+    string? Anchor = null) {
     /// <summary>Ticks a finished episode is held on screen before the next one starts (multi-episode recipes only).</summary>
     public int HandPauseTicks => 2;
 
@@ -178,17 +211,34 @@ internal static class Episodes {
     /// </summary>
     public static IReadOnlyList<EpisodeRecipe> All { get; } = new[] {
         new EpisodeRecipe("CartPole-v1", "classic_control", 3, 50, () => new DelegatePolicy(CartPoleSway),
-            (term, trunc, ret) => trunc ? "500 STEPS!" : "FELL", "A linear controller balances the pole while gliding the cart from side to side."),
+            (term, trunc, ret) => trunc ? "500 STEPS!" : "FELL", "A linear controller balances the pole while gliding the cart from side to side.",
+            Manual: new GameManual("◀ ▶ push the cart left or right", "the cart's position and speed, the pole's angle and spin",
+                "+1 for every step the pole stays up", "the pole leans past 12°, the cart leaves the track, or 500 steps"),
+            Page: "cart_pole"),
         new EpisodeRecipe("MountainCar-v0", "classic_control", 4, 30, () => new DelegatePolicy(MountainCarPump),
-            (term, _, _) => term ? "SUMMIT!" : null, "Too weak to drive straight up: it pushes with its velocity to swing higher each time."),
+            (term, _, _) => term ? "SUMMIT!" : null, "Too weak to drive straight up: it pushes with its velocity to swing higher each time.",
+            Manual: new GameManual("◀ push left, coast, or ▶ push right", "the car's position along the track and its speed",
+                "−1 for every step until the flag", "the car reaches the flag on the right hilltop, or 200 steps"),
+            Page: "mountain_car"),
         // Pendulum only truncates (200 steps); a return above -300 means it spent the episode up, a failed swing scores
         // around -1,000.
         new EpisodeRecipe("Pendulum-v1", "classic_control", 5, 30, () => new DelegatePolicy(PendulumSwingUp),
-            (_, _, ret) => ret > -300 ? "UPRIGHT!" : null, "Energy pumping swings it up, then a PD controller catches it at the top."),
+            (_, _, ret) => ret > -300 ? "UPRIGHT!" : null, "Energy pumping swings it up, then a PD controller catches it at the top.",
+            Manual: new GameManual("a twist on the pivot, from −2 to 2",
+                "which way the pendulum points (its angle's cosine and sine) and how fast it spins",
+                "0 at best: minus how far it is from upright, how fast it spins and how hard you twist", "never early: 200 steps"),
+            Page: "pendulum"),
         new EpisodeRecipe("Acrobot-v1", "classic_control", 1, 15, () => new DelegatePolicy(AcrobotPump),
-            (term, _, _) => term ? "REACHED!" : null, "Torque on the elbow, timed with the swing, lifts the tip over the line."),
+            (term, _, _) => term ? "REACHED!" : null, "Torque on the elbow, timed with the swing, lifts the tip over the line.",
+            Manual: new GameManual("twist the joint between the links: −1, 0 or +1",
+                "both joints' angles (cosine and sine) and how fast each turns", "−1 for every step until the tip is above the line",
+                "the tip swings above the line, or 500 steps"),
+            Page: "acrobot"),
         new EpisodeRecipe("InvertedPendulum-v5", "mujoco", 0, 25, Expert("InvertedPendulum-v5"),
-            (term, trunc, _) => trunc ? "BALANCED!" : term ? "FELL" : null, "MuJoCo's cart-pole, held up for all 1,000 steps by Farama's SAC expert."),
+            (term, trunc, _) => trunc ? "BALANCED!" : term ? "FELL" : null, "MuJoCo's cart-pole, held up for all 1,000 steps by Farama's SAC expert.",
+            Manual: new GameManual("push the cart, from −3 to 3", "the cart's position and speed, the pole's angle and spin",
+                "+1 for every step the pole stays within 0.2 rad of upright", "the pole leans past 0.2 rad, or 1,000 steps"),
+            Page: "inverted_pendulum"),
         // Gymnasium sets no camera for this env, and MuJoCo's free camera shows it a few pixels tall in a quarter panel.
         new EpisodeRecipe("InvertedDoublePendulum-v5", "mujoco", 0, 20, Expert("InvertedDoublePendulum-v5"),
             (term, trunc, _) => trunc ? "BALANCED!" : term ? "FELL" : null, "Two poles stacked on a cart, both held upright by Farama's SAC expert.",
@@ -196,7 +246,12 @@ internal static class Episodes {
                 ["default_camera_config"] = new Dictionary<string, object?> {
                     ["trackbodyid"] = 0L, ["distance"] = 2.6, ["lookat"] = new[] { 0.0, 0.0, 0.55 }, ["elevation"] = -5.0,
                 },
-            }),
+            },
+            Manual: new GameManual("push the cart, from −1 to 1",
+                "the cart's position, both poles' angles (sine and cosine), every speed, the force on the cart",
+                "+10 for every step it stays up, less for a low tip and for spinning poles",
+                "the tip drops to 1 m (it stands 1.2 m tall), or 1,000 steps"),
+            Page: "inverted_double_pendulum"),
         // One Reacher episode is 50 steps (a second at its own 50 fps): four targets in a row at half speed make a clip.
         // The still: the arena (the purple frame) spans x 48-408 and y 150-370 of the 480x480 frame, the arm's base at its middle;
         // the crop frames it whole and shrinks it 3x, so the 120x80 still shows the arena, the arm and the target. The expert
@@ -206,7 +261,11 @@ internal static class Episodes {
         new EpisodeRecipe("Reacher-v5", "mujoco", 0, 25, Expert("Reacher-v5"),
             (_, _, ret) => ret > -6 ? "REACHED!" : null, "Farama's SAC expert puts the fingertip on each new target.",
             Hands: 4, HandLabel: "TARGET",
-            Poster: new PosterShot(Seconds: 2.73, Left: 48, Top: 140, Width: 360, Height: 240, PixelWidth: 120, PixelHeight: 80)),
+            Poster: new PosterShot(Seconds: 2.73, Left: 48, Top: 140, Width: 360, Height: 240, PixelWidth: 120, PixelHeight: 80),
+            Manual: new GameManual("twist the two joints, each from −1 to 1",
+                "the arm's angles and speeds, where the target is, and the gap from fingertip to target",
+                "minus the fingertip's distance from the target, minus the effort", "never early: 50 steps"),
+            Page: "reacher"),
         // Seed 7: the expert pushes the puck into the goal (return -20.4; the ten seeds 0-9 average -28.0). Gymnasium's own
         // camera stands 4 m off, which leaves the arm a small figure in a half panel; 2.4 m at a 135 degree azimuth shows
         // the whole arm reaching across the table to the puck and the goal.
@@ -219,32 +278,72 @@ internal static class Episodes {
             Kwargs: new Dictionary<string, object?> {
                 ["default_camera_config"] = new Dictionary<string, object?> { ["trackbodyid"] = -1L, ["distance"] = 2.4, ["azimuth"] = 135.0 },
             },
-            Poster: new PosterShot(Seconds: 0.5, Left: 122, Top: 112, Width: 240, Height: 160, PixelWidth: 120, PixelHeight: 80)),
+            Poster: new PosterShot(Seconds: 0.5, Left: 122, Top: 112, Width: 240, Height: 160, PixelWidth: 120, PixelHeight: 80),
+            Manual: new GameManual("seven twists, shoulder to wrist, each from −2 to 2",
+                "the arm's angles and speeds, and where the fingertip, the puck and the goal are",
+                "minus the puck's distance from the goal, half the fingertip's distance from the puck, and the effort",
+                "never early: 100 steps"),
+            Page: "pusher"),
         new EpisodeRecipe("LunarLander-v3", "box2d", 7, 50, () => new DelegatePolicy((env, o) => LunarLanderEnv.Heuristic(env, (NDArray)o!)),
             (term, _, ret) => term && ret > 100 ? "LANDED!" : term ? "CRASH" : null, "Gymnasium's own heuristic lands between the flags.",
-            RenderEveryStep: true),
+            RenderEveryStep: true,
+            Manual: new GameManual("fire the left engine, the main engine or the right engine, or do nothing",
+                "position, speed, tilt and spin, and which legs touch the ground",
+                "nearer, slower and level scores, +10 per leg down, firing costs points; +100 landed, −100 crashed",
+                "it crashes, flies off the screen, or comes to rest; 1,000 steps"),
+            Page: "lunar_lander"),
         new EpisodeRecipe("BipedalWalker-v3", "box2d", 0, 50, () => new BipedalPolicy(),
             (term, _, ret) => term && ret > 0 ? "FINISH!" : term ? "GAME OVER" : null, "Gymnasium's gait state machine walks the whole course.",
-            RenderEveryStep: true),
+            RenderEveryStep: true,
+            Manual: new GameManual("four motors: both hips and both knees, each from −1 to 1",
+                "the hull's tilt and speeds, each joint, which feet touch, and 10 lidar distances ahead",
+                "about 300 for walking to the far end, minus torque and tilt; −100 for a fall",
+                "the hull hits the ground or the walker reaches the end; 1,600 steps"),
+            Page: "bipedal_walker"),
         // Seed 7: RL Zoo's TQC agent clears the whole course (return 308 in 968 steps; it finishes six seeds of 0-9).
         new EpisodeRecipe("BipedalWalkerHardcore-v3", "box2d", 7, 50, Expert("BipedalWalkerHardcore-v3"),
             (term, _, ret) => term && ret > 0 ? "FINISH!" : term ? "GAME OVER" : null,
-            "Stumps, pits and stairs, cleared by RL Zoo's TQC agent.", RenderEveryStep: true),
+            "Stumps, pits and stairs, cleared by RL Zoo's TQC agent.", RenderEveryStep: true,
+            Manual: new GameManual("four motors: both hips and both knees, each from −1 to 1",
+                "the hull, each joint, which feet touch, and 10 lidar rays that see the stumps, pits and stairs ahead",
+                "about 300 for walking to the far end, minus torque and tilt; −100 for a fall",
+                "the hull hits the ground or the walker reaches the end; 2,000 steps"),
+            Page: "bipedal_walker", Anchor: "hardcore"),
         // CarRacing terminates when the lap closes; seed 11 visits 98% of the tiles but meets the 1,000-step limit first,
         // so it truncates and earns no stamp (the score in its own frame tells the story).
         new EpisodeRecipe("CarRacing-v3", "box2d", 11, 50, () => new DelegatePolicy(CarRacingPursuit),
-            (term, _, _) => term ? "LAP!" : null, "Pure pursuit on the track's centre line, braking into the bends."),
+            (term, _, _) => term ? "LAP!" : null, "Pure pursuit on the track's centre line, braking into the bends.",
+            Manual: new GameManual("steer left or right, gas, brake", "a 96×96 colour picture from above: the car, the road and the gauges",
+                "1,000 shared among the road's tiles, each paid when first reached; −0.1 every frame",
+                "the lap is done (95% of the road), or the car leaves the playfield (−100); 1,000 steps"),
+            Page: "car_racing"),
         // The locomotion envs render through their model's own "track" camera (mode trackcom), named explicitly: with no
         // camera named, Gymnasium 1.4 forces MuJoCo's free camera, which never follows a body, so a runner leaves the
         // frame within a second (Gym.NET draws it the same way).
         new EpisodeRecipe("HalfCheetah-v5", "mujoco", 0, 20, Expert("HalfCheetah-v5"),
-            (_, _, _) => null, "Farama's TQC expert at full gallop: 17,629 in a thousand steps.", Kwargs: TrackCamera, LoopTicks: 90),
+            (_, _, _) => null, "Farama's TQC expert at full gallop: 17,629 in a thousand steps.", Kwargs: TrackCamera, LoopTicks: 90,
+            Manual: new GameManual("six torques: thigh, shin and foot of each leg", "the body's height and pitch, every joint's angle, every speed",
+                "forward speed, minus 0.1 × the torques squared", "never early, not even upside down: 1,000 steps"),
+            Page: "half_cheetah"),
         new EpisodeRecipe("Hopper-v5", "mujoco", 0, 125, Expert("Hopper-v5"),
-            (term, _, _) => term ? "FELL" : null, "One leg, hopping forward for all 1,000 steps (Farama's SAC expert).", Kwargs: TrackCamera),
+            (term, _, _) => term ? "FELL" : null, "One leg, hopping forward for all 1,000 steps (Farama's SAC expert).", Kwargs: TrackCamera,
+            Manual: new GameManual("three torques: thigh, leg and foot", "the torso's height and tilt, the joints' angles, every speed",
+                "+1 for staying up, plus forward speed, minus the effort",
+                "it falls (the torso below 0.7 m or tilted past 0.2 rad); 1,000 steps"),
+            Page: "hopper"),
         new EpisodeRecipe("Walker2d-v5", "mujoco", 0, 125, Expert("Walker2d-v5"),
-            (term, _, _) => term ? "FELL" : null, "Two legs, running forward (Farama's SAC expert).", Kwargs: TrackCamera),
+            (term, _, _) => term ? "FELL" : null, "Two legs, running forward (Farama's SAC expert).", Kwargs: TrackCamera,
+            Manual: new GameManual("six torques: thigh, leg and foot of each leg", "the torso's height and tilt, the joints' angles, every speed",
+                "+1 for staying up, plus forward speed, minus the effort",
+                "it falls (the torso below 0.8 m or above 2 m, or tilted past 1 rad); 1,000 steps"),
+            Page: "walker2d"),
         new EpisodeRecipe("Ant-v5", "mujoco", 0, 20, Expert("Ant-v5"),
-            (term, _, _) => term ? "FLIPPED" : null, "Four legs, eight motors, running forward (Farama's SAC expert).", Kwargs: TrackCamera),
+            (term, _, _) => term ? "FLIPPED" : null, "Four legs, eight motors, running forward (Farama's SAC expert).", Kwargs: TrackCamera,
+            Manual: new GameManual("eight torques: hip and ankle of each of four legs",
+                "the torso's height and orientation, the joints, every speed, the contact forces (105 numbers)",
+                "+1 for staying healthy, plus forward speed, minus the effort and the contact forces",
+                "the torso leaves 0.2 to 1 m of height (a flip or a leap); 1,000 steps"),
+            Page: "ant"),
         // Three-quarter speed: its floor ends near step 350, and the scene's 5.2 s then show 260 steps.
         // The still: the track camera keeps the figure near the middle of a frame that is mostly sky and floor, and the expert
         // walks upright with one arm raised, which makes the figure about 275 px tall (x 194-317, y 158-433 of 480x480 over
@@ -253,23 +352,53 @@ internal static class Episodes {
         new EpisodeRecipe("Humanoid-v5", "mujoco", 0, 50, Expert("Humanoid-v5"),
             (term, _, _) => term ? "FELL" : null, "Seventeen motors, a humanoid walking for all 1,000 steps (Farama's TQC expert, at three-quarter speed).",
             Kwargs: TrackCamera, LoopTicks: 300,
-            Poster: new PosterShot(Seconds: 3.0, Left: 76, Top: 115, Width: 360, Height: 360, PixelWidth: 120, PixelHeight: 120)),
-        // Farama's expert was trained seeing positions and velocities only; its observation flags come with it.
+            Poster: new PosterShot(Seconds: 3.0, Left: 76, Top: 115, Width: 360, Height: 360, PixelWidth: 120, PixelHeight: 120),
+            Manual: new GameManual("seventeen torques: abdomen, hips, knees, shoulders and elbows",
+                "the body's pose and speeds, each part's mass and motion, the forces on it (348 numbers)",
+                "+5 for staying up, plus 1.25 × forward speed, minus the effort and the impacts",
+                "the torso drops below 1 m or rises above 2 m; 1,000 steps"),
+            Page: "humanoid"),
+        // Farama's expert was trained seeing positions and velocities only; its observation flags come with it. The manual
+        // describes the env as make builds it by default (348 numbers), which is what the reader's env sees.
         new EpisodeRecipe("HumanoidStandup-v5", "mujoco", 0, 67, Expert("HumanoidStandup-v5"),
-            (_, _, _) => null, "Lying on the floor, getting up and standing (Farama's SAC expert).", Kwargs: StandupKwargs),
+            (_, _, _) => null, "Lying on the floor, getting up and standing (Farama's SAC expert).", Kwargs: StandupKwargs,
+            Manual: new GameManual("seventeen torques, each from −0.4 to 0.4",
+                "the body's pose and speeds, each part's mass and motion, the forces on it (348 numbers)",
+                "the torso's height every step (the higher, the more), minus the effort and the impacts", "never early: 1,000 steps"),
+            Page: "humanoid_standup"),
         new EpisodeRecipe("Swimmer-v5", "mujoco", 0, 50, Expert("Swimmer-v5"),
             (_, _, _) => null, "Three links in a viscous fluid swim forward with a travelling wave (Farama's PPO expert, at twice its speed).",
-            Kwargs: TrackCamera),
+            Kwargs: TrackCamera,
+            Manual: new GameManual("two torques, one for each joint", "the front's angle, both joints' angles, every speed",
+                "forward speed, minus a tiny effort cost", "never early: 1,000 steps"),
+            Page: "swimmer"),
         new EpisodeRecipe("Blackjack-v1", "toy_text", 40, 1.6, () => new DelegatePolicy(BlackjackBasic),
-            (_, _, ret) => ret > 0 ? "WIN!" : ret < 0 ? "BUST" : "PUSH", "Basic strategy against the dealer, hand after hand.", Hands: 5, ScoresHands: true),
+            (_, _, ret) => ret > 0 ? "WIN!" : ret < 0 ? "BUST" : "PUSH", "Basic strategy against the dealer, hand after hand.", Hands: 5, ScoresHands: true,
+            Manual: new GameManual("hit (take a card) or stick", "your sum, the dealer's face-up card, and whether you hold a usable ace",
+                "+1 for a win, −1 for a loss, 0 for a draw, when the hand ends", "you stick or go bust"),
+            Page: "blackjack"),
         new EpisodeRecipe("FrozenLake-v1", "toy_text", 1, 8, () => new ToyTextPlan(),
-            (term, _, ret) => ret > 0 ? "GOAL!" : term ? "SPLASH" : null, "The ice is slippery; value iteration still finds the safest way across."),
+            (term, _, ret) => ret > 0 ? "GOAL!" : term ? "SPLASH" : null, "The ice is slippery; value iteration still finds the safest way across.",
+            Manual: new GameManual("◀ ▼ ▶ ▲ walk, but the ice may slide you sideways", "the square you stand on, 0 to 15",
+                "+1 for reaching the goal, 0 otherwise", "you fall into a hole or reach the goal; 100 steps"),
+            Page: "frozen_lake"),
         new EpisodeRecipe("FrozenLake8x8-v1", "toy_text", 2, 12, () => new ToyTextPlan(),
-            (term, _, ret) => ret > 0 ? "GOAL!" : term ? "SPLASH" : null, "The 8x8 lake, sliding past every hole."),
+            (term, _, ret) => ret > 0 ? "GOAL!" : term ? "SPLASH" : null, "The 8x8 lake, sliding past every hole.",
+            Manual: new GameManual("◀ ▼ ▶ ▲ walk, but the ice may slide you sideways", "the square you stand on, 0 to 63",
+                "+1 for reaching the goal, 0 otherwise", "you fall into a hole or reach the goal; 200 steps"),
+            Page: "frozen_lake", Anchor: "8x8"),
         new EpisodeRecipe("CliffWalking-v1", "toy_text", 0, 4, () => new ToyTextPlan(),
-            (term, _, _) => term ? "SAFE!" : null, "The shortest path, one step from the cliff's edge."),
+            (term, _, _) => term ? "SAFE!" : null, "The shortest path, one step from the cliff's edge.",
+            Manual: new GameManual("▲ ▶ ▼ ◀ walk", "the square you stand on, 0 to 47",
+                "−1 for every step, −100 for stepping off the cliff, which sends you back to the start",
+                "you reach the goal; there is no step limit"),
+            Page: "cliff_walking"),
         new EpisodeRecipe("Taxi-v4", "toy_text", 12, 4, () => new ToyTextPlan(),
-            (term, _, ret) => term && ret > 0 ? "DELIVERED!" : null, "Pick the passenger up, drop them at the hotel."),
+            (term, _, ret) => term && ret > 0 ? "DELIVERED!" : null, "Pick the passenger up, drop them at the hotel.",
+            Manual: new GameManual("drive ▼ ▲ ▶ ◀, pick up, drop off",
+                "one of 500 numbers: the taxi's square, where the passenger waits and where they are going",
+                "−1 for every step, +20 for the delivery, −10 for a wrong pickup or drop-off", "the passenger is delivered, or 200 steps"),
+            Page: "taxi"),
     };
 
     /// <summary>Finds a recipe by id.</summary>

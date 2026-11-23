@@ -7,7 +7,7 @@ played by a scripted policy or a published expert agent, composed in C# over a 1
 |---|---|
 | `docs/media/gym-net-showreel.mp4`: 15 lettered scenes in the order `video-order.txt` gives (78.4 s in letter order), 1280x720, 30 fps, H.264 (about 10 MB) | The docs site's landing page, and linked from the README |
 | `docs/media/gym-net-hero.webp`: the same scenes in the same order, each about 60% as long (49.4 s), animated WebP, 800x450, 15 fps (about 8 MB) | The top of `README.md` on GitHub (no package embeds the README), and the site's fallback where video does not play |
-| `docs/website-src/images/envs/*.webp`, `envs.json` | The site's 8-bit "select your environment" gallery |
+| `docs/website-src/images/envs/*.webp`, `envs.json` (each cartridge's episode facts, its game manual and its links: the env's page, its example, Gymnasium's page, its API page) | The site's 8-bit "select your environment" gallery, on the landing page and the Environments page |
 | `docs/website-src/images/envs/*.png`: one still per env, the frame 2/5 of the way through its loop at a fifth of the frame's size, except Pusher, Reacher and Humanoid, whose subjects fill only part of the frame: each names a moment and a crop (`PosterShot` in `Episodes.cs`) | The gallery of stills in `README.md` (the site does not read them) |
 | `docs/website-src/images/envs/*.mp4`: the same moments at each env's own frame size, H.264, 30 fps (about 4.2 MB for the 24) | The gallery's "now playing" screen (DR-101), muted and looping without controls |
 | `docs/website-src/images/showreel-poster.jpg`, `gymnet-logo.png`, `gymnet-icon.png` | The video's poster, the site's navbar logo and favicon |
@@ -173,8 +173,9 @@ Constructor arguments that change what the camera sees, or what an agent observe
 - HumanoidStandup turns off its four extra observation groups (`include_cinert_in_observation` and the three like it):
   Farama's expert was trained seeing positions and velocities only, and its file's `make_kwargs` says so.
 
-The site's gallery shows each env's exact `Gymnasium.Make` call, these arguments included (a dictionary argument by
-name).
+The manifest still records each env's exact `Gymnasium.Make` call, these arguments included (a dictionary argument by
+name), though since DR-102 the gallery's panel shows the game manual in its place and the call belongs to each env
+page's infobox (DR-103).
 
 ## The parity segment
 
@@ -196,7 +197,10 @@ FOR BIT, IN C#".
 ## Where to change things
 
 - `video-order.txt`: the scene order, of the video and the README cut.
-- `Episodes.cs`: the recipes (id, seed, agent, speed, stamp, the gallery's blurb, presentation arguments, loop limits).
+- `Episodes.cs`: the recipes (id, seed, agent, speed, stamp, the gallery's blurb, presentation arguments, loop limits),
+  and each cartridge's game manual (`GameManual`: CONTROLS, YOU SEE, SCORE, GAME OVER in game words, DR-102) with its
+  page (`Page`, Gymnasium's slug, and `Anchor` for the two variants). The manual is prose written from Gymnasium's
+  source: change it with the env's behaviour.
 - `Storyboard.cs`: the video's scenes (`Storyboards.Scenes`: which panel is where, when, with what easing), the README
   cut's short forms (`Storyboards.ShortScenes`), their composer (`Compose`: captions, the header logo, the letters), and
   the titles and captions.
