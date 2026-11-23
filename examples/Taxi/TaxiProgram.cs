@@ -3,34 +3,37 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using Gym.Environments.Envs.ToyText;
 using Gym.Envs;
 using Gym.Observations;
+using Gym.Rendering;
 using Gym.Rendering.Avalonia;
 using Gym.Utils;
 using NumSharp;
 
-namespace Gym.Examples.Pendulum {
+namespace Gym.Examples.Taxi {
     /// <summary>
-    ///     Swings Pendulum-v1 up and holds it upright: energy pumping, then a PD controller near the top. <c>dotnet run
-    ///     --project examples/Pendulum -c Release</c> plays one seeded episode headless and prints its steps and
-    ///     return; <c>-- --render</c> plays it in a window, and <c>-- --play</c> hands the motor to the A and D keys.
+    ///     Picks up and delivers Taxi-v4's passenger by value iteration over the env's own transition table. <c>dotnet
+    ///     run --project examples/Taxi -c Release</c> plays one seeded episode headless and prints its steps and
+    ///     return; <c>-- --render</c> plays it in a window, and <c>-- --play</c> lets you play it with the keyboard.
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///     The motor is too weak to lift the pendulum straight up. Far from the top, full torque along the swing adds
-    ///     energy until the pendulum has the energy of the upright rest (<c>w^2/2 + 15 cos(theta)</c> for Gymnasium's g
-    ///     = 10, m = l = 1); within about 32 degrees of the top a PD controller catches it and holds it there.
+    ///     500 states: the taxi's square, the passenger's place (one of four stands, or in the taxi) and the
+    ///     destination. Every step costs 1, a delivery pays 20, and a pick-up or drop-off in the wrong place costs 10.
+    ///     Value iteration over the transition table <c>P</c> finds the shortest delivery from every state: 16 steps
+    ///     from seed 12.
     ///     </para>
     ///     <para>
-    ///     The default seed, 5, is the episode the front-page showreel plays (<c>tools/showreel</c>, DR-74).
+    ///     The default seed, 12, is the episode the front-page showreel plays (<c>tools/showreel</c>, DR-74).
     ///     </para>
     /// </remarks>
-    internal static class Program {
+    internal static class TaxiProgram {
         /// <summary>The environment this example plays, by its registered id.</summary>
-        private const string Id = "Pendulum-v1";
+        private const string Id = "Taxi-v4";
 
         /// <summary>The first reset seed when <c>--seed</c> is not given: the episode the showreel plays.</summary>
-        private const long DefaultSeed = 5;
+        private const long DefaultSeed = 12;
 
         /// <summary>
         ///     Plays the episodes the arguments ask for with the agent, or hands the env to the keyboard.
@@ -92,50 +95,80 @@ namespace Gym.Examples.Pendulum {
             // make's stack: TimeLimit over OrderEnforcing over PassiveEnvChecker over the env. The render mode is a
             // constructor argument, fixed for the env's life, as in Gymnasium.
             using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>(Id, render ? new { render_mode = "human" } : null);
+            // The plan comes from the env's own model of itself: the transition table of the unwrapped env.
+            long[] plan = Plan(((TaxiEnv)env.Unwrapped).P);
             NDArray observation = env.Reset(seed: seed).Observation;
             int steps = 0;
             double total = 0;
             while (true) {
-                StepResult<NDArray> step = env.Step(Act(observation));
+                StepResult<NDArray> step = env.Step(NDArray.Scalar(plan[State(observation)]));
                 observation = step.Observation;
                 steps++;
                 total += step.Reward;
                 if (step.Terminated || step.Truncated)
-                    return (steps, total, step.Terminated ? "terminated" : "truncated by the time limit");
+                    return (steps, total, step.Terminated ? "delivered the passenger" : "truncated by the time limit");
             }
         }
 
         /// <summary>
-        ///     Reads an observation's values as float64, whatever its dtype (classic control's are float32).
+        ///     Value iteration over the env's own transition table: the best action in every state, for a discount of
+        ///     0.99, computed once per episode before the first step.
         /// </summary>
-        /// <param name="observation">The observation.</param>
-        /// <returns>Its values in C order.</returns>
-        private static double[] Values(NDArray observation) {
-            using NDArray values = observation.astype(NPTypeCode.Double);
-            return values.ToArray<double>();
+        /// <param name="p">The transition table <c>P</c>: for each state and action, the possible transitions.</param>
+        /// <returns>
+        ///     The greedy action per state; ties go to the lowest action, as NumPy's argmax would choose.
+        /// </returns>
+        private static long[] Plan(IReadOnlyDictionary<long, IReadOnlyDictionary<long, IReadOnlyList<ToyTextTransition>>> p) {
+            const double gamma = 0.99;
+            int states = p.Count, actions = p[0].Count;
+            var v = new double[states];
+            // The expected discounted return of an action: no value is carried past a terminal transition.
+            double Q(int s, int a) {
+                double q = 0;
+                foreach (ToyTextTransition t in p[s][a])
+                    q += t.Probability * (t.Reward + (t.Terminated ? 0 : gamma * v[t.NextState]));
+                return q;
+            }
+
+            // Sweep until no state's value moves by more than 1e-10 (a few hundred sweeps at most).
+            for (int sweep = 0; sweep < 10_000; sweep++) {
+                double delta = 0;
+                for (int s = 0; s < states; s++) {
+                    double best = double.NegativeInfinity;
+                    for (int a = 0; a < actions; a++)
+                        best = Math.Max(best, Q(s, a));
+                    delta = Math.Max(delta, Math.Abs(best - v[s]));
+                    v[s] = best;
+                }
+                if (delta < 1e-10)
+                    break;
+            }
+            var plan = new long[states];
+            for (int s = 0; s < states; s++) {
+                double best = double.NegativeInfinity;
+                for (int a = 0; a < actions; a++) {
+                    double q = Q(s, a);
+                    // A strict improvement by more than rounding noise: equal actions keep the lowest index.
+                    if (q > best + 1e-12) {
+                        best = q;
+                        plan[s] = a;
+                    }
+                }
+            }
+
+            return plan;
         }
 
-        /// <summary>The agent: pump energy far from the top, catch and hold the pendulum near it.</summary>
-        /// <param name="observation">The observation <c>[cos(theta), sin(theta), theta_dot]</c>.</param>
-        /// <returns>A float32 torque in [-2, 2], as a one-element array.</returns>
-        private static NDArray Act(NDArray observation) {
-            double[] s = Values(observation);
-            double theta = Math.Atan2(s[1], s[0]), w = s[2];
-            double energy = 0.5 * w * w + 15.0 * Math.Cos(theta);
-            // Near the top (cos > 0.85) a PD controller holds it; below, full torque along the swing until the energy
-            // reaches the upright rest's 15, then a gentle brake against overshooting.
-            double u = Math.Cos(theta) > 0.85 ? -(12.0 * theta + 2.5 * w) : energy < 15.0 ? 2.0 * (w >= 0 ? 1 : -1) : -0.5 * Math.Sign(w);
-            return np.array(new[] { (float)Math.Clamp(u, -2.0, 2.0) });
-        }
+        /// <summary>The state an observation names.</summary>
+        /// <param name="observation">A 0-d int64 array.</param>
+        /// <returns>The state's index.</returns>
+        private static long State(NDArray observation) => Convert.ToInt64(observation.GetValue(), CultureInfo.InvariantCulture);
 
         /// <summary>
-        ///     The keys for <c>--play</c>: A turns the motor one way at full torque (-2), D the other way (+2).
+        ///     The keys for <c>--play</c>: the arrow keys drive the taxi, P picks the passenger up, D drops them off.
         /// </summary>
-        /// <returns>The map from keys to float32 torques; the caller disposes the actions.</returns>
-        private static Dictionary<object, object?> Keys() => new() {
-            ["a"] = np.array(new[] { -2f }),
-            ["d"] = np.array(new[] { 2f }),
-        };
+        /// <returns>The map from key codes and keys to Taxi's actions.</returns>
+        private static Dictionary<object, object?> Keys() => new() { [KeyCode.Down] = 0L, [KeyCode.Up] = 1L, [KeyCode.Right] = 2L, [KeyCode.Left] = 3L, ["p"] = 4L, ["d"] = 5L };
 
         /// <summary>
         ///     Hands the env to the keyboard, Gymnasium's play, until Escape or the window's close button.
@@ -143,19 +176,14 @@ namespace Gym.Examples.Pendulum {
         /// <param name="seed">
         ///     The seed of every reset: each new game starts as the last one did, as Gymnasium's play does.
         /// </param>
+        /// <remarks>
+        ///     The game is turn-based (<c>waitOnPlayer</c>): it steps only while a mapped key is held.
+        /// </remarks>
         private static void PlayWithKeyboard(long seed) {
             // play reads the env's rgb_array frames and draws them into its own window.
             using IEnv env = Gymnasium.Make(Id, new { render_mode = "rgb_array" });
             Dictionary<object, object?> keys = Keys();
-            NDArray noop = np.array(new[] { 0f });
-            try {
-                Play.Run(env, keysToAction: keys, noop: noop, seed: seed);
-            } finally {
-                // play only borrows a map it is given: its actions, and the no-op, stay ours to release.
-                foreach (object? action in keys.Values)
-                    (action as IDisposable)?.Dispose();
-                noop.Dispose();
-            }
+            Play.Run(env, keysToAction: keys, seed: seed, waitOnPlayer: true);
         }
 
         /// <summary>Reads a whole-number option's value, or the fallback when the option is absent.</summary>

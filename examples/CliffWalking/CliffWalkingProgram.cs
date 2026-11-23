@@ -3,34 +3,37 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using Gym.Environments.Envs.ToyText;
 using Gym.Envs;
 using Gym.Observations;
+using Gym.Rendering;
 using Gym.Rendering.Avalonia;
 using Gym.Utils;
 using NumSharp;
 
-namespace Gym.Examples.Blackjack {
+namespace Gym.Examples.CliffWalking {
     /// <summary>
-    ///     Plays Blackjack-v1 by basic strategy against Gymnasium's dealer, who stands on 17. <c>dotnet run --project
-    ///     examples/Blackjack -c Release</c> plays one seeded episode headless and prints its steps and return; <c>--
-    ///     --render</c> plays it in a window, and <c>-- --play</c> deals you the hands.
+    ///     Walks CliffWalking-v1 to the goal along the cliff's edge, by value iteration over the env's own transition
+    ///     table. <c>dotnet run --project examples/CliffWalking -c Release</c> plays one seeded episode headless and
+    ///     prints its steps and return; <c>-- --render</c> plays it in a window, and <c>-- --play</c> lets you play it
+    ///     with the keyboard.
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///     Basic strategy for these rules: hit a soft total below 18, and a soft 18 against a 9, a 10 or an ace; hit a
-    ///     hard total below 12; hit 12 to 16 against a 7 or better or an ace; hit 12 against a 2 or a 3; otherwise
-    ///     stick. One episode is one hand: <c>--episodes 1000</c> shows the strategy's long-run return.
+    ///     Every step costs 1 and stepping off the cliff costs 100 and sends the walker back to the start. The shortest
+    ///     safe path runs along the cliff's edge, which value iteration over the transition table <c>P</c> finds: 13
+    ///     steps.
     ///     </para>
     ///     <para>
-    ///     The default seed, 40, is the episode the front-page showreel plays (<c>tools/showreel</c>, DR-74).
+    ///     The default seed, 0, is the episode the front-page showreel plays (<c>tools/showreel</c>, DR-74).
     ///     </para>
     /// </remarks>
-    internal static class Program {
+    internal static class CliffWalkingProgram {
         /// <summary>The environment this example plays, by its registered id.</summary>
-        private const string Id = "Blackjack-v1";
+        private const string Id = "CliffWalking-v1";
 
         /// <summary>The first reset seed when <c>--seed</c> is not given: the episode the showreel plays.</summary>
-        private const long DefaultSeed = 40;
+        private const long DefaultSeed = 0;
 
         /// <summary>
         ///     Plays the episodes the arguments ask for with the agent, or hands the env to the keyboard.
@@ -70,7 +73,7 @@ namespace Gym.Examples.Blackjack {
                     $"{Id}, seed {seed + episode}: {steps} step{(steps == 1 ? "" : "s")}, return {total:F1}, {ending}"));
             }
             if (episodes > 1)
-                Console.WriteLine(string.Create(CultureInfo.InvariantCulture, $"Mean return over {episodes} episodes: {sum / episodes:F3}"));
+                Console.WriteLine(string.Create(CultureInfo.InvariantCulture, $"Mean return over {episodes} episodes: {sum / episodes:F1}"));
             return 0;
         }
 
@@ -91,39 +94,79 @@ namespace Gym.Examples.Blackjack {
         private static (int Steps, double Return, string Ending) PlayEpisode(long seed, bool render) {
             // make's stack: TimeLimit over OrderEnforcing over PassiveEnvChecker over the env. The render mode is a
             // constructor argument, fixed for the env's life, as in Gymnasium.
-            using Env<object?[], NDArray> env = Gymnasium.Make<object?[], NDArray>(Id, render ? new { render_mode = "human" } : null);
-            object?[] observation = env.Reset(seed: seed).Observation;
+            using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>(Id, render ? new { render_mode = "human" } : null);
+            // The plan comes from the env's own model of itself: the transition table of the unwrapped env.
+            long[] plan = Plan(((CliffWalkingEnv)env.Unwrapped).P);
+            NDArray observation = env.Reset(seed: seed).Observation;
             int steps = 0;
             double total = 0;
             while (true) {
-                StepResult<object?[]> step = env.Step(Act(observation));
+                StepResult<NDArray> step = env.Step(NDArray.Scalar(plan[State(observation)]));
                 observation = step.Observation;
                 steps++;
                 total += step.Reward;
                 if (step.Terminated || step.Truncated)
-                    return (steps, total, step.Terminated ? total > 0 ? "won" : total < 0 ? "lost" : "a draw" : "truncated by the time limit");
+                    return (steps, total, step.Terminated ? "reached the goal" : "truncated by the time limit");
             }
         }
 
-        /// <summary>The agent: basic strategy against a dealer who stands on 17.</summary>
-        /// <param name="observation">
-        ///     Gym.NET's tuple for Gymnasium's <c>(player_sum, dealer_card, usable_ace)</c>: three 0-d int64 arrays
-        ///     (the dealer's ace is 1).
-        /// </param>
-        /// <returns>Hit (1) or stick (0), as a 0-d int64 array.</returns>
-        private static NDArray Act(object?[] observation) {
-            long sum = Convert.ToInt64(((NDArray)observation[0]!).GetValue(), CultureInfo.InvariantCulture);
-            long dealer = Convert.ToInt64(((NDArray)observation[1]!).GetValue(), CultureInfo.InvariantCulture);
-            bool soft = Convert.ToInt64(((NDArray)observation[2]!).GetValue(), CultureInfo.InvariantCulture) != 0;
-            bool hit = soft
-                ? sum < 18 || (sum == 18 && (dealer >= 9 || dealer == 1))
-                : sum < 12 || (sum < 17 && (dealer >= 7 || dealer == 1)) || (sum == 12 && dealer <= 3);
-            return NDArray.Scalar(hit ? 1L : 0L);
+        /// <summary>
+        ///     Value iteration over the env's own transition table: the best action in every state, for a discount of
+        ///     0.99, computed once per episode before the first step.
+        /// </summary>
+        /// <param name="p">The transition table <c>P</c>: for each state and action, the possible transitions.</param>
+        /// <returns>
+        ///     The greedy action per state; ties go to the lowest action, as NumPy's argmax would choose.
+        /// </returns>
+        private static long[] Plan(IReadOnlyDictionary<long, IReadOnlyDictionary<long, IReadOnlyList<ToyTextTransition>>> p) {
+            const double gamma = 0.99;
+            int states = p.Count, actions = p[0].Count;
+            var v = new double[states];
+            // The expected discounted return of an action: no value is carried past a terminal transition.
+            double Q(int s, int a) {
+                double q = 0;
+                foreach (ToyTextTransition t in p[s][a])
+                    q += t.Probability * (t.Reward + (t.Terminated ? 0 : gamma * v[t.NextState]));
+                return q;
+            }
+
+            // Sweep until no state's value moves by more than 1e-10 (a few hundred sweeps at most).
+            for (int sweep = 0; sweep < 10_000; sweep++) {
+                double delta = 0;
+                for (int s = 0; s < states; s++) {
+                    double best = double.NegativeInfinity;
+                    for (int a = 0; a < actions; a++)
+                        best = Math.Max(best, Q(s, a));
+                    delta = Math.Max(delta, Math.Abs(best - v[s]));
+                    v[s] = best;
+                }
+                if (delta < 1e-10)
+                    break;
+            }
+            var plan = new long[states];
+            for (int s = 0; s < states; s++) {
+                double best = double.NegativeInfinity;
+                for (int a = 0; a < actions; a++) {
+                    double q = Q(s, a);
+                    // A strict improvement by more than rounding noise: equal actions keep the lowest index.
+                    if (q > best + 1e-12) {
+                        best = q;
+                        plan[s] = a;
+                    }
+                }
+            }
+
+            return plan;
         }
 
-        /// <summary>The keys for <c>--play</c>: H hits, S sticks.</summary>
-        /// <returns>The map from keys to Blackjack's actions.</returns>
-        private static Dictionary<object, object?> Keys() => new() { ["h"] = 1L, ["s"] = 0L };
+        /// <summary>The state an observation names.</summary>
+        /// <param name="observation">A 0-d int64 array.</param>
+        /// <returns>The state's index.</returns>
+        private static long State(NDArray observation) => Convert.ToInt64(observation.GetValue(), CultureInfo.InvariantCulture);
+
+        /// <summary>The keys for <c>--play</c>: the arrow keys move the walker.</summary>
+        /// <returns>The map from key codes and keys to CliffWalking's actions.</returns>
+        private static Dictionary<object, object?> Keys() => new() { [KeyCode.Up] = 0L, [KeyCode.Right] = 1L, [KeyCode.Down] = 2L, [KeyCode.Left] = 3L };
 
         /// <summary>
         ///     Hands the env to the keyboard, Gymnasium's play, until Escape or the window's close button.

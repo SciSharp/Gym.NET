@@ -3,37 +3,38 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using Gym.Environments.Envs.Box2D;
+using Gym.Environments.Envs.ToyText;
 using Gym.Envs;
 using Gym.Observations;
+using Gym.Rendering;
 using Gym.Rendering.Avalonia;
-using Gym.Spaces;
 using Gym.Utils;
 using NumSharp;
 
-namespace Gym.Examples.BipedalWalker {
+namespace Gym.Examples.FrozenLake {
     /// <summary>
-    ///     Walks BipedalWalker-v3's whole course with Gymnasium's own gait, <c>BipedalWalkerHeuristics</c>. <c>dotnet
-    ///     run --project examples/BipedalWalker -c Release</c> plays one seeded episode headless and prints its steps
-    ///     and return; <c>-- --render</c> plays it in a window, and <c>-- --play</c> hands the four motors to the
+    ///     Crosses FrozenLake-v1's slippery ice to the goal with value iteration over the env's own transition table.
+    ///     <c>dotnet run --project examples/FrozenLake -c Release</c> plays one seeded episode headless and prints its
+    ///     steps and return; <c>-- --render</c> plays it in a window, and <c>-- --play</c> lets you play it with the
     ///     keyboard.
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///     The gait is Gymnasium's walking <c>heuristic</c>, a state machine kept bit for bit: one leg stays straight
-    ///     to carry the body while the other lifts, swings forward and comes down, then they swap; a PD controller
-    ///     keeps the hull level. Seed 0 walks the whole course in 1,598 steps.
+    ///     The ice is slippery: an action goes the intended way only a third of the time, and sideways otherwise. Value
+    ///     iteration over the transition table <c>P</c> finds the action that maximizes the chance of reaching the goal
+    ///     from every square, often by edging along a hole's far side so that a slip cannot drop the elf in. From seed
+    ///     1 it reaches the goal in 41 steps.
     ///     </para>
     ///     <para>
-    ///     The default seed, 0, is the episode the front-page showreel plays (<c>tools/showreel</c>, DR-74).
+    ///     The default seed, 1, is the episode the front-page showreel plays (<c>tools/showreel</c>, DR-74).
     ///     </para>
     /// </remarks>
-    internal static class Program {
+    internal static class FrozenLakeProgram {
         /// <summary>The environment this example plays, by its registered id.</summary>
-        private const string Id = "BipedalWalker-v3";
+        private const string Id = "FrozenLake-v1";
 
         /// <summary>The first reset seed when <c>--seed</c> is not given: the episode the showreel plays.</summary>
-        private const long DefaultSeed = 0;
+        private const long DefaultSeed = 1;
 
         /// <summary>
         ///     Plays the episodes the arguments ask for with the agent, or hands the env to the keyboard.
@@ -95,67 +96,78 @@ namespace Gym.Examples.BipedalWalker {
             // make's stack: TimeLimit over OrderEnforcing over PassiveEnvChecker over the env. The render mode is a
             // constructor argument, fixed for the env's life, as in Gymnasium.
             using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>(Id, render ? new { render_mode = "human" } : null);
-            // The gait is a state machine with a phase: a fresh one for every episode.
-            var gait = new BipedalWalkerHeuristics();
+            // The plan comes from the env's own model of itself: the transition table of the unwrapped env.
+            long[] plan = Plan(((FrozenLakeEnv)env.Unwrapped).P);
             NDArray observation = env.Reset(seed: seed).Observation;
             int steps = 0;
             double total = 0;
             while (true) {
-                StepResult<NDArray> step = env.Step(gait.StepHeuristic(observation));
+                StepResult<NDArray> step = env.Step(NDArray.Scalar(plan[State(observation)]));
                 observation = step.Observation;
                 steps++;
                 total += step.Reward;
                 if (step.Terminated || step.Truncated)
-                    return (steps, total, step.Terminated ? total > 0 ? "reached the end of the course" : "fell over" : "truncated by the time limit");
+                    return (steps, total, step.Terminated ? total > 0 ? "reached the goal" : "fell into a hole" : "truncated by the time limit");
             }
         }
 
         /// <summary>
-        ///     The action space's upper bound per motor, as float64: the policy scales its [-1, 1] outputs by it.
+        ///     Value iteration over the env's own transition table: the best action in every state, for a discount of
+        ///     0.99, computed once per episode before the first step.
         /// </summary>
-        /// <param name="env">The env, whose action space is a <see cref="Box"/>.</param>
-        /// <returns>One bound per motor.</returns>
-        private static double[] ActionHigh(IEnv env) {
-            // High is the space's own array: read a converted copy and leave the space's untouched.
-            using NDArray high = ((Box)env.ActionSpace).High.astype(NPTypeCode.Double);
-            return high.ToArray<double>();
-        }
-
-        /// <summary>
-        ///     The keys for <c>--play</c>: Q and A the first hip, W and S the first knee, U and J the second hip, I and
-        ///     K the second knee. The first key of a pair turns its motor one way at full torque, the second the other
-        ///     way; keys of different motors combine.
-        /// </summary>
-        /// <param name="high">The action space's upper bound per motor.</param>
+        /// <param name="p">The transition table <c>P</c>: for each state and action, the possible transitions.</param>
         /// <returns>
-        ///     The map from the keys held together (a string of them) to a float32 action; the caller disposes the
-        ///     actions.
+        ///     The greedy action per state; ties go to the lowest action, as NumPy's argmax would choose.
         /// </returns>
-        /// <remarks>
-        ///     Gymnasium's play looks up the exact set of keys held, so the map lists every combination: 3^4 - 1 = 80
-        ///     entries, one per motor being off, forward or back. Holding both keys of one pair matches nothing and
-        ///     plays the no-op, every motor off.
-        /// </remarks>
-        private static Dictionary<object, object?> Keys(double[] high) {
-            string[] pairs = { "qa", "ws", "uj", "ik" };
-            var map = new Dictionary<object, object?>();
-            int combinations = (int)Math.Pow(3, pairs.Length);
-            // Each combination numbers the motors' states in base 3: 0 off, 1 the pair's first key, 2 its second.
-            for (int combination = 1; combination < combinations; combination++) {
-                var action = new float[pairs.Length];
-                string held = "";
-                for (int motor = 0, rest = combination; motor < pairs.Length; motor++, rest /= 3) {
-                    int state = rest % 3;
-                    if (state == 0)
-                        continue;
-                    held += pairs[motor][state - 1];
-                    action[motor] = (float)(state == 1 ? high[motor] : -high[motor]);
-                }
-                map[held] = np.array(action);
+        private static long[] Plan(IReadOnlyDictionary<long, IReadOnlyDictionary<long, IReadOnlyList<ToyTextTransition>>> p) {
+            const double gamma = 0.99;
+            int states = p.Count, actions = p[0].Count;
+            var v = new double[states];
+            // The expected discounted return of an action: no value is carried past a terminal transition.
+            double Q(int s, int a) {
+                double q = 0;
+                foreach (ToyTextTransition t in p[s][a])
+                    q += t.Probability * (t.Reward + (t.Terminated ? 0 : gamma * v[t.NextState]));
+                return q;
             }
 
-            return map;
+            // Sweep until no state's value moves by more than 1e-10 (a few hundred sweeps at most).
+            for (int sweep = 0; sweep < 10_000; sweep++) {
+                double delta = 0;
+                for (int s = 0; s < states; s++) {
+                    double best = double.NegativeInfinity;
+                    for (int a = 0; a < actions; a++)
+                        best = Math.Max(best, Q(s, a));
+                    delta = Math.Max(delta, Math.Abs(best - v[s]));
+                    v[s] = best;
+                }
+                if (delta < 1e-10)
+                    break;
+            }
+            var plan = new long[states];
+            for (int s = 0; s < states; s++) {
+                double best = double.NegativeInfinity;
+                for (int a = 0; a < actions; a++) {
+                    double q = Q(s, a);
+                    // A strict improvement by more than rounding noise: equal actions keep the lowest index.
+                    if (q > best + 1e-12) {
+                        best = q;
+                        plan[s] = a;
+                    }
+                }
+            }
+
+            return plan;
         }
+
+        /// <summary>The state an observation names.</summary>
+        /// <param name="observation">A 0-d int64 array.</param>
+        /// <returns>The state's index.</returns>
+        private static long State(NDArray observation) => Convert.ToInt64(observation.GetValue(), CultureInfo.InvariantCulture);
+
+        /// <summary>The keys for <c>--play</c>: the arrow keys move the elf (and the ice may slip).</summary>
+        /// <returns>The map from key codes and keys to FrozenLake's actions.</returns>
+        private static Dictionary<object, object?> Keys() => new() { [KeyCode.Left] = 0L, [KeyCode.Down] = 1L, [KeyCode.Right] = 2L, [KeyCode.Up] = 3L };
 
         /// <summary>
         ///     Hands the env to the keyboard, Gymnasium's play, until Escape or the window's close button.
@@ -163,20 +175,14 @@ namespace Gym.Examples.BipedalWalker {
         /// <param name="seed">
         ///     The seed of every reset: each new game starts as the last one did, as Gymnasium's play does.
         /// </param>
+        /// <remarks>
+        ///     The game is turn-based (<c>waitOnPlayer</c>): it steps only while a mapped key is held.
+        /// </remarks>
         private static void PlayWithKeyboard(long seed) {
             // play reads the env's rgb_array frames and draws them into its own window.
             using IEnv env = Gymnasium.Make(Id, new { render_mode = "rgb_array" });
-            double[] high = ActionHigh(env);
-            Dictionary<object, object?> keys = Keys(high);
-            NDArray noop = np.array(new float[4]);
-            try {
-                Play.Run(env, keysToAction: keys, noop: noop, seed: seed);
-            } finally {
-                // play only borrows a map it is given: its actions, and the no-op, stay ours to release.
-                foreach (object? action in keys.Values)
-                    (action as IDisposable)?.Dispose();
-                noop.Dispose();
-            }
+            Dictionary<object, object?> keys = Keys();
+            Play.Run(env, keysToAction: keys, seed: seed, waitOnPlayer: true);
         }
 
         /// <summary>Reads a whole-number option's value, or the fallback when the option is absent.</summary>

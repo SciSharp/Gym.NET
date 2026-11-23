@@ -28,7 +28,7 @@ namespace Gym.Examples.FrozenLake8x8 {
     ///     The default seed, 2, is the episode the front-page showreel plays (<c>tools/showreel</c>, DR-74).
     ///     </para>
     /// </remarks>
-    internal static class Program {
+    internal static class FrozenLake8x8Program {
         /// <summary>The environment this example plays, by its registered id.</summary>
         private const string Id = "FrozenLake8x8-v1";
 

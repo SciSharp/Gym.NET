@@ -147,12 +147,13 @@ refs/Gym.NET/
 │   │                              #   README.md indexes them. Each plays a seeded episode with its agent (the showreel's: controllers,
 │   │                              #   Gymnasium's heuristics, value iteration, the expert agents' policy.json copies, DR-109), --render in a window,
 │   │                              #   --play from the keyboard through Play.Run where a few keys and the frame cost allow; each episode
-│   │                              #   is one [NDScoped] method (NumSharp.Build in every project, DR-80)
+│   │                              #   is one [NDScoped] method (NumSharp.Build in every project, DR-80). Each program is
+│   │                              #   <Env>Program.cs, class <Env>Program (DR-112), so an env page names the file that recorded it
 │   ├── CartPole/                  # The first example (D13): the cross-entropy method over linear policies, 100 carts at once through
 │   │                              #   MakeVec, then a played episode; --controller the showreel's hand-written controller
 │   ├── HalfCheetah/               # Farama's TQC expert (expert.json) or the autopilot (--autopilot) through Gymnasium.Make, and the playable
 │   │                              #   HalfCheetah (moved from tools/parity), which compiles the engine in for its internals (CS0436 silenced)
-│   └── Acrobot/ … Walker2d/       # The other 22 envs, one folder each: Program.cs, README.md, and policy.json for the trained ones
+│   └── Acrobot/ … Walker2d/       # The other 22 envs, one folder each: <Env>Program.cs, README.md, and policy.json for the trained ones
 │
 ├── docs/                          # README.md (index), architecture.md, guides/ (getting_started, creating_custom_environments,
 │                                  #   migrating_to_1.0, development_and_testing), releases/RELEASE_1.0.0.md, plans/;

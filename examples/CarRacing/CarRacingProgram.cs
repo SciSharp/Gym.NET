@@ -3,38 +3,36 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using Gym.Environments.Envs.ToyText;
+using Gym.Environments.Envs.Box2D;
 using Gym.Envs;
 using Gym.Observations;
-using Gym.Rendering;
 using Gym.Rendering.Avalonia;
 using Gym.Utils;
 using NumSharp;
 
-namespace Gym.Examples.FrozenLake {
+namespace Gym.Examples.CarRacing {
     /// <summary>
-    ///     Crosses FrozenLake-v1's slippery ice to the goal with value iteration over the env's own transition table.
-    ///     <c>dotnet run --project examples/FrozenLake -c Release</c> plays one seeded episode headless and prints its
-    ///     steps and return; <c>-- --render</c> plays it in a window, and <c>-- --play</c> lets you play it with the
-    ///     keyboard.
+    ///     Drives CarRacing-v3 by pure pursuit on the track's centre line. <c>dotnet run --project examples/CarRacing
+    ///     -c Release</c> plays one seeded episode headless and prints its steps and return; <c>-- --render</c> plays
+    ///     it in a window, and <c>-- --play</c> hands the car to the W, A, S and D keys.
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///     The ice is slippery: an action goes the intended way only a third of the time, and sideways otherwise. Value
-    ///     iteration over the transition table <c>P</c> finds the action that maximizes the chance of reaching the goal
-    ///     from every square, often by edging along a hole's far side so that a slip cannot drop the elf in. From seed
-    ///     1 it reaches the goal in 41 steps.
+    ///     The agent reads the track and the car from the unwrapped env rather than from the 96x96 pixels: it aims at
+    ///     the centre-line point five track tiles past the nearest one, steers by the angle to it, keeps the throttle
+    ///     while the speed is under a limit that drops with that angle, and brakes into sharp bends. Seed 11 drives the
+    ///     full 1,000 steps.
     ///     </para>
     ///     <para>
-    ///     The default seed, 1, is the episode the front-page showreel plays (<c>tools/showreel</c>, DR-74).
+    ///     The default seed, 11, is the episode the front-page showreel plays (<c>tools/showreel</c>, DR-74).
     ///     </para>
     /// </remarks>
-    internal static class Program {
+    internal static class CarRacingProgram {
         /// <summary>The environment this example plays, by its registered id.</summary>
-        private const string Id = "FrozenLake-v1";
+        private const string Id = "CarRacing-v3";
 
         /// <summary>The first reset seed when <c>--seed</c> is not given: the episode the showreel plays.</summary>
-        private const long DefaultSeed = 1;
+        private const long DefaultSeed = 11;
 
         /// <summary>
         ///     Plays the episodes the arguments ask for with the agent, or hands the env to the keyboard.
@@ -96,78 +94,67 @@ namespace Gym.Examples.FrozenLake {
             // make's stack: TimeLimit over OrderEnforcing over PassiveEnvChecker over the env. The render mode is a
             // constructor argument, fixed for the env's life, as in Gymnasium.
             using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>(Id, render ? new { render_mode = "human" } : null);
-            // The plan comes from the env's own model of itself: the transition table of the unwrapped env.
-            long[] plan = Plan(((FrozenLakeEnv)env.Unwrapped).P);
             NDArray observation = env.Reset(seed: seed).Observation;
             int steps = 0;
             double total = 0;
             while (true) {
-                StepResult<NDArray> step = env.Step(NDArray.Scalar(plan[State(observation)]));
+                StepResult<NDArray> step = env.Step(Act(env));
                 observation = step.Observation;
                 steps++;
                 total += step.Reward;
                 if (step.Terminated || step.Truncated)
-                    return (steps, total, step.Terminated ? total > 0 ? "reached the goal" : "fell into a hole" : "truncated by the time limit");
+                    return (steps, total, step.Terminated ? total > 0 ? "finished the lap" : "left the playfield" : "truncated by the time limit");
             }
+        }
+
+        /// <summary>The agent: pure pursuit of a point on the centre line, five tiles ahead.</summary>
+        /// <param name="env">The env; its unwrapped <see cref="CarRacingEnv"/> exposes the car and the track.</param>
+        /// <returns>A float32 <c>[steer, gas, brake]</c>.</returns>
+        private static NDArray Act(IEnv env) {
+            var race = (CarRacingEnv)env.Unwrapped;
+            var hull = race.Car!.Hull!;
+            var p = hull.Position;
+            double angle = hull.Angle;
+            var track = race.Track;
+            int nearest = 0;
+            double best = double.MaxValue;
+            for (int i = 0; i < track.Count; i++) {
+                double dx0 = track[i].X - p.x, dy0 = track[i].Y - p.y, d = dx0 * dx0 + dy0 * dy0;
+                if (d < best) {
+                    best = d;
+                    nearest = i;
+                }
+            }
+            var target = track[(nearest + 5) % track.Count];
+            double dx = target.X - p.x, dy = target.Y - p.y;
+            // The hull's forward axis is its local +y: (-sin a, cos a) in world coordinates.
+            double fx = -Math.Sin(angle), fy = Math.Cos(angle);
+            double error = Math.Atan2(fx * dy - fy * dx, fx * dx + fy * dy);
+            var v = hull.LinearVelocity;
+            double speed = Math.Sqrt(v.x * v.x + v.y * v.y);
+            float steer = (float)Math.Clamp(-error * 2.5, -1, 1);
+            float gas = speed < 45 - 30 * Math.Min(1, Math.Abs(error)) ? 0.6f : 0f;
+            float brake = Math.Abs(error) > 0.6 && speed > 30 ? 0.4f : 0f;
+            return np.array(new[] { steer, gas, brake });
         }
 
         /// <summary>
-        ///     Value iteration over the env's own transition table: the best action in every state, for a discount of
-        ///     0.99, computed once per episode before the first step.
+        ///     The keys for <c>--play</c>, the map Gymnasium's own <c>play</c> documentation gives for CarRacing: W
+        ///     gas, A and D steer, S brake, and the four two-key combinations.
         /// </summary>
-        /// <param name="p">The transition table <c>P</c>: for each state and action, the possible transitions.</param>
         /// <returns>
-        ///     The greedy action per state; ties go to the lowest action, as NumPy's argmax would choose.
+        ///     The map from keys to float32 <c>[steer, gas, brake]</c> actions; the caller disposes them.
         /// </returns>
-        private static long[] Plan(IReadOnlyDictionary<long, IReadOnlyDictionary<long, IReadOnlyList<ToyTextTransition>>> p) {
-            const double gamma = 0.99;
-            int states = p.Count, actions = p[0].Count;
-            var v = new double[states];
-            // The expected discounted return of an action: no value is carried past a terminal transition.
-            double Q(int s, int a) {
-                double q = 0;
-                foreach (ToyTextTransition t in p[s][a])
-                    q += t.Probability * (t.Reward + (t.Terminated ? 0 : gamma * v[t.NextState]));
-                return q;
-            }
-
-            // Sweep until no state's value moves by more than 1e-10 (a few hundred sweeps at most).
-            for (int sweep = 0; sweep < 10_000; sweep++) {
-                double delta = 0;
-                for (int s = 0; s < states; s++) {
-                    double best = double.NegativeInfinity;
-                    for (int a = 0; a < actions; a++)
-                        best = Math.Max(best, Q(s, a));
-                    delta = Math.Max(delta, Math.Abs(best - v[s]));
-                    v[s] = best;
-                }
-                if (delta < 1e-10)
-                    break;
-            }
-            var plan = new long[states];
-            for (int s = 0; s < states; s++) {
-                double best = double.NegativeInfinity;
-                for (int a = 0; a < actions; a++) {
-                    double q = Q(s, a);
-                    // A strict improvement by more than rounding noise: equal actions keep the lowest index.
-                    if (q > best + 1e-12) {
-                        best = q;
-                        plan[s] = a;
-                    }
-                }
-            }
-
-            return plan;
-        }
-
-        /// <summary>The state an observation names.</summary>
-        /// <param name="observation">A 0-d int64 array.</param>
-        /// <returns>The state's index.</returns>
-        private static long State(NDArray observation) => Convert.ToInt64(observation.GetValue(), CultureInfo.InvariantCulture);
-
-        /// <summary>The keys for <c>--play</c>: the arrow keys move the elf (and the ice may slip).</summary>
-        /// <returns>The map from key codes and keys to FrozenLake's actions.</returns>
-        private static Dictionary<object, object?> Keys() => new() { [KeyCode.Left] = 0L, [KeyCode.Down] = 1L, [KeyCode.Right] = 2L, [KeyCode.Up] = 3L };
+        private static Dictionary<object, object?> Keys() => new() {
+            ["w"] = np.array(new[] { 0f, 0.7f, 0f }),
+            ["a"] = np.array(new[] { -1f, 0f, 0f }),
+            ["s"] = np.array(new[] { 0f, 0f, 1f }),
+            ["d"] = np.array(new[] { 1f, 0f, 0f }),
+            ["wa"] = np.array(new[] { -1f, 0.7f, 0f }),
+            ["dw"] = np.array(new[] { 1f, 0.7f, 0f }),
+            ["ds"] = np.array(new[] { 1f, 0f, 1f }),
+            ["as"] = np.array(new[] { -1f, 0f, 1f }),
+        };
 
         /// <summary>
         ///     Hands the env to the keyboard, Gymnasium's play, until Escape or the window's close button.
@@ -175,14 +162,19 @@ namespace Gym.Examples.FrozenLake {
         /// <param name="seed">
         ///     The seed of every reset: each new game starts as the last one did, as Gymnasium's play does.
         /// </param>
-        /// <remarks>
-        ///     The game is turn-based (<c>waitOnPlayer</c>): it steps only while a mapped key is held.
-        /// </remarks>
         private static void PlayWithKeyboard(long seed) {
             // play reads the env's rgb_array frames and draws them into its own window.
             using IEnv env = Gymnasium.Make(Id, new { render_mode = "rgb_array" });
             Dictionary<object, object?> keys = Keys();
-            Play.Run(env, keysToAction: keys, seed: seed, waitOnPlayer: true);
+            NDArray noop = np.array(new float[3]);
+            try {
+                Play.Run(env, keysToAction: keys, noop: noop, seed: seed);
+            } finally {
+                // play only borrows a map it is given: its actions, and the no-op, stay ours to release.
+                foreach (object? action in keys.Values)
+                    (action as IDisposable)?.Dispose();
+                noop.Dispose();
+            }
         }
 
         /// <summary>Reads a whole-number option's value, or the fallback when the option is absent.</summary>

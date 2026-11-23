@@ -11,21 +11,21 @@ using Gym.Observations;
 using Gym.Rendering.Avalonia;
 using NumSharp;
 
-namespace Gym.Examples.Ant {
+namespace Gym.Examples.Hopper {
     /// <summary>
-    ///     Plays Ant-v5 with Farama's SAC expert, a published Stable-Baselines3 agent. <c>dotnet run --project
-    ///     examples/Ant -c Release</c> plays one seeded episode headless and prints its steps and return; <c>--
+    ///     Plays Hopper-v5 with Farama's SAC expert, a published Stable-Baselines3 agent. <c>dotnet run --project
+    ///     examples/Hopper -c Release</c> plays one seeded episode headless and prints its steps and return; <c>--
     ///     --render</c> plays it in a window.
     /// </summary>
     /// <remarks>
     ///     <para>
     ///     <c>policy.json</c> holds the agent (<see cref="ExpertPolicy"/>): Farama's SAC expert, the agent the Farama
     ///     Foundation, Gymnasium's maintainers, trained on this env to record the Minari datasets, imported from
-    ///     Hugging Face (<c>farama-minari/Ant-v5-SAC-expert</c> at revision <c>e2eb33e</c>) by
+    ///     Hugging Face (<c>farama-minari/Hopper-v5-SAC-expert</c> at revision <c>bff2655</c>) by
     ///     <c>tools/agents/import_agents.py</c>. A Stable-Baselines3 network of two dense layers of 256 with relu: each
     ///     step it casts the observation to float32 and squashes the result into the motors' range with tanh. Over
-    ///     seeds 0-9 it scores 5,661.2 in Gym.NET (every seed runs all 1,000 steps); the model card reports 5846.28 +/-
-    ///     138.52.
+    ///     seeds 0-9 it scores 4,143.5 in Gym.NET (every seed hops all 1,000 steps); the model card reports 4098.17 +/-
+    ///     247.70.
     ///     </para>
     ///     <para>
     ///     The model repository states no licence; its training code is MIT. Gym.NET commits the weights with this
@@ -35,9 +35,9 @@ namespace Gym.Examples.Ant {
     ///     The default seed, 0, is the episode the front-page showreel plays (<c>tools/showreel</c>, DR-74).
     ///     </para>
     /// </remarks>
-    internal static class Program {
+    internal static class HopperProgram {
         /// <summary>The environment this example plays, by its registered id.</summary>
-        private const string Id = "Ant-v5";
+        private const string Id = "Hopper-v5";
 
         /// <summary>The first reset seed when <c>--seed</c> is not given: the episode the showreel plays.</summary>
         private const long DefaultSeed = 0;
@@ -59,7 +59,7 @@ namespace Gym.Examples.Ant {
                 return 2;
             bool render = args.Contains("--render");
             if (args.Contains("--play")) {
-                Console.Error.WriteLine($"{Id}: its 8 motors would need 16 keys held in combinations, too many to play; --render shows the agent instead.");
+                Console.Error.WriteLine($"{Id}: its frames take about 0.3 s each to draw in software and a step is 8 ms of simulated time, so keyboard play would run about 37 times slower than real time; --render shows the agent instead.");
                 return 2;
             }
             // Human mode draws inside every reset and step into the app-wide viewer (DR-20); without one it raises
@@ -108,7 +108,7 @@ namespace Gym.Examples.Ant {
                 steps++;
                 total += step.Reward;
                 if (step.Terminated || step.Truncated)
-                    return (steps, total, step.Terminated ? "flipped over" : "truncated by the time limit");
+                    return (steps, total, step.Terminated ? "fell over" : "truncated by the time limit");
             }
         }
 

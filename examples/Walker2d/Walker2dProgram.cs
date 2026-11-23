@@ -6,71 +6,61 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using Gym.Environments.Envs.Box2D;
 using Gym.Envs;
 using Gym.Observations;
 using Gym.Rendering.Avalonia;
-using Gym.Spaces;
-using Gym.Utils;
 using NumSharp;
 
-namespace Gym.Examples.BipedalWalkerHardcore {
+namespace Gym.Examples.Walker2d {
     /// <summary>
-    ///     Plays BipedalWalkerHardcore-v3 with RL Zoo's TQC expert, a published Stable-Baselines3 agent. <c>dotnet run
-    ///     --project examples/BipedalWalkerHardcore -c Release</c> plays one seeded episode headless and prints its
-    ///     steps and return; <c>-- --render</c> plays it in a window, and <c>-- --play</c> hands the four motors to the
-    ///     keyboard.
+    ///     Plays Walker2d-v5 with Farama's SAC expert, a published Stable-Baselines3 agent. <c>dotnet run --project
+    ///     examples/Walker2d -c Release</c> plays one seeded episode headless and prints its steps and return; <c>--
+    ///     --render</c> plays it in a window.
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///     <c>policy.json</c> holds the agent (<see cref="ExpertPolicy"/>): RL Zoo's TQC expert, the agent RL
-    ///     Baselines3 Zoo trained and published for this env, imported from Hugging Face
-    ///     (<c>sb3/tqc-BipedalWalkerHardcore-v3</c> at revision <c>4eb282a</c>) by
-    ///     <c>tools/agents/import_agents.py</c>. A Stable-Baselines3 network of dense layers of 400 and 300 with relu:
-    ///     each step it casts the observation to float32 and squashes the result into the motors' range with tanh. Over
-    ///     seeds 0-9 it scores 243.8 in Gym.NET (six seeds of ten finish the course; seed 7, the default, in 968 steps
-    ///     for 308); the model card reports 208.05 +/- 121.38.
+    ///     <c>policy.json</c> holds the agent (<see cref="ExpertPolicy"/>): Farama's SAC expert, the agent the Farama
+    ///     Foundation, Gymnasium's maintainers, trained on this env to record the Minari datasets, imported from
+    ///     Hugging Face (<c>farama-minari/Walker2d-v5-SAC-expert</c> at revision <c>2b0ab40</c>) by
+    ///     <c>tools/agents/import_agents.py</c>. A Stable-Baselines3 network of two dense layers of 256 with relu: each
+    ///     step it casts the observation to float32 and squashes the result into the motors' range with tanh. Over
+    ///     seeds 0-9 it scores 6,949.0 in Gym.NET (every seed runs all 1,000 steps); the model card reports 6956.61 +/-
+    ///     15.95.
     ///     </para>
     ///     <para>
     ///     The model repository states no licence; its training code is MIT. Gym.NET commits the weights with this
     ///     attribution, on the maintainer's decision (DR-109).
     ///     </para>
     ///     <para>
-    ///     The default seed, 7, is the episode the front-page showreel plays (<c>tools/showreel</c>, DR-74).
+    ///     The default seed, 0, is the episode the front-page showreel plays (<c>tools/showreel</c>, DR-74).
     ///     </para>
     /// </remarks>
-    internal static class Program {
+    internal static class Walker2dProgram {
         /// <summary>The environment this example plays, by its registered id.</summary>
-        private const string Id = "BipedalWalkerHardcore-v3";
+        private const string Id = "Walker2d-v5";
 
         /// <summary>The first reset seed when <c>--seed</c> is not given: the episode the showreel plays.</summary>
-        private const long DefaultSeed = 7;
+        private const long DefaultSeed = 0;
 
-        /// <summary>
-        ///     Plays the episodes the arguments ask for with the agent, or hands the env to the keyboard.
-        /// </summary>
+        /// <summary>Plays the episodes the arguments ask for with the agent.</summary>
         /// <param name="args">
         ///     <c>--seed N</c> starts from reset seed N; <c>--episodes N</c> plays N episodes on consecutive seeds and
-        ///     prints their mean; <c>--render</c> shows them in a window; <c>--play</c> lets you play the env from the
-        ///     keyboard instead, until Escape or the window's close button. Other arguments are ignored.
+        ///     prints their mean; <c>--render</c> shows them in a window; <c>--play</c> is refused, with the reason
+        ///     this env cannot be played from the keyboard. Other arguments are ignored.
         /// </param>
         /// <returns>
-        ///     0 when the episodes were played or the keyboard game ended, 2 when an option's value is not a whole
-        ///     number.
+        ///     0 when the episodes were played, 2 when an option's value is not a whole number, or for <c>--play</c>.
         /// </returns>
         /// <exception cref="Gym.Exceptions.DependencyNotInstalled">
-        ///     Not thrown in practice: <c>--render</c> and <c>--play</c> set Avalonia's viewer before the env first
-        ///     draws.
+        ///     Not thrown in practice: <c>--render</c> sets Avalonia's viewer before the env first draws.
         /// </exception>
         private static int Main(string[] args) {
             if (!TryNumber(args, "--seed", DefaultSeed, out long seed) || !TryNumber(args, "--episodes", 1, out long episodes))
                 return 2;
             bool render = args.Contains("--render");
             if (args.Contains("--play")) {
-                // play draws the env's frames into a window of the app-wide viewer and reads the keys from it.
-                Gymnasium.HumanViewerFactory = AvaloniaEnvViewer.Factory;
-                PlayWithKeyboard(seed);
-                return 0;
+                Console.Error.WriteLine($"{Id}: its frames take about 0.1 s each to draw in software and a step is 8 ms of simulated time, so keyboard play would run about 12 times slower than real time; --render shows the agent instead.");
+                return 2;
             }
             // Human mode draws inside every reset and step into the app-wide viewer (DR-20); without one it raises
             // DependencyNotInstalled at the first frame, as Gymnasium does without pygame.
@@ -118,76 +108,7 @@ namespace Gym.Examples.BipedalWalkerHardcore {
                 steps++;
                 total += step.Reward;
                 if (step.Terminated || step.Truncated)
-                    return (steps, total, step.Terminated ? total > 0 ? "reached the end of the course" : "fell over" : "truncated by the time limit");
-            }
-        }
-
-        /// <summary>
-        ///     The action space's upper bound per motor, as float64: the policy scales its [-1, 1] outputs by it.
-        /// </summary>
-        /// <param name="env">The env, whose action space is a <see cref="Box"/>.</param>
-        /// <returns>One bound per motor.</returns>
-        private static double[] ActionHigh(IEnv env) {
-            // High is the space's own array: read a converted copy and leave the space's untouched.
-            using NDArray high = ((Box)env.ActionSpace).High.astype(NPTypeCode.Double);
-            return high.ToArray<double>();
-        }
-
-        /// <summary>
-        ///     The keys for <c>--play</c>: Q and A the first hip, W and S the first knee, U and J the second hip, I and
-        ///     K the second knee. The first key of a pair turns its motor one way at full torque, the second the other
-        ///     way; keys of different motors combine.
-        /// </summary>
-        /// <param name="high">The action space's upper bound per motor.</param>
-        /// <returns>
-        ///     The map from the keys held together (a string of them) to a float32 action; the caller disposes the
-        ///     actions.
-        /// </returns>
-        /// <remarks>
-        ///     Gymnasium's play looks up the exact set of keys held, so the map lists every combination: 3^4 - 1 = 80
-        ///     entries, one per motor being off, forward or back. Holding both keys of one pair matches nothing and
-        ///     plays the no-op, every motor off.
-        /// </remarks>
-        private static Dictionary<object, object?> Keys(double[] high) {
-            string[] pairs = { "qa", "ws", "uj", "ik" };
-            var map = new Dictionary<object, object?>();
-            int combinations = (int)Math.Pow(3, pairs.Length);
-            // Each combination numbers the motors' states in base 3: 0 off, 1 the pair's first key, 2 its second.
-            for (int combination = 1; combination < combinations; combination++) {
-                var action = new float[pairs.Length];
-                string held = "";
-                for (int motor = 0, rest = combination; motor < pairs.Length; motor++, rest /= 3) {
-                    int state = rest % 3;
-                    if (state == 0)
-                        continue;
-                    held += pairs[motor][state - 1];
-                    action[motor] = (float)(state == 1 ? high[motor] : -high[motor]);
-                }
-                map[held] = np.array(action);
-            }
-
-            return map;
-        }
-
-        /// <summary>
-        ///     Hands the env to the keyboard, Gymnasium's play, until Escape or the window's close button.
-        /// </summary>
-        /// <param name="seed">
-        ///     The seed of every reset: each new game starts as the last one did, as Gymnasium's play does.
-        /// </param>
-        private static void PlayWithKeyboard(long seed) {
-            // play reads the env's rgb_array frames and draws them into its own window.
-            using IEnv env = Gymnasium.Make(Id, new { render_mode = "rgb_array" });
-            double[] high = ActionHigh(env);
-            Dictionary<object, object?> keys = Keys(high);
-            NDArray noop = np.array(new float[4]);
-            try {
-                Play.Run(env, keysToAction: keys, noop: noop, seed: seed);
-            } finally {
-                // play only borrows a map it is given: its actions, and the no-op, stay ours to release.
-                foreach (object? action in keys.Values)
-                    (action as IDisposable)?.Dispose();
-                noop.Dispose();
+                    return (steps, total, step.Terminated ? "fell over" : "truncated by the time limit");
             }
         }
 

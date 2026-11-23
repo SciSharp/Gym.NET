@@ -47,7 +47,7 @@ namespace MujocoPoc.Play;
 ///     product's env instead, the one <c>Gymnasium.Make</c> builds.
 ///     </para>
 /// </remarks>
-internal static class Program {
+internal static class HalfCheetahProgram {
     private const string Title = "HalfCheetah-v5 - Gym.NET managed core, bit-exact with MuJoCo 4.0.0";
 
     /// <summary>Dispatches the command.</summary>

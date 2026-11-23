@@ -11,36 +11,36 @@ using Gym.Observations;
 using Gym.Rendering.Avalonia;
 using NumSharp;
 
-namespace Gym.Examples.Walker2d {
+namespace Gym.Examples.Pusher {
     /// <summary>
-    ///     Plays Walker2d-v5 with Farama's SAC expert, a published Stable-Baselines3 agent. <c>dotnet run --project
-    ///     examples/Walker2d -c Release</c> plays one seeded episode headless and prints its steps and return; <c>--
+    ///     Plays Pusher-v5 with Farama's SAC expert, a published Stable-Baselines3 agent. <c>dotnet run --project
+    ///     examples/Pusher -c Release</c> plays one seeded episode headless and prints its steps and return; <c>--
     ///     --render</c> plays it in a window.
     /// </summary>
     /// <remarks>
     ///     <para>
     ///     <c>policy.json</c> holds the agent (<see cref="ExpertPolicy"/>): Farama's SAC expert, the agent the Farama
     ///     Foundation, Gymnasium's maintainers, trained on this env to record the Minari datasets, imported from
-    ///     Hugging Face (<c>farama-minari/Walker2d-v5-SAC-expert</c> at revision <c>2b0ab40</c>) by
+    ///     Hugging Face (<c>farama-minari/Pusher-v5-SAC-expert</c> at revision <c>3e10360</c>) by
     ///     <c>tools/agents/import_agents.py</c>. A Stable-Baselines3 network of two dense layers of 256 with relu: each
     ///     step it casts the observation to float32 and squashes the result into the motors' range with tanh. Over
-    ///     seeds 0-9 it scores 6,949.0 in Gym.NET (every seed runs all 1,000 steps); the model card reports 6956.61 +/-
-    ///     15.95.
+    ///     seeds 0-9 it scores -28.0 in Gym.NET (seed 7, the default, puts the puck in the goal for -20.4); the model
+    ///     card reports -22.05 +/- 2.69.
     ///     </para>
     ///     <para>
     ///     The model repository states no licence; its training code is MIT. Gym.NET commits the weights with this
     ///     attribution, on the maintainer's decision (DR-109).
     ///     </para>
     ///     <para>
-    ///     The default seed, 0, is the episode the front-page showreel plays (<c>tools/showreel</c>, DR-74).
+    ///     The default seed, 7, is the episode the front-page showreel plays (<c>tools/showreel</c>, DR-74).
     ///     </para>
     /// </remarks>
-    internal static class Program {
+    internal static class PusherProgram {
         /// <summary>The environment this example plays, by its registered id.</summary>
-        private const string Id = "Walker2d-v5";
+        private const string Id = "Pusher-v5";
 
         /// <summary>The first reset seed when <c>--seed</c> is not given: the episode the showreel plays.</summary>
-        private const long DefaultSeed = 0;
+        private const long DefaultSeed = 7;
 
         /// <summary>Plays the episodes the arguments ask for with the agent.</summary>
         /// <param name="args">
@@ -59,7 +59,7 @@ namespace Gym.Examples.Walker2d {
                 return 2;
             bool render = args.Contains("--render");
             if (args.Contains("--play")) {
-                Console.Error.WriteLine($"{Id}: its frames take about 0.1 s each to draw in software and a step is 8 ms of simulated time, so keyboard play would run about 12 times slower than real time; --render shows the agent instead.");
+                Console.Error.WriteLine($"{Id}: its 7 motors would need 14 keys held in combinations, too many to play; --render shows the agent instead.");
                 return 2;
             }
             // Human mode draws inside every reset and step into the app-wide viewer (DR-20); without one it raises
@@ -108,7 +108,7 @@ namespace Gym.Examples.Walker2d {
                 steps++;
                 total += step.Reward;
                 if (step.Terminated || step.Truncated)
-                    return (steps, total, step.Terminated ? "fell over" : "truncated by the time limit");
+                    return (steps, total, step.Terminated ? "terminated" : "truncated by the time limit");
             }
         }
 

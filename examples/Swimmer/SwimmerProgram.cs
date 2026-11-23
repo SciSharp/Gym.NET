@@ -9,29 +9,22 @@ using System.Text.Json.Nodes;
 using Gym.Envs;
 using Gym.Observations;
 using Gym.Rendering.Avalonia;
-using Gym.Utils;
 using NumSharp;
 
-namespace Gym.Examples.InvertedDoublePendulum {
+namespace Gym.Examples.Swimmer {
     /// <summary>
-    ///     Plays InvertedDoublePendulum-v5 with Farama's SAC expert, a published Stable-Baselines3 agent. <c>dotnet run
-    ///     --project examples/InvertedDoublePendulum -c Release</c> plays one seeded episode headless and prints its
-    ///     steps and return; <c>-- --render</c> plays it in a window, and <c>-- --play</c> hands the cart to the A and
-    ///     D keys.
+    ///     Plays Swimmer-v5 with Farama's PPO expert, a published Stable-Baselines3 agent. <c>dotnet run --project
+    ///     examples/Swimmer -c Release</c> plays one seeded episode headless and prints its steps and return; <c>--
+    ///     --render</c> plays it in a window.
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///     <c>policy.json</c> holds the agent (<see cref="ExpertPolicy"/>): Farama's SAC expert, the agent the Farama
+    ///     <c>policy.json</c> holds the agent (<see cref="ExpertPolicy"/>): Farama's PPO expert, the agent the Farama
     ///     Foundation, Gymnasium's maintainers, trained on this env to record the Minari datasets, imported from
-    ///     Hugging Face (<c>farama-minari/InvertedDoublePendulum-v5-SAC-expert</c> at revision <c>8e4db31</c>) by
-    ///     <c>tools/agents/import_agents.py</c>. A Stable-Baselines3 network of two dense layers of 256 with relu: each
-    ///     step it casts the observation to float32 and squashes the result into the motors' range with tanh. Over
-    ///     seeds 0-9 it scores 9,356.0 in Gym.NET (every seed holds both poles all 1,000 steps); the model card reports
-    ///     9356.02 +/- 0.06.
-    ///     </para>
-    ///     <para>
-    ///     Gymnasium sets no camera for this env, and MuJoCo's free camera shows the poles small: <c>--render</c> and
-    ///     <c>--play</c> pass a closer <c>default_camera_config</c>, which changes the view and never the dynamics.
+    ///     Hugging Face (<c>farama-minari/Swimmer-v5-PPO-expert</c> at revision <c>11ae7c5</c>) by
+    ///     <c>tools/agents/import_agents.py</c>. A Stable-Baselines3 network of two dense layers of 64 with tanh: each
+    ///     step it casts the observation to float32 and clips the result to the motors' range. Over seeds 0-9 it scores
+    ///     364.0 in Gym.NET (from 361 to 366); the model card reports 363.70 +/- 1.81.
     ///     </para>
     ///     <para>
     ///     The model repository states no licence; its training code is MIT. Gym.NET commits the weights with this
@@ -41,38 +34,32 @@ namespace Gym.Examples.InvertedDoublePendulum {
     ///     The default seed, 0, is the episode the front-page showreel plays (<c>tools/showreel</c>, DR-74).
     ///     </para>
     /// </remarks>
-    internal static class Program {
+    internal static class SwimmerProgram {
         /// <summary>The environment this example plays, by its registered id.</summary>
-        private const string Id = "InvertedDoublePendulum-v5";
+        private const string Id = "Swimmer-v5";
 
         /// <summary>The first reset seed when <c>--seed</c> is not given: the episode the showreel plays.</summary>
         private const long DefaultSeed = 0;
 
-        /// <summary>
-        ///     Plays the episodes the arguments ask for with the agent, or hands the env to the keyboard.
-        /// </summary>
+        /// <summary>Plays the episodes the arguments ask for with the agent.</summary>
         /// <param name="args">
         ///     <c>--seed N</c> starts from reset seed N; <c>--episodes N</c> plays N episodes on consecutive seeds and
-        ///     prints their mean; <c>--render</c> shows them in a window; <c>--play</c> lets you play the env from the
-        ///     keyboard instead, until Escape or the window's close button. Other arguments are ignored.
+        ///     prints their mean; <c>--render</c> shows them in a window; <c>--play</c> is refused, with the reason
+        ///     this env cannot be played from the keyboard. Other arguments are ignored.
         /// </param>
         /// <returns>
-        ///     0 when the episodes were played or the keyboard game ended, 2 when an option's value is not a whole
-        ///     number.
+        ///     0 when the episodes were played, 2 when an option's value is not a whole number, or for <c>--play</c>.
         /// </returns>
         /// <exception cref="Gym.Exceptions.DependencyNotInstalled">
-        ///     Not thrown in practice: <c>--render</c> and <c>--play</c> set Avalonia's viewer before the env first
-        ///     draws.
+        ///     Not thrown in practice: <c>--render</c> sets Avalonia's viewer before the env first draws.
         /// </exception>
         private static int Main(string[] args) {
             if (!TryNumber(args, "--seed", DefaultSeed, out long seed) || !TryNumber(args, "--episodes", 1, out long episodes))
                 return 2;
             bool render = args.Contains("--render");
             if (args.Contains("--play")) {
-                // play draws the env's frames into a window of the app-wide viewer and reads the keys from it.
-                Gymnasium.HumanViewerFactory = AvaloniaEnvViewer.Factory;
-                PlayWithKeyboard(seed);
-                return 0;
+                Console.Error.WriteLine($"{Id}: its frames take about 0.3 s each to draw in software and a step is 40 ms of simulated time, so keyboard play would run about 7 times slower than real time; --render shows the agent instead.");
+                return 2;
             }
             // Human mode draws inside every reset and step into the app-wide viewer (DR-20); without one it raises
             // DependencyNotInstalled at the first frame, as Gymnasium does without pygame.
@@ -110,7 +97,7 @@ namespace Gym.Examples.InvertedDoublePendulum {
             ExpertPolicy policy = ExpertPolicy.Load(Path.Combine(AppContext.BaseDirectory, "policy.json"));
             // make's stack: TimeLimit over OrderEnforcing over PassiveEnvChecker over the env. The render mode is a
             // constructor argument, fixed for the env's life, as in Gymnasium.
-            using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>(Id, policy.MakeArguments(render, new Dictionary<string, object?> { ["default_camera_config"] = CameraConfig() }));
+            using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>(Id, policy.MakeArguments(render));
             NDArray observation = env.Reset(seed: seed).Observation;
             int steps = 0;
             double total = 0;
@@ -120,44 +107,7 @@ namespace Gym.Examples.InvertedDoublePendulum {
                 steps++;
                 total += step.Reward;
                 if (step.Terminated || step.Truncated)
-                    return (steps, total, step.Terminated ? "the poles fell" : "truncated by the time limit");
-            }
-        }
-
-        /// <summary>
-        ///     A closer view than MuJoCo's default free camera, which shows the poles a few centimetres tall: 2.6 m
-        ///     from the cart, looking at the poles' middle, nearly level. Only the view changes, never the dynamics.
-        /// </summary>
-        /// <returns>The <c>default_camera_config</c> keyword argument, by MuJoCo's camera field names.</returns>
-        private static Dictionary<string, object?> CameraConfig() => new() {
-            ["trackbodyid"] = 0L, ["distance"] = 2.6, ["lookat"] = new[] { 0.0, 0.0, 0.55 }, ["elevation"] = -5.0,
-        };
-
-        /// <summary>The keys for <c>--play</c>: A pushes the cart left at full force (-1), D right (+1).</summary>
-        /// <returns>The map from keys to float32 forces; the caller disposes the actions.</returns>
-        private static Dictionary<object, object?> Keys() => new() {
-            ["a"] = np.array(new[] { -1f }),
-            ["d"] = np.array(new[] { 1f }),
-        };
-
-        /// <summary>
-        ///     Hands the env to the keyboard, Gymnasium's play, until Escape or the window's close button.
-        /// </summary>
-        /// <param name="seed">
-        ///     The seed of every reset: each new game starts as the last one did, as Gymnasium's play does.
-        /// </param>
-        private static void PlayWithKeyboard(long seed) {
-            // play reads the env's rgb_array frames and draws them into its own window.
-            using IEnv env = Gymnasium.Make(Id, new { render_mode = "rgb_array", default_camera_config = CameraConfig() });
-            Dictionary<object, object?> keys = Keys();
-            NDArray noop = np.array(new[] { 0f });
-            try {
-                Play.Run(env, keysToAction: keys, noop: noop, seed: seed);
-            } finally {
-                // play only borrows a map it is given: its actions, and the no-op, stay ours to release.
-                foreach (object? action in keys.Values)
-                    (action as IDisposable)?.Dispose();
-                noop.Dispose();
+                    return (steps, total, step.Terminated ? "terminated" : "truncated by the time limit");
             }
         }
 

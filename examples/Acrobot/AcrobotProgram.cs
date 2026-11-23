@@ -3,37 +3,33 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using Gym.Environments.Envs.ToyText;
 using Gym.Envs;
 using Gym.Observations;
-using Gym.Rendering;
 using Gym.Rendering.Avalonia;
 using Gym.Utils;
 using NumSharp;
 
-namespace Gym.Examples.Taxi {
+namespace Gym.Examples.Acrobot {
     /// <summary>
-    ///     Picks up and delivers Taxi-v4's passenger by value iteration over the env's own transition table. <c>dotnet
-    ///     run --project examples/Taxi -c Release</c> plays one seeded episode headless and prints its steps and
-    ///     return; <c>-- --render</c> plays it in a window, and <c>-- --play</c> lets you play it with the keyboard.
+    ///     Swings Acrobot-v1's tip over the line by torquing the second joint the way it already turns. <c>dotnet run
+    ///     --project examples/Acrobot -c Release</c> plays one seeded episode headless and prints its steps and return;
+    ///     <c>-- --render</c> plays it in a window, and <c>-- --play</c> hands the joint to the A and D keys.
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///     500 states: the taxi's square, the passenger's place (one of four stands, or in the taxi) and the
-    ///     destination. Every step costs 1, a delivery pays 20, and a pick-up or drop-off in the wrong place costs 10.
-    ///     Value iteration over the transition table <c>P</c> finds the shortest delivery from every state: 16 steps
-    ///     from seed 12.
+    ///     Torque in the direction the second link swings feeds energy into the swing on every pass. Over seeds 0-9 the
+    ///     tip crosses the line in 83 steps on average; seed 1 in 65.
     ///     </para>
     ///     <para>
-    ///     The default seed, 12, is the episode the front-page showreel plays (<c>tools/showreel</c>, DR-74).
+    ///     The default seed, 1, is the episode the front-page showreel plays (<c>tools/showreel</c>, DR-74).
     ///     </para>
     /// </remarks>
-    internal static class Program {
+    internal static class AcrobotProgram {
         /// <summary>The environment this example plays, by its registered id.</summary>
-        private const string Id = "Taxi-v4";
+        private const string Id = "Acrobot-v1";
 
         /// <summary>The first reset seed when <c>--seed</c> is not given: the episode the showreel plays.</summary>
-        private const long DefaultSeed = 12;
+        private const long DefaultSeed = 1;
 
         /// <summary>
         ///     Plays the episodes the arguments ask for with the agent, or hands the env to the keyboard.
@@ -95,80 +91,42 @@ namespace Gym.Examples.Taxi {
             // make's stack: TimeLimit over OrderEnforcing over PassiveEnvChecker over the env. The render mode is a
             // constructor argument, fixed for the env's life, as in Gymnasium.
             using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>(Id, render ? new { render_mode = "human" } : null);
-            // The plan comes from the env's own model of itself: the transition table of the unwrapped env.
-            long[] plan = Plan(((TaxiEnv)env.Unwrapped).P);
             NDArray observation = env.Reset(seed: seed).Observation;
             int steps = 0;
             double total = 0;
             while (true) {
-                StepResult<NDArray> step = env.Step(NDArray.Scalar(plan[State(observation)]));
+                StepResult<NDArray> step = env.Step(Act(observation));
                 observation = step.Observation;
                 steps++;
                 total += step.Reward;
                 if (step.Terminated || step.Truncated)
-                    return (steps, total, step.Terminated ? "delivered the passenger" : "truncated by the time limit");
+                    return (steps, total, step.Terminated ? "swung the tip over the line" : "truncated by the time limit");
             }
         }
 
         /// <summary>
-        ///     Value iteration over the env's own transition table: the best action in every state, for a discount of
-        ///     0.99, computed once per episode before the first step.
+        ///     Reads an observation's values as float64, whatever its dtype (classic control's are float32).
         /// </summary>
-        /// <param name="p">The transition table <c>P</c>: for each state and action, the possible transitions.</param>
+        /// <param name="observation">The observation.</param>
+        /// <returns>Its values in C order.</returns>
+        private static double[] Values(NDArray observation) {
+            using NDArray values = observation.astype(NPTypeCode.Double);
+            return values.ToArray<double>();
+        }
+
+        /// <summary>The agent: torque the second joint the way it is already turning.</summary>
+        /// <param name="observation">
+        ///     The observation: the cosines and sines of both joint angles, then both angular velocities (index 5 is
+        ///     the second joint's).
+        /// </param>
         /// <returns>
-        ///     The greedy action per state; ties go to the lowest action, as NumPy's argmax would choose.
+        ///     +1 torque (2) when the second joint turns positively, else -1 torque (0), as a 0-d int64 array.
         /// </returns>
-        private static long[] Plan(IReadOnlyDictionary<long, IReadOnlyDictionary<long, IReadOnlyList<ToyTextTransition>>> p) {
-            const double gamma = 0.99;
-            int states = p.Count, actions = p[0].Count;
-            var v = new double[states];
-            // The expected discounted return of an action: no value is carried past a terminal transition.
-            double Q(int s, int a) {
-                double q = 0;
-                foreach (ToyTextTransition t in p[s][a])
-                    q += t.Probability * (t.Reward + (t.Terminated ? 0 : gamma * v[t.NextState]));
-                return q;
-            }
+        private static NDArray Act(NDArray observation) => NDArray.Scalar(Values(observation)[5] > 0 ? 2L : 0L);
 
-            // Sweep until no state's value moves by more than 1e-10 (a few hundred sweeps at most).
-            for (int sweep = 0; sweep < 10_000; sweep++) {
-                double delta = 0;
-                for (int s = 0; s < states; s++) {
-                    double best = double.NegativeInfinity;
-                    for (int a = 0; a < actions; a++)
-                        best = Math.Max(best, Q(s, a));
-                    delta = Math.Max(delta, Math.Abs(best - v[s]));
-                    v[s] = best;
-                }
-                if (delta < 1e-10)
-                    break;
-            }
-            var plan = new long[states];
-            for (int s = 0; s < states; s++) {
-                double best = double.NegativeInfinity;
-                for (int a = 0; a < actions; a++) {
-                    double q = Q(s, a);
-                    // A strict improvement by more than rounding noise: equal actions keep the lowest index.
-                    if (q > best + 1e-12) {
-                        best = q;
-                        plan[s] = a;
-                    }
-                }
-            }
-
-            return plan;
-        }
-
-        /// <summary>The state an observation names.</summary>
-        /// <param name="observation">A 0-d int64 array.</param>
-        /// <returns>The state's index.</returns>
-        private static long State(NDArray observation) => Convert.ToInt64(observation.GetValue(), CultureInfo.InvariantCulture);
-
-        /// <summary>
-        ///     The keys for <c>--play</c>: the arrow keys drive the taxi, P picks the passenger up, D drops them off.
-        /// </summary>
-        /// <returns>The map from key codes and keys to Taxi's actions.</returns>
-        private static Dictionary<object, object?> Keys() => new() { [KeyCode.Down] = 0L, [KeyCode.Up] = 1L, [KeyCode.Right] = 2L, [KeyCode.Left] = 3L, ["p"] = 4L, ["d"] = 5L };
+        /// <summary>The keys for <c>--play</c>: A applies -1 torque to the second joint, D +1.</summary>
+        /// <returns>The map from keys to Acrobot's actions.</returns>
+        private static Dictionary<object, object?> Keys() => new() { ["a"] = 0L, ["d"] = 2L };
 
         /// <summary>
         ///     Hands the env to the keyboard, Gymnasium's play, until Escape or the window's close button.
@@ -177,13 +135,14 @@ namespace Gym.Examples.Taxi {
         ///     The seed of every reset: each new game starts as the last one did, as Gymnasium's play does.
         /// </param>
         /// <remarks>
-        ///     The game is turn-based (<c>waitOnPlayer</c>): it steps only while a mapped key is held.
+        ///     With no key held the joint is free: the no-op is action 1, no torque.
         /// </remarks>
         private static void PlayWithKeyboard(long seed) {
             // play reads the env's rgb_array frames and draws them into its own window.
             using IEnv env = Gymnasium.Make(Id, new { render_mode = "rgb_array" });
             Dictionary<object, object?> keys = Keys();
-            Play.Run(env, keysToAction: keys, seed: seed, waitOnPlayer: true);
+            object noop = 1L;
+            Play.Run(env, keysToAction: keys, noop: noop, seed: seed);
         }
 
         /// <summary>Reads a whole-number option's value, or the fallback when the option is absent.</summary>

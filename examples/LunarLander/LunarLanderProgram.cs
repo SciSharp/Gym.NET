@@ -3,35 +3,36 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using Gym.Environments.Envs.Box2D;
 using Gym.Envs;
 using Gym.Observations;
-using Gym.Rendering;
 using Gym.Rendering.Avalonia;
 using Gym.Utils;
 using NumSharp;
 
-namespace Gym.Examples.MountainCar {
+namespace Gym.Examples.LunarLander {
     /// <summary>
-    ///     Drives MountainCar-v0's car over the hill by pumping energy: it accelerates whichever way the car already
-    ///     moves. <c>dotnet run --project examples/MountainCar -c Release</c> plays one seeded episode headless and
-    ///     prints its steps and return; <c>-- --render</c> plays it in a window, and <c>-- --play</c> hands the car to
-    ///     the arrow keys.
+    ///     Lands LunarLander-v3 between the flags with Gymnasium's own heuristic, <c>LunarLanderEnv.Heuristic</c>.
+    ///     <c>dotnet run --project examples/LunarLander -c Release</c> plays one seeded episode headless and prints its
+    ///     steps and return; <c>-- --render</c> plays it in a window, and <c>-- --play</c> hands the engines to the W,
+    ///     A and D keys.
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///     The engine is too weak to climb the right hill directly. Accelerating in the direction of motion adds energy
-    ///     on every pass, as pumping a swing does, until the car carries over the top: 122 steps from seed 4.
+    ///     The heuristic is Gymnasium's <c>heuristic</c> function, kept bit for bit: a PD controller aims the lander's
+    ///     angle at a target that leans it toward the pad, fires the main engine to hold a descent rate that slows with
+    ///     height, and cuts the engines once both legs touch. Seed 7 lands in 299 steps.
     ///     </para>
     ///     <para>
-    ///     The default seed, 4, is the episode the front-page showreel plays (<c>tools/showreel</c>, DR-74).
+    ///     The default seed, 7, is the episode the front-page showreel plays (<c>tools/showreel</c>, DR-74).
     ///     </para>
     /// </remarks>
-    internal static class Program {
+    internal static class LunarLanderProgram {
         /// <summary>The environment this example plays, by its registered id.</summary>
-        private const string Id = "MountainCar-v0";
+        private const string Id = "LunarLander-v3";
 
         /// <summary>The first reset seed when <c>--seed</c> is not given: the episode the showreel plays.</summary>
-        private const long DefaultSeed = 4;
+        private const long DefaultSeed = 7;
 
         /// <summary>
         ///     Plays the episodes the arguments ask for with the agent, or hands the env to the keyboard.
@@ -97,39 +98,21 @@ namespace Gym.Examples.MountainCar {
             int steps = 0;
             double total = 0;
             while (true) {
-                StepResult<NDArray> step = env.Step(Act(observation));
+                StepResult<NDArray> step = env.Step(LunarLanderEnv.Heuristic(env, observation));
                 observation = step.Observation;
                 steps++;
                 total += step.Reward;
                 if (step.Terminated || step.Truncated)
-                    return (steps, total, step.Terminated ? "reached the flag" : "truncated by the time limit");
+                    return (steps, total, step.Terminated ? total > 100 ? "landed" : "crashed or flew off" : "truncated by the time limit");
             }
         }
 
         /// <summary>
-        ///     Reads an observation's values as float64, whatever its dtype (classic control's are float32).
+        ///     The keys for <c>--play</c>: W fires the main engine, A the left orientation engine, D the right one (one
+        ///     engine at a time: LunarLander's action is a single choice of four).
         /// </summary>
-        /// <param name="observation">The observation.</param>
-        /// <returns>Its values in C order.</returns>
-        private static double[] Values(NDArray observation) {
-            using NDArray values = observation.astype(NPTypeCode.Double);
-            return values.ToArray<double>();
-        }
-
-        /// <summary>The agent: accelerate the way the car is already moving, rightward from rest.</summary>
-        /// <param name="observation">The observation <c>[position, velocity]</c>.</param>
-        /// <returns>
-        ///     Accelerate right (2) when the velocity is not negative, else left (0), as a 0-d int64 array.
-        /// </returns>
-        private static NDArray Act(NDArray observation) => NDArray.Scalar(Values(observation)[1] >= 0 ? 2L : 0L);
-
-        /// <summary>
-        ///     The keys for <c>--play</c>: the left and right arrows accelerate that way. MountainCar's own
-        ///     <c>get_keys_to_action</c> is not used: it names pygame 1's arrow codes, which no pygame 2 window sends,
-        ///     and maps the empty combination, which Gymnasium's play rejects.
-        /// </summary>
-        /// <returns>The map from key codes to MountainCar's actions.</returns>
-        private static Dictionary<object, object?> Keys() => new() { [KeyCode.Left] = 0L, [KeyCode.Right] = 2L };
+        /// <returns>The map from keys to LunarLander's actions.</returns>
+        private static Dictionary<object, object?> Keys() => new() { ["w"] = 2L, ["a"] = 1L, ["d"] = 3L };
 
         /// <summary>
         ///     Hands the env to the keyboard, Gymnasium's play, until Escape or the window's close button.
@@ -138,13 +121,13 @@ namespace Gym.Examples.MountainCar {
         ///     The seed of every reset: each new game starts as the last one did, as Gymnasium's play does.
         /// </param>
         /// <remarks>
-        ///     With no key held the car coasts: the no-op is action 1, no acceleration.
+        ///     With no key held every engine is off: the no-op is action 0.
         /// </remarks>
         private static void PlayWithKeyboard(long seed) {
             // play reads the env's rgb_array frames and draws them into its own window.
             using IEnv env = Gymnasium.Make(Id, new { render_mode = "rgb_array" });
             Dictionary<object, object?> keys = Keys();
-            object noop = 1L;
+            object noop = 0L;
             Play.Run(env, keysToAction: keys, noop: noop, seed: seed);
         }
 

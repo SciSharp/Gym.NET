@@ -32,7 +32,7 @@ namespace Gym.Examples.CartPole {
     ///     two runs print the same numbers on the same platform.
     ///     </para>
     /// </remarks>
-    internal static class Program {
+    internal static class CartPoleProgram {
         /// <summary>Policy parameters: four observation weights and a bias.</summary>
         private const int ParameterCount = 5;
 

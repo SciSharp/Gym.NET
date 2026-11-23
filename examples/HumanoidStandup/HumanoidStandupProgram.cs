@@ -11,36 +11,42 @@ using Gym.Observations;
 using Gym.Rendering.Avalonia;
 using NumSharp;
 
-namespace Gym.Examples.Pusher {
+namespace Gym.Examples.HumanoidStandup {
     /// <summary>
-    ///     Plays Pusher-v5 with Farama's SAC expert, a published Stable-Baselines3 agent. <c>dotnet run --project
-    ///     examples/Pusher -c Release</c> plays one seeded episode headless and prints its steps and return; <c>--
-    ///     --render</c> plays it in a window.
+    ///     Plays HumanoidStandup-v5 with Farama's SAC expert, a published Stable-Baselines3 agent. <c>dotnet run
+    ///     --project examples/HumanoidStandup -c Release</c> plays one seeded episode headless and prints its steps and
+    ///     return; <c>-- --render</c> plays it in a window.
     /// </summary>
     /// <remarks>
     ///     <para>
     ///     <c>policy.json</c> holds the agent (<see cref="ExpertPolicy"/>): Farama's SAC expert, the agent the Farama
     ///     Foundation, Gymnasium's maintainers, trained on this env to record the Minari datasets, imported from
-    ///     Hugging Face (<c>farama-minari/Pusher-v5-SAC-expert</c> at revision <c>3e10360</c>) by
+    ///     Hugging Face (<c>farama-minari/HumanoidStandup-v5-SAC-expert</c> at revision <c>a8a03ed</c>) by
     ///     <c>tools/agents/import_agents.py</c>. A Stable-Baselines3 network of two dense layers of 256 with relu: each
     ///     step it casts the observation to float32 and squashes the result into the motors' range with tanh. Over
-    ///     seeds 0-9 it scores -28.0 in Gym.NET (seed 7, the default, puts the puck in the goal for -20.4); the model
-    ///     card reports -22.05 +/- 2.69.
+    ///     seeds 0-9 it scores 400,097.0 in Gym.NET (every seed stands up within a second and stays up); the model card
+    ///     reports 395485.91 +/- 33309.92.
+    ///     </para>
+    ///     <para>
+    ///     The expert was trained seeing positions and velocities only: the file's <c>make_kwargs</c> turns off
+    ///     HumanoidStandup's four other observation groups (inertias, velocities, actuator forces and contact forces),
+    ///     and <see cref="ExpertPolicy.MakeArguments"/> passes them to make. They change what the agent sees, never the
+    ///     dynamics.
     ///     </para>
     ///     <para>
     ///     The model repository states no licence; its training code is MIT. Gym.NET commits the weights with this
     ///     attribution, on the maintainer's decision (DR-109).
     ///     </para>
     ///     <para>
-    ///     The default seed, 7, is the episode the front-page showreel plays (<c>tools/showreel</c>, DR-74).
+    ///     The default seed, 0, is the episode the front-page showreel plays (<c>tools/showreel</c>, DR-74).
     ///     </para>
     /// </remarks>
-    internal static class Program {
+    internal static class HumanoidStandupProgram {
         /// <summary>The environment this example plays, by its registered id.</summary>
-        private const string Id = "Pusher-v5";
+        private const string Id = "HumanoidStandup-v5";
 
         /// <summary>The first reset seed when <c>--seed</c> is not given: the episode the showreel plays.</summary>
-        private const long DefaultSeed = 7;
+        private const long DefaultSeed = 0;
 
         /// <summary>Plays the episodes the arguments ask for with the agent.</summary>
         /// <param name="args">
@@ -59,7 +65,7 @@ namespace Gym.Examples.Pusher {
                 return 2;
             bool render = args.Contains("--render");
             if (args.Contains("--play")) {
-                Console.Error.WriteLine($"{Id}: its 7 motors would need 14 keys held in combinations, too many to play; --render shows the agent instead.");
+                Console.Error.WriteLine($"{Id}: its 17 motors would need 34 keys held in combinations, too many to play; --render shows the agent instead.");
                 return 2;
             }
             // Human mode draws inside every reset and step into the app-wide viewer (DR-20); without one it raises

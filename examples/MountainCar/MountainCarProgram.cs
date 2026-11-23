@@ -5,31 +5,33 @@ using System.Globalization;
 using System.Linq;
 using Gym.Envs;
 using Gym.Observations;
+using Gym.Rendering;
 using Gym.Rendering.Avalonia;
 using Gym.Utils;
 using NumSharp;
 
-namespace Gym.Examples.Acrobot {
+namespace Gym.Examples.MountainCar {
     /// <summary>
-    ///     Swings Acrobot-v1's tip over the line by torquing the second joint the way it already turns. <c>dotnet run
-    ///     --project examples/Acrobot -c Release</c> plays one seeded episode headless and prints its steps and return;
-    ///     <c>-- --render</c> plays it in a window, and <c>-- --play</c> hands the joint to the A and D keys.
+    ///     Drives MountainCar-v0's car over the hill by pumping energy: it accelerates whichever way the car already
+    ///     moves. <c>dotnet run --project examples/MountainCar -c Release</c> plays one seeded episode headless and
+    ///     prints its steps and return; <c>-- --render</c> plays it in a window, and <c>-- --play</c> hands the car to
+    ///     the arrow keys.
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///     Torque in the direction the second link swings feeds energy into the swing on every pass. Over seeds 0-9 the
-    ///     tip crosses the line in 83 steps on average; seed 1 in 65.
+    ///     The engine is too weak to climb the right hill directly. Accelerating in the direction of motion adds energy
+    ///     on every pass, as pumping a swing does, until the car carries over the top: 122 steps from seed 4.
     ///     </para>
     ///     <para>
-    ///     The default seed, 1, is the episode the front-page showreel plays (<c>tools/showreel</c>, DR-74).
+    ///     The default seed, 4, is the episode the front-page showreel plays (<c>tools/showreel</c>, DR-74).
     ///     </para>
     /// </remarks>
-    internal static class Program {
+    internal static class MountainCarProgram {
         /// <summary>The environment this example plays, by its registered id.</summary>
-        private const string Id = "Acrobot-v1";
+        private const string Id = "MountainCar-v0";
 
         /// <summary>The first reset seed when <c>--seed</c> is not given: the episode the showreel plays.</summary>
-        private const long DefaultSeed = 1;
+        private const long DefaultSeed = 4;
 
         /// <summary>
         ///     Plays the episodes the arguments ask for with the agent, or hands the env to the keyboard.
@@ -100,7 +102,7 @@ namespace Gym.Examples.Acrobot {
                 steps++;
                 total += step.Reward;
                 if (step.Terminated || step.Truncated)
-                    return (steps, total, step.Terminated ? "swung the tip over the line" : "truncated by the time limit");
+                    return (steps, total, step.Terminated ? "reached the flag" : "truncated by the time limit");
             }
         }
 
@@ -114,19 +116,20 @@ namespace Gym.Examples.Acrobot {
             return values.ToArray<double>();
         }
 
-        /// <summary>The agent: torque the second joint the way it is already turning.</summary>
-        /// <param name="observation">
-        ///     The observation: the cosines and sines of both joint angles, then both angular velocities (index 5 is
-        ///     the second joint's).
-        /// </param>
+        /// <summary>The agent: accelerate the way the car is already moving, rightward from rest.</summary>
+        /// <param name="observation">The observation <c>[position, velocity]</c>.</param>
         /// <returns>
-        ///     +1 torque (2) when the second joint turns positively, else -1 torque (0), as a 0-d int64 array.
+        ///     Accelerate right (2) when the velocity is not negative, else left (0), as a 0-d int64 array.
         /// </returns>
-        private static NDArray Act(NDArray observation) => NDArray.Scalar(Values(observation)[5] > 0 ? 2L : 0L);
+        private static NDArray Act(NDArray observation) => NDArray.Scalar(Values(observation)[1] >= 0 ? 2L : 0L);
 
-        /// <summary>The keys for <c>--play</c>: A applies -1 torque to the second joint, D +1.</summary>
-        /// <returns>The map from keys to Acrobot's actions.</returns>
-        private static Dictionary<object, object?> Keys() => new() { ["a"] = 0L, ["d"] = 2L };
+        /// <summary>
+        ///     The keys for <c>--play</c>: the left and right arrows accelerate that way. MountainCar's own
+        ///     <c>get_keys_to_action</c> is not used: it names pygame 1's arrow codes, which no pygame 2 window sends,
+        ///     and maps the empty combination, which Gymnasium's play rejects.
+        /// </summary>
+        /// <returns>The map from key codes to MountainCar's actions.</returns>
+        private static Dictionary<object, object?> Keys() => new() { [KeyCode.Left] = 0L, [KeyCode.Right] = 2L };
 
         /// <summary>
         ///     Hands the env to the keyboard, Gymnasium's play, until Escape or the window's close button.
@@ -135,7 +138,7 @@ namespace Gym.Examples.Acrobot {
         ///     The seed of every reset: each new game starts as the last one did, as Gymnasium's play does.
         /// </param>
         /// <remarks>
-        ///     With no key held the joint is free: the no-op is action 1, no torque.
+        ///     With no key held the car coasts: the no-op is action 1, no acceleration.
         /// </remarks>
         private static void PlayWithKeyboard(long seed) {
             // play reads the env's rgb_array frames and draws them into its own window.

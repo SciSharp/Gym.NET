@@ -3,36 +3,34 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using Gym.Environments.Envs.Box2D;
 using Gym.Envs;
 using Gym.Observations;
 using Gym.Rendering.Avalonia;
 using Gym.Utils;
 using NumSharp;
 
-namespace Gym.Examples.CarRacing {
+namespace Gym.Examples.Pendulum {
     /// <summary>
-    ///     Drives CarRacing-v3 by pure pursuit on the track's centre line. <c>dotnet run --project examples/CarRacing
-    ///     -c Release</c> plays one seeded episode headless and prints its steps and return; <c>-- --render</c> plays
-    ///     it in a window, and <c>-- --play</c> hands the car to the W, A, S and D keys.
+    ///     Swings Pendulum-v1 up and holds it upright: energy pumping, then a PD controller near the top. <c>dotnet run
+    ///     --project examples/Pendulum -c Release</c> plays one seeded episode headless and prints its steps and
+    ///     return; <c>-- --render</c> plays it in a window, and <c>-- --play</c> hands the motor to the A and D keys.
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///     The agent reads the track and the car from the unwrapped env rather than from the 96x96 pixels: it aims at
-    ///     the centre-line point five track tiles past the nearest one, steers by the angle to it, keeps the throttle
-    ///     while the speed is under a limit that drops with that angle, and brakes into sharp bends. Seed 11 drives the
-    ///     full 1,000 steps.
+    ///     The motor is too weak to lift the pendulum straight up. Far from the top, full torque along the swing adds
+    ///     energy until the pendulum has the energy of the upright rest (<c>w^2/2 + 15 cos(theta)</c> for Gymnasium's g
+    ///     = 10, m = l = 1); within about 32 degrees of the top a PD controller catches it and holds it there.
     ///     </para>
     ///     <para>
-    ///     The default seed, 11, is the episode the front-page showreel plays (<c>tools/showreel</c>, DR-74).
+    ///     The default seed, 5, is the episode the front-page showreel plays (<c>tools/showreel</c>, DR-74).
     ///     </para>
     /// </remarks>
-    internal static class Program {
+    internal static class PendulumProgram {
         /// <summary>The environment this example plays, by its registered id.</summary>
-        private const string Id = "CarRacing-v3";
+        private const string Id = "Pendulum-v1";
 
         /// <summary>The first reset seed when <c>--seed</c> is not given: the episode the showreel plays.</summary>
-        private const long DefaultSeed = 11;
+        private const long DefaultSeed = 5;
 
         /// <summary>
         ///     Plays the episodes the arguments ask for with the agent, or hands the env to the keyboard.
@@ -98,62 +96,45 @@ namespace Gym.Examples.CarRacing {
             int steps = 0;
             double total = 0;
             while (true) {
-                StepResult<NDArray> step = env.Step(Act(env));
+                StepResult<NDArray> step = env.Step(Act(observation));
                 observation = step.Observation;
                 steps++;
                 total += step.Reward;
                 if (step.Terminated || step.Truncated)
-                    return (steps, total, step.Terminated ? total > 0 ? "finished the lap" : "left the playfield" : "truncated by the time limit");
+                    return (steps, total, step.Terminated ? "terminated" : "truncated by the time limit");
             }
-        }
-
-        /// <summary>The agent: pure pursuit of a point on the centre line, five tiles ahead.</summary>
-        /// <param name="env">The env; its unwrapped <see cref="CarRacingEnv"/> exposes the car and the track.</param>
-        /// <returns>A float32 <c>[steer, gas, brake]</c>.</returns>
-        private static NDArray Act(IEnv env) {
-            var race = (CarRacingEnv)env.Unwrapped;
-            var hull = race.Car!.Hull!;
-            var p = hull.Position;
-            double angle = hull.Angle;
-            var track = race.Track;
-            int nearest = 0;
-            double best = double.MaxValue;
-            for (int i = 0; i < track.Count; i++) {
-                double dx0 = track[i].X - p.x, dy0 = track[i].Y - p.y, d = dx0 * dx0 + dy0 * dy0;
-                if (d < best) {
-                    best = d;
-                    nearest = i;
-                }
-            }
-            var target = track[(nearest + 5) % track.Count];
-            double dx = target.X - p.x, dy = target.Y - p.y;
-            // The hull's forward axis is its local +y: (-sin a, cos a) in world coordinates.
-            double fx = -Math.Sin(angle), fy = Math.Cos(angle);
-            double error = Math.Atan2(fx * dy - fy * dx, fx * dx + fy * dy);
-            var v = hull.LinearVelocity;
-            double speed = Math.Sqrt(v.x * v.x + v.y * v.y);
-            float steer = (float)Math.Clamp(-error * 2.5, -1, 1);
-            float gas = speed < 45 - 30 * Math.Min(1, Math.Abs(error)) ? 0.6f : 0f;
-            float brake = Math.Abs(error) > 0.6 && speed > 30 ? 0.4f : 0f;
-            return np.array(new[] { steer, gas, brake });
         }
 
         /// <summary>
-        ///     The keys for <c>--play</c>, the map Gymnasium's own <c>play</c> documentation gives for CarRacing: W
-        ///     gas, A and D steer, S brake, and the four two-key combinations.
+        ///     Reads an observation's values as float64, whatever its dtype (classic control's are float32).
         /// </summary>
-        /// <returns>
-        ///     The map from keys to float32 <c>[steer, gas, brake]</c> actions; the caller disposes them.
-        /// </returns>
+        /// <param name="observation">The observation.</param>
+        /// <returns>Its values in C order.</returns>
+        private static double[] Values(NDArray observation) {
+            using NDArray values = observation.astype(NPTypeCode.Double);
+            return values.ToArray<double>();
+        }
+
+        /// <summary>The agent: pump energy far from the top, catch and hold the pendulum near it.</summary>
+        /// <param name="observation">The observation <c>[cos(theta), sin(theta), theta_dot]</c>.</param>
+        /// <returns>A float32 torque in [-2, 2], as a one-element array.</returns>
+        private static NDArray Act(NDArray observation) {
+            double[] s = Values(observation);
+            double theta = Math.Atan2(s[1], s[0]), w = s[2];
+            double energy = 0.5 * w * w + 15.0 * Math.Cos(theta);
+            // Near the top (cos > 0.85) a PD controller holds it; below, full torque along the swing until the energy
+            // reaches the upright rest's 15, then a gentle brake against overshooting.
+            double u = Math.Cos(theta) > 0.85 ? -(12.0 * theta + 2.5 * w) : energy < 15.0 ? 2.0 * (w >= 0 ? 1 : -1) : -0.5 * Math.Sign(w);
+            return np.array(new[] { (float)Math.Clamp(u, -2.0, 2.0) });
+        }
+
+        /// <summary>
+        ///     The keys for <c>--play</c>: A turns the motor one way at full torque (-2), D the other way (+2).
+        /// </summary>
+        /// <returns>The map from keys to float32 torques; the caller disposes the actions.</returns>
         private static Dictionary<object, object?> Keys() => new() {
-            ["w"] = np.array(new[] { 0f, 0.7f, 0f }),
-            ["a"] = np.array(new[] { -1f, 0f, 0f }),
-            ["s"] = np.array(new[] { 0f, 0f, 1f }),
-            ["d"] = np.array(new[] { 1f, 0f, 0f }),
-            ["wa"] = np.array(new[] { -1f, 0.7f, 0f }),
-            ["dw"] = np.array(new[] { 1f, 0.7f, 0f }),
-            ["ds"] = np.array(new[] { 1f, 0f, 1f }),
-            ["as"] = np.array(new[] { -1f, 0f, 1f }),
+            ["a"] = np.array(new[] { -2f }),
+            ["d"] = np.array(new[] { 2f }),
         };
 
         /// <summary>
@@ -166,7 +147,7 @@ namespace Gym.Examples.CarRacing {
             // play reads the env's rgb_array frames and draws them into its own window.
             using IEnv env = Gymnasium.Make(Id, new { render_mode = "rgb_array" });
             Dictionary<object, object?> keys = Keys();
-            NDArray noop = np.array(new float[3]);
+            NDArray noop = np.array(new[] { 0f });
             try {
                 Play.Run(env, keysToAction: keys, noop: noop, seed: seed);
             } finally {
