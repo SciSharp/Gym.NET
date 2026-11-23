@@ -554,7 +554,8 @@ article .gn-env-banner ~ h2#quick-start {
 
 /* A table drawn in 4-pixel art pixels (Blackjack's 384x376, every element placed on a multiple of 4) at 1.25 times its
    size: each art pixel becomes exactly 5 screen pixels, so nearest-neighbour scaling keeps it crisp, where the 640 px
-   box would make some art pixels 6 wide and some 7. */
+   box would make some art pixels 6 wide and some 7. CarRacing's 96x96 observation takes the same box at five times
+   its size, each of its pixels 5 screen pixels too. */
 .gn-figure.gn-figure-art,
 .gn-figure-art + .gn-figure-caption {
   max-width: 480px;
