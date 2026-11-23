@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- InvertedPendulum-v5 played by linear state feedback (decision DR-74): one seeded episode headless, or in a
+  <!-- InvertedPendulum-v5 played by Farama's SAC expert (decision DR-74): one seeded episode headless, or in a
        window, or played from the keyboard. It references the source projects so it always builds against the current tree (Gym.NET.sln
        builds it, so an API change that breaks it fails the build); a copy outside this repository replaces the three
        ProjectReferences with PackageReferences to Gym.NET.Environments and Gym.NET.Rendering.Avalonia, and drops the
@@ -19,6 +19,11 @@
     <ProjectReference Include="..\..\src\Gym\Gym.csproj" />
     <ProjectReference Include="..\..\src\Gym.Environments\Gym.Environments.csproj" />
     <ProjectReference Include="..\..\src\Gym.Rendering.Avalonia\Gym.Rendering.Avalonia.csproj" />
+  </ItemGroup>
+
+  <!-- The trained policy, read from the program's folder at start-up. -->
+  <ItemGroup>
+    <None Include="policy.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <!-- NumSharp.Build weaves [NDScoped] (DR-80): the episode method releases every array the episode creates when it

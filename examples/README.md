@@ -26,23 +26,23 @@ returns. The env is built and disposed inside that method, the guides' rule for 
 | [Pendulum](Pendulum) | Energy pumping, then a PD controller near the top | Seed 5: 200 steps, return -114.1 | A / D |
 | [Acrobot](Acrobot) | Torque the second joint the way it turns | Seed 1: over the line in 65 steps | A / D |
 | **MuJoCo, control** | | | |
-| [InvertedPendulum](InvertedPendulum) | Linear state feedback | Seed 0: 1,000 steps balanced | A / D |
-| [InvertedDoublePendulum](InvertedDoublePendulum) | A linear policy trained by Augmented Random Search | Seed 0: 1,000 steps, return 9,359.6 | A / D |
-| [Reacher](Reacher) | Inverse kinematics and a joint PD controller | Seed 0: return -3.8 | Q/A, W/S |
-| [Pusher](Pusher) | Operational-space control of the fingertip | Seed 73: return -39.0 | Not offered (7 motors) |
+| [InvertedPendulum](InvertedPendulum) | Farama's SAC expert | Seed 0: 1,000 steps balanced | A / D |
+| [InvertedDoublePendulum](InvertedDoublePendulum) | Farama's SAC expert | Seed 0: 1,000 steps, return 9,355.8 | A / D |
+| [Reacher](Reacher) | Farama's SAC expert | Seed 0: return -2.8 | Q/A, W/S |
+| [Pusher](Pusher) | Farama's SAC expert | Seed 7: the puck in the goal, return -20.4 | Not offered (7 motors) |
 | **Box2D** | | | |
 | [LunarLander](LunarLander) | Gymnasium's heuristic | Seed 7: landed in 299 steps, return 248.6 | W / A / D |
 | [BipedalWalker](BipedalWalker) | Gymnasium's gait | Seed 0: the whole course in 1,598 steps, return 314.5 | Q/A W/S U/J I/K |
-| [BipedalWalkerHardcore](BipedalWalkerHardcore) | The same gait, on the hardcore course | Seed 10: falls at step 157 | Q/A W/S U/J I/K |
+| [BipedalWalkerHardcore](BipedalWalkerHardcore) | RL Zoo's TQC agent | Seed 7: the whole course in 968 steps, return 308.4 | Q/A W/S U/J I/K |
 | [CarRacing](CarRacing) | Pure pursuit on the track's centre line | Seed 11: 1,000 steps, return 880.7 | W / A / S / D |
 | **MuJoCo, locomotion** | | | |
-| [HalfCheetah](HalfCheetah) | Its autopilot, a linear policy trained by Augmented Random Search; the playable HalfCheetah | Seed 0: 1,000 steps, return 5,797.0 | Its own game: Q/A W/S E/D U/J I/K O/L, Tab |
-| [Hopper](Hopper) | A linear policy trained by Augmented Random Search | Seed 0: 1,000 steps, return 3,614.8 | Not offered (frames too slow) |
-| [Walker2d](Walker2d) | A linear policy trained by Augmented Random Search | Seed 0: 1,000 steps, return 2,446.0 | Not offered (frames too slow) |
-| [Ant](Ant) | A linear policy trained by Augmented Random Search | Seed 0: 1,000 steps, return 3,131.8 | Not offered (8 motors) |
-| [Humanoid](Humanoid) | A linear policy trained by Augmented Random Search | Seed 73: falls at step 203, return 993.4 | Not offered (17 motors) |
-| [HumanoidStandup](HumanoidStandup) | A linear policy trained by Augmented Random Search | Seed 0: 1,000 steps, return 124,315.4 | Not offered (17 motors) |
-| [Swimmer](Swimmer) | A linear policy trained by Augmented Random Search | Seed 0: 1,000 steps, return 357.0 | Not offered (frames too slow) |
+| [HalfCheetah](HalfCheetah) | Farama's TQC expert; `--autopilot`: its linear autopilot, trained by Augmented Random Search, which also drives the playable HalfCheetah | Seed 0: 1,000 steps, return 17,648.0 (autopilot 5,797.0) | Its own game: Q/A W/S E/D U/J I/K O/L, Tab |
+| [Hopper](Hopper) | Farama's SAC expert | Seed 0: 1,000 steps, return 4,187.0 | Not offered (frames too slow) |
+| [Walker2d](Walker2d) | Farama's SAC expert | Seed 0: 1,000 steps, return 6,943.4 | Not offered (frames too slow) |
+| [Ant](Ant) | Farama's SAC expert | Seed 0: 1,000 steps, return 5,705.8 | Not offered (8 motors) |
+| [Humanoid](Humanoid) | Farama's TQC expert | Seed 0: 1,000 steps, return 10,563.5 | Not offered (17 motors) |
+| [HumanoidStandup](HumanoidStandup) | Farama's SAC expert | Seed 0: up within a second, return 399,827.7 | Not offered (17 motors) |
+| [Swimmer](Swimmer) | Farama's PPO expert | Seed 0: 1,000 steps, return 361.0 | Not offered (frames too slow) |
 | **Toy text** | | | |
 | [FrozenLake](FrozenLake) | Value iteration over the env's transition table | Seed 1: the goal in 41 steps | Arrows |
 | [FrozenLake8x8](FrozenLake8x8) | Value iteration over the env's transition table | Seed 2: the goal in 63 steps | Arrows |
@@ -76,12 +76,21 @@ not. The episodes checked there, MountainCar's, Taxi's, CartPole's controller an
 same. HalfCheetah's seed-0 return was 5,895.8 instead of 5,797.0, because its contact-rich, chaotic dynamics grow a
 last-bit difference over 1,000 steps.
 
-## The trained policies
+## The expert agents
 
-InvertedDoublePendulum, Hopper, Walker2d, Ant, Humanoid, HumanoidStandup and Swimmer play a `policy.json` beside their
-program: a linear policy, `a = clip(W · (s - mean) / scale, -1, 1) · high`, trained by Augmented Random Search V2-t
-(Mania, Guy and Recht 2018) with `tools/showreel`'s `train` command. HalfCheetah's autopilot is the same kind, trained
-by its own `train` command. Each file's `info` records how it was trained and its returns on seeds 0-4.
+The eleven MuJoCo examples and BipedalWalkerHardcore play published expert agents (DR-109): the agents the Farama
+Foundation, Gymnasium's maintainers, trained on these v5 envs to record the Minari datasets (Stable-Baselines3's SAC,
+TQC and PPO), and RL Zoo's TQC agent for the hardcore course. Each sits beside its program as `policy.json`
+(HalfCheetah's as `expert.json`), a copy of the agent in [`tests/Gym.Tests/Agents`](../tests/Gym.Tests/Agents), where
+the tests measure every one, and each program carries its own copy of the reader, `ExpertPolicy`. The networks are two
+dense layers of 256 (Swimmer's 64, the hardcore walker's 400 and 300); `tools/agents/import_agents.py` writes them from
+their pinned Hugging Face revisions. The model repositories state no licence; their training code is MIT. Gym.NET commits
+the weights with that attribution, on the maintainer's decision.
+
+They replaced weaker agents: linear policies trained by Augmented Random Search, which kept Humanoid up for about 200
+steps, and hand-written controllers for InvertedPendulum, Reacher and Pusher. HalfCheetah keeps its linear autopilot,
+trained by its own `train` command, for `--autopilot` and the playable game: Gymnasium reproduces its returns to the
+last bit.
 
 ## Outside this repository
 

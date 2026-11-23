@@ -24,8 +24,10 @@ namespace Gym.Tests.Parity.Tests.Envs {
     /// </summary>
     /// <remarks>
     ///     <para>
-    ///     Equality with Gymnasium is never required (DR-67): part of Gymnasium's pixels are its GPU's own choices, which
-    ///     Gym.NET reproduces where they were measured (<c>tools/parity/mujoco/gpu_probe.py</c>) and approximates elsewhere.
+    ///     Equality with Gymnasium is the goal, family by family (DR-98, amending DR-67): part of Gymnasium's pixels are its
+    ///     GPU's own choices, which Gym.NET reproduces where they were measured (<c>tools/parity/mujoco/gpu_probe.py</c>) and
+    ///     approximates elsewhere, so each frame is gated on its recorded count, and a family brought to equality records 0
+    ///     and is from then on held to equality by this same gate.
     ///     So the cells are pinned twice: to the reference platform, whose arithmetic the engine's trajectory is bit for bit
     ///     with, and to the GPU the baseline was recorded on (<see cref="MujocoFrameBaseline"/>); on another GPU or driver they
     ///     are Inconclusive, and so where Gymnasium cannot draw MuJoCo frames at all (a machine without a GPU, such as CI's

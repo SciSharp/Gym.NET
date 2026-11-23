@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using Gym.Agents;
 using Gym.Environments.Envs.Box2D;
 using Gym.Environments.Envs.MuJoCo;
 using Gym.Environments.Envs.ToyText;
@@ -71,7 +72,8 @@ internal sealed record PosterShot(double Seconds, int Left, int Top, int Width, 
 /// <param name="ScoresHands">Whether the status counts won and lost episodes (Blackjack) rather than showing the return.</param>
 /// <param name="Kwargs">
 ///     Constructor arguments added to <c>render_mode="rgb_array"</c> when the env is made, by Python name, or null. Only
-///     presentation is set this way (InvertedDoublePendulum's camera); never anything that changes the dynamics.
+///     presentation (the cameras) and what an expert agent was trained to observe (HumanoidStandup's) are set this way;
+///     never anything that changes the dynamics.
 /// </param>
 /// <param name="RenderEveryStep">
 ///     Whether the env's <c>render()</c> changes what its next frame shows, so the player must render after every step, as
@@ -83,6 +85,11 @@ internal sealed record PosterShot(double Seconds, int Left, int Top, int Width, 
 /// <param name="Poster">
 ///     How the gallery's poster still is cut from this episode, or null for the default (see <see cref="PosterShot"/>). The
 ///     still is what the README's gallery shows, so a recipe sets one when its default would be a speck in a mostly empty frame.
+/// </param>
+/// <param name="LoopTicks">
+///     The last tick the site gallery's loop plays, or null for the gallery's 6.5 s. The experts run fast enough to leave
+///     a MuJoCo model's finite floor, past which a panel shows grey void: HalfCheetah's at step 96 (17 m/s), Humanoid's
+///     near step 350, so their loops stop at 90 and 300. The video's scenes end before those steps on their own.
 /// </param>
 internal sealed record EpisodeRecipe(
     string Id,
@@ -97,7 +104,8 @@ internal sealed record EpisodeRecipe(
     bool ScoresHands = false,
     IReadOnlyDictionary<string, object?>? Kwargs = null,
     bool RenderEveryStep = false,
-    PosterShot? Poster = null) {
+    PosterShot? Poster = null,
+    int? LoopTicks = null) {
     /// <summary>Ticks a finished episode is held on screen before the next one starts (multi-episode recipes only).</summary>
     public int HandPauseTicks => 2;
 
@@ -121,18 +129,24 @@ internal sealed record EpisodeRecipe(
 ///     <para>
 ///     Every policy and seed was checked to play a good episode: CartPole balances for all 500 steps while swaying,
 ///     MountainCar climbs in 122 steps, Pendulum swings up and holds, Acrobot reaches the line in 65 steps, LunarLander
-///     lands for 248.6, BipedalWalker finishes the course for 314.5, the hardcore walker trips over a stump (on purpose,
-///     for the GAME OVER stamp), CarRacing scores 880.7, and the toy-text agents follow value iteration over the env's own
-///     transition table. LunarLander and BipedalWalker use Gymnasium's own heuristics as Gym.NET ships them.
+///     lands for 248.6, BipedalWalker finishes the course for 314.5, RL Zoo's hardcore walker clears the stumps, pits and
+///     stairs, CarRacing scores 880.7, and the toy-text agents follow value iteration over the env's own transition
+///     table. LunarLander and BipedalWalker use Gymnasium's own heuristics as Gym.NET ships them.
 ///     </para>
 ///     <para>
-///     Eight of the eleven MuJoCo envs play linear policies committed in <c>tools/showreel/policies</c>: HalfCheetah's is
-///     the autopilot trained for <c>examples/HalfCheetah</c> on the same physics, the others were
-///     trained by <see cref="Ars"/> (the <c>train</c> command), and each file records its training and evaluation returns.
-///     Three are scripted instead, each after its trained policy looked wrong on screen: InvertedPendulum
-///     (<see cref="InvertedPendulumBalance"/>, which keeps the cart centred), Reacher (<see cref="ReacherReach"/>, whose
-///     inverse kinematics beat the linear policy's plateau) and Pusher (<see cref="PusherScript"/>, which moves where the
-///     linear policy barely did).
+///     The eleven MuJoCo envs and the hardcore walker play published expert agents (DR-109), read from
+///     <c>agents/&lt;id&gt;.json</c> next to the program, which the build copies from their home in
+///     <c>tests/Gym.Tests/Agents</c>: Farama's own SAC, TQC and PPO experts for the MuJoCo v5 envs (the agents Farama
+///     trained to record the Minari datasets) and RL Zoo's TQC agent for BipedalWalkerHardcore-v3. Measured in Gym.NET
+///     over seeds 0-9 they score what their model cards report: Humanoid 10,651, HumanoidStandup 400,097, Walker2d
+///     6,949, Ant 5,661, HalfCheetah 17,629, Hopper 4,144, Swimmer 364, and the hardcore walker finishes six courses in
+///     ten. The maintainer, 2026-11-22: "All of our envs must be good or state of the art".
+///     </para>
+///     <para>
+///     The hand-written controllers the MuJoCo recipes played before (<see cref="InvertedPendulumBalance"/>,
+///     <see cref="ReacherReach"/>, <see cref="PusherScript"/>) and the ARS policies in <c>tools/showreel/policies</c>
+///     (<see cref="Trained"/>, the <c>train</c> command) are kept, unused by the recipes, as the record of what the
+///     experts replaced.
 ///     </para>
 /// </remarks>
 internal static class Episodes {
@@ -144,6 +158,19 @@ internal static class Episodes {
     ///     read this field while <see cref="All"/> is built.
     /// </remarks>
     private static readonly IReadOnlyDictionary<string, object?> TrackCamera = new Dictionary<string, object?> { ["camera_name"] = "track" };
+
+    /// <summary>
+    ///     HumanoidStandup's arguments: the track camera, and the observation Farama's expert was trained on, positions and
+    ///     velocities only (its <c>make_kwargs</c>, DR-109). They change what the agent sees, never the dynamics.
+    /// </summary>
+    /// <remarks>Declared before <see cref="All"/> for the same reason as <see cref="TrackCamera"/>.</remarks>
+    private static readonly IReadOnlyDictionary<string, object?> StandupKwargs = new Dictionary<string, object?> {
+        ["camera_name"] = "track",
+        ["include_cinert_in_observation"] = false,
+        ["include_cvel_in_observation"] = false,
+        ["include_qfrc_actuator_in_observation"] = false,
+        ["include_cfrc_ext_in_observation"] = false,
+    };
 
     /// <summary>
     ///     The recipes in the video's order, which the gallery follows: classic control, MuJoCo's control tasks, Box2D,
@@ -160,11 +187,11 @@ internal static class Episodes {
             (_, _, ret) => ret > -300 ? "UPRIGHT!" : null, "Energy pumping swings it up, then a PD controller catches it at the top."),
         new EpisodeRecipe("Acrobot-v1", "classic_control", 1, 15, () => new DelegatePolicy(AcrobotPump),
             (term, _, _) => term ? "REACHED!" : null, "Torque on the elbow, timed with the swing, lifts the tip over the line."),
-        new EpisodeRecipe("InvertedPendulum-v5", "mujoco", 0, 25, () => new DelegatePolicy(InvertedPendulumBalance),
-            (term, trunc, _) => trunc ? "BALANCED!" : term ? "FELL" : null, "MuJoCo's cart-pole: linear state feedback holds the pole up and the cart centred."),
+        new EpisodeRecipe("InvertedPendulum-v5", "mujoco", 0, 25, Expert("InvertedPendulum-v5"),
+            (term, trunc, _) => trunc ? "BALANCED!" : term ? "FELL" : null, "MuJoCo's cart-pole, held up for all 1,000 steps by Farama's SAC expert."),
         // Gymnasium sets no camera for this env, and MuJoCo's free camera shows it a few pixels tall in a quarter panel.
-        new EpisodeRecipe("InvertedDoublePendulum-v5", "mujoco", 0, 20, Trained("InvertedDoublePendulum-v5"),
-            (term, trunc, _) => trunc ? "BALANCED!" : term ? "FELL" : null, "Two poles stacked on a cart, both held upright by a linear policy.",
+        new EpisodeRecipe("InvertedDoublePendulum-v5", "mujoco", 0, 20, Expert("InvertedDoublePendulum-v5"),
+            (term, trunc, _) => trunc ? "BALANCED!" : term ? "FELL" : null, "Two poles stacked on a cart, both held upright by Farama's SAC expert.",
             Kwargs: new Dictionary<string, object?> {
                 ["default_camera_config"] = new Dictionary<string, object?> {
                     ["trackbodyid"] = 0L, ["distance"] = 2.6, ["lookat"] = new[] { 0.0, 0.0, 0.55 }, ["elevation"] = -5.0,
@@ -172,29 +199,37 @@ internal static class Episodes {
             }),
         // One Reacher episode is 50 steps (a second at its own 50 fps): four targets in a row at half speed make a clip.
         // The still: the arena (the purple frame) spans x 48-408 and y 150-370 of the 480x480 frame, the arm's base at its middle;
-        // the crop frames it whole and shrinks it 3x, so the 120x80 still shows the arena, the arm and the target. The first
-        // target is reached at about 1.9 s (the arm folds onto it and hides it) and the second appears at about 2.1 s; at 2.2 s
-        // the arm is stretched out and the target is a red dot of its own.
-        new EpisodeRecipe("Reacher-v5", "mujoco", 0, 25, () => new DelegatePolicy(ReacherReach),
-            (_, _, ret) => ret > -6 ? "REACHED!" : null, "Inverse kinematics finds the joint angles that put the fingertip on each new target.",
+        // the crop frames it whole and shrinks it 3x, so the 120x80 still shows the arena, the arm and the target. The expert
+        // folds the arm onto each target, hiding it, within about a second; the second target appears at about 2.1 s with the
+        // arm stretched away from it, and at 2.73 s (cartridge frame 41) the arm is swinging round with its fingertip just
+        // short of the target, the two still apart.
+        new EpisodeRecipe("Reacher-v5", "mujoco", 0, 25, Expert("Reacher-v5"),
+            (_, _, ret) => ret > -6 ? "REACHED!" : null, "Farama's SAC expert puts the fingertip on each new target.",
             Hands: 4, HandLabel: "TARGET",
-            Poster: new PosterShot(Seconds: 2.2, Left: 48, Top: 140, Width: 360, Height: 240, PixelWidth: 120, PixelHeight: 80)),
-        // Seed 73: the best of seeds 0-199 for the scripted push (the puck ends 0.145 from the goal; return -39.0).
-        // The still: the table and the arm fill the frame's upper left (x 50-320, y 112-290 of 480x480) and the rest is black, so
-        // the default still is a speck. The crop keeps the arm's end of the table, the puck and the pole's foot and shrinks it 2x;
-        // at 0.5 s the arm is stretched out with its gripper open beside the red puck.
-        new EpisodeRecipe("Pusher-v5", "mujoco", 73, 20, () => new PusherScript(),
-            (_, _, ret) => ret > -35 ? "PUSHED!" : null, "A seven-joint arm, steered by its fingertip's Jacobian, sweeps to the puck and nudges it goalward.",
-            Poster: new PosterShot(Seconds: 0.5, Left: 110, Top: 150, Width: 240, Height: 160, PixelWidth: 120, PixelHeight: 80)),
+            Poster: new PosterShot(Seconds: 2.73, Left: 48, Top: 140, Width: 360, Height: 240, PixelWidth: 120, PixelHeight: 80)),
+        // Seed 7: the expert pushes the puck into the goal (return -20.4; the ten seeds 0-9 average -28.0). Gymnasium's own
+        // camera stands 4 m off, which leaves the arm a small figure in a half panel; 2.4 m at a 135 degree azimuth shows
+        // the whole arm reaching across the table to the puck and the goal.
+        // The still: from there the table's diamond fills the frame's upper middle and the frame's lower third is black; the
+        // arm stands at the table's left corner (about x 140-350, y 128-270 of 480x480), so the default still, the whole frame
+        // shrunk 5x, leaves it small. The crop keeps the arm whole with the red goal and the white puck and shrinks it 2x; at
+        // 0.5 s the gripper has reached the puck at the goal's edge.
+        new EpisodeRecipe("Pusher-v5", "mujoco", 7, 20, Expert("Pusher-v5"),
+            (_, _, ret) => ret > -30 ? "PUSHED!" : null, "A seven-joint arm, Farama's SAC expert, sweeps to the puck and pushes it into the goal.",
+            Kwargs: new Dictionary<string, object?> {
+                ["default_camera_config"] = new Dictionary<string, object?> { ["trackbodyid"] = -1L, ["distance"] = 2.4, ["azimuth"] = 135.0 },
+            },
+            Poster: new PosterShot(Seconds: 0.5, Left: 122, Top: 112, Width: 240, Height: 160, PixelWidth: 120, PixelHeight: 80)),
         new EpisodeRecipe("LunarLander-v3", "box2d", 7, 50, () => new DelegatePolicy((env, o) => LunarLanderEnv.Heuristic(env, (NDArray)o!)),
             (term, _, ret) => term && ret > 100 ? "LANDED!" : term ? "CRASH" : null, "Gymnasium's own heuristic lands between the flags.",
             RenderEveryStep: true),
         new EpisodeRecipe("BipedalWalker-v3", "box2d", 0, 50, () => new BipedalPolicy(),
             (term, _, ret) => term && ret > 0 ? "FINISH!" : term ? "GAME OVER" : null, "Gymnasium's gait state machine walks the whole course.",
             RenderEveryStep: true),
-        new EpisodeRecipe("BipedalWalkerHardcore-v3", "box2d", 10, 50, () => new BipedalPolicy(),
-            (term, _, _) => term ? "GAME OVER" : null, "The same gait meets stumps, pits and stairs. It does not go well.",
-            RenderEveryStep: true),
+        // Seed 7: RL Zoo's TQC agent clears the whole course (return 308 in 968 steps; it finishes six seeds of 0-9).
+        new EpisodeRecipe("BipedalWalkerHardcore-v3", "box2d", 7, 50, Expert("BipedalWalkerHardcore-v3"),
+            (term, _, ret) => term && ret > 0 ? "FINISH!" : term ? "GAME OVER" : null,
+            "Stumps, pits and stairs, cleared by RL Zoo's TQC agent.", RenderEveryStep: true),
         // CarRacing terminates when the lap closes; seed 11 visits 98% of the tiles but meets the 1,000-step limit first,
         // so it truncates and earns no stamp (the score in its own frame tells the story).
         new EpisodeRecipe("CarRacing-v3", "box2d", 11, 50, () => new DelegatePolicy(CarRacingPursuit),
@@ -202,27 +237,29 @@ internal static class Episodes {
         // The locomotion envs render through their model's own "track" camera (mode trackcom), named explicitly: with no
         // camera named, Gymnasium 1.4 forces MuJoCo's free camera, which never follows a body, so a runner leaves the
         // frame within a second (Gym.NET draws it the same way).
-        new EpisodeRecipe("HalfCheetah-v5", "mujoco", 0, 20, Trained("HalfCheetah-v5"),
-            (_, _, _) => null, "The autopilot trained in C# on this engine; in Gymnasium it scores the same, to the last bit.", Kwargs: TrackCamera),
-        new EpisodeRecipe("Hopper-v5", "mujoco", 0, 125, Trained("Hopper-v5"),
-            (term, _, _) => term ? "FELL" : null, "One leg, hopping forward without falling over.", Kwargs: TrackCamera),
-        new EpisodeRecipe("Walker2d-v5", "mujoco", 0, 125, Trained("Walker2d-v5"),
-            (term, _, _) => term ? "FELL" : null, "Two legs, walking forward.", Kwargs: TrackCamera),
-        new EpisodeRecipe("Ant-v5", "mujoco", 0, 20, Trained("Ant-v5"),
-            (term, _, _) => term ? "FLIPPED" : null, "Four legs, eight motors, walking forward.", Kwargs: TrackCamera),
-        // A linear policy keeps Humanoid up for about 120 steps on average; seed 73 is the longest of seeds 0-199 (203
-        // steps), and three-quarter speed stretches that past the 3.9 s the panel is on screen.
-        // The still: the track camera keeps the figure (x 190-370, y 213-427 of 480x480) near the middle of a frame that is mostly
-        // sky and floor. The crop gives it equal margins above and below and shrinks it 2x; at 0.9 s it stands with its arms out,
-        // well before the fall the recipe ends on.
-        new EpisodeRecipe("Humanoid-v5", "mujoco", 73, 50, Trained("Humanoid-v5"),
-            (term, _, _) => term ? "FELL" : null, "Seventeen motors keep a humanoid on its feet for a while (shown at three-quarter speed).",
-            Kwargs: TrackCamera,
-            Poster: new PosterShot(Seconds: 0.9, Left: 144, Top: 200, Width: 240, Height: 240, PixelWidth: 120, PixelHeight: 120)),
-        new EpisodeRecipe("HumanoidStandup-v5", "mujoco", 0, 67, Trained("HumanoidStandup-v5"),
-            (_, _, _) => null, "Lying on the floor, working its way up.", Kwargs: TrackCamera),
-        new EpisodeRecipe("Swimmer-v5", "mujoco", 0, 50, Trained("Swimmer-v5"),
-            (_, _, _) => null, "Three links in a viscous fluid swim forward with a travelling wave (shown at twice its speed).", Kwargs: TrackCamera),
+        new EpisodeRecipe("HalfCheetah-v5", "mujoco", 0, 20, Expert("HalfCheetah-v5"),
+            (_, _, _) => null, "Farama's TQC expert at full gallop: 17,629 in a thousand steps.", Kwargs: TrackCamera, LoopTicks: 90),
+        new EpisodeRecipe("Hopper-v5", "mujoco", 0, 125, Expert("Hopper-v5"),
+            (term, _, _) => term ? "FELL" : null, "One leg, hopping forward for all 1,000 steps (Farama's SAC expert).", Kwargs: TrackCamera),
+        new EpisodeRecipe("Walker2d-v5", "mujoco", 0, 125, Expert("Walker2d-v5"),
+            (term, _, _) => term ? "FELL" : null, "Two legs, running forward (Farama's SAC expert).", Kwargs: TrackCamera),
+        new EpisodeRecipe("Ant-v5", "mujoco", 0, 20, Expert("Ant-v5"),
+            (term, _, _) => term ? "FLIPPED" : null, "Four legs, eight motors, running forward (Farama's SAC expert).", Kwargs: TrackCamera),
+        // Three-quarter speed: its floor ends near step 350, and the scene's 5.2 s then show 260 steps.
+        // The still: the track camera keeps the figure near the middle of a frame that is mostly sky and floor, and the expert
+        // walks upright with one arm raised, which makes the figure about 275 px tall (x 194-317, y 158-433 of 480x480 over
+        // the first 4 s). The crop holds all of it with a margin and shrinks it 3x; at 3.0 s it is mid-stride, its torso
+        // upright and one leg swung back.
+        new EpisodeRecipe("Humanoid-v5", "mujoco", 0, 50, Expert("Humanoid-v5"),
+            (term, _, _) => term ? "FELL" : null, "Seventeen motors, a humanoid walking for all 1,000 steps (Farama's TQC expert, at three-quarter speed).",
+            Kwargs: TrackCamera, LoopTicks: 300,
+            Poster: new PosterShot(Seconds: 3.0, Left: 76, Top: 115, Width: 360, Height: 360, PixelWidth: 120, PixelHeight: 120)),
+        // Farama's expert was trained seeing positions and velocities only; its observation flags come with it.
+        new EpisodeRecipe("HumanoidStandup-v5", "mujoco", 0, 67, Expert("HumanoidStandup-v5"),
+            (_, _, _) => null, "Lying on the floor, getting up and standing (Farama's SAC expert).", Kwargs: StandupKwargs),
+        new EpisodeRecipe("Swimmer-v5", "mujoco", 0, 50, Expert("Swimmer-v5"),
+            (_, _, _) => null, "Three links in a viscous fluid swim forward with a travelling wave (Farama's PPO expert, at twice its speed).",
+            Kwargs: TrackCamera),
         new EpisodeRecipe("Blackjack-v1", "toy_text", 40, 1.6, () => new DelegatePolicy(BlackjackBasic),
             (_, _, ret) => ret > 0 ? "WIN!" : ret < 0 ? "BUST" : "PUSH", "Basic strategy against the dealer, hand after hand.", Hands: 5, ScoresHands: true),
         new EpisodeRecipe("FrozenLake-v1", "toy_text", 1, 8, () => new ToyTextPlan(),
@@ -243,8 +280,23 @@ internal static class Episodes {
         All.FirstOrDefault(r => r.Id == id) ?? throw new KeyNotFoundException($"no showreel recipe for '{id}'");
 
     /// <summary>
-    ///     A factory of agents playing the committed policy of an id (<c>policies/&lt;id&gt;.json</c> next to the program),
-    ///     the file read once, on first use, and shared by every player.
+    ///     A factory of agents playing the published expert of an id (<c>agents/&lt;id&gt;.json</c> next to the program,
+    ///     DR-109), the file read once, on first use, and shared by every player.
+    /// </summary>
+    /// <param name="id">The registered id.</param>
+    /// <returns>The factory.</returns>
+    /// <remarks>
+    ///     The file is read lazily, so a missing agent fails when its env is first played, naming the file. The agent is
+    ///     immutable and thread-safe, so the players share one.
+    /// </remarks>
+    private static Func<IPolicy> Expert(string id) {
+        var agent = new Lazy<ExpertPolicy>(() => ExpertPolicy.Load(Path.Combine(AppContext.BaseDirectory, "agents", id + ".json")));
+        return () => new ExpertAgent(agent.Value);
+    }
+
+    /// <summary>
+    ///     A factory of agents playing the committed ARS policy of an id (<c>policies/&lt;id&gt;.json</c> next to the
+    ///     program), the file read once, on first use, and shared by every player. No recipe plays one since DR-109.
     /// </summary>
     /// <param name="id">The registered id.</param>
     /// <returns>The factory.</returns>

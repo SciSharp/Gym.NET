@@ -1119,7 +1119,8 @@ The designs approved for the resumption before round 21, superseded where noted:
     `TestNumEnvsScreenSize_Ant`, passing since the MuJoCo frames, gates.*
   - *Before P10.5 (the release-readiness review of 2026-11-12): Gymnasium's `tests/envs` modules not mirrored yet
     (`test_make_vec.py`, `test_taxi.py`, `test_envs.py`, `test_action_dim_check.py`, `test_rendering.py`,
-    `test_frozen_lake.py`: the definition of done's item 2); CI never run (the branch is not pushed) and, as written,
+    `test_frozen_lake.py`: the definition of done's item 2; `test_rendering.py` mirrored on 2026-11-21 as
+    `TestRendering`, every one of the 38 ids in every mode it lists); CI never run (the branch is not pushed) and, as written,
     beyond its 60-minute limit and rendering MuJoCo frames on a GPU-less runner before it checks the GPU; the
     maintainer's decisions on DR-70's readings, review findings R12 and R13 (breaking after 1.0) and `DictInfoToList`'s
     result shape; at P10.5, pack with `-p:ContinuousIntegrationBuild=true` so no local paths ship.*

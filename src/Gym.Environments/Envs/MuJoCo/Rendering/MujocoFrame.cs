@@ -13,7 +13,8 @@ namespace Gym.Environments.Envs.MuJoCo.Rendering {
     /// <remarks>
     ///     <para>
     ///     Drawn by <see cref="GlContext"/> in software, so a frame never needs a GPU, and repeats bit for bit (DR-71's
-    ///     goldens); what remains different from the GPU frames Gymnasium draws is measured, not required equal (DR-67).
+    ///     goldens); the GPU frames Gymnasium draws are its target, byte for byte, family by family (DR-98), and what still
+    ///     differs is measured against a baseline until it is closed (DR-71).
     ///     </para>
     ///     <para>
     ///     Reference: <see href="https://github.com/google-deepmind/mujoco/blob/4.0.0/src/render/classic/render_gl3.c">render_gl3.c</see>,
@@ -43,6 +44,36 @@ namespace Gym.Environments.Envs.MuJoCo.Rendering {
 
         /// <summary>The shadow map, allocated on the first frame with a shadow light.</summary>
         private GlTarget? _shadow;
+
+        /// <summary>
+        ///     A diagnostic for the frame-parity work (DR-98): when set, the next frames record which triangle wrote each
+        ///     sample (<see cref="DebugTriangleIds"/>). Off in every product frame.
+        /// </summary>
+        internal bool DebugRecordTriangles { get; set; }
+
+        /// <summary>
+        ///     The last frame's per-sample triangle ids (<c>(row from the bottom × width + column) × samples + sample</c>, 0
+        ///     where no triangle wrote), or <see langword="null"/> when <see cref="DebugRecordTriangles"/> was off.
+        /// </summary>
+        internal int[]? DebugTriangleIds => _gl.DebugTriangleIds;
+
+        /// <summary>
+        ///     The last frame's triangles as drawn, before rejection: three vertices' clip coordinates each, in drawing
+        ///     order, or <see langword="null"/> when <see cref="DebugRecordTriangles"/> was off.
+        /// </summary>
+        internal List<float>? DebugClipTriangles => _gl.DebugClipTriangles;
+
+        /// <summary>
+        ///     The last frame's per-vertex attributes as the vertex stage produced them, in <see cref="DebugClipTriangles"/>'
+        ///     order and layout (<see cref="GlContext.DebugAttributeFloats"/> floats per vertex: the lit colour, unit 0's and
+        ///     unit 1's texture coordinates, the fog distance), or <see langword="null"/> when <see cref="DebugRecordTriangles"/>
+        ///     was off; compared with the fixed-function outputs NVIDIA's transform feedback captures around MuJoCo's own
+        ///     <c>mjr_render</c>.
+        /// </summary>
+        internal List<float>? DebugVertexAttributes => _gl.DebugVertexAttributes;
+
+        /// <summary>The offscreen buffer's samples per pixel (4, or 1 for the human window's), 0 before the first frame.</summary>
+        internal int DebugSamples => _off?.Samples ?? 0;
 
         /// <summary>Creates the context's resources for a model (<c>mjr_makeContext</c>).</summary>
         /// <param name="m">The model.</param>
@@ -79,6 +110,11 @@ namespace Gym.Environments.Envs.MuJoCo.Rendering {
             int samples = window ? 1 : _m.vis_offsamples > 1 ? 4 : 1;
             if (_off == null || _off.Width != width || _off.Height != height || _off.Samples != samples || _off.Depth24 != window)
                 _off = new GlTarget(width, height, samples, color: true, stencil: true, depth24: window);
+            // the frame-parity diagnostic (DR-98): a fresh record of which triangle wrote each sample, or none
+            _gl.DebugTriangleIds = DebugRecordTriangles ? new int[width * height * samples] : null;
+            _gl.DebugTarget = DebugRecordTriangles ? _off : null;
+            _gl.DebugClipTriangles = DebugRecordTriangles ? new List<float>() : null;
+            _gl.DebugVertexAttributes = DebugRecordTriangles ? new List<float>() : null;
             GlCamera cam = AverageCamera(scn.Camera[0], scn.Camera[1]);
             if (cam.FrustumNear < 1e-15) {
                 if (scn.Geoms.Count > 0)
@@ -215,10 +251,9 @@ namespace Gym.Environments.Envs.MuJoCo.Rendering {
                             int sum = 0;
                             for (int s = 0; s < ns; s++)
                                 sum += off.Color![4 * (pixel * ns + s) + ch];
-                            // the average of the samples' levels as the GPU's resolve blit rounds it: a quarter up
-                            // from three, a half down (measured on exact per-sample values: 99.3% of 6,350 pixels whose
-                            // samples differ, every pixel whose samples agree; (sum + 2) / 4 got 31% of the former)
-                            rgb[3 * o + ch] = (byte)(ns == 1 ? sum : (sum + ns / 2 - 1) / ns);
+                            // the average of the samples' levels as the GPU's resolve blit rounds it (ResolveFour);
+                            // a single-sampled buffer (the human window's) is read as it is
+                            rgb[3 * o + ch] = ns == 1 ? (byte)sum : ResolveFour[sum];
                         }
                     }
 
@@ -226,6 +261,41 @@ namespace Gym.Environments.Envs.MuJoCo.Rendering {
                         depth[o] = 1.0f - off.Depth[pixel * ns];
                 }
             }
+        }
+
+        /// <summary>
+        ///     The reference GPU's 4x resolve blit, by the sum of a channel's four sample levels (0 to 1020): the level
+        ///     <c>mjr_readPixels</c> reads back for that pixel.
+        /// </summary>
+        /// <remarks>
+        ///     <para>
+        ///     The average of the four levels, a quarter rounded down, three quarters up, and an exact half down, except
+        ///     where the half lies just below a multiple of 16 under 128 (averages 15.5, 31.5, ..., 111.5), which round up.
+        ///     Measured on 2026-11-21 (<c>tools/parity/mujoco/gpu_probe.py</c>'s <c>resolve</c> probe): every one of the 1,021
+        ///     possible sums, each over many sample orders, resolves to one level only, and this table reproduces all of them
+        ///     on the RTX 4060 Ti (driver 616.56). The earlier <c>(sum + 1) / 4</c> missed exactly the seven rounded-up
+        ///     halves, which left InvertedPendulum's interior edges one level dark (DR-98).
+        ///     </para>
+        ///     <para>
+        ///     Footgun: it is the reference GPU's rule, not OpenGL's; another GPU resolves halves its own way, which is why
+        ///     the frame cells are pinned to the reference GPU (DR-71).
+        ///     </para>
+        /// </remarks>
+        internal static readonly byte[] ResolveFour = BuildResolveFour();
+
+        /// <summary>Builds <see cref="ResolveFour"/>.</summary>
+        /// <returns>The 1,021 resolved levels.</returns>
+        private static byte[] BuildResolveFour() {
+            var table = new byte[4 * 255 + 1];
+            for (int sum = 0; sum < table.Length; sum++) {
+                int level = (sum + 1) >> 2;
+                // the exact halves just below 16, 32, ..., 112 round up on the reference GPU
+                if ((sum & 3) == 2 && (sum >> 2) < 127 && ((sum >> 2) & 15) == 15)
+                    level++;
+                table[sum] = (byte)level;
+            }
+
+            return table;
         }
 
         /// <summary>The OpenGL state <c>mjr_render</c> starts from (<c>initGL3</c>, <c>initLights</c>).</summary>
@@ -290,7 +360,8 @@ namespace Gym.Environments.Envs.MuJoCo.Rendering {
             float[] proj = cam.Orthographic
                 ? GlMath.Ortho(cam.FrustumCenter - halfwidth, cam.FrustumCenter + halfwidth, cam.FrustumBottom, cam.FrustumTop, cam.FrustumNear, cam.FrustumFar)
                 : GlMath.Frustum(cam.FrustumCenter - halfwidth, cam.FrustumCenter + halfwidth, cam.FrustumBottom, cam.FrustumTop, cam.FrustumNear, cam.FrustumFar);
-            camProject = GlMath.Multiply(GlMath.ReverseZ(), proj);
+            // glFrustum (or glOrtho) multiplied into the reverse-Z prefix on the driver's stack
+            camProject = GlMath.MultiplyDriver(GlMath.ReverseZ(), proj);
             camView = GlMath.LookAt(cam.Pos, cam.Forward, cam.Up);
             _gl.Projection = camProject;
             _gl.Modelview = camView;
@@ -505,7 +576,7 @@ namespace Gym.Environments.Envs.MuJoCo.Rendering {
                 float[] proj = l.Type == 1
                     ? GlMath.Ortho(-shadowClip, shadowClip, -shadowClip, shadowClip, cam.FrustumNear, cam.FrustumFar)
                     : Perspective(Math.Min(2 * l.Cutoff * _m.vis_shadowscale, 160), 1, cam.FrustumNear, cam.FrustumFar);
-                float[] lightProject = GlMath.Multiply(GlMath.ReverseZ(), proj);
+                float[] lightProject = GlMath.MultiplyDriver(GlMath.ReverseZ(), proj);
                 float[] lightView = GlMath.LookAt(l.Pos, l.Dir, up);
 
                 // the depth map from the light
@@ -535,6 +606,7 @@ namespace Gym.Environments.Envs.MuJoCo.Rendering {
 
                 // the camera-to-light mapping, through the bias that maps the light's clip space to the map
                 float[] bias = [0.5f, 0, 0, 0, 0, 0.5f, 0, 0, 0, 0, 1, 0, 0.5f, 0.5f, 0, 1];
+                // MuJoCo multiplies these itself (mjr_mulMat44, sequential sums), not on the driver's stack
                 float[] texture = GlMath.Multiply(bias, GlMath.Multiply(lightProject, lightView));
                 float[] rows = new float[16];
                 for (int r = 0; r < 4; r++) {
@@ -773,8 +845,9 @@ namespace Gym.Environments.Envs.MuJoCo.Rendering {
 
                 float[] tm = GlMath.Identity();
                 if (g.Type == 0 && (g.Size[0] <= 0 || g.Size[1] <= 0))
-                    tm = GlMath.Multiply(tm, GlMath.Translate(-0.5f, -0.5f, 0.0f));
-                _gl.TextureMatrix = GlMath.Multiply(tm, GlMath.Scale(scl0, scl1, 1.0f));
+                    tm = GlMath.MultiplyDriver(tm, GlMath.Translate(-0.5f, -0.5f, 0.0f));
+                // glTranslatef and glScalef on the driver's texture matrix stack
+                _gl.TextureMatrix = GlMath.MultiplyDriver(tm, GlMath.Scale(scl0, scl1, 1.0f));
                 _gl.TexGen = false;
                 return;
             }

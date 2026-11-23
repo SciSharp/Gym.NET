@@ -19,11 +19,11 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/SciSharp/Gym.NET/blob/master/docs/media/gym-net-showreel.mp4"><img src="https://raw.githubusercontent.com/SciSharp/Gym.NET/master/docs/media/gym-net-hero.webp" alt="Gym.NET's 24 visually distinct environments playing in neon panels over a synthwave grid: classic control, MuJoCo, Box2D and toy text, each played by a scripted or trained policy, then Gymnasium and Gym.NET side by side with zero pixels different"></a>
+  <a href="https://github.com/SciSharp/Gym.NET/blob/master/docs/media/gym-net-showreel.mp4"><img src="https://raw.githubusercontent.com/SciSharp/Gym.NET/master/docs/media/gym-net-hero.webp" alt="22 of Gym.NET's visually distinct environments playing in neon panels over a 16-bit dusk beach: classic control, MuJoCo, Box2D and toy text, each played by a scripted policy or a published expert agent, then Gymnasium and Gym.NET side by side with zero pixels different"></a>
 </p>
 
 <p align="center">
-  <sub>24 environments playing, <a href="https://scisharp.github.io/Gym.NET/#select-your-environment">see all environments</a></sub>
+  <sub>22 environments playing, <a href="https://scisharp.github.io/Gym.NET/#select-your-environment">see all environments</a></sub>
 </p>
 
 ## What is Gym.NET?
@@ -201,9 +201,9 @@ steps). The render mode is chosen when the env is built: `Gymnasium.Make("CartPo
 
 [examples/CartPole](https://github.com/SciSharp/Gym.NET/tree/master/examples/CartPole) trains a policy that balances
 the pole, playing 100 carts at once through `Gymnasium.MakeVec`. [examples/](https://github.com/SciSharp/Gym.NET/tree/master/examples)
-has one project for each of the 24 environments in the showreel above. Each plays its env with the same agent, a
-hand-written controller, Gymnasium's heuristic, value iteration or a trained linear policy, headless, in a window
-(`--render`) or from your keyboard (`--play`).
+has one project for each of the 24 environments above. Each plays its env with the showreel's agent, a hand-written
+controller, Gymnasium's heuristic, value iteration or, for the MuJoCo envs and BipedalWalkerHardcore, a published expert
+agent, headless, in a window (`--render`) or from your keyboard (`--play`).
 
 ## Performance
 

@@ -149,8 +149,18 @@ any other viewer). Nothing blocks on a task, and ImageSharp is not part of the c
 convert frames themselves (`src/Shared/ViewerFrames.cs`, compiled into both). 0.2's `CloseEnvironment()` is `[Obsolete]`
 until 2.0.
 
+Both windows show one screen pixel per frame pixel at any display scaling (DR-99): the WinForms viewer's thread is
+per-monitor DPI aware and its client area is the frame's size in physical pixels, the Avalonia viewer sizes its window
+and image in device-independent pixels divided by the monitor's scale with interpolation off, and both refit when the
+window moves to a monitor of another scale; their mouse and resize reports are in the same physical pixels. A pygame
+window, which declares no DPI awareness, is stretched by Windows on a scaled display instead.
+`ViewerScreenPixelTests` (a desktop's cells) captures each window from the screen for every registered id and requires
+the frame's bytes, verified at 100%, 125%, 150% and 175%.
+
 The MuJoCo envs draw their frames with a renderer of their own (`Envs/MuJoCo/Rendering`, DR-62, DR-69): MuJoCo's classic
-renderer in software, with the reference GPU's measured rounding, measured against Gymnasium's frames (DR-71). Their
+renderer in software, with the reference GPU's measured arithmetic (its resolve, its driver's matrix stack, its vertex
+transform and reciprocal, its truncated depths), brought to equality with Gymnasium's frames family by family (DR-98)
+and gated on a measured baseline until a family is equal (DR-71). Their
 `human` window is Gymnasium's MuJoCo viewer (DR-70): the mouse orbits, pans and zooms the camera, keys pause, step,
 switch cameras, contact forces, frames, transparency and geom groups, save a frame or hide the menu MuJoCo's overlay
 draws. It reads the viewer's input through `IInteractiveEnvViewer` (the Avalonia and WinForms viewers; another viewer

@@ -2,7 +2,6 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using Avalonia;
@@ -13,9 +12,6 @@ using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using Gym.Environments;
 using NumSharp;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.PixelFormats;
-using Image = SixLabors.ImageSharp.Image;
 using AVImage = Avalonia.Controls.Image;
 using Size = Avalonia.Size;
 using Point = Avalonia.Point;
@@ -36,8 +32,14 @@ namespace Gym.Rendering.Avalonia {
     ///     character and this viewer the virtual key (<c>K_1</c>), and the keypad's Enter is the main Enter (Avalonia's key
     ///     does not tell them apart). A held key reports one press, not the system's auto-repeat, as pygame's default (no
     ///     <c>key.set_repeat</c>). Keys without an SDL keycode in <see cref="KeyCode"/> are not reported. Resizes are
-    ///     reported in device-independent pixels, the unit the window was opened in, and so is the mouse (DR-70: its
-    ///     buttons, moves and wheel, for a MuJoCo env's camera controls).
+    ///     reported in physical pixels, the frame's unit, and so is the mouse (DR-70: its buttons, moves and wheel, for a
+    ///     MuJoCo env's camera controls; DR-99: the unit the window is opened in).
+    ///     </para>
+    ///     <para>
+    ///     One screen pixel per frame pixel at any display scaling (DR-99): the client area is the frame's size in physical
+    ///     pixels (its size in device-independent pixels divided by the monitor's scale, refitted when the window moves to
+    ///     a monitor of another scale), and the frame is drawn unscaled from the top-left corner without interpolation, so
+    ///     the screen holds the frame's own bytes. On a scaled display the window looks smaller than a scaled app's.
     ///     </para>
     ///     <para>
     ///     Before <see cref="BeginInput"/> nothing changes: the close button closes the window, as it always has for the
@@ -68,21 +70,53 @@ namespace Gym.Rendering.Avalonia {
         private volatile bool _inputEnabled;
 
         /// <summary>
+        ///     The client size the window keeps, in physical pixels: the frame size it was opened for, then the size of each
+        ///     frame shown, so a move to a monitor of another scale refits it (<see cref="FitClientToFrame"/>). UI thread only.
+        /// </summary>
+        private int _frameWidth, _frameHeight;
+
+        /// <summary>The last frame shown as BGRA, kept to redraw it at a new scale; <see langword="null"/> before the first frame. UI thread only.</summary>
+        private byte[] _shownBgra;
+
+        /// <summary>The image control the frames are shown in, created with the first frame. UI thread only.</summary>
+        private AVImage _image;
+
+        /// <summary>
         ///     A window with the XAML's defaults (the designer's size, the title <c>Gym.Rendering.Avalonia</c>); create it on
         ///     Avalonia's UI thread. Envs get theirs through <see cref="Factory"/> instead.
         /// </summary>
         public AvaloniaEnvViewer() {
             InitializeComponent();
+            // a move to a monitor of another scale refits the client area and redraws the frame for it (DR-99)
+            ScalingChanged += (_, _) => {
+                FitClientToFrame();
+                if (_shownBgra != null)
+                    ShowFrame(_shownBgra, _frameWidth, _frameHeight);
+            };
         }
 
         /// <summary>A window of a frame's size; create it on Avalonia's UI thread, as <see cref="Factory"/> does.</summary>
-        /// <param name="width">The width in device-independent pixels, the frame's width.</param>
-        /// <param name="height">The height in device-independent pixels, the frame's height.</param>
+        /// <param name="width">The width in physical pixels, the frame's width (DR-99).</param>
+        /// <param name="height">The height in physical pixels, the frame's height.</param>
         /// <param name="title">The title, or <see langword="null"/> for none.</param>
         public AvaloniaEnvViewer(int width, int height, string title) : this() {
-            Width = width;
-            Height = height;
+            _frameWidth = width;
+            _frameHeight = height;
+            FitClientToFrame();
             Title = title;
+        }
+
+        /// <summary>
+        ///     Sizes the client area to the frame's size in physical pixels: its size in device-independent pixels is the
+        ///     frame's divided by the window's current scale (DR-99). A window without a frame size (the designer's) keeps
+        ///     its own size.
+        /// </summary>
+        private void FitClientToFrame() {
+            if (_frameWidth <= 0 || _frameHeight <= 0)
+                return;
+            double scaling = RenderScaling;
+            Width = _frameWidth / scaling;
+            Height = _frameHeight / scaling;
         }
 
         /// <summary>Loads the XAML that declares the window.</summary>
@@ -112,25 +146,22 @@ namespace Gym.Rendering.Avalonia {
         public static EnvViewerFactory Factory => StaticAvaloniaApp.Open;
 
         /// <summary>
-        ///     Shows a frame, replacing the previous one; the frame stays the caller's (it is copied through a BMP stream
-        ///     first). From another thread it waits up to 4 seconds for the UI thread to take the frame.
+        ///     Shows a frame, replacing the previous one; the frame stays the caller's (its pixels are copied first). From
+        ///     another thread it waits up to 4 seconds for the UI thread to take the frame.
         /// </summary>
         /// <param name="frame">The frame, <c>(H, W, 3)</c>; another dtype is cast to uint8.</param>
         /// <exception cref="ArgumentNullException">Thrown when <paramref name="frame"/> is <see langword="null"/>.</exception>
         /// <exception cref="ArgumentException">Thrown for a frame that is not <c>(H, W, 3)</c>.</exception>
         /// <exception cref="TimeoutException">Thrown when the UI thread did not take the frame within 4 seconds (<c>Rendering timed out.</c>).</exception>
         public void Render(NDArray frame) {
-            Bitmap bitmap = ToBitmap(frame);
+            // copied on the caller's thread, so the caller may reuse the frame however the UI thread is scheduled
+            byte[] bgra = ViewerFrames.ToBgra(frame, out int width, out int height);
             if (Dispatcher.UIThread.CheckAccess()) {
-                Content = new AVImage {
-                    Source = bitmap
-                };
+                ShowFrame(bgra, width, height);
             } else {
                 RenderResetEvent.Reset();
                 Dispatcher.UIThread.InvokeAsync(() => {
-                    Content = new AVImage {
-                        Source = bitmap
-                    };
+                    ShowFrame(bgra, width, height);
                     RenderResetEvent.Set();
                 }, DispatcherPriority.MaxValue);
                 // The synchronous path (DR-85) waits on an event, not a task: the UI thread never waits on this one, so the
@@ -141,8 +172,8 @@ namespace Gym.Rendering.Avalonia {
         }
 
         /// <summary>
-        ///     Shows a frame without blocking (DR-85): the bitmap is made on the caller's thread, then handed to the UI thread,
-        ///     and the task completes once the UI has taken it. On the UI thread itself it completes at once.
+        ///     Shows a frame without blocking (DR-85): the frame's pixels are copied on the caller's thread, then handed to the
+        ///     UI thread, and the task completes once the UI has taken them. On the UI thread itself it completes at once.
         /// </summary>
         /// <param name="frame">The frame, <c>(H, W, 3)</c>; it stays the caller's, copied before this returns its task.</param>
         /// <param name="cancellationToken">Cancels the wait for the UI thread; the frame may still be shown.</param>
@@ -152,34 +183,71 @@ namespace Gym.Rendering.Avalonia {
         /// <exception cref="OperationCanceledException">Thrown, or through the task, when <paramref name="cancellationToken"/> is cancelled first.</exception>
         public ValueTask RenderAsync(NDArray frame, CancellationToken cancellationToken = default) {
             cancellationToken.ThrowIfCancellationRequested();
-            Bitmap bitmap = ToBitmap(frame);
+            byte[] bgra = ViewerFrames.ToBgra(frame, out int width, out int height);
             if (Dispatcher.UIThread.CheckAccess()) {
-                Content = new AVImage {
-                    Source = bitmap
-                };
+                ShowFrame(bgra, width, height);
                 return default;
             }
 
-            Task shown = Dispatcher.UIThread.InvokeAsync(() => {
-                Content = new AVImage {
-                    Source = bitmap
-                };
-            }, DispatcherPriority.MaxValue).GetTask();
+            Task shown = Dispatcher.UIThread.InvokeAsync(() => ShowFrame(bgra, width, height), DispatcherPriority.MaxValue).GetTask();
             return new ValueTask(shown.WaitAsync(cancellationToken));
         }
 
-        /// <summary>A frame as an Avalonia bitmap, through ImageSharp's BMP encoder (the viewers' own conversion, shared by both packages).</summary>
-        /// <param name="frame">The frame, <c>(H, W, 3)</c>.</param>
+        /// <summary>
+        ///     Shows a frame's pixels one screen pixel each (DR-99): the image control is given the frame's size in physical
+        ///     pixels divided by the window's scale, in device-independent pixels, and the bitmap is stretched into exactly
+        ///     that box, which at the window's scale is the bitmap's own size on screen, an identity mapping; interpolation is
+        ///     off, so even a box that layout rounding moved by a fraction of a pixel blends no colour in. The frame replaces
+        ///     the previous one, whose bitmap is released, and its size becomes the client size a later change of scale
+        ///     refits to. UI thread only.
+        /// </summary>
+        /// <param name="bgra">The frame as opaque BGRA rows (<see cref="ViewerFrames.ToBgra"/>); kept, never changed.</param>
+        /// <param name="width">The frame's width.</param>
+        /// <param name="height">The frame's height.</param>
+        /// <remarks>
+        ///     Footgun, measured on Avalonia 12.1 at 150%: a bitmap's own DPI does not size the image control (it measures
+        ///     the bitmap at its pixel size in device-independent pixels, so the frame showed magnified by the scale), which
+        ///     is why the box is set explicitly here.
+        /// </remarks>
+        private void ShowFrame(byte[] bgra, int width, int height) {
+            Bitmap bitmap = ToBitmap(bgra, width, height);
+            if (_image == null) {
+                _image = new AVImage {
+                    Stretch = global::Avalonia.Media.Stretch.Fill,
+                    HorizontalAlignment = global::Avalonia.Layout.HorizontalAlignment.Left,
+                    VerticalAlignment = global::Avalonia.Layout.VerticalAlignment.Top,
+                };
+                // nearest texel: should layout ever land the bitmap a fraction of a pixel off, no colour is blended in
+                global::Avalonia.Media.RenderOptions.SetBitmapInterpolationMode(_image, global::Avalonia.Media.Imaging.BitmapInterpolationMode.None);
+                Content = _image;
+            }
+
+            double scaling = RenderScaling;
+            _image.Width = width / scaling;
+            _image.Height = height / scaling;
+            // the compositor holds its own reference to a bitmap it still draws, so the replaced one can go now
+            var replaced = _image.Source as Bitmap;
+            _image.Source = bitmap;
+            replaced?.Dispose();
+            _shownBgra = bgra;
+            _frameWidth = width;
+            _frameHeight = height;
+        }
+
+        /// <summary>A frame's BGRA pixels as an Avalonia bitmap.</summary>
+        /// <param name="bgra">The pixels, rows top first, <c>4 × width</c> bytes each; copied by the bitmap.</param>
+        /// <param name="width">The width in pixels.</param>
+        /// <param name="height">The height in pixels.</param>
         /// <returns>A new bitmap the window takes over.</returns>
-        /// <exception cref="ArgumentNullException">Thrown when <paramref name="frame"/> is <see langword="null"/>.</exception>
-        /// <exception cref="ArgumentException">Thrown for a frame that is not <c>(H, W, 3)</c>.</exception>
-        private static Bitmap ToBitmap(NDArray frame) {
-            using Image<Rgb24> image = ViewerFrames.ToImage(frame);
-            // A 24-bit BMP is its 54-byte header and rows padded to 4 bytes: room for that, so the stream does not regrow.
-            using var stream = new MemoryStream(image.Height * (image.Width * 3 + 3) + 54);
-            image.SaveAsBmp(stream);
-            stream.Seek(0, SeekOrigin.Begin);
-            return new Bitmap(stream);
+        private static Bitmap ToBitmap(byte[] bgra, int width, int height) {
+            // pinned only while Avalonia copies the pixels into its own bitmap
+            System.Runtime.InteropServices.GCHandle pin = System.Runtime.InteropServices.GCHandle.Alloc(bgra, System.Runtime.InteropServices.GCHandleType.Pinned);
+            try {
+                return new Bitmap(global::Avalonia.Platform.PixelFormat.Bgra8888, global::Avalonia.Platform.AlphaFormat.Opaque, pin.AddrOfPinnedObject(),
+                                  new PixelSize(width, height), new global::Avalonia.Vector(96, 96), width * 4);
+            } finally {
+                pin.Free();
+            }
         }
 
         /// <summary>Marks the window as open, after Avalonia's own handling.</summary>
@@ -271,62 +339,64 @@ namespace Gym.Rendering.Avalonia {
         }
 
         /// <summary>
-        ///     Reports a new client size, in device-independent pixels, whatever made it (a drag, maximizing, snapping, another
-        ///     program), as SDL reports every size change of a pygame window; only a resize by the window's own code
-        ///     (<see cref="WindowResizeReason.Application"/>) is not the user's and is left out.
+        ///     Reports a new client size, in physical pixels (the frame's unit, DR-99), whatever made it (a drag, maximizing,
+        ///     snapping, another program), as SDL reports every size change of a pygame window; only a resize by the
+        ///     window's own code (<see cref="WindowResizeReason.Application"/>, a refit to a new scale included) is not the
+        ///     user's and is left out.
         /// </summary>
         /// <param name="e">The resize event.</param>
         protected override void OnResized(WindowResizedEventArgs e) {
             base.OnResized(e);
             if (!_inputEnabled || e.Reason == WindowResizeReason.Application)
                 return;
-            int width = (int)Math.Round(e.ClientSize.Width), height = (int)Math.Round(e.ClientSize.Height);
+            double scaling = RenderScaling;
+            int width = (int)Math.Round(e.ClientSize.Width * scaling), height = (int)Math.Round(e.ClientSize.Height * scaling);
             if (width > 0 && height > 0)
                 _input.Enqueue(ViewerInput.Resized(width, height));
         }
 
         /// <summary>
-        ///     Reports a mouse button press at the pointer, in device-independent pixels from the client area's top-left (DR-70,
-        ///     GLFW's numbering of the buttons), when input is on; buttons beyond the three are not reported.
+        ///     Reports a mouse button press at the pointer, in physical pixels from the client area's top-left (DR-70, DR-99:
+        ///     the frame's pixels; GLFW's numbering of the buttons), when input is on; buttons beyond the three are not reported.
         /// </summary>
         /// <param name="e">The pointer event; marked handled when reported.</param>
         protected override void OnPointerPressed(PointerPressedEventArgs e) {
             base.OnPointerPressed(e);
             if (!_inputEnabled || !MouseButton(e.GetCurrentPoint(this).Properties.PointerUpdateKind, out int button))
                 return;
-            Point at = e.GetPosition(this);
+            Point at = e.GetPosition(this) * RenderScaling;
             _input.Enqueue(ViewerInput.MouseDown(button, at.X, at.Y));
             e.Handled = true;
         }
 
-        /// <summary>Reports a mouse button release at the pointer, when input is on.</summary>
+        /// <summary>Reports a mouse button release at the pointer, in physical pixels (DR-99), when input is on.</summary>
         /// <param name="e">The pointer event; marked handled when reported.</param>
         protected override void OnPointerReleased(PointerReleasedEventArgs e) {
             base.OnPointerReleased(e);
             if (!_inputEnabled || !MouseButton(e.GetCurrentPoint(this).Properties.PointerUpdateKind, out int button))
                 return;
-            Point at = e.GetPosition(this);
+            Point at = e.GetPosition(this) * RenderScaling;
             _input.Enqueue(ViewerInput.MouseUp(button, at.X, at.Y));
             e.Handled = true;
         }
 
-        /// <summary>Reports the pointer's new position, when input is on (Avalonia captures it to the window while a button is held).</summary>
+        /// <summary>Reports the pointer's new position, in physical pixels (DR-99), when input is on (Avalonia captures it to the window while a button is held).</summary>
         /// <param name="e">The pointer event.</param>
         protected override void OnPointerMoved(PointerEventArgs e) {
             base.OnPointerMoved(e);
             if (!_inputEnabled)
                 return;
-            Point at = e.GetPosition(this);
+            Point at = e.GetPosition(this) * RenderScaling;
             _input.Enqueue(ViewerInput.MouseMove(at.X, at.Y));
         }
 
-        /// <summary>Reports a turn of the wheel in notches, positive away from the user, when input is on.</summary>
+        /// <summary>Reports a turn of the wheel in notches, positive away from the user, at the pointer in physical pixels (DR-99), when input is on.</summary>
         /// <param name="e">The wheel event; marked handled when reported.</param>
         protected override void OnPointerWheelChanged(PointerWheelEventArgs e) {
             base.OnPointerWheelChanged(e);
             if (!_inputEnabled)
                 return;
-            Point at = e.GetPosition(this);
+            Point at = e.GetPosition(this) * RenderScaling;
             _input.Enqueue(ViewerInput.Scroll(e.Delta.X, e.Delta.Y, at.X, at.Y));
             e.Handled = true;
         }

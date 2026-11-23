@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- Hopper-v5 played by a linear policy trained by Augmented Random Search (decision DR-74): one seeded episode headless, or in a
+  <!-- Hopper-v5 played by Farama's SAC expert (decision DR-74): one seeded episode headless, or in a
        window. It references the source projects so it always builds against the current tree (Gym.NET.sln
        builds it, so an API change that breaks it fails the build); a copy outside this repository replaces the three
        ProjectReferences with PackageReferences to Gym.NET.Environments and Gym.NET.Rendering.Avalonia, and drops the

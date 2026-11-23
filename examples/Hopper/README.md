@@ -1,7 +1,7 @@
-# Hopper: a linear policy
+# Hopper: Farama's SAC expert
 
-A one-legged robot (thigh, leg, foot) in a plane has to hop forward without falling. A linear policy, trained by
-Augmented Random Search on Gym.NET's own MuJoCo engine, makes it hop.
+A one-legged robot (thigh, leg, foot) in a plane has to hop forward without falling. A published expert agent, Farama's
+own, makes it hop for all 1,000 steps.
 
 ```bash
 dotnet run --project examples/Hopper -c Release                   # one episode, headless
@@ -13,19 +13,23 @@ Output, the same on every run since the reset is seeded and the agent has no ran
 CPU with FMA: [the numbers](../README.md#the-numbers) says why that matters):
 
 ```
-Hopper-v5, seed 0: 1000 steps, return 3614.8, truncated by the time limit
+Hopper-v5, seed 0: 1000 steps, return 4187.0, truncated by the time limit
 ```
 
 ## The agent
 
-`policy.json` holds the policy. Each step it normalizes the observation by the mean and scale seen in training, weighs
-it into one command per motor, clips each to [-1, 1] and scales it to the motor's range: `a = clip(W · (s - mean) /
-scale, -1, 1) · high`. `tools/showreel`'s `train` command found it in 5 minutes on 32 threads, with Augmented Random
-Search V2-t (Mania, Guy and Recht 2018): it perturbs the weights in random directions, plays an episode with each, and
-steps toward the better ones. The file's `info` records the training settings and the returns on seeds 0-4.
+`policy.json` holds the agent: Farama's SAC (Soft Actor-Critic) expert, the agent the Farama Foundation, Gymnasium's
+maintainers, trained on this env to record the Minari datasets. It comes from Hugging Face,
+[farama-minari/Hopper-v5-SAC-expert](https://huggingface.co/farama-minari/Hopper-v5-SAC-expert) at revision `bff2655`,
+imported by `tools/agents/import_agents.py`, and is a copy of
+[`tests/Gym.Tests/Agents/Hopper-v5.json`](../../tests/Gym.Tests/Agents/Hopper-v5.json), where the tests measure it. It
+is a Stable-Baselines3 network of two dense layers of 256 with relu: each step it casts the observation to float32, runs
+it through the network, and squashes the result into the motors' range with tanh, as Stable-Baselines3's deterministic
+`predict` does.
 
-The training subtracted Hopper's survival bonus from the reward, as the paper does: with it, standing still is a strong
-local optimum.
+Over seeds 0-9 it scores 4,143.5 in Gym.NET (every seed hops all 1,000 steps); the model card reports 4098.17 +/-
+247.70. The model repository states no licence; its training code is MIT. Gym.NET commits the weights with this
+attribution, on the maintainer's decision (DR-109).
 
 ## Watching and playing
 
@@ -39,9 +43,10 @@ keyboard play would run about 37 times slower than real time.
 
 ## The API it shows
 
-- `Gymnasium.Make<NDArray, NDArray>("Hopper-v5", kwargs)`: a MuJoCo env on Gym.NET's own engine, bit for bit with MuJoCo
-  4.0.0
-- `((Box)env.ActionSpace).High`: the motors' ranges, which the policy scales its outputs by
+- `ExpertPolicy.Load(path)` and `policy.Act(observation)`: the agent's network, a new float32 action each step (released
+  with the episode's other arrays by `[NDScoped]`)
+- `policy.MakeArguments(...)`: the agent's own constructor arguments plus the render mode, for `Gymnasium.Make<NDArray,
+  NDArray>(id, kwargs)`
 - `env.Reset(seed: s)` and `env.Step(action)`: their results own the arrays they hold (D19), so the example releases
   each one once the agent has acted on it
 
