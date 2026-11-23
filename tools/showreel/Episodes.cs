@@ -199,25 +199,27 @@ internal static class Episodes {
             }),
         // One Reacher episode is 50 steps (a second at its own 50 fps): four targets in a row at half speed make a clip.
         // The still: the arena (the purple frame) spans x 48-408 and y 150-370 of the 480x480 frame, the arm's base at its middle;
-        // the crop frames it whole and shrinks it 3x, so the 120x80 still shows the arena, the arm and the target. The first
-        // target is reached at about 1.9 s (the arm folds onto it and hides it) and the second appears at about 2.1 s; at 2.2 s
-        // the arm is stretched out and the target is a red dot of its own.
+        // the crop frames it whole and shrinks it 3x, so the 120x80 still shows the arena, the arm and the target. The expert
+        // folds the arm onto each target, hiding it, within about a second; the second target appears at about 2.1 s with the
+        // arm stretched away from it, and at 2.73 s (cartridge frame 41) the arm is swinging round with its fingertip just
+        // short of the target, the two still apart.
         new EpisodeRecipe("Reacher-v5", "mujoco", 0, 25, Expert("Reacher-v5"),
             (_, _, ret) => ret > -6 ? "REACHED!" : null, "Farama's SAC expert puts the fingertip on each new target.",
             Hands: 4, HandLabel: "TARGET",
-            Poster: new PosterShot(Seconds: 2.2, Left: 48, Top: 140, Width: 360, Height: 240, PixelWidth: 120, PixelHeight: 80)),
+            Poster: new PosterShot(Seconds: 2.73, Left: 48, Top: 140, Width: 360, Height: 240, PixelWidth: 120, PixelHeight: 80)),
         // Seed 7: the expert pushes the puck into the goal (return -20.4; the ten seeds 0-9 average -28.0). Gymnasium's own
         // camera stands 4 m off, which leaves the arm a small figure in a half panel; 2.4 m at a 135 degree azimuth shows
         // the whole arm reaching across the table to the puck and the goal.
-        // The still: the table and the arm fill the frame's upper left (x 50-320, y 112-290 of 480x480) and the rest is black, so
-        // the default still is a speck. The crop keeps the arm's end of the table, the puck and the pole's foot and shrinks it 2x;
-        // at 0.5 s the arm is stretched out with its gripper open beside the red puck.
+        // The still: from there the table's diamond fills the frame's upper middle and the frame's lower third is black; the
+        // arm stands at the table's left corner (about x 140-350, y 128-270 of 480x480), so the default still, the whole frame
+        // shrunk 5x, leaves it small. The crop keeps the arm whole with the red goal and the white puck and shrinks it 2x; at
+        // 0.5 s the gripper has reached the puck at the goal's edge.
         new EpisodeRecipe("Pusher-v5", "mujoco", 7, 20, Expert("Pusher-v5"),
             (_, _, ret) => ret > -30 ? "PUSHED!" : null, "A seven-joint arm, Farama's SAC expert, sweeps to the puck and pushes it into the goal.",
             Kwargs: new Dictionary<string, object?> {
                 ["default_camera_config"] = new Dictionary<string, object?> { ["trackbodyid"] = -1L, ["distance"] = 2.4, ["azimuth"] = 135.0 },
             },
-            Poster: new PosterShot(Seconds: 0.5, Left: 110, Top: 150, Width: 240, Height: 160, PixelWidth: 120, PixelHeight: 80)),
+            Poster: new PosterShot(Seconds: 0.5, Left: 122, Top: 112, Width: 240, Height: 160, PixelWidth: 120, PixelHeight: 80)),
         new EpisodeRecipe("LunarLander-v3", "box2d", 7, 50, () => new DelegatePolicy((env, o) => LunarLanderEnv.Heuristic(env, (NDArray)o!)),
             (term, _, ret) => term && ret > 100 ? "LANDED!" : term ? "CRASH" : null, "Gymnasium's own heuristic lands between the flags.",
             RenderEveryStep: true),
@@ -244,13 +246,14 @@ internal static class Episodes {
         new EpisodeRecipe("Ant-v5", "mujoco", 0, 20, Expert("Ant-v5"),
             (term, _, _) => term ? "FLIPPED" : null, "Four legs, eight motors, running forward (Farama's SAC expert).", Kwargs: TrackCamera),
         // Three-quarter speed: its floor ends near step 350, and the scene's 5.2 s then show 260 steps.
-        // The still: the track camera keeps the figure (x 190-370, y 213-427 of 480x480) near the middle of a frame that is mostly
-        // sky and floor. The crop gives it equal margins above and below and shrinks it 2x; at 0.9 s it stands with its arms out,
-        // well before the fall the recipe ends on.
+        // The still: the track camera keeps the figure near the middle of a frame that is mostly sky and floor, and the expert
+        // walks upright with one arm raised, which makes the figure about 275 px tall (x 194-317, y 158-433 of 480x480 over
+        // the first 4 s). The crop holds all of it with a margin and shrinks it 3x; at 3.0 s it is mid-stride, its torso
+        // upright and one leg swung back.
         new EpisodeRecipe("Humanoid-v5", "mujoco", 0, 50, Expert("Humanoid-v5"),
             (term, _, _) => term ? "FELL" : null, "Seventeen motors, a humanoid walking for all 1,000 steps (Farama's TQC expert, at three-quarter speed).",
             Kwargs: TrackCamera, LoopTicks: 300,
-            Poster: new PosterShot(Seconds: 0.9, Left: 144, Top: 200, Width: 240, Height: 240, PixelWidth: 120, PixelHeight: 120)),
+            Poster: new PosterShot(Seconds: 3.0, Left: 76, Top: 115, Width: 360, Height: 360, PixelWidth: 120, PixelHeight: 120)),
         // Farama's expert was trained seeing positions and velocities only; its observation flags come with it.
         new EpisodeRecipe("HumanoidStandup-v5", "mujoco", 0, 67, Expert("HumanoidStandup-v5"),
             (_, _, _) => null, "Lying on the floor, getting up and standing (Farama's SAC expert).", Kwargs: StandupKwargs),
