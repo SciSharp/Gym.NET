@@ -2,20 +2,26 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Linq;
+using System.Text.Json;
 using Gym.Envs;
 using Gym.Observations;
 using Gym.Rendering.Avalonia;
 using Gym.Utils;
 using Gym.Vector;
+using Gym.Wrappers;
 using NumSharp;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.PixelFormats;
 
 namespace Gym.Examples.CartPole {
     /// <summary>
     ///     Learns to balance CartPole-v1 with the cross-entropy method over linear policies, then plays the learned policy
     ///     for one episode: <c>dotnet run --project examples/CartPole -c Release</c>, with <c>-- --render</c> to watch that
     ///     episode in a window. <c>-- --controller</c> plays a hand-written controller instead of learning one (the cart
-    ///     the front-page showreel shows), and <c>-- --play</c> hands the cart to the keyboard.
+    ///     the front-page showreel shows), <c>-- --play</c> hands the cart to the keyboard, and
+    ///     <c>-- --record &lt;folder&gt;</c> records the controller's episode for CartPole's page on the docs site (DR-112).
     /// </summary>
     /// <remarks>
     ///     <para>
@@ -72,24 +78,50 @@ namespace Gym.Examples.CartPole {
         /// <summary>The reset seed of the hand-written controller's episode: the one the front-page showreel plays (DR-74).</summary>
         private const long ControllerSeed = 3;
 
+        /// <summary>
+        ///     The moment How it works annotates on CartPole's page (DR-114): the frame after this many steps of the
+        ///     controller's episode, mid-sway, with the cart right of the centre and the pole leaning back toward it.
+        /// </summary>
+        private const int FigureStep = 125;
+
+        /// <summary>The id the media files are named after, <c>&lt;id&gt;.episode.mp4</c> and the rest (DR-112).</summary>
+        private const string EnvId = "CartPole-v1";
+
         /// <summary>Trains a policy, then plays one episode with it; or plays the hand-written controller; or the keyboard.</summary>
         /// <param name="args">
         ///     <c>--render</c> plays the final episode in a window (Avalonia); <c>--controller</c> plays the hand-written
         ///     controller instead of training; <c>--play</c> hands the cart to the keyboard (A and D) until Escape or the
-        ///     window's close button. Other arguments are ignored.
+        ///     window's close button; <c>--record &lt;folder&gt;</c> records the controller's episode for the docs site
+        ///     (<see cref="Record"/>). Other arguments are ignored.
         /// </param>
         /// <returns>
-        ///     The process exit code: 0 when training solved CartPole-v1 (or the controller or the keyboard game ran), 1 when
-        ///     <see cref="MaxGenerations"/> ran out first.
+        ///     The process exit code: 0 when training solved CartPole-v1 (or the controller, the keyboard game or the
+        ///     recording ran), 1 when <see cref="MaxGenerations"/> ran out first, 2 when <c>--record</c> names no folder.
         /// </returns>
         /// <exception cref="Gym.Exceptions.DependencyNotInstalled">
         ///     Not thrown in practice: <c>--render</c> and <c>--play</c> set the Avalonia viewer before the env renders, and
-        ///     without them the env never renders.
+        ///     without them the env never renders in human mode.
+        /// </exception>
+        /// <exception cref="InvalidOperationException">
+        ///     <c>--record</c> could not run ffmpeg, which <see cref="FfmpegVideoWriter"/> needs on PATH.
         /// </exception>
         private static int Main(string[] args) {
             bool render = args.Contains("--render");
             if (args.Contains("--play")) {
                 PlayWithKeyboard();
+                return 0;
+            }
+            int record = Array.IndexOf(args, "--record");
+            if (record >= 0) {
+                // The folder is required: the page's media live in the docs tree, and a default would write them where no
+                // page reads them.
+                if (record + 1 >= args.Length || args[record + 1].StartsWith("--", StringComparison.Ordinal)) {
+                    Console.Error.WriteLine("--record needs a folder, e.g. --record docs/environments/classic_control/media");
+                    return 2;
+                }
+                (int steps, double total) = Record(args[record + 1]);
+                Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
+                    $"{EnvId}, seed {ControllerSeed}: {steps} steps, return {total:F1}, recorded into {args[record + 1]}"));
                 return 0;
             }
             if (args.Contains("--controller")) {
@@ -297,16 +329,137 @@ namespace Gym.Examples.CartPole {
             double total = 0;
             while (true) {
                 float[] s = observation.ToArray<float>();
-                // The set point's phase is the step count, which is what TimeLimit's _elapsed_steps holds at this point.
-                double target = 1.2 * Math.Sin(steps * 2 * Math.PI / 250.0);
-                double u = 0.6 * (s[0] - target) + 1.2 * s[1] + 12.0 * s[2] + 2.0 * s[3];
-                StepResult<NDArray> step = env.Step(NDArray.Scalar(u > 0 ? 1L : 0L));
+                StepResult<NDArray> step = env.Step(NDArray.Scalar(ControllerAction(s, SwayTarget(steps))));
                 observation = step.Observation;
                 steps++;
                 total += step.Reward;
                 if (step.Terminated || step.Truncated)
                     return (steps, total, step.Terminated ? "the pole fell" : "truncated by the time limit");
             }
+        }
+
+        /// <summary>The controller's set point before a step: 1.2 either side of the centre, a full sway every 250 steps.</summary>
+        /// <param name="steps">Steps already taken in the episode (the phase is the step count, which TimeLimit's
+        ///     <c>_elapsed_steps</c> holds at this point).</param>
+        /// <returns>The cart position the controller steers the balancing act toward.</returns>
+        private static double SwayTarget(int steps) => 1.2 * Math.Sin(steps * 2 * Math.PI / 250.0);
+
+        /// <summary>
+        ///     The controller's push for an observation: right (1) when <c>0.6 (x - target) + 1.2 x_dot + 12 theta + 2
+        ///     theta_dot</c> is positive, else left (0). <see cref="PlayController"/> and <see cref="Record"/> both act through
+        ///     it, so the recorded episode is the one <c>--controller</c> plays.
+        /// </summary>
+        /// <param name="s">The observation: cart position, cart velocity, pole angle, pole angular velocity (float32).</param>
+        /// <param name="target">The set point, <see cref="SwayTarget"/>.</param>
+        /// <returns>The action, 0 or 1.</returns>
+        private static long ControllerAction(float[] s, double target) {
+            double u = 0.6 * (s[0] - target) + 1.2 * s[1] + 12.0 * s[2] + 2.0 * s[3];
+            return u > 0 ? 1L : 0L;
+        }
+
+        /// <summary>
+        ///     Records the controller's episode for CartPole's page on the docs site (DR-112): the whole episode as
+        ///     <c>CartPole-v1.episode.mp4</c>, one frame per step at the env's 50 frames a second, through Gymnasium's
+        ///     <see cref="RecordVideo{TObs, TAct}"/> and <see cref="FfmpegVideoWriter"/>; every step as
+        ///     <c>CartPole-v1.episode.json</c>, for the page's anatomy chart; and How it works' frame as
+        ///     <c>CartPole-v1.figure.png</c> with <c>CartPole-v1.figure.json</c>, the pixels its labels point at.
+        /// </summary>
+        /// <param name="folder">The output folder, <c>docs/environments/classic_control/media</c> for the site; created if missing.</param>
+        /// <returns>The steps taken and the return.</returns>
+        /// <exception cref="InvalidOperationException">ffmpeg could not be run, or wrote no video.</exception>
+        /// <exception cref="IOException">A file cannot be written.</exception>
+        /// <remarks>
+        ///     <para>
+        ///     Each JSON row is the observation the controller acted on, then its action, the reward and the sway's set
+        ///     point: <c>step, x, x_dot, theta, theta_dot, action, reward, target</c>. The video's frame <c>t</c> shows the
+        ///     state of row <c>t</c> (frame 0 is the reset), and its last frame the state after the last step, which the
+        ///     JSON keeps as <c>final</c>.
+        ///     </para>
+        ///     <para>
+        ///     RecordVideo names its file <c>CartPole-v1-episode-0.mp4</c> and writes it when the env closes; it records into
+        ///     a scratch folder inside <paramref name="folder"/> and the file is moved to the page's name, so a recording
+        ///     that fails halfway leaves the published video as it was.
+        ///     </para>
+        /// </remarks>
+        [NDScoped]   // releases every array the episode creates when it returns (DR-80); the envs are disposed inside
+        private static (int Steps, double Return) Record(string folder) {
+            Directory.CreateDirectory(folder);
+            string scratch = Path.Combine(folder, ".recording");
+            var rows = new List<double[]>();
+            double total = 0;
+            float[] final;
+            using (Env<NDArray, NDArray> made = Gymnasium.Make<NDArray, NDArray>(EnvId, RenderMode.RgbArray))
+            using (var env = new RecordVideo<NDArray, NDArray>(made, scratch, episodeTrigger: _ => true, namePrefix: EnvId,
+                       videoWriter: new FfmpegVideoWriter())) {
+                NDArray observation = env.Reset(seed: ControllerSeed).Observation;
+                for (int t = 0; ; t++) {
+                    float[] s = observation.ToArray<float>();
+                    double target = SwayTarget(t);
+                    long action = ControllerAction(s, target);
+                    // The frame now on screen shows the state the controller is about to act on (row t).
+                    if (t == FigureStep)
+                        SaveFigure(env, folder, s);
+                    StepResult<NDArray> step = env.Step(NDArray.Scalar(action));
+                    total += step.Reward;
+                    rows.Add(new double[] { t, s[0], s[1], s[2], s[3], action, step.Reward, target });
+                    observation = step.Observation;
+                    if (step.Terminated || step.Truncated)
+                        break;
+                }
+                final = observation.ToArray<float>();
+                // RecordVideo writes the episode's video when it stops recording, which closing the env does.
+                env.Close();
+            }
+            string recorded = Path.Combine(scratch, $"{EnvId}-episode-0.mp4");
+            if (!File.Exists(recorded))
+                throw new InvalidOperationException($"RecordVideo wrote no {recorded}; is ffmpeg on PATH?");
+            File.Move(recorded, Path.Combine(folder, $"{EnvId}.episode.mp4"), overwrite: true);
+            Directory.Delete(scratch, recursive: true);
+            var json = new JsonSerializerOptions { WriteIndented = false };
+            File.WriteAllText(Path.Combine(folder, $"{EnvId}.episode.json"), JsonSerializer.Serialize(new {
+                id = EnvId, seed = ControllerSeed, steps = rows.Count, @return = total, fps = 50,
+                agent = "the swaying controller (examples/CartPole --controller)",
+                columns = new[] { "step", "x", "x_dot", "theta", "theta_dot", "action", "reward", "target" },
+                // Five decimals keep the chart exact to the pixel at a fraction of the file size.
+                rows = rows.Select(r => r.Select(v => Math.Round(v, 5)).ToArray()).ToArray(),
+                final = final.Select(v => Math.Round((double)v, 5)).ToArray(),
+            }, json) + "\n");
+            return (rows.Count, total);
+        }
+
+        /// <summary>
+        ///     Saves How it works' frame (the frame the env shows now) as <c>CartPole-v1.figure.png</c>, and where its labels
+        ///     point as <c>CartPole-v1.figure.json</c>: the cart's centre, the pole's axle and tip, in the frame's pixels.
+        /// </summary>
+        /// <param name="env">The recording env, in <c>rgb_array</c> mode; rendering it adds nothing to the video.</param>
+        /// <param name="folder">The output folder.</param>
+        /// <param name="s">The state the frame shows: cart position, cart velocity, pole angle, pole angular velocity.</param>
+        /// <exception cref="IOException">A file cannot be written.</exception>
+        /// <remarks>
+        ///     The pixels follow CartPole's renderer: 125 px a metre (the 600 px frame spans the ±2.4 m track), the cart's
+        ///     centre at <c>300 + 125 x</c>, the axle 107.5 px above the bottom edge (the cart's centre at 100 px plus a
+        ///     quarter of its 30 px height), the pole's tip 120 px along the pole from the axle (its 125 px length less half
+        ///     its 10 px width). Reference:
+        ///     <see href="https://github.com/Farama-Foundation/Gymnasium/blob/8ba8c3a63bb4e000b7f33923f43d292acac07be1/gymnasium/envs/classic_control/cartpole.py#L279-L322">gymnasium/envs/classic_control/cartpole.py</see>.
+        /// </remarks>
+        private static void SaveFigure(Env<NDArray, NDArray> env, string folder, float[] s) {
+            using (RenderResult render = env.Render()) {
+                NDArray frame = (NDArray)render;
+                int height = (int)frame.shape[0], width = (int)frame.shape[1];
+                using var image = Image.LoadPixelData<Rgb24>(frame.ToArray<byte>(), width, height);
+                image.SaveAsPng(Path.Combine(folder, $"{EnvId}.figure.png"));
+            }
+            // The renderer draws in pygame's upward coordinates and flips the frame, so a height h above the bottom edge is
+            // the frame's row 400 - h.
+            const double Scale = 600 / 4.8, CartY = 400 - 100, AxleY = 400 - (100 + 30 / 4.0), TipLength = 125 - 10 / 2.0;
+            double cartX = 300 + s[0] * Scale, theta = s[2];
+            File.WriteAllText(Path.Combine(folder, $"{EnvId}.figure.json"), JsonSerializer.Serialize(new {
+                id = EnvId, step = FigureStep, width = 600, height = 400, pixelsPerMetre = Scale,
+                state = new { x = Math.Round(s[0], 5), x_dot = Math.Round(s[1], 5), theta = Math.Round(s[2], 5), theta_dot = Math.Round(s[3], 5) },
+                cart = new[] { Math.Round(cartX, 2), CartY },
+                axle = new[] { Math.Round(cartX, 2), AxleY },
+                tip = new[] { Math.Round(cartX + TipLength * Math.Sin(theta), 2), Math.Round(AxleY - TipLength * Math.Cos(theta), 2) },
+            }, new JsonSerializerOptions { WriteIndented = true }) + "\n");
         }
 
         /// <summary>

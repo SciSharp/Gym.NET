@@ -9,6 +9,7 @@ dotnet run --project examples/CartPole -c Release                  # train, then
 dotnet run --project examples/CartPole -c Release -- --render      # play the final episode in a window (Avalonia)
 dotnet run --project examples/CartPole -c Release -- --controller  # a hand-written controller instead (add --render to watch)
 dotnet run --project examples/CartPole -c Release -- --play        # you balance it, A and D push the cart
+dotnet run --project examples/CartPole -c Release -- --record docs/environments/classic_control/media   # the docs page's media
 ```
 
 Output of a run (the same on every run, since every draw is seeded):
@@ -61,6 +62,23 @@ CartPole-v1, seed 3: 500 steps, return 500.0, truncated by the time limit
 `--play` hands the cart to you through Gymnasium's `play` utility (`Play.Run`): A pushes the cart left, D right.
 CartPole has no neutral action, so with no key held the default no-op, action 0, pushes left: keep a key down,
 alternating as the pole leans. Each new game starts from the same seed; Escape or the window's close button quits.
+
+## Recording the docs page's media
+
+`--record <folder>` plays the controller's episode once more and writes the media of CartPole's page on the docs site
+(DR-112) into the folder, `docs/environments/classic_control/media` for the site:
+
+| File | What it is |
+|---|---|
+| `CartPole-v1.episode.mp4` | The whole episode, one frame per step at the env's 50 frames a second (501 frames: the reset and 500 steps), H.264 through Gymnasium's `RecordVideo` and `FfmpegVideoWriter` |
+| `CartPole-v1.episode.json` | Every step: the observation the controller acted on (`x`, `x_dot`, `theta`, `theta_dot`), its action, the reward and the sway's set point, for the page's anatomy chart; the state after the last step as `final` |
+| `CartPole-v1.figure.png`, `.figure.json` | The frame after 125 steps, which the page annotates, and where its labels point: the cart's centre, the axle and the pole's tip, in the frame's pixels |
+
+```
+CartPole-v1, seed 3: 500 steps, return 500.0, recorded into docs/environments/classic_control/media
+```
+
+ffmpeg must be on PATH to record; every other mode runs without it.
 
 ## The API it shows
 
