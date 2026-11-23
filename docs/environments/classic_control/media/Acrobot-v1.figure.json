@@ -1,0 +1,27 @@
+{
+  "id": "Acrobot-v1",
+  "step": 64,
+  "width": 500,
+  "height": 500,
+  "pixelsPerMetre": 113.6364,
+  "state": {
+    "theta1": 1.36996,
+    "theta2": 1.71183,
+    "theta1_dot": 2.05374,
+    "theta2_dot": -2.18636,
+    "height": 0.79872
+  },
+  "pivot": [
+    250,
+    250
+  ],
+  "elbow": [
+    361.35,
+    272.67
+  ],
+  "tip": [
+    368.14,
+    159.24
+  ],
+  "line": 136.36
+}

@@ -8,6 +8,7 @@ dotnet run --project examples/Acrobot -c Release                   # one episode
 dotnet run --project examples/Acrobot -c Release -- --render       # the same episode in a window
 dotnet run --project examples/Acrobot -c Release -- --play         # you play it, from the keyboard
 dotnet run --project examples/Acrobot -c Release -- --episodes 5   # seeds 1-5, and their mean
+dotnet run --project examples/Acrobot -c Release -- --record docs/environments/classic_control/media   # the docs page's media
 ```
 
 Output, the same on every run since the reset is seeded and the agent has no randomness of its own (measured on an x64
@@ -35,6 +36,23 @@ episode ends; Escape or the window's close button quits.
 | A | Torque -1 on the second joint |
 | D | Torque +1 |
 | Nothing held | No torque |
+
+## Recording the docs page's media
+
+`--record <folder>` plays the seed-1 episode once more (whatever `--seed` says) and writes the media of Acrobot's page
+on the docs site (DR-112) into the folder, `docs/environments/classic_control/media` for the site:
+
+| File | What it is |
+|---|---|
+| `Acrobot-v1.episode.mp4` | The whole episode, one frame per step at the env's 15 frames a second (66 frames: the reset and 65 steps), H.264 through Gymnasium's `RecordVideo` and `FfmpegVideoWriter` |
+| `Acrobot-v1.episode.json` | Every step: both joint angles (from the observation's cosines and sines), both speeds and the tip's height above the pivot that the agent acted on, its action and the reward, for the page's anatomy chart; the state after the last step as `final` |
+| `Acrobot-v1.figure.png`, `.figure.json` | The frame after 64 steps, the tip 0.80 m above the pivot and one step from the line, which the page annotates, and where its labels point: the pivot, the elbow, the tip and the line, in the frame's pixels |
+
+```
+Acrobot-v1, seed 1: 65 steps, return -64.0, recorded into docs/environments/classic_control/media
+```
+
+ffmpeg must be on PATH to record; every other mode runs without it.
 
 ## The API it shows
 

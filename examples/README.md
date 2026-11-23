@@ -68,6 +68,20 @@ Hopper, Walker2d and Swimmer either: `play` draws a frame per step, and their fr
 ms of simulated time per step, which would run the game 7 to 37 times slower than real time. HalfCheetah has its own
 game, which draws a cheap side view in real time.
 
+## Recording a docs page's media
+
+An example whose env has a page on the docs site records that page's media (DR-112): `--record <folder>` plays its
+seeded episode once more and writes `<id>.episode.mp4` (the whole episode, one frame per step at the env's render fps,
+through `RecordVideo` and `FfmpegVideoWriter`), `<id>.episode.json` (every step's state, action and reward, for the
+page's anatomy chart) and `<id>.figure.png` with `<id>.figure.json` (the frame How it works annotates, and the pixels
+its labels point at). Classic control's five record so far, into `docs/environments/classic_control/media`:
+
+```bash
+dotnet run --project examples/Acrobot -c Release -- --record docs/environments/classic_control/media
+```
+
+ffmpeg must be on PATH to record; every other mode runs without it. Each README lists its files.
+
 ## The numbers
 
 The outputs in the READMEs were measured on an x64 CPU with FMA (an i9-13900K), where Gym.NET's tests prove the envs bit

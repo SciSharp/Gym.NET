@@ -6,6 +6,8 @@
   href: index.md
 - name: Classic control
   items:
+  - name: Acrobot
+    href: classic_control/acrobot.md
   - name: CartPole
     href: classic_control/cart_pole.md
   - name: Mountain Car

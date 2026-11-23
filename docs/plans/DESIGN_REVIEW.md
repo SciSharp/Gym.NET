@@ -836,3 +836,22 @@ Effects of approved designs that only showed up in code. None changes a design; 
   them: NumPy aligns the bounds in columns. It caught each of three planted errors, one at a time: a step limit, the
   quick start's range and an argument's default. All seven Python twins ran against Gymnasium 1.4.0 (a venv with the
   parity stack's pins).
+- **DR-112, DR-114 and DR-124, classic control's other pages** (E4, 2026-11-23). Acrobot, Mountain Car, Mountain
+  Car Continuous and Pendulum follow CartPole's template, and each example gained `--record`; MountainCarContinuous is
+  the new example DR-124 asked for, the 25th. Every figure equals Gymnasium's own frame of the same moment, 0 differing
+  pixels. What the four pages found:
+  - Gymnasium's MountainCar renderer scales by `600 / (0.6 - (-1.2))`, and 0.6 + 1.2 is 1.7999999999999998 in float64:
+    with `600 / 1.8` instead, `int()` puts the continuous flag in column 549, not 550. The examples' figure code uses
+    the renderer's own expression.
+  - The facts test read only positive thresholds, so MountainCar's −110 and Acrobot's −100 would have passed unchecked.
+    It now reads the typographic minus, and a registered threshold the Reward row leaves out fails.
+  - `Gymnasium.Make("MountainCarContinuous-v0")` has no break opportunity before its id's hyphen and pushed the
+    half-width infobox's table past the article. A `<wbr>` after `Make(` lets it wrap, and the facts test compares the
+    call without it. The longer ids of E6 and E7 will need the same.
+  - The 500x500 frames (Pendulum, Acrobot) keep their own size (`.gn-figure-narrow`) instead of the wide frames' 640 px.
+  - MountainCarContinuous's controller pushes left from rest, away from the flag: over seeds 0-99 it reaches the flag in
+    75 to 86 steps, mean return 92.03, above the registry's 90. Pushing right from rest, as MountainCar's rule does,
+    averages 89.37; at half force the rule averages 96.10, since the cost is the force's square.
+  - The Arguments sections' make calls are compiled regions on every page, CartPole's included.
+  - Gymnasium's `acrobot.py` carries RLPy's notice (Copyright 2013, RLPy, BSD 3-Clause), which `THIRD-PARTY-NOTICES.md`
+    does not list beside Gymnasium's MIT notice. The page names it; the notices file is the maintainer's to amend.
