@@ -28,9 +28,12 @@ mujoco==4.0.0
 # The rest of Gymnasium's extra "mujoco" (pyproject.toml: imageio>=2.14.1, packaging>=23.0), which
 # gymnasium/envs/mujoco/mujoco_rendering.py imports at module load, so no MuJoCo id makes without them. They were
 # missing here until CI's first parity run on a clean venv failed every MuJoCo cell with "No module named 'imageio'":
-# the reference machine's interpreter had both from other work, which hid the gap. The versions are that machine's;
-# pillow, which imageio requires, is pinned beside it so a clean venv resolves the same build. None of the three
-# computes a compared value.
+# the reference machine's interpreter had both from other work, which hid the gap; their versions are that machine's.
+# pillow, which imageio requires (pillow>=8.3.2), is pinned beside them so a clean venv always gets the same build. It
+# is 13.0.0, the first release that fixes all 60 advisories GitHub lists against 11.3.0 (Dependabot PR #26), and not
+# the reference machine's 11.3.0, which other packages in that interpreter pin; a venv made over that interpreter with
+# --system-site-packages gets its own 13.0.0 from this file. None of the three computes a compared value: the parity
+# gate's counts were the same on either pillow (2,856 passed and 66 skipped of 2,922 cells, CI, 2026-11-22).
 imageio==2.38.1
 packaging==26.0
 pillow==13.0.0
