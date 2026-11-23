@@ -191,11 +191,7 @@ By Gymnasium's name in `Make`'s kwargs, or by the C# name in the constructor and
 | `sutton_barto_reward`<br>`suttonBartoReward` | `bool`<br>`false` | The original paper's reward (see [Rewards](#rewards)) |
 | (Gym.NET)<br>`viewerFactory` | `EnvViewerFactory?`<br>`null` | The window for `human`: Avalonia, WinForms, or headless |
 
-```csharp
-Gymnasium.Make("CartPole-v1", new { render_mode = "rgb_array", sutton_barto_reward = true });
-Gymnasium.Make("CartPole-v1",
-    new CartPoleEnvOptions { RenderMode = "rgb_array", SuttonBartoReward = true });
-```
+[!code-csharp[](../../../tests/Gym.Tests/Docs/EnvPageSamples/CartPoleSamples.cs#Arguments)]
 
 The physics constants are settable properties of the unwrapped env (the table in [How it works](#how-it-works)).
 

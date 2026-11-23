@@ -8,6 +8,7 @@ dotnet run --project examples/MountainCar -c Release                   # one epi
 dotnet run --project examples/MountainCar -c Release -- --render       # the same episode in a window
 dotnet run --project examples/MountainCar -c Release -- --play         # you play it, from the keyboard
 dotnet run --project examples/MountainCar -c Release -- --episodes 5   # seeds 4-8, and their mean
+dotnet run --project examples/MountainCar -c Release -- --record docs/environments/classic_control/media   # the docs page's media
 ```
 
 Output, the same on every run since the reset is seeded and the agent has no randomness of its own (measured on an x64
@@ -35,6 +36,23 @@ episode ends; Escape or the window's close button quits.
 | Left arrow | Accelerate left |
 | Right arrow | Accelerate right |
 | Nothing held | Coast |
+
+## Recording the docs page's media
+
+`--record <folder>` plays the seed-4 episode once more (whatever `--seed` says) and writes the media of MountainCar's
+page on the docs site (DR-112) into the folder, `docs/environments/classic_control/media` for the site:
+
+| File | What it is |
+|---|---|
+| `MountainCar-v0.episode.mp4` | The whole episode, one frame per step at the env's 30 frames a second (123 frames: the reset and 122 steps), H.264 through Gymnasium's `RecordVideo` and `FfmpegVideoWriter` |
+| `MountainCar-v0.episode.json` | Every step: the observation the agent acted on (`position`, `velocity`), its action and the reward, for the page's anatomy chart; the state after the last step as `final` |
+| `MountainCar-v0.figure.png`, `.figure.json` | The frame after 80 steps, the top of the car's back-swing, which the page annotates, and where its labels point: the car's centre, the hill under it and its slope, the flag, the starting range, the valley's floor and the wall, in the frame's pixels |
+
+```
+MountainCar-v0, seed 4: 122 steps, return -122.0, recorded into docs/environments/classic_control/media
+```
+
+ffmpeg must be on PATH to record; every other mode runs without it.
 
 ## The API it shows
 

@@ -95,9 +95,10 @@ namespace Gym.Tests.Docs {
                 string first = ids[0].Id;
                 EnvSpec spec = Gym.Gymnasium.Spec(first);
 
-                // Thresholds: "solved at 475 (v1), 195 (v0)" names each version's; "solved at 4,800" the first id's.
-                var byVersion = Regex.Matches(facts["Reward"], "([0-9][0-9,.]*) \\((v[0-9]+)\\)")
-                    .ToDictionary(m => m.Groups[2].Value, m => double.Parse(m.Groups[1].Value, NumberStyles.Number, CultureInfo.InvariantCulture));
+                // Thresholds: "solved at 475 (v1), 195 (v0)" names each version's; "solved at 4,800" the first id's. A
+                // threshold may be negative (MountainCar's −110, Acrobot's −100), written with the typographic minus.
+                var byVersion = Regex.Matches(facts["Reward"], "([−-]?[0-9][0-9,.]*) \\((v[0-9]+)\\)")
+                    .ToDictionary(m => m.Groups[2].Value, m => Number(m.Groups[1].Value));
                 if (byVersion.Count > 0) {
                     foreach (var (id, _) in ids) {
                         string version = id[(id.LastIndexOf("-v", StringComparison.Ordinal) + 1)..];
@@ -105,9 +106,12 @@ namespace Gym.Tests.Docs {
                             Assert.AreEqual(threshold, Gym.Gymnasium.Spec(id).RewardThreshold, $"{name}: {id}'s threshold");
                     }
                 } else {
-                    Match solved = Regex.Match(facts["Reward"], "solved at ([0-9][0-9,.]*)");
+                    Match solved = Regex.Match(facts["Reward"], "solved at ([−-]?[0-9][0-9,.]*)");
                     if (solved.Success)
-                        Assert.AreEqual(double.Parse(solved.Groups[1].Value, NumberStyles.Number, CultureInfo.InvariantCulture), spec.RewardThreshold, $"{name}: {first}'s threshold");
+                        Assert.AreEqual(Number(solved.Groups[1].Value), spec.RewardThreshold, $"{name}: {first}'s threshold");
+                    else
+                        // A registered threshold the page leaves out is a fact missing from the box, not a pass.
+                        Assert.IsNull(spec.RewardThreshold, $"{name}: {first} is registered with a threshold of {spec.RewardThreshold}, which the Reward row does not state");
                 }
 
                 using IEnv env = Gym.Gymnasium.Make(first);
@@ -257,6 +261,16 @@ namespace Gym.Tests.Docs {
             }
             return regions;
         }
+
+        /// <summary>
+        ///     A number as a page writes it: thousands separated by commas, and a negative one with the typographic minus
+        ///     (U+2212) the pages use, or an ASCII hyphen.
+        /// </summary>
+        /// <param name="text">The number's text, such as <c>4,800</c> or <c>−110</c>.</param>
+        /// <returns>Its value.</returns>
+        /// <exception cref="FormatException">The text is not a number, which fails the test that read it.</exception>
+        private static double Number(string text) =>
+            double.Parse(text.Replace('−', '-'), NumberStyles.Number, CultureInfo.InvariantCulture);
 
         /// <summary>A text with every run of whitespace made one space, as HTML shows it.</summary>
         /// <param name="text">The text.</param>

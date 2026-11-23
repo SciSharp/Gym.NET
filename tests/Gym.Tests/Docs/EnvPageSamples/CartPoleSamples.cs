@@ -146,5 +146,22 @@ namespace Gym.Docs.EnvPageSamples {
             Assert.IsNotNull(last);
             Assert.IsTrue(last!.ContainsKey("episode"));
         }
+
+        /// <summary>
+        ///     The Arguments section's calls: kwargs by Gymnasium's names, or the generated options record by C# names; both
+        ///     build the same env.
+        /// </summary>
+        [TestMethod]
+        public void Arguments() {
+            #region Arguments
+            using IEnv byName = Gymnasium.Make("CartPole-v1",
+                new { render_mode = "rgb_array", sutton_barto_reward = true });
+            using IEnv byRecord = Gymnasium.Make("CartPole-v1",
+                new CartPoleEnvOptions { RenderMode = "rgb_array", SuttonBartoReward = true });
+            #endregion
+            Assert.IsTrue(((CartPoleEnv)byName.Unwrapped).SuttonBartoReward);
+            Assert.IsTrue(((CartPoleEnv)byRecord.Unwrapped).SuttonBartoReward);
+            Assert.AreEqual("rgb_array", byRecord.RenderMode);
+        }
     }
 }
