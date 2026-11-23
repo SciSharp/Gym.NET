@@ -552,6 +552,13 @@ article .gn-env-banner ~ h2#quick-start {
   image-rendering: pixelated;
 }
 
+/* A pixel-art frame a little narrower than the 640 px (Taxi's 536x456) at its own size: at 640 each of its pixels
+   would come out 1.19 wide, some one screen pixel and some two, and the walls and lettering would blur. */
+.gn-figure.gn-figure-medium,
+.gn-figure-medium + .gn-figure-caption {
+  max-width: 536px;
+}
+
 /* A frame wider than the 640 px the others take (CliffWalking's 768x256, a strip three times as wide as it is tall),
    up to its own size: at 640 px its 64 px cells would shrink to 53 and its labels with them, while the strip stays
    short enough to cost little height at full width. Where the article is narrower it shrinks to fit, as any figure. */

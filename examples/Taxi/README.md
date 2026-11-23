@@ -7,6 +7,7 @@ dotnet run --project examples/Taxi -c Release                   # one episode, h
 dotnet run --project examples/Taxi -c Release -- --render       # the same episode in a window
 dotnet run --project examples/Taxi -c Release -- --play         # you play it, from the keyboard
 dotnet run --project examples/Taxi -c Release -- --episodes 5   # seeds 12-16, and their mean
+dotnet run --project examples/Taxi -c Release -- --record docs/environments/toy_text/media   # the docs page's media
 ```
 
 Output, the same on every run since the reset is seeded and the agent has no randomness of its own (measured on an x64
@@ -36,6 +37,24 @@ episode ends; Escape or the window's close button quits.
 | Arrow keys | Drive: down is south, up north, right east, left west |
 | P | Pick the passenger up |
 | D | Drop the passenger off |
+
+## Recording the docs page's media
+
+`--record <folder>` plays the seed-12 episode once more (whatever `--seed` says) and writes the media of Taxi's page on
+the docs site (DR-112) into the folder, `docs/environments/toy_text/media` for the site:
+
+| File | What it is |
+|---|---|
+| `Taxi-v4.episode.mp4` | The whole episode, one frame per step at the env's 4 frames a second (17 frames: the reset and 16 steps), H.264 through Gymnasium's `RecordVideo` and `FfmpegVideoWriter` |
+| `Taxi-v4.episode.json` | Every step: the state the agent acted on, decoded (the taxi's row and column, the passenger's place, the destination) and as its number, whether the passenger is aboard, the action and the reward; the state after the last step as `final` |
+| `Taxi-v4.board.png` | The town as the reset shows it, the passenger on their stand and the destination framed, which the page's anatomy draws the taxi's path over (DR-131) |
+| `Taxi-v4.figure.png`, `.figure.json` | The frame after 6 steps, the taxi on the passenger's stand about to pick them up, which the page annotates, and what its labels point at: the grid's origin and cells, the state and its decoding, the action, the action mask, the stands and the walls, read from the env's map |
+
+```
+Taxi-v4, seed 12: 16 steps, return 5.0, recorded into docs/environments/toy_text/media
+```
+
+ffmpeg must be on PATH to record; every other mode runs without it.
 
 ## The API it shows
 
