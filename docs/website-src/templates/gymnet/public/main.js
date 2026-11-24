@@ -1,6 +1,6 @@
 // Gym.NET DocFX template customization (https://dotnet.github.io/docfx/docs/template.html).
 //
-// The modern template imports this module's default export through its options() hook. It adds four behaviours:
+// The modern template imports this module's default export through its options() hook. It adds five behaviours:
 //   1. pixel text: every <canvas class="gn-pixel" data-text="..."> is drawn in the showreel's 5x7 font (the gallery's
 //      lettering and the env pages' banners);
 //   2. the 8-bit "select your environment" gallery (on the landing page and the Environments page, one shared include,
@@ -10,7 +10,10 @@
 //   3. links docfx could not resolve (repository files outside the site, such as CLAUDE.md or LICENSE) are pointed at
 //      GitHub, so pages copied from docs/ keep working links on the site;
 //   4. the env pages' episode anatomy (DR-115): a chart of the recorded episode, drawn from its step trace, with a
-//      cursor and a readout that follow the playing video.
+//      cursor and a readout that follow the playing video;
+//   5. the sidebar remembers which sections the reader opened or closed and restores them on the next page, for 48
+//      hours that slide forward with every visit (DR-138), the same code as NumSharp's site, so the SciSharp sites on
+//      scisharp.github.io behave alike; toc.yml's `expanded` sets a section's state until the reader changes it.
 
 /**
  * The classic 5x7 dot-matrix font for ASCII 32-95, five column bytes per glyph, bit 0 the top row. The same table as
@@ -820,6 +823,355 @@ function rewriteRepoLinks() {
   }
 }
 
+/**
+ * How long a remembered sidebar layout survives with no visits, in milliseconds (48 hours). Every read and write of
+ * the record re-stamps it from "now", so the window slides: the state expires only after 48 hours of inactivity.
+ * @type {number}
+ */
+const TOC_STATE_TTL_MS = 48 * 60 * 60 * 1000
+
+/**
+ * Storage-format version. Bump it to discard every reader's saved sidebar state at once when the record's shape
+ * changes (a record of another version is dropped as if expired), so an old record is never misread as the new shape.
+ * @type {number}
+ */
+const TOC_STATE_SCHEMA = 1
+
+/**
+ * Separator joining ancestor labels into a node key. U+203A (›) occurs in no sidebar title; a title that contained it
+ * could map two distinct nodes onto one key (a cosmetic glitch, not a failure).
+ * @type {string}
+ */
+const TOC_KEY_SEP = '›'
+
+/**
+ * Remembers the sidebar's expanded and collapsed sections in `localStorage` for a sliding 48-hour window, and
+ * restores them on the next page (DR-138). The code is NumSharp's site's, so the SciSharp sites behave alike.
+ *
+ * Why it is not a one-liner: the modern template keeps each node's expanded flag in a private closure and re-renders
+ * the whole `#toc` on every toggle (lit-html), so setting the `.expanded` class on restore would be wiped by the next
+ * toggle. Instead it drives docfx's own model, clicking the toggle of each node whose remembered state differs from
+ * what docfx rendered.
+ *
+ * Defaults: a section's `expanded` in toc.yml (the Environments sidebar's four families open, DR-138) holds until the
+ * reader toggles that section; only toggled sections are stored. The current page's own branch is never collapsed by
+ * a remembered choice, so the reader always sees where they are.
+ *
+ * Safe to call before `#toc` is filled (docfx fills it after fetching toc.json): a MutationObserver waits for the
+ * first expander. Does nothing without a `#toc` or without a usable `localStorage` (private mode, file://).
+ *
+ * Reference: <https://github.com/SciSharp/NumSharp/blob/4deab50400eda8f853c076a6dd09fdf167cd3512/docs/website-src/templates/numsharp/public/main.js>
+ * (NumSharp's `installTocStatePersistence`).
+ * @returns {void}
+ */
+function installTocStatePersistence() {
+  // Reading localStorage can itself throw (site data blocked), so probe it and bail rather than break the page.
+  let store
+  try {
+    store = window.localStorage
+  } catch {
+    return
+  }
+  if (!store) {
+    return
+  }
+
+  const toc = document.getElementById('toc')
+  if (!toc) {
+    return
+  }
+
+  // The record is scoped to this page's toc.json: each sidebar (Docs, Environments, API) keeps its own state, and
+  // localStorage is per origin, not per path, so NumSharp's, OptunaSharp's and Gym.NET's sites, all on
+  // scisharp.github.io, would otherwise share (and overwrite) one record.
+  const tocRelMeta = document.querySelector('meta[name="docfx:tocrel"]')
+  const tocRel = tocRelMeta ? tocRelMeta.content || '' : ''
+  let scope
+  try {
+    scope = new URL(tocRel, window.location.href).href
+  } catch {
+    scope = tocRel
+  }
+  const storageKey = 'docfx:tocExpanded:' + scope
+
+  // docfx overwrites toc.yml's `expanded` when it opens the active branch, so the defaults are read from toc.json
+  // itself: a section that links to the current page then honours its configured default too.
+  const defaultsReady = fetch(scope.replace(/\.html(?=$|[?#])/i, '.json'))
+    .then(response => response.ok ? response.json() : null)
+    .then(data => {
+      const defaults = Object.create(null)
+      function visit(items, ancestors = []) {
+        for (const item of items || []) {
+          const path = [...ancestors, item.name]
+          if (typeof item.expanded === 'boolean') {
+            defaults[path.join(TOC_KEY_SEP)] = item.expanded
+          }
+          visit(item.items, path)
+        }
+      }
+      visit(data?.items)
+      return defaults
+    })
+    .catch(() => Object.create(null))
+  let defaultStates = Object.create(null)
+
+  /**
+   * Reads the remembered states, dropping an expired, malformed or other-version record (each read as "nothing
+   * remembered").
+   * @returns {{[nodeKey: string]: boolean}} node key to expanded flag; empty when nothing valid is stored.
+   */
+  function loadNodes() {
+    const nodes = Object.create(null)
+    let raw
+    try {
+      raw = store.getItem(storageKey)
+    } catch {
+      return nodes
+    }
+    if (!raw) {
+      return nodes
+    }
+    let data
+    try {
+      data = JSON.parse(raw)
+    } catch {
+      // A corrupt record cannot be repaired; drop it so it cannot keep failing.
+      removeRecord()
+      return nodes
+    }
+    const expired = !data ||
+      data.v !== TOC_STATE_SCHEMA ||
+      !Number.isFinite(data.expiresAt) ||
+      data.expiresAt <= Date.now()
+    if (expired) {
+      removeRecord()
+      return nodes
+    }
+    if (data.nodes && typeof data.nodes === 'object' && !Array.isArray(data.nodes)) {
+      for (const [key, value] of Object.entries(data.nodes)) {
+        if (typeof value === 'boolean') nodes[key] = value
+      }
+    }
+    return nodes
+  }
+
+  /**
+   * Stores the states and re-stamps the 48-hour expiry from now, which is what slides the window forward on every
+   * visit and toggle.
+   * @param {{[nodeKey: string]: boolean}} nodeStates node key to expanded flag.
+   * @returns {void}
+   */
+  function saveNodes(nodeStates) {
+    const record = { v: TOC_STATE_SCHEMA, expiresAt: Date.now() + TOC_STATE_TTL_MS, nodes: nodeStates }
+    try {
+      store.setItem(storageKey, JSON.stringify(record))
+    } catch {
+      // A full or unavailable store is not fatal: the sidebar still works, it just forgets this time.
+    }
+  }
+
+  /**
+   * Deletes this sidebar's record, when it is expired or corrupt.
+   * @returns {void}
+   */
+  function removeRecord() {
+    try {
+      store.removeItem(storageKey)
+    } catch {
+      // Nothing to do, and it must not break the page.
+    }
+  }
+
+  /** The remembered states, refreshed before the restore and before each recorded toggle. */
+  let nodeStates = loadNodes()
+  if (Object.keys(nodeStates).length > 0) saveNodes(nodeStates)
+
+  /**
+   * The label of an `<li>`'s own node: its direct `<a>`, or the `name-only` span of a group without a link; never the
+   * empty `.expand-stub` nor the nested `<ul>`. The `<wbr>` breaks docfx inserts carry no text.
+   * @param {Element} li the sidebar's list item.
+   * @returns {string} the node's own label, trimmed; empty when it has none.
+   */
+  function labelOf(li) {
+    const anchor = li.querySelector(':scope > a')
+    if (anchor) {
+      return anchor.textContent.trim()
+    }
+    const nameSpan = li.querySelector(':scope > span.name-only')
+    return nameSpan ? nameSpan.textContent.trim() : ''
+  }
+
+  /**
+   * A node's identity: the chain of its ancestors' labels down to it. It survives docfx's re-render on every toggle
+   * (the elements are new, their titles are not) and is the same on every page sharing the toc.json, which is what
+   * lets a choice made on one page be restored on the next.
+   * @param {Element} li the list item to identify.
+   * @returns {string} the labels from the root down, joined by {@link TOC_KEY_SEP}.
+   */
+  function keyOf(li) {
+    const parts = []
+    for (let cur = li; cur && cur !== toc; cur = cur.parentElement) {
+      if (cur.tagName === 'LI') {
+        parts.unshift(labelOf(cur))
+      }
+    }
+    return parts.join(TOC_KEY_SEP)
+  }
+
+  /**
+   * True while the restore clicks, so the click listener records only the reader's own toggles.
+   * @type {boolean}
+   */
+  let applyingRestore = false
+
+  /**
+   * Finds a section whose rendered state differs from what it should be. A remembered choice wins; otherwise only a
+   * section that links to the current page itself takes its toc.yml default here (docfx already renders the other
+   * defaults, and forces the current page's branch open). A remembered collapse is never applied to an ancestor of
+   * the current page, so the page stays visible in the sidebar.
+   * @returns {Element|null} the `<li>` to toggle, or null when the sidebar already matches.
+   */
+  function findMismatchedExpander() {
+    const expanders = toc.querySelectorAll('li.expander')
+    for (const li of expanders) {
+      const key = keyOf(li)
+      const anchor = li.querySelector(':scope > a')
+      const url = anchor && anchor.getAttribute('href') !== '#'
+        ? new URL(anchor.href, window.location.href)
+        : null
+      // docfx's equivalence for index pages and extensionless URLs.
+      const normalize = path => path.replace(/\/index\.html$/gi, '/')
+        .replace(/\.html$/gi, '').replace(/\/$/g, '').toLowerCase()
+      const isCurrentPage = url && url.origin === window.location.origin &&
+        normalize(url.pathname) === normalize(window.location.pathname)
+      const remembered = Object.hasOwn(nodeStates, key)
+      if (!remembered && (!isCurrentPage || !Object.hasOwn(defaultStates, key))) {
+        continue
+      }
+      const wanted = remembered ? nodeStates[key] : defaultStates[key]
+      // Only a true ancestor of the current page has to stay open to show it.
+      if (wanted === false && li.classList.contains('active') && !isCurrentPage) {
+        continue
+      }
+      const isExpanded = li.classList.contains('expanded')
+      if (isExpanded !== wanted) {
+        return li
+      }
+    }
+    return null
+  }
+
+  /**
+   * Brings the rendered sidebar to the remembered states by clicking each mismatched section's `.expand-stub`. Each
+   * click re-renders synchronously and replaces the elements, so every pass queries again; a toggle changes no other
+   * node's state, so each pass fixes one node, and the budget only guards against a pathological tree.
+   * @returns {void}
+   */
+  function restore() {
+    applyingRestore = true
+    try {
+      const budget = toc.querySelectorAll('li.expander').length * 2 + 8
+      for (let pass = 0; pass < budget; pass++) {
+        const li = findMismatchedExpander()
+        if (!li) {
+          break
+        }
+        const stub = li.querySelector(':scope > .expand-stub')
+        if (!stub) {
+          // No handle to drive docfx's model with: stop rather than spin.
+          break
+        }
+        stub.click()
+      }
+    } finally {
+      applyingRestore = false
+    }
+  }
+
+  // The toggled node's identity is taken in the capture phase, before docfx replaces the clicked element; its new
+  // state is read in the bubble phase, after docfx's own handler has re-rendered (a microtask queued in the capture
+  // phase can run before that handler for real input).
+  const toggles = new WeakMap()
+  toc.addEventListener('click', event => {
+    // The restore's clicks are untrusted, and so is any other synthetic click: neither is the reader's choice.
+    if (applyingRestore || !event.isTrusted) {
+      return
+    }
+    const target = event.target
+    if (!(target instanceof Element)) {
+      return
+    }
+    // A toggle is the caret or a group's own href='#' link; a link to a page navigates and is not recorded.
+    const onStub = target.closest('.expand-stub')
+    const anchor = target.closest('a')
+    const onGroupToggle = anchor && anchor.getAttribute('href') === '#'
+    if (!onStub && !onGroupToggle) {
+      return
+    }
+    const li = target.closest('li.expander')
+    if (!li) {
+      return
+    }
+    toggles.set(event, keyOf(li))
+  }, true)
+
+  toc.addEventListener('click', event => {
+    if (!toggles.has(event)) return
+    const key = toggles.get(event)
+    toggles.delete(event)
+    for (const current of toc.querySelectorAll('li.expander')) {
+      if (keyOf(current) !== key) continue
+      // Merged into the latest record: another open tab may have changed another section since this page loaded.
+      nodeStates = loadNodes()
+      nodeStates[key] = current.classList.contains('expanded')
+      saveNodes(nodeStates)
+      break
+    }
+  })
+
+  /**
+   * True once this page load has restored, so the observer's later firings (and the restore's own mutations) do not
+   * run it again.
+   * @type {boolean}
+   */
+  let booted = false
+
+  /**
+   * Restores once the unfiltered sidebar has rendered. docfx keeps its title filter across reloads, and a filtered
+   * sidebar hides branches that cannot be reconciled until the filter is cleared.
+   * @returns {Promise<void>} settles when the restore has run, or at once when the sidebar is not ready.
+   */
+  async function boot() {
+    if (booted) {
+      return
+    }
+    const filter = toc.querySelector('input')
+    if (filter && filter.value.trim()) return
+    if (!toc.querySelector('li.expander')) {
+      // Not filled yet: wait for the next mutation.
+      return
+    }
+    booted = true
+    // Stop observing before restoring, so the restore's own mutations do not call back.
+    observer.disconnect()
+    defaultStates = await defaultsReady
+    // The reader may have started filtering while the defaults loaded.
+    if (filter && filter.value.trim()) {
+      booted = false
+      observer.observe(toc, { childList: true, subtree: true })
+      return
+    }
+    // Another tab may have changed the layout while a restored filter postponed this.
+    nodeStates = loadNodes()
+    restore()
+  }
+
+  // #toc fills after toc.json loads, so wait for its first expander; and try now, in case it is already there.
+  const observer = new MutationObserver(boot)
+  observer.observe(toc, { childList: true, subtree: true })
+  boot()
+}
+
 export default {
   iconLinks: [
     {
@@ -839,5 +1191,6 @@ export default {
     installArcade()
     installAnatomy()
     rewriteRepoLinks()
+    installTocStatePersistence()
   }
 }

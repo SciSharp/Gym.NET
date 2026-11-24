@@ -2,9 +2,12 @@
 # one page per page of Gymnasium's environment docs (DR-104). A family's entries are added with its pages (steps E3 to E7
 # of docs/plans/ENV_DOCS_PLAN.md), so the sidebar never links to a page that does not exist yet. Links are relative to
 # this file; docs/docfx.json's second content group publishes the folder as docs/environments/ on the site.
+# Each family opens by default (`expanded: true`, DR-138): the sidebar shows every env until the reader closes a
+# family, and main.js remembers that choice for 48 hours of inactivity, as NumSharp's site does.
 - name: Overview
   href: index.md
 - name: Classic control
+  expanded: true
   items:
   - name: Acrobot
     href: classic_control/acrobot.md
@@ -17,6 +20,7 @@
   - name: Pendulum
     href: classic_control/pendulum.md
 - name: Box2D
+  expanded: true
   items:
   - name: Bipedal Walker
     href: box2d/bipedal_walker.md
@@ -25,6 +29,7 @@
   - name: Lunar Lander
     href: box2d/lunar_lander.md
 - name: Toy text
+  expanded: true
   items:
   - name: Blackjack
     href: toy_text/blackjack.md
@@ -35,6 +40,7 @@
   - name: Taxi
     href: toy_text/taxi.md
 - name: MuJoCo
+  expanded: true
   items:
   - name: Ant
     href: mujoco/ant.md
