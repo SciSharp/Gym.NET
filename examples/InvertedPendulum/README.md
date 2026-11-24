@@ -8,6 +8,7 @@ dotnet run --project examples/InvertedPendulum -c Release                   # on
 dotnet run --project examples/InvertedPendulum -c Release -- --render       # the same episode in a window
 dotnet run --project examples/InvertedPendulum -c Release -- --play         # you play it, from the keyboard
 dotnet run --project examples/InvertedPendulum -c Release -- --episodes 5   # seeds 0-4, and their mean
+dotnet run --project examples/InvertedPendulum -c Release -- --record docs/environments/mujoco/media   # the docs page's media
 ```
 
 Output, the same on every run since the reset is seeded and the agent has no randomness of its own (measured on an x64
@@ -46,6 +47,23 @@ episode ends; Escape or the window's close button quits.
 | A | Push the cart left (-3) |
 | D | Push it right (+3) |
 | Nothing held | No force |
+
+## Recording the docs page's media
+
+`--record <folder>` plays the seed-0 episode once more (whatever `--seed` says) and writes the media of
+InvertedPendulum's page on the docs site (DR-112) into the folder, `docs/environments/mujoco/media` for the site:
+
+| File | What it is |
+|---|---|
+| `InvertedPendulum-v5.episode.mp4` | The whole episode, one 480×480 frame per step at the env's 25 frames a second (1,001 frames: the reset and 1,000 steps), through Gymnasium's own camera for this env (the model has none), H.264 through Gymnasium's `RecordVideo` and `FfmpegVideoWriter` |
+| `InvertedPendulum-v5.episode.json` | Every step: the state acted on (the cart's position and the pole's angle, and their speeds), the expert's float32 push (`action_dtype` float32, written as the float64 that holds it exactly), the reward and `reward_survive` from the info; the state after the last step as `final` |
+| `InvertedPendulum-v5.figure.png`, `.figure.json` | How it works' frame: 760×380 of the reset pose without noise, from MuJoCo's free camera 1.9 m to the side, and the camera with the cart, the pole's tip and the rail's ends projected to the frame's pixels through MuJoCo's camera geometry |
+
+```
+InvertedPendulum-v5, seed 0: 1000 steps, return 1000.0, recorded into docs/environments/mujoco/media
+```
+
+ffmpeg must be on PATH to record; every other mode runs without it.
 
 ## The API it shows
 

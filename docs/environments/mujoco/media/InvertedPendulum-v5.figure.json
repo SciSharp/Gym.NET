@@ -1,0 +1,88 @@
+{
+  "id": "InvertedPendulum-v5",
+  "width": 760,
+  "height": 380,
+  "camera": {
+    "distance": 1.9,
+    "azimuth": 90,
+    "elevation": -8,
+    "lookat": [
+      0,
+      0,
+      0.25
+    ],
+    "fovy": 45
+  },
+  "observation": [
+    0,
+    0,
+    0,
+    0
+  ],
+  "torso": [
+    380,
+    248.69
+  ],
+  "joints": [
+    {
+      "name": "slider",
+      "body": "cart",
+      "offset": [
+        0,
+        0,
+        0
+      ],
+      "observation": 0,
+      "action": 0,
+      "pixel": [
+        380,
+        248.69
+      ]
+    },
+    {
+      "name": "tip",
+      "body": "pole",
+      "offset": [
+        0.001,
+        0,
+        0.6
+      ],
+      "observation": 1,
+      "action": -1,
+      "pixel": [
+        380.25,
+        104.12
+      ]
+    },
+    {
+      "name": "rail_left",
+      "body": "cart",
+      "offset": [
+        -1,
+        0,
+        0
+      ],
+      "observation": 0,
+      "action": -1,
+      "pixel": [
+        142.92,
+        248.69
+      ]
+    },
+    {
+      "name": "rail_right",
+      "body": "cart",
+      "offset": [
+        1,
+        0,
+        0
+      ],
+      "observation": 0,
+      "action": -1,
+      "pixel": [
+        617.08,
+        248.69
+      ]
+    }
+  ]
+}
