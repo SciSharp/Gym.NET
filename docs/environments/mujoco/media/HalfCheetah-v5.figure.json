@@ -1,0 +1,101 @@
+{
+  "id": "HalfCheetah-v5",
+  "width": 760,
+  "height": 380,
+  "camera": {
+    "distance": 1.6,
+    "azimuth": 90,
+    "elevation": -8,
+    "lookat": [
+      0,
+      0,
+      0.45
+    ],
+    "fovy": 45
+  },
+  "observation": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+  ],
+  "torso": [
+    380,
+    117.45
+  ],
+  "joints": [
+    {
+      "name": "bthigh",
+      "body": "bthigh",
+      "observation": 2,
+      "action": 0,
+      "pixel": [
+        233.47,
+        117.45
+      ]
+    },
+    {
+      "name": "bshin",
+      "body": "bshin",
+      "observation": 3,
+      "action": 1,
+      "pixel": [
+        282.53,
+        190
+      ]
+    },
+    {
+      "name": "bfoot",
+      "body": "bfoot",
+      "observation": 4,
+      "action": 2,
+      "pixel": [
+        204.39,
+        229.27
+      ]
+    },
+    {
+      "name": "fthigh",
+      "body": "fthigh",
+      "observation": 5,
+      "action": 3,
+      "pixel": [
+        526.53,
+        117.45
+      ]
+    },
+    {
+      "name": "fshin",
+      "body": "fshin",
+      "observation": 6,
+      "action": 4,
+      "pixel": [
+        483.3,
+        187.16
+      ]
+    },
+    {
+      "name": "ffoot",
+      "body": "ffoot",
+      "observation": 7,
+      "action": 5,
+      "pixel": [
+        518.43,
+        237.56
+      ]
+    }
+  ]
+}

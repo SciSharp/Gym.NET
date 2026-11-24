@@ -4,14 +4,18 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Gym;
 using Gym.Environments;
+using Gym.Environments.Envs.MuJoCo;
 using Gym.Envs;
 using Gym.Observations;
 using Gym.Rendering;
 using Gym.Rendering.Avalonia;
+using Gym.Utils;
+using Gym.Wrappers;
 using NumSharp;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
@@ -31,6 +35,7 @@ namespace MujocoPoc.Play;
 ///     Usage:
 ///     <code>
 ///     HalfCheetah [--seed N] [--episodes N] [--render]    Farama's TQC expert through Gymnasium.Make (default; DR-74, DR-109)
+///     HalfCheetah --record FOLDER                          the docs page's media from the expert's seed-0 episode (DR-112)
 ///     HalfCheetah --autopilot [--seed N] [--episodes N] [--render]    the same, on the autopilot
 ///     HalfCheetah --play [--seed N]                        the game, with the keyboard driving
 ///     HalfCheetah play [--seed N] [--manual]               the game, with the autopilot driving until Tab
@@ -68,6 +73,9 @@ internal static class HalfCheetahProgram {
         try {
             switch (command) {
                 case "episode":
+                    // --record writes the docs page's media from the expert's seed-0 episode (DR-112), whatever --seed says.
+                    if (options.Flag("record"))
+                        return Record(expertPath, options.Text("record", ""));
                     // The expert plays by default (DR-109); --autopilot keeps the linear policy whose returns Gymnasium
                     // reproduces to the last bit (replay_in_gymnasium.py).
                     return options.Flag("autopilot")
@@ -154,6 +162,201 @@ internal static class HalfCheetahProgram {
             if (step.Terminated || step.Truncated)
                 return (steps, total);
         }
+    }
+
+    // ================================================================================== record (the docs page's media)
+
+    /// <summary>The id the docs page's media come from.</summary>
+    private const string Id = "HalfCheetah-v5";
+
+    /// <summary>The docs page's episode (DR-112): the expert from seed 0, the episode the showreel plays.</summary>
+    private const int RecordSeed = 0;
+
+    /// <summary>
+    ///     How it works' frame (DR-114): 760×380 pixels of the reset pose without noise (<c>reset_noise_scale</c> 0), seen
+    ///     by MuJoCo's free camera from the side, 1.6 m from a point 0.45 m above the floor, at azimuth 90° and elevation -8°.
+    /// </summary>
+    private const int FigureWidth = 760, FigureHeight = 380;
+
+    /// <summary>The figure's camera: distance (m), azimuth and elevation (degrees), as <c>default_camera_config</c> takes them.</summary>
+    private const double FigureDistance = 1.6, FigureAzimuth = 90, FigureElevation = -8;
+
+    /// <summary>The point the figure's camera looks at, in world coordinates: above the torso's start, 0.45 m up.</summary>
+    private static readonly double[] FigureLookat = { 0, 0, 0.45 };
+
+    /// <summary>
+    ///     The joints How it works labels, each with the body it moves (whose frame origin is the joint's anchor in this
+    ///     model: every hinge sits at its body's origin), the observation's item for its angle and the action's item for its
+    ///     motor. HalfCheetah's model (<c>half_cheetah.xml</c>): the back leg's thigh, shin and foot, then the front leg's.
+    /// </summary>
+    private static readonly (string Joint, string Body, int Observation, int Action)[] FigureJoints = {
+        ("bthigh", "bthigh", 2, 0), ("bshin", "bshin", 3, 1), ("bfoot", "bfoot", 4, 2),
+        ("fthigh", "fthigh", 5, 3), ("fshin", "fshin", 6, 4), ("ffoot", "ffoot", 7, 5),
+    };
+
+    /// <summary>
+    ///     Records the docs page's media (DR-112) into <paramref name="folder"/>: the expert's seed-0 episode as
+    ///     <c>HalfCheetah-v5.episode.mp4</c> (one 480×480 frame per step at the env's 20 frames a second, through the
+    ///     model's <c>track</c> camera, by Gymnasium's <see cref="RecordVideo{TObs, TAct}"/> and
+    ///     <see cref="FfmpegVideoWriter"/>), every step as <c>HalfCheetah-v5.episode.json</c>, and How it works' frame as
+    ///     <c>HalfCheetah-v5.figure.png</c> with <c>HalfCheetah-v5.figure.json</c>.
+    /// </summary>
+    /// <param name="expertPath">The expert's file.</param>
+    /// <param name="folder">The output folder, <c>docs/environments/mujoco/media</c> for the site; created if missing.</param>
+    /// <returns>0 when the media were written, 2 when no folder was given.</returns>
+    /// <exception cref="InvalidOperationException">ffmpeg could not be run, or wrote no video.</exception>
+    /// <exception cref="IOException">A file cannot be written, or the expert's file cannot be read.</exception>
+    /// <exception cref="InvalidDataException">The expert's file is not a <c>gym.net-agent/1</c> agent.</exception>
+    /// <remarks>
+    ///     <para>
+    ///     Each JSON row is the state the expert acted on, its six commands and the step's reward with its two terms:
+    ///     <c>step, x, z, pitch, vx, bthigh, bshin, bfoot, fthigh, fshin, ffoot, a0 ... a5, reward_forward, reward_ctrl,
+    ///     reward</c>. The state is the simulation's own: the torso's x, height and pitch (<c>qpos[0..2]</c>), its forward
+    ///     velocity (<c>qvel[0]</c>) and the six joint angles (<c>qpos[3..8]</c>), rounded to 5 decimals. The commands are
+    ///     the network's float32 values, each written as the float64 that holds it exactly, so the trace replays the
+    ///     episode bit for bit (<c>action_dtype</c> says to cast them back); the reward terms are the step's info. The
+    ///     video's frame <c>t</c> shows the state of row <c>t</c>, and its last frame the state after the last step, which
+    ///     the JSON keeps as <c>final</c>.
+    ///     </para>
+    ///     <para>
+    ///     Gym.NET draws MuJoCo's frames in software (DR-62), so the recording takes a minute or two. RecordVideo names its
+    ///     file <c>HalfCheetah-v5-episode-0.mp4</c> and writes it when the env closes; it records into a scratch folder
+    ///     inside <paramref name="folder"/> and the file is moved to the page's name, so a recording that fails halfway
+    ///     leaves the published video as it was. <c>[NDScoped]</c> (DR-80) releases every array the episode creates.
+    ///     </para>
+    /// </remarks>
+    [NDScoped]
+    private static int Record(string expertPath, string folder) {
+        // The folder is required: the page's media live in the docs tree, and a default would write them where no page
+        // reads them.
+        if (string.IsNullOrEmpty(folder)) {
+            Console.Error.WriteLine("--record needs a folder, e.g. --record docs/environments/mujoco/media");
+            return 2;
+        }
+        ExpertPolicy expert = ExpertPolicy.Load(expertPath);
+        Directory.CreateDirectory(folder);
+        string scratch = Path.Combine(folder, ".recording");
+        var rows = new List<double[]>();
+        double total = 0;
+        double[] final;
+        Dictionary<string, object?> arguments = expert.MakeArguments(human: false);
+        arguments["render_mode"] = "rgb_array";
+        // The model's own camera, which follows the body's centre of mass: with no camera named, Gymnasium 1.4 forces
+        // MuJoCo's free camera, which never follows a body, and the runner leaves the frame within a second (the
+        // showreel's choice, DR-74).
+        arguments["camera_name"] = "track";
+        using (Env<NDArray, NDArray> made = Gymnasium.Make<NDArray, NDArray>(Id, arguments))
+        using (var env = new RecordVideo<NDArray, NDArray>(made, scratch, episodeTrigger: _ => true, namePrefix: Id,
+                   videoWriter: new FfmpegVideoWriter())) {
+            var cheetah = (MujocoEnv)env.Unwrapped;
+            NDArray observation = env.Reset(seed: RecordSeed).Observation;
+            for (int t = 0; ; t++) {
+                NDArray action = expert.Act(observation);
+                // float32 to float64 is exact, so the JSON's number casts back to the very float32 the expert chose.
+                double[] commands = action.ToArray<float>().Select(v => (double)v).ToArray();
+                double[] state = RecordState(cheetah);
+                StepResult<NDArray> step = env.Step(action);
+                total += step.Reward;
+                double forward = step.Info.Get<double>("reward_forward"), control = step.Info.Get<double>("reward_ctrl");
+                rows.Add(state.Prepend(t).Concat(commands)
+                    .Append(Math.Round(forward, 5)).Append(Math.Round(control, 5)).Append(Math.Round(step.Reward, 5)).ToArray());
+                observation = step.Observation;
+                // HalfCheetah never terminates: the time limit ends the episode at 1,000 steps.
+                if (step.Terminated || step.Truncated)
+                    break;
+            }
+            final = RecordState(cheetah);
+            // RecordVideo writes the episode's video when it stops recording, which closing the env does.
+            env.Close();
+        }
+        string recorded = Path.Combine(scratch, $"{Id}-episode-0.mp4");
+        if (!File.Exists(recorded))
+            throw new InvalidOperationException($"RecordVideo wrote no {recorded}; is ffmpeg on PATH?");
+        File.Move(recorded, Path.Combine(folder, $"{Id}.episode.mp4"), overwrite: true);
+        Directory.Delete(scratch, recursive: true);
+        File.WriteAllText(Path.Combine(folder, $"{Id}.episode.json"), JsonSerializer.Serialize(new {
+            id = Id, seed = RecordSeed, steps = rows.Count, @return = total, fps = 20,
+            agent = "Farama's TQC expert (examples/HalfCheetah)", action_dtype = "float32",
+            columns = new[] { "step", "x", "z", "pitch", "vx", "bthigh", "bshin", "bfoot", "fthigh", "fshin", "ffoot",
+                "a0", "a1", "a2", "a3", "a4", "a5", "reward_forward", "reward_ctrl", "reward" },
+            rows,
+            final,
+        }) + "\n");
+        SaveFigure(folder);
+        Console.WriteLine($"{Id}, seed {RecordSeed}: {rows.Count} steps, return {total:F1}, recorded into {folder}");
+        return 0;
+    }
+
+    /// <summary>The trace's view of a state: the torso's x, height and pitch, its forward velocity, the six joint angles.</summary>
+    /// <param name="cheetah">The unwrapped env, whose simulation holds the state.</param>
+    /// <returns>Ten values, rounded to 5 decimals: <c>qpos[0..2]</c>, <c>qvel[0]</c>, <c>qpos[3..8]</c>.</returns>
+    private static double[] RecordState(MujocoEnv cheetah) {
+        // The simulation's own arrays through views: copied out at once, the views released with the episode's scope.
+        double[] qpos = cheetah.Data.Qpos.ToArray<double>(), qvel = cheetah.Data.Qvel.ToArray<double>();
+        double R(double v) => Math.Round(v, 5);
+        return new[] { R(qpos[0]), R(qpos[1]), R(qpos[2]), R(qvel[0]), R(qpos[3]), R(qpos[4]), R(qpos[5]), R(qpos[6]), R(qpos[7]), R(qpos[8]) };
+    }
+
+    /// <summary>
+    ///     Saves How it works' frame as <c>HalfCheetah-v5.figure.png</c>, and as <c>HalfCheetah-v5.figure.json</c> the camera
+    ///     and the pixel of each point its labels mark: the torso and each joint, projected through MuJoCo's free-camera
+    ///     geometry.
+    /// </summary>
+    /// <param name="folder">The output folder.</param>
+    /// <exception cref="IOException">A file cannot be written.</exception>
+    /// <remarks>
+    ///     <para>
+    ///     The frame is the env's own render of its reset without noise, which every seed then gives alike. The projection
+    ///     is <c>mjv_updateCamera</c>'s for a free camera: <c>forward = (cos e cos a, cos e sin a, sin e)</c>,
+    ///     <c>up = (-sin e cos a, -sin e sin a, cos e)</c>, <c>right = (sin a, -cos a, 0)</c> for azimuth <c>a</c> and
+    ///     elevation <c>e</c>, the eye at <c>lookat - distance forward</c>, and a vertical field of view of 45° (MuJoCo's
+    ///     <c>vis.global.fovy</c>, which every model Gymnasium bundles keeps) over the frame's height: a point at camera
+    ///     coordinates <c>(x, y, z)</c> is the pixel <c>(W/2 + f x/z, H/2 - f y/z)</c>, <c>f = (H/2) / tan(22.5°)</c>.
+    ///     Reference: <see href="https://github.com/google-deepmind/mujoco/blob/4.0.0/src/engine/engine_vis_visualize.c">engine_vis_visualize.c</see>.
+    ///     </para>
+    ///     <para>
+    ///     The frame is Gym.NET's: its MuJoCo frames are drawn in software and equal Gymnasium's only for the inverted
+    ///     pendulums so far (DR-98), so a few thousand of this frame's pixels differ from Gymnasium's own, along the
+    ///     floor's checkers and the bodies' edges; the projected points do not depend on the drawing.
+    ///     </para>
+    /// </remarks>
+    [NDScoped]
+    private static void SaveFigure(string folder) {
+        var arguments = new Dictionary<string, object?> {
+            ["render_mode"] = "rgb_array", ["width"] = FigureWidth, ["height"] = FigureHeight, ["reset_noise_scale"] = 0.0,
+            ["default_camera_config"] = new Dictionary<string, object?> {
+                ["distance"] = FigureDistance, ["azimuth"] = FigureAzimuth, ["elevation"] = FigureElevation, ["lookat"] = FigureLookat,
+            },
+        };
+        using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>(Id, arguments);
+        NDArray observation = env.Reset(seed: RecordSeed).Observation;
+        using RenderResult rendered = env.Render();
+        NDArray frame = (NDArray)rendered;
+        using (var image = Image.LoadPixelData<Rgb24>(frame.ToArray<byte>(), FigureWidth, FigureHeight))
+            image.SaveAsPng(Path.Combine(folder, $"{Id}.figure.png"));
+        var cheetah = (MujocoEnv)env.Unwrapped;
+        double a = FigureAzimuth * Math.PI / 180, e = FigureElevation * Math.PI / 180;
+        double[] forward = { Math.Cos(e) * Math.Cos(a), Math.Cos(e) * Math.Sin(a), Math.Sin(e) };
+        double[] up = { -Math.Sin(e) * Math.Cos(a), -Math.Sin(e) * Math.Sin(a), Math.Cos(e) };
+        double[] right = { Math.Sin(a), -Math.Cos(a), 0 };
+        double[] eye = Enumerable.Range(0, 3).Select(k => FigureLookat[k] - FigureDistance * forward[k]).ToArray();
+        double focal = FigureHeight / 2.0 / Math.Tan(45.0 / 2 * Math.PI / 180);
+        double[] Pixel(string body) {
+            double[] p = cheetah.Data.Body(body).Xpos.ToArray<double>();
+            double[] v = { p[0] - eye[0], p[1] - eye[1], p[2] - eye[2] };
+            double z = v[0] * forward[0] + v[1] * forward[1] + v[2] * forward[2];
+            double x = v[0] * right[0] + v[1] * right[1] + v[2] * right[2];
+            double y = v[0] * up[0] + v[1] * up[1] + v[2] * up[2];
+            return new[] { Math.Round(FigureWidth / 2.0 + focal * x / z, 2), Math.Round(FigureHeight / 2.0 - focal * y / z, 2) };
+        }
+        double[] o = observation.ToArray<double>();
+        File.WriteAllText(Path.Combine(folder, $"{Id}.figure.json"), JsonSerializer.Serialize(new {
+            id = Id, width = FigureWidth, height = FigureHeight,
+            camera = new { distance = FigureDistance, azimuth = FigureAzimuth, elevation = FigureElevation, lookat = FigureLookat, fovy = 45.0 },
+            observation = o.Select(v => Math.Round(v, 5)).ToArray(),
+            torso = Pixel("torso"),
+            joints = FigureJoints.Select(j => new { name = j.Joint, body = j.Body, observation = j.Observation, action = j.Action, pixel = Pixel(j.Body) }).ToArray(),
+        }, new JsonSerializerOptions { WriteIndented = true }) + "\n");
     }
 
     /// <summary>

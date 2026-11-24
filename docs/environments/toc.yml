@@ -34,3 +34,7 @@
     href: toy_text/frozen_lake.md
   - name: Taxi
     href: toy_text/taxi.md
+- name: MuJoCo
+  items:
+  - name: Half Cheetah
+    href: mujoco/half_cheetah.md

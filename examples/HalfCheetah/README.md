@@ -12,6 +12,7 @@ dotnet run --project examples/HalfCheetah -c Release -- --render       # the sam
 dotnet run --project examples/HalfCheetah -c Release -- --autopilot    # the episode on the autopilot instead
 dotnet run --project examples/HalfCheetah -c Release -- --play         # the playable HalfCheetah, you driving
 dotnet run --project examples/HalfCheetah -c Release -- --episodes 5   # seeds 0-4, and their mean
+dotnet run --project examples/HalfCheetah -c Release -- --record docs/environments/mujoco/media   # the docs page's media
 ```
 
 Output, the same on every run since the reset is seeded and neither agent has randomness of its own (measured on an x64
@@ -63,6 +64,24 @@ What you see:
 "track" camera follows the runner), the mouse orbits, pans and zooms, Space pauses and H lists the rest. Gym.NET draws
 MuJoCo's frames in software, every one by default: when the window falls behind real time, D turns "render every frame"
 off and it skips frames instead.
+
+## Recording the docs page's media
+
+`--record <folder>` plays the expert's seed-0 episode once more (whatever `--seed` says) and writes the media of Half
+Cheetah's page on the docs site (DR-112) into the folder, `docs/environments/mujoco/media` for the site:
+
+| File | What it is |
+|---|---|
+| `HalfCheetah-v5.episode.mp4` | The whole episode, one 480×480 frame per step at the env's 20 frames a second (1,001 frames: the reset and 1,000 steps), through the model's `track` camera, H.264 through Gymnasium's `RecordVideo` and `FfmpegVideoWriter` |
+| `HalfCheetah-v5.episode.json` | Every step: the state acted on (the torso's x, height and pitch, its forward velocity, the six joint angles), the expert's six float32 commands (`action_dtype` float32, each written as the float64 that holds it exactly), the reward and its two terms from the info; the state after the last step as `final` |
+| `HalfCheetah-v5.figure.png`, `.figure.json` | How it works' frame: 760×380 of the reset pose without noise, from MuJoCo's free camera 1.6 m to the side (azimuth 90°, elevation -8°), and the camera with each joint's body projected to the frame's pixels through MuJoCo's camera geometry |
+
+```
+HalfCheetah-v5, seed 0: 1000 steps, return 17648.0, recorded into docs/environments/mujoco/media
+```
+
+Gym.NET draws MuJoCo's frames in software, so the recording takes about two minutes. ffmpeg must be on PATH to record;
+every other mode runs without it.
 
 ## The expert
 
