@@ -6,6 +6,7 @@ A two-legged robot in a plane has to walk forward without falling. A published e
 dotnet run --project examples/Walker2d -c Release                   # one episode, headless
 dotnet run --project examples/Walker2d -c Release -- --render       # the same episode in a window
 dotnet run --project examples/Walker2d -c Release -- --episodes 5   # seeds 0-4, and their mean
+dotnet run --project examples/Walker2d -c Release -- --record docs/environments/mujoco/media   # the docs page's media
 ```
 
 Output, the same on every run since the reset is seeded and the agent has no randomness of its own (measured on an x64
@@ -39,6 +40,24 @@ runner leaves the default free camera's view; Tab to the model's "track" camera,
 
 `--play` is not offered: its frames take about 0.1 s each to draw in software and a step is 8 ms of simulated time, so
 keyboard play would run about 12 times slower than real time.
+
+## Recording the docs page's media
+
+`--record <folder>` plays the seed-0 episode once more (whatever `--seed` says) and writes the media of Walker2d's page
+on the docs site (DR-112) into the folder, `docs/environments/mujoco/media` for the site:
+
+| File | What it is |
+|---|---|
+| `Walker2d-v5.episode.mp4` | The whole episode, one 480×480 frame per step at the env's 125 frames a second (1,001 frames: the reset and 1,000 steps), through the model's `track` camera, H.264 through Gymnasium's `RecordVideo` and `FfmpegVideoWriter` |
+| `Walker2d-v5.episode.json` | Every step: the state acted on (the torso's x, height and angle, its forward velocity, both legs' three joint angles), the expert's six float32 commands (`action_dtype` float32, each written as the float64 that holds it exactly), the reward and its three terms from the info; the state after the last step as `final` |
+| `Walker2d-v5.figure.png`, `.figure.json` | How it works' frame: 480×600 of the reset pose without noise, from MuJoCo's free camera 2.4 m to the side, and the camera with each joint's anchor projected to the frame's pixels through MuJoCo's camera geometry |
+
+```
+Walker2d-v5, seed 0: 1000 steps, return 6943.4, recorded into docs/environments/mujoco/media
+```
+
+Gym.NET draws MuJoCo's frames in software, so the recording takes a few minutes. ffmpeg must be on PATH to record; every
+other mode runs without it.
 
 ## The API it shows
 
