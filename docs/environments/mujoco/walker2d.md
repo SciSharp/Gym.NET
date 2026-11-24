@@ -203,7 +203,7 @@ By Gymnasium's name in `Make`'s kwargs, or by the C# name in the constructor and
 |---|---|---|
 | `xml_file`<br>`xmlFile` | `string`<br>`"walker2d_v5.xml"` | The model: the bundled one by name, or a path to your own MJCF file |
 | `frame_skip`<br>`frameSkip` | `int`<br>`4` | Physics steps per env step; changes the step's duration and the frame rate |
-| `default_camera_config`<br>`defaultCameraConfig` | `IReadOnlyDictionary<string, object?>?`<br>`null` | The free camera's `distance`, `azimuth`, `elevation`, `lookat` or `trackbodyid`; null takes the env's own, following the right thigh from 4 m |
+| `default_camera_config`<br>`defaultCameraConfig` | `IReadOnlyDictionary<string, object?>?`<br>`null` | The free camera's `distance`, `azimuth`, `elevation`, `lookat` or `trackbodyid`; null takes the env's own, 4 m off and 20° above, which does not follow the walker |
 | `forward_reward_weight`<br>`forwardRewardWeight` | `double`<br>`1.0` | The weight of the speed in the reward |
 | `ctrl_cost_weight`<br>`ctrlCostWeight` | `double`<br>`1e-3` | The weight of the control cost |
 | `healthy_reward`<br>`healthyReward` | `double`<br>`1.0` | The reward for each healthy step |
@@ -238,9 +238,11 @@ its start) on every reset and step; `x_velocity`, `reward_forward`, `reward_ctrl
 | `human` | MuJoCo's window from the viewer factory, drawn after every reset and step, with Gymnasium's controls |
 | none | `Render()` warns and returns nothing, as Gymnasium's does |
 
-With no camera named, Gymnasium 1.4 renders through MuJoCo's free camera with the env's `default_camera_config`,
-which for Walker2d tracks the right thigh from 4 m, 20° above; `camera_name = "track"` takes the model's own camera, 3 m to the
-side, which follows the body's centre of mass, as the video does. In `human` mode, Tab cycles the cameras, the mouse
+With no camera named, Gymnasium 1.4 renders through MuJoCo's free camera with the env's `default_camera_config`: for
+Walker2d 4 m from a point 1.15 m above the start, 20° above it. The config names the right thigh as `trackbodyid`, but
+a free camera tracks nothing, so the camera stays where it is and a walking walker leaves the frame.
+`camera_name = "track"` takes the model's own camera, 3 m to the side, which follows the body's centre of mass, as the
+video does. In `human` mode, Tab cycles the cameras, the mouse
 orbits, pans and zooms, and H lists Gymnasium's other keys. Gym.NET draws this model's frames in software in about
 0.1 s each; by default every frame is drawn, and D switches to skipping frames.
 

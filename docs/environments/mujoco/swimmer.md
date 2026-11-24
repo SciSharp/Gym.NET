@@ -186,7 +186,7 @@ By Gymnasium's name in `Make`'s kwargs, or by the C# name in the constructor and
 |---|---|---|
 | `xml_file`<br>`xmlFile` | `string`<br>`"swimmer.xml"` | The model: the bundled one by name, or a path to your own MJCF file |
 | `frame_skip`<br>`frameSkip` | `int`<br>`4` | Physics steps per env step; changes the step's duration and the frame rate |
-| `default_camera_config`<br>`defaultCameraConfig` | `IReadOnlyDictionary<string, object?>?`<br>`null` | The free camera's `distance`, `azimuth`, `elevation`, `lookat` or `trackbodyid`; Swimmer sets none, so null leaves MuJoCo's default, 8 m off |
+| `default_camera_config`<br>`defaultCameraConfig` | `IReadOnlyDictionary<string, object?>?`<br>`null` | The free camera's `distance`, `azimuth`, `elevation`, `lookat` or `trackbodyid`; Swimmer sets none, so null leaves the renderer's start, the model's extent, 8 m off |
 | `forward_reward_weight`<br>`forwardRewardWeight` | `double`<br>`1.0` | The weight of the speed in the reward |
 | `ctrl_cost_weight`<br>`ctrlCostWeight` | `double`<br>`1e-4` | The weight of the control cost |
 | `reset_noise_scale`<br>`resetNoiseScale` | `double`<br>`0.1` | The starting state's noise; 0 starts from the model's pose |
