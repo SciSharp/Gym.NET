@@ -9,6 +9,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using Gym.Envs;
 using Gym.Envs.Registration;
+using Gym.Utils;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using NumSharp;
 
@@ -191,8 +192,9 @@ namespace Gym.Tests.Docs {
                     string[] names = row.Groups[1].Value.Split("<br>");
                     string python = names[0].Trim().Trim('`'), csharp = names[1].Trim().Trim('`');
                     Assert.IsTrue(parameters.TryGetValue(csharp, out ParameterInfo? parameter), $"{name}: {envType.Name} has no parameter {csharp}");
+                    // The keyword make binds to the parameter: its [PyName], else the binding's own snake_case (PyKwargs).
                     if (python != "(Gym.NET)")
-                        Assert.AreEqual(SnakeCase(csharp), python, $"{name}: {csharp}'s Gymnasium keyword");
+                        Assert.AreEqual(parameter!.GetCustomAttribute<PyNameAttribute>()?.Name ?? SnakeCase(csharp), python, $"{name}: {csharp}'s Gymnasium keyword");
                     string stated = row.Groups[2].Value.Split("<br>").Last().Trim().Trim('`');
                     Assert.IsTrue(DefaultMatches(parameter!.DefaultValue, stated), $"{name}: {csharp}'s default is {parameter.DefaultValue ?? "null"}, the page says {stated}");
                 }
@@ -303,10 +305,18 @@ namespace Gym.Tests.Docs {
         /// <returns>The collapsed text.</returns>
         private static string Collapse(string text) => Regex.Replace(text, "\\s+", " ");
 
-        /// <summary>A C# parameter name in Gymnasium's snake_case: <c>suttonBartoReward</c> becomes <c>sutton_barto_reward</c>.</summary>
+        /// <summary>
+        ///     A C# parameter name in Gymnasium's snake_case, by the rule <c>Make</c>'s kwargs bind with
+        ///     (<see cref="PyAttributes.SnakeCase"/>): <c>suttonBartoReward</c> becomes <c>sutton_barto_reward</c>, and a
+        ///     one-letter word keeps its own underscore, <c>healthyZRange</c> becoming <c>healthy_z_range</c>.
+        /// </summary>
         /// <param name="name">The camelCase name.</param>
         /// <returns>The snake_case name.</returns>
-        private static string SnakeCase(string name) => Regex.Replace(name, "(?<=[a-z0-9])([A-Z])", "_$1").ToLowerInvariant();
+        /// <remarks>
+        ///     The test once had its own pattern, an underscore before each capital that follows a lower-case letter or a
+        ///     digit, which made <c>healthyZRange</c> <c>healthy_zrange</c>: the binding's rule is the one a page must match.
+        /// </remarks>
+        private static string SnakeCase(string name) => PyAttributes.SnakeCase(name);
 
         /// <summary>Whether a parameter's default value is the one a page states in its Arguments table.</summary>
         /// <param name="value">The parameter's default.</param>

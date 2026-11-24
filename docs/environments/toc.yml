@@ -38,3 +38,5 @@
   items:
   - name: Half Cheetah
     href: mujoco/half_cheetah.md
+  - name: Hopper
+    href: mujoco/hopper.md

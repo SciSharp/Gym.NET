@@ -1,0 +1,80 @@
+{
+  "id": "Hopper-v5",
+  "width": 480,
+  "height": 600,
+  "camera": {
+    "distance": 2.4,
+    "azimuth": 90,
+    "elevation": -5,
+    "lookat": [
+      0,
+      0,
+      0.8
+    ],
+    "fovy": 45
+  },
+  "observation": [
+    1.25,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+  ],
+  "torso": [
+    240,
+    162.47
+  ],
+  "joints": [
+    {
+      "name": "thigh_joint",
+      "body": "thigh",
+      "offset": [
+        0,
+        0,
+        0
+      ],
+      "observation": 2,
+      "action": 0,
+      "pixel": [
+        240,
+        224.15
+      ]
+    },
+    {
+      "name": "leg_joint",
+      "body": "leg",
+      "offset": [
+        0,
+        0,
+        0.25
+      ],
+      "observation": 3,
+      "action": 1,
+      "pixel": [
+        240,
+        359.69
+      ]
+    },
+    {
+      "name": "foot_joint",
+      "body": "foot",
+      "offset": [
+        -0.13,
+        0,
+        0.1
+      ],
+      "observation": 4,
+      "action": 2,
+      "pixel": [
+        240,
+        505.22
+      ]
+    }
+  ]
+}

@@ -32,6 +32,12 @@
     <PackageReference Include="NumSharp.Build" Version="0.81.0" PrivateAssets="all" />
   </ItemGroup>
 
+  <!-- Used directly: the record mode saves How it works' frame as a PNG for the env's docs page (DR-112). 2.1.13, the
+       version the whole repository pins (decision D18). -->
+  <ItemGroup>
+    <PackageReference Include="SixLabors.ImageSharp" Version="2.1.13" />
+  </ItemGroup>
+
   <!-- What the Gym.NET.Environments package's buildTransitive targets do for a C# app (DR-17): compile a module
        initializer that registers the built-in env ids before Main, so Gymnasium.Make("Hopper-v5") works with no set-up
        call. A ProjectReference does not bring buildTransitive files, so the example imports it by path. -->
