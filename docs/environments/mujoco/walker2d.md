@@ -435,7 +435,7 @@ Gymnasium 1.4.0 runs inside the test process, MuJoCo 4.0.0 under it, and both ar
 | What is compared | How | Result |
 |---|---|---|
 | Episodes | sampled episodes of both versions from several seeds, three in a row in one env through their falls, every observation, reward, flag and info value with its NumPy type | ✓ bit for bit |
-| Arguments | Gymnasium's keyword variants (the x in the observation, other weights, ranges and noise, another frame skip) | ✓ bit for bit |
+| Arguments | Gymnasium's keyword variants (the x in the observation, the model by name, the healthy reward and height, no termination) | ✓ bit for bit |
 | Actions | every form of action NumPy takes or refuses, with Gymnasium's messages | ✓ same values, same messages |
 | Frames | `rgb_array` and `depth_array` frames against Gymnasium's on the reference GPU, within a measured baseline | 23,701 of 230,400 pixels differ |
 | Spaces, metadata, `make`'s stack, the window | both spaces; the metadata; `make`'s stacks and warnings; the human window's controls and overlay | ✓ |
