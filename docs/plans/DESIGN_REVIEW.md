@@ -903,3 +903,29 @@ Effects of approved designs that only showed up in code. None changes a design; 
     `BlackjackObservation` shares: its samples read the numbers out before the result goes. Blackjack's samples file
     enables nullable annotations below the quick start's four lines, for `object?[]`.
   - Gymnasium's Cliff Walking docstring names the info key `p`; the env sends `prob`, as the page says.
+- **DR-112 and DR-114, Box2D's pages** (E6, 2026-11-24). Bipedal Walker (with its hardcore section), Car Racing and
+  Lunar Lander (with its continuous section) follow the template, and their four examples gained `--record`. Every
+  figure equals Gymnasium's own frame after replaying the trace's actions in Gymnasium, one render a step (0 differing
+  pixels, and the replay's return equals the trace's bit for bit). What the three pages found:
+  - A render changes Box2D's envs: Lunar Lander's ages the exhaust particles (and destroys spent ones), Bipedal Walker's
+    moves its lidar sweep on. A figure rendered a second time changes that frame and every later one, so the recorders
+    take the figure from `RecordVideo.RecordedFrames`, the frame the video already holds.
+  - The legs' (Lunar Lander) and feet's (Bipedal Walker) contact flags are one boolean each, set by `BeginContact` and
+    cleared by any `EndContact`, over a ground of separate edges: a leg crossing a joint clears its flag while it
+    stands. Replayed with pybox2d's contact lists, Bipedal Walker's leg 2 reads 0 after 209 of the 923 steps its foot
+    touches the ground. Both pages warn, and their charts call the strips flags.
+  - Gymnasium's walking gait never reads the lidar, and seed 0, the showreel's, is one of its few full courses: over
+    seeds 0-99 it reaches the end 4 times and falls 91 times (mean 48.8), and on the hardcore course it gets no further
+    than 33 units. The example's README said the gait timed its steps by the lidar; corrected.
+  - Bipedal Walker's hardcore section plays the TQC expert's episode with its own figure, a frame with a staircase, a
+    stump and a pit, which the figure's script tells apart by their sizes (the env keeps no kinds). The expert hops: in
+    486 of its 968 steps neither foot is on the ground.
+  - Gymnasium's CarRacing docstring lists the change of 1.0.0, finishing the lap as a termination, under v2; that
+    change registered CarRacing-v3. The page's version history follows the registry's history instead (v1 February
+    2022, v2 July 2022, v3 Gymnasium 1.0.0).
+  - Car Racing's page shows the observation beside the labelled frame: the 96x96 picture at five times its size, in
+    `.gn-figure-art`'s 480 px.
+  - The anatomy readout showed "−0°" for a level hull: `toFixed` keeps a small negative value's sign. `formatReadout`
+    drops it when every digit is a zero.
+  - A float32 action makes Gymnasium's reward an `np.float32` (NEP 50), and a Python float plus it stays float32; the
+    replay checker sums `float(reward)`, as Gym.NET's double rewards do.
