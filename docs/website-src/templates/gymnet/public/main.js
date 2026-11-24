@@ -6,7 +6,7 @@
 //   2. the 8-bit "select your environment" gallery (on the landing page and the Environments page, one shared include,
 //      website-src/includes/arcade.md), filled from images/envs/envs.json, which the showreel tool (tools/showreel)
 //      writes together with the looping clips (the cartridges' 8-bit WebPs and the "now playing" screen's full-size
-//      MP4s), with each cartridge's game manual (DR-102);
+//      MP4s), with each cartridge's game manual (DR-102); a hover previews a cartridge, a click locks it (DR-143);
 //   3. links docfx could not resolve (repository files outside the site, such as CLAUDE.md or LICENSE) are pointed at
 //      GitHub, so pages copied from docs/ keep working links on the site;
 //   4. the env pages' episode anatomy (DR-115): a chart of the recorded episode, drawn from its step trace, with a
@@ -230,8 +230,11 @@ async function writtenPages(root) {
  * "now playing" panel with the chosen env's family, its full-size loop, a HUD with the showreel episode's seed, steps
  * and return, its game manual (DR-102: HOW TO PLAY in game words, READ THE MANUAL opening the env's page, links to its
  * example, Gymnasium's page and the API). It runs in attract mode (the cursor moves on by itself every few seconds)
- * until the reader hovers, clicks or uses the arrow keys; Enter opens the selected env's page. Does nothing on pages
- * without the gallery, or when the manifest cannot be fetched.
+ * until the reader hovers, clicks or uses the arrow keys; Enter opens the selected env's page. Hovering a cartridge
+ * shows it; a click locks it (DR-143): while locked, hovering the others leaves NOW PLAYING alone, so a reader can pick a
+ * cartridge mid-shelf and cross the rest to the panel or the sidebar. A click on the locked cartridge, or Esc, releases
+ * it; a click on another moves the lock; the arrow keys, Home and End carry it along. Does nothing on pages without the
+ * gallery, or when the manifest cannot be fetched.
  * @returns {Promise<void>} Settles when the gallery is built (or skipped).
  */
 async function installArcade() {
@@ -268,6 +271,8 @@ async function installArcade() {
   const linksLine = arcade.querySelector('.gn-links')
   const links = linksLine.querySelectorAll('a[data-link]')
   const enterHint = arcade.querySelector('.gn-enter')
+  // The lock's hint at the end of the links line (DR-143); an include older than the lock has none.
+  const lockHint = arcade.querySelector('.gn-lock-hint')
 
   /**
    * The address READ THE MANUAL opens for an env: its page (with the variant's section) when the site has that page,
@@ -304,13 +309,56 @@ async function installArcade() {
     // The text painted now; fitLabels compares against it, so a label that fits is not painted twice.
     name.dataset.label = env.id
     button.append(art, name)
-    button.addEventListener('click', () => select(i, true))
-    button.addEventListener('mouseenter', () => select(i, true))
+    button.addEventListener('click', () => toggleLock(i))
+    // A hover only previews: while a cartridge is locked, the pointer crossing the others changes nothing (DR-143).
+    // On a touch screen a tap fires this before its click, so a tap on an unlocked shelf previews, then locks.
+    button.addEventListener('mouseenter', () => {
+      if (locked < 0) {
+        select(i, true)
+      }
+    })
     carts.appendChild(button)
     return button
   })
 
   let current = -1
+
+  /**
+   * The cartridge the reader locked with a click (DR-143), or -1 while none is: a locked cartridge stays on NOW PLAYING
+   * whatever the pointer crosses, until a click on it or Esc releases it.
+   * @type {number}
+   */
+  let locked = -1
+
+  /**
+   * A click on a cartridge: it locks that env on the screen (showing it first, which ends attract mode as any reader
+   * choice does), moves the lock there from another cartridge, or, on the locked cartridge itself, releases the lock.
+   * @param {number} i The clicked cartridge's index in the manifest.
+   * @returns {void}
+   */
+  function toggleLock(i) {
+    if (locked === i) {
+      setLock(-1)
+      return
+    }
+    select(i, true)
+    setLock(i)
+  }
+
+  /**
+   * Sets the lock and its marks: the locked cartridge's settled cursor (`.gn-locked`: its frame stops blinking and
+   * stays gold, its arrow turns gold, main.css) and the hint at the end of the links line, which says how to lock, or
+   * how to let go.
+   * @param {number} i The env to lock (always the selected one), or -1 to release the lock.
+   * @returns {void}
+   */
+  function setLock(i) {
+    locked = i
+    buttons.forEach((b, n) => b.classList.toggle('gn-locked', n === i))
+    if (lockHint) {
+      lockHint.textContent = i < 0 ? ' · click a cartridge to keep it' : ' · click it again or Esc to let go'
+    }
+  }
 
   /**
    * Repaints each cartridge's label for the width its cartridge now has (cartLabel), and the NOW PLAYING label for the
@@ -467,8 +515,16 @@ async function installArcade() {
   }
 
   // Arrow keys move the cursor through the grid while focus is inside the gallery; Home and End jump to the ends;
-  // Enter opens the selected env's page.
+  // Enter opens the selected env's page; Esc releases a lock.
   arcade.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      // Only a lock to release takes the key; otherwise Esc stays the page's (a dialog's, the search box's).
+      if (locked >= 0) {
+        e.preventDefault()
+        setLock(-1)
+      }
+      return
+    }
     if (e.key === 'Enter') {
       // A focused link (the example, Gymnasium's page, the API, READ THE MANUAL itself) follows its own address.
       if (e.target instanceof Element && e.target.closest('a')) {
@@ -496,6 +552,10 @@ async function installArcade() {
     }
     e.preventDefault()
     select(next, true)
+    // A key is as deliberate as a click: a lock moves along with the cursor instead of being left behind.
+    if (locked >= 0) {
+      setLock(next)
+    }
     buttons[next].focus()
   })
 

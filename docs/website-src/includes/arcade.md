@@ -22,7 +22,7 @@ Keep it one HTML block with no blank line inside, or markdown would end the bloc
 </dl>
 </div>
 <a class="gn-manual-button" hidden><canvas class="gn-pixel" data-text="&gt; READ THE MANUAL" data-scale="3" data-color="#000"></canvas></a>
-<p class="gn-links">Or open <a data-link="example" target="_blank" rel="noopener">its example</a> · <a data-link="gymnasium" target="_blank" rel="noopener">Gymnasium's page</a> · <a data-link="api">the API</a><span class="gn-enter" hidden> · Enter opens the manual</span></p>
+<p class="gn-links">Or open <a data-link="example" target="_blank" rel="noopener">its example</a> · <a data-link="gymnasium" target="_blank" rel="noopener">Gymnasium's page</a> · <a data-link="api">the API</a><span class="gn-enter" hidden> · Enter opens the manual</span><span class="gn-lock-hint"> · click a cartridge to keep it</span></p>
 </div>
 </div>
 <canvas class="gn-pixel gn-press-start" data-text="PRESS START" data-scale="2" data-color="#f8b800"></canvas>

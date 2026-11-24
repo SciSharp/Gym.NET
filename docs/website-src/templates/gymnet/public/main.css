@@ -253,6 +253,18 @@
   border-left: 12px solid #fcfcfc;
 }
 
+/* A locked cartridge (DR-143): a click keeps it on the screen while the pointer crosses the others, and its cursor
+   settles: the frame stops blinking and stays gold, and the arrow turns gold. A hover preview keeps blinking, so the
+   two read apart at a glance. */
+.gn-cart.gn-locked[aria-selected="true"] {
+  animation: none;
+  border-color: #f8b800;
+}
+
+.gn-cart.gn-locked[aria-selected="true"]::after {
+  border-left-color: #f8b800;
+}
+
 .gn-cart-art {
   display: flex;
   align-items: center;
