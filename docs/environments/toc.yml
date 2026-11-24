@@ -42,6 +42,8 @@
     href: mujoco/half_cheetah.md
   - name: Hopper
     href: mujoco/hopper.md
+  - name: Humanoid
+    href: mujoco/humanoid.md
   - name: Swimmer
     href: mujoco/swimmer.md
   - name: Walker2d
