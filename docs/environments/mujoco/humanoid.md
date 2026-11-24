@@ -529,7 +529,7 @@ reference GPU for this model, by a few pixels, so "equal" means one of the frame
 | v4 | The `mujoco` bindings (MuJoCo 2.1.3 or later) instead of mujoco-py |
 | v3 | `make` kwargs such as `xml_file`, `ctrl_cost_weight` and `reset_noise_scale`; frames from the tracking camera; now raises `ImportError` in Gymnasium (mujoco-py), and in Gym.NET |
 | v2 | mujoco-py 1.50; likewise refused today |
-| v1 | Episodes of 1,000 steps; the reward threshold |
+| v1 | Episodes of 1,000 steps (Gymnasium's note for v1 also adds reward thresholds; this env registers none) |
 | v0 | The first release |
 | Gym.NET 1.0.0 | New: Gymnasium 1.4.0's Humanoid-v5 and Humanoid-v4 on Gym.NET's own MuJoCo engine, bit for bit; 0.2.0 had no MuJoCo |
 

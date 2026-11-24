@@ -6,16 +6,22 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Gym.Environments.Envs.MuJoCo;
 using Gym.Envs;
 using Gym.Observations;
 using Gym.Rendering.Avalonia;
+using Gym.Utils;
+using Gym.Wrappers;
 using NumSharp;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.PixelFormats;
 
 namespace Gym.Examples.HumanoidStandup {
     /// <summary>
     ///     Plays HumanoidStandup-v5 with Farama's SAC expert, a published Stable-Baselines3 agent. <c>dotnet run
     ///     --project examples/HumanoidStandup -c Release</c> plays one seeded episode headless and prints its steps and
-    ///     return; <c>-- --render</c> plays it in a window.
+    ///     return; <c>-- --render</c> plays it in a window, and <c>-- --record &lt;folder&gt;</c> records the episode for
+    ///     the env's page on the docs site (DR-112).
     /// </summary>
     /// <remarks>
     ///     <para>
@@ -52,17 +58,38 @@ namespace Gym.Examples.HumanoidStandup {
         /// <param name="args">
         ///     <c>--seed N</c> starts from reset seed N; <c>--episodes N</c> plays N episodes on consecutive seeds and
         ///     prints their mean; <c>--render</c> shows them in a window; <c>--play</c> is refused, with the reason
-        ///     this env cannot be played from the keyboard. Other arguments are ignored.
+        ///     this env cannot be played from the keyboard; <c>--record &lt;folder&gt;</c> records the docs page's media
+        ///     from seed 0, whatever <c>--seed</c> says (<see cref="Record"/>). Other arguments are ignored.
         /// </param>
         /// <returns>
-        ///     0 when the episodes were played, 2 when an option's value is not a whole number, or for <c>--play</c>.
+        ///     0 when the episodes were played or the recording was written, 2 when an option's value is not a whole number,
+        ///     <c>--record</c> names no folder, or for <c>--play</c>.
         /// </returns>
         /// <exception cref="Gym.Exceptions.DependencyNotInstalled">
         ///     Not thrown in practice: <c>--render</c> sets Avalonia's viewer before the env first draws.
         /// </exception>
+        /// <exception cref="InvalidOperationException">
+        ///     <c>--record</c> could not run ffmpeg, which <see cref="FfmpegVideoWriter"/> needs on PATH.
+        /// </exception>
+        /// <exception cref="IOException">
+        ///     <c>--record</c> could not create the folder or write one of its files, or <c>policy.json</c> cannot be read.
+        /// </exception>
         private static int Main(string[] args) {
             if (!TryNumber(args, "--seed", DefaultSeed, out long seed) || !TryNumber(args, "--episodes", 1, out long episodes))
                 return 2;
+            int record = Array.IndexOf(args, "--record");
+            if (record >= 0) {
+                // The folder is required: the page's media live in the docs tree, and a default would write them where no
+                // page reads them.
+                if (record + 1 >= args.Length || args[record + 1].StartsWith("--", StringComparison.Ordinal)) {
+                    Console.Error.WriteLine("--record needs a folder, e.g. --record docs/environments/mujoco/media");
+                    return 2;
+                }
+                (int recordedSteps, double recordedReturn) = Record(args[record + 1]);
+                Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
+                    $"{Id}, seed 0: {recordedSteps} steps, return {recordedReturn:F1}, recorded into {args[record + 1]}"));
+                return 0;
+            }
             bool render = args.Contains("--render");
             if (args.Contains("--play")) {
                 Console.Error.WriteLine($"{Id}: its 17 motors would need 34 keys held in combinations, too many to play; --render shows the agent instead.");
@@ -116,6 +143,217 @@ namespace Gym.Examples.HumanoidStandup {
                 if (step.Terminated || step.Truncated)
                     return (steps, total, step.Terminated ? "terminated" : "truncated by the time limit");
             }
+        }
+
+        // ============================================================================ record (the docs page's media)
+
+        /// <summary>
+        ///     The video's view (DR-112): the model's own <c>track</c> camera, 3 m to the side (−y) and 0.5 m above the body's centre of mass, looking across at it and following it, as the front-page showreel plays it (DR-74).
+        /// </summary>
+        private static readonly Dictionary<string, object?> RecordView = new Dictionary<string, object?> { ["camera_name"] = "track" };
+
+        /// <summary>
+        ///     The trace's state columns, each a value of the simulation read before the step that acts on it: a name, the
+        ///     array (<c>q</c> for <c>qpos</c>, <c>v</c> for <c>qvel</c>) and the index. HumanoidStandup's: the torso's x, y and height (<c>qpos[0..2]</c>), its upward velocity (<c>qvel[2]</c>), and each leg's hip pitch and knee (<c>qpos[12..13]</c> and <c>qpos[16..17]</c>; <c>qpos[3..6]</c> is the torso's orientation quaternion).
+        /// </summary>
+        private static readonly (string Name, char Array, int Index)[] TraceState = {
+            ("x", 'q', 0),
+            ("y", 'q', 1),
+            ("z", 'q', 2),
+            ("vz", 'v', 2),
+            ("right_hip_y", 'q', 12),
+            ("right_knee", 'q', 13),
+            ("left_hip_y", 'q', 16),
+            ("left_knee", 'q', 17),
+        };
+
+        /// <summary>The info's reward terms the trace keeps for each step, in the info's own names.</summary>
+        private static readonly string[] RewardTerms = { "reward_linup", "reward_quadctrl", "reward_impact" };
+
+        /// <summary>
+        ///     How it works' frame (DR-114): 760×480 pixels of the reset pose without noise (<c>reset_noise_scale</c> 0), seen by MuJoCo's free camera 1.7 m from a point 0.45 m along the body and 0.1 m above the floor, at azimuth 90° and elevation -55°: the humanoid lying flat, head toward -x, its arms along its sides.
+        /// </summary>
+        private const int FigureWidth = 760, FigureHeight = 480;
+
+        /// <summary>The figure's free camera: distance (m), azimuth and elevation (degrees), as <c>default_camera_config</c> takes them.</summary>
+        private const double FigureDistance = 1.7, FigureAzimuth = 90.0, FigureElevation = -55.0;
+
+        /// <summary>The point the figure's camera looks at, in world coordinates.</summary>
+        private static readonly double[] FigureLookat = { 0.45, 0.0, 0.1 };
+
+        /// <summary>
+        ///     The joints How it works labels: each joint, the body it moves, the joint's anchor in that body's frame (its
+        ///     <c>pos</c> in the model, which this model's bodies keep unrotated at the reset pose without noise, so the
+        ///     anchor is the body's origin plus this offset), the observation's item for its angle (-1 for none) and the
+        ///     action's item for its motor (-1 for none). HumanoidStandup's model (<c>humanoidstandup.xml</c>), the humanoid's joints laid along x: one point per place joints share, named by its first joint (the abdomen's z and y hinges share one, each hip's three hinges one, each shoulder's two one). Each anchor is its body's origin plus the joint's offset; <c>lwaist</c> and <c>pelvis</c> are turned 0.23° each in the model, so the abdomen's and the knees' anchors are within a millimetre of MuJoCo's own.
+        /// </summary>
+        private static readonly (string Joint, string Body, double[] Offset, int Observation, int Action)[] FigureJoints = {
+            ("abdomen_z", "lwaist", new[] { 0.0, 0.0, 0.065 }, 5, 1),
+            ("abdomen_x", "pelvis", new[] { 0.0, 0.0, 0.1 }, 7, 2),
+            ("right_hip_x", "right_thigh", new[] { 0.0, 0.0, 0.0 }, 8, 3),
+            ("right_knee", "right_shin", new[] { 0.0, 0.0, 0.02 }, 11, 6),
+            ("left_hip_x", "left_thigh", new[] { 0.0, 0.0, 0.0 }, 12, 7),
+            ("left_knee", "left_shin", new[] { 0.0, 0.0, 0.02 }, 15, 10),
+            ("right_shoulder1", "right_upper_arm", new[] { 0.0, 0.0, 0.0 }, 16, 11),
+            ("right_elbow", "right_lower_arm", new[] { 0.0, 0.0, 0.0 }, 18, 13),
+            ("left_shoulder1", "left_upper_arm", new[] { 0.0, 0.0, 0.0 }, 19, 14),
+            ("left_elbow", "left_lower_arm", new[] { 0.0, 0.0, 0.0 }, 21, 16),
+        };
+
+        /// <summary>
+        ///     Records the docs page's media (DR-112) into <paramref name="folder"/>: the seed-0 episode as
+        ///     <c>HumanoidStandup-v5.episode.mp4</c> (one 480×480 frame per step at the env's own frame rate, through Gymnasium's
+        ///     <see cref="RecordVideo{TObs, TAct}"/> and <see cref="FfmpegVideoWriter"/>), every step as
+        ///     <c>HumanoidStandup-v5.episode.json</c>, and How it works' frame as <c>HumanoidStandup-v5.figure.png</c> with
+        ///     <c>HumanoidStandup-v5.figure.json</c>.
+        /// </summary>
+        /// <param name="folder">The output folder, <c>docs/environments/mujoco/media</c> for the site; created if missing.</param>
+        /// <returns>The steps taken and the return.</returns>
+        /// <exception cref="InvalidOperationException">ffmpeg could not be run, or wrote no video.</exception>
+        /// <exception cref="IOException">A file cannot be written, or the agent's file cannot be read.</exception>
+        /// <exception cref="InvalidDataException">The agent's file is not a <c>gym.net-agent/1</c> agent.</exception>
+        /// <remarks>
+        ///     <para>
+        ///     Each JSON row is the state the agent acted on, its commands and the step's reward with its terms:
+        ///     <c>step, x, y, z, vz, right_hip_y, right_knee, left_hip_y, left_knee, a0 ... a16, reward_linup, reward_quadctrl, reward_impact, reward</c>. The state is
+        ///     the simulation's own, rounded to 5 decimals (<see cref="TraceState"/>); the commands are the network's float32
+        ///     values, each written as the float64 that holds it exactly, so the trace replays the episode bit for bit
+        ///     (<c>action_dtype</c> says to cast them back); the reward terms are the step's info. The video's frame <c>t</c>
+        ///     shows the state of row <c>t</c>, and its last frame the state after the last step, which the JSON keeps as
+        ///     <c>final</c>.
+        ///     </para>
+        ///     <para>
+        ///     Gym.NET draws MuJoCo's frames in software (DR-62), so the recording takes minutes. RecordVideo names its file
+        ///     <c>HumanoidStandup-v5-episode-0.mp4</c> and writes it when the env closes; it records into a scratch folder inside
+        ///     <paramref name="folder"/> and the file is moved to the page's name, so a recording that fails halfway leaves
+        ///     the published video as it was. <c>[NDScoped]</c> (DR-80) releases every array the episode creates.
+        ///     </para>
+        /// </remarks>
+        [NDScoped]
+        private static (int Steps, double Return) Record(string folder) {
+            ExpertPolicy policy = ExpertPolicy.Load(Path.Combine(AppContext.BaseDirectory, "policy.json"));
+            Directory.CreateDirectory(folder);
+            string scratch = Path.Combine(folder, ".recording");
+            var rows = new List<double[]>();
+            double total = 0;
+            double[] final;
+            long fps;
+            // The agent's own constructor arguments, with the recorder's render mode and the page's view.
+            Dictionary<string, object?> arguments = policy.MakeArguments(human: false);
+            arguments["render_mode"] = "rgb_array";
+            foreach (var (name, value) in RecordView)
+                arguments[name] = value;
+            using (Env<NDArray, NDArray> made = Gymnasium.Make<NDArray, NDArray>(Id, arguments))
+            using (var env = new RecordVideo<NDArray, NDArray>(made, scratch, episodeTrigger: _ => true, namePrefix: Id,
+                       videoWriter: new FfmpegVideoWriter())) {
+                var mujoco = (MujocoEnv)env.Unwrapped;
+                fps = Convert.ToInt64(env.Metadata["render_fps"], CultureInfo.InvariantCulture);
+                NDArray observation = env.Reset(seed: 0).Observation;
+                for (int t = 0; ; t++) {
+                    NDArray action = policy.Act(observation);
+                    // float32 to float64 is exact, so the JSON's number casts back to the very float32 the agent chose.
+                    double[] commands = action.ToArray<float>().Select(v => (double)v).ToArray();
+                    double[] state = RecordState(mujoco);
+                    StepResult<NDArray> step = env.Step(action);
+                    total += step.Reward;
+                    double[] terms = RewardTerms.Select(term => Math.Round(step.Info.Get<double>(term), 5)).ToArray();
+                    rows.Add(state.Prepend(t).Concat(commands).Concat(terms).Append(Math.Round(step.Reward, 5)).ToArray());
+                    observation = step.Observation;
+                    if (step.Terminated || step.Truncated)
+                        break;
+                }
+                final = RecordState(mujoco);
+                // RecordVideo writes the episode's video when it stops recording, which closing the env does.
+                env.Close();
+            }
+            string recorded = Path.Combine(scratch, $"{Id}-episode-0.mp4");
+            if (!File.Exists(recorded))
+                throw new InvalidOperationException($"RecordVideo wrote no {recorded}; is ffmpeg on PATH?");
+            File.Move(recorded, Path.Combine(folder, $"{Id}.episode.mp4"), overwrite: true);
+            Directory.Delete(scratch, recursive: true);
+            File.WriteAllText(Path.Combine(folder, $"{Id}.episode.json"), JsonSerializer.Serialize(new {
+                id = Id, seed = 0, steps = rows.Count, @return = total, fps,
+                agent = "Farama's SAC expert (examples/HumanoidStandup)", action_dtype = "float32",
+                columns = new[] { "step", "x", "y", "z", "vz", "right_hip_y", "right_knee", "left_hip_y", "left_knee", "a0", "a1", "a2", "a3", "a4", "a5", "a6", "a7", "a8", "a9", "a10", "a11", "a12", "a13", "a14", "a15", "a16", "reward_linup", "reward_quadctrl", "reward_impact", "reward" },
+                rows,
+                final,
+            }) + "\n");
+            SaveFigure(folder);
+            return (rows.Count, total);
+        }
+
+        /// <summary>The trace's view of a state: <see cref="TraceState"/>'s values of the simulation, rounded to 5 decimals.</summary>
+        /// <param name="mujoco">The unwrapped env, whose simulation holds the state.</param>
+        /// <returns>One value per <see cref="TraceState"/> entry.</returns>
+        private static double[] RecordState(MujocoEnv mujoco) {
+            // The simulation's own arrays through views: copied out at once, the views released with the episode's scope.
+            double[] qpos = mujoco.Data.Qpos.ToArray<double>(), qvel = mujoco.Data.Qvel.ToArray<double>();
+            return TraceState.Select(s => Math.Round(s.Array == 'q' ? qpos[s.Index] : qvel[s.Index], 5)).ToArray();
+        }
+
+        /// <summary>
+        ///     Saves How it works' frame as <c>HumanoidStandup-v5.figure.png</c>, and as <c>HumanoidStandup-v5.figure.json</c> the camera and the pixel
+        ///     of each point its labels mark: the root body and each joint, projected through MuJoCo's free-camera geometry.
+        /// </summary>
+        /// <param name="folder">The output folder.</param>
+        /// <exception cref="IOException">A file cannot be written.</exception>
+        /// <remarks>
+        ///     <para>
+        ///     The frame is the env's own render of its reset without noise (<c>reset_noise_scale</c> 0), which every seed
+        ///     then gives alike. The projection is <c>mjv_updateCamera</c>'s for a free camera: <c>forward = (cos e cos a,
+        ///     cos e sin a, sin e)</c>, <c>up = (-sin e cos a, -sin e sin a, cos e)</c>, <c>right = (sin a, -cos a, 0)</c> for
+        ///     azimuth <c>a</c> and elevation <c>e</c>, the eye at <c>lookat - distance forward</c>, and a vertical field of
+        ///     view of 45° (MuJoCo's <c>vis.global.fovy</c>, which every model Gymnasium bundles keeps) over the frame's
+        ///     height: a point at camera coordinates <c>(x, y, z)</c> is the pixel <c>(W/2 + f x/z, H/2 - f y/z)</c>,
+        ///     <c>f = (H/2) / tan(22.5°)</c>. Reference:
+        ///     <see href="https://github.com/google-deepmind/mujoco/blob/4.0.0/src/engine/engine_vis_visualize.c">engine_vis_visualize.c</see>.
+        ///     </para>
+        ///     <para>
+        ///     The frame is Gym.NET's drawing of MuJoCo's renderer (DR-98): equal to Gymnasium's for the inverted pendulums,
+        ///     a few pixels off for the other models; the projected points do not depend on the drawing.
+        ///     </para>
+        /// </remarks>
+        [NDScoped]
+        private static void SaveFigure(string folder) {
+            var arguments = new Dictionary<string, object?> {
+                ["render_mode"] = "rgb_array", ["width"] = FigureWidth, ["height"] = FigureHeight, ["reset_noise_scale"] = 0.0,
+                ["default_camera_config"] = new Dictionary<string, object?> {
+                    ["distance"] = FigureDistance, ["azimuth"] = FigureAzimuth, ["elevation"] = FigureElevation, ["lookat"] = FigureLookat,
+                },
+            };
+            ExpertPolicy policy = ExpertPolicy.Load(Path.Combine(AppContext.BaseDirectory, "policy.json"));
+            // The agent's constructor arguments change what it observes, never the pose: kept so the figure's observation is the page's.
+            foreach (var (name, value) in policy.MakeArguments(human: false))
+                arguments[name] = value;
+            using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>(Id, arguments);
+            NDArray observation = env.Reset(seed: 0).Observation;
+            using RenderResult rendered = env.Render();
+            NDArray frame = (NDArray)rendered;
+            using (var image = Image.LoadPixelData<Rgb24>(frame.ToArray<byte>(), FigureWidth, FigureHeight))
+                image.SaveAsPng(Path.Combine(folder, $"{Id}.figure.png"));
+            var mujoco = (MujocoEnv)env.Unwrapped;
+            double a = FigureAzimuth * Math.PI / 180, e = FigureElevation * Math.PI / 180;
+            double[] forward = { Math.Cos(e) * Math.Cos(a), Math.Cos(e) * Math.Sin(a), Math.Sin(e) };
+            double[] up = { -Math.Sin(e) * Math.Cos(a), -Math.Sin(e) * Math.Sin(a), Math.Cos(e) };
+            double[] right = { Math.Sin(a), -Math.Cos(a), 0 };
+            double[] eye = Enumerable.Range(0, 3).Select(k => FigureLookat[k] - FigureDistance * forward[k]).ToArray();
+            double focal = FigureHeight / 2.0 / Math.Tan(45.0 / 2 * Math.PI / 180);
+            double[] Pixel(string body, double[] offset) {
+                double[] p = mujoco.Data.Body(body).Xpos.ToArray<double>();
+                double[] v = { p[0] + offset[0] - eye[0], p[1] + offset[1] - eye[1], p[2] + offset[2] - eye[2] };
+                double z = v[0] * forward[0] + v[1] * forward[1] + v[2] * forward[2];
+                double x = v[0] * right[0] + v[1] * right[1] + v[2] * right[2];
+                double y = v[0] * up[0] + v[1] * up[1] + v[2] * up[2];
+                return new[] { Math.Round(FigureWidth / 2.0 + focal * x / z, 2), Math.Round(FigureHeight / 2.0 - focal * y / z, 2) };
+            }
+            double[] o = observation.ToArray<double>();
+            File.WriteAllText(Path.Combine(folder, $"{Id}.figure.json"), JsonSerializer.Serialize(new {
+                id = Id, width = FigureWidth, height = FigureHeight,
+                camera = new { distance = FigureDistance, azimuth = FigureAzimuth, elevation = FigureElevation, lookat = FigureLookat, fovy = 45.0 },
+                observation = o.Take(40).Select(v => Math.Round(v, 5)).ToArray(),
+                torso = Pixel("torso", new double[3]),
+                joints = FigureJoints.Select(j => new { name = j.Joint, body = j.Body, offset = j.Offset, observation = j.Observation, action = j.Action, pixel = Pixel(j.Body, j.Offset) }).ToArray(),
+            }, new JsonSerializerOptions { WriteIndented = true }) + "\n");
         }
 
         /// <summary>Reads a whole-number option's value, or the fallback when the option is absent.</summary>

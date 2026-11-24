@@ -1,0 +1,214 @@
+{
+  "id": "HumanoidStandup-v5",
+  "width": 760,
+  "height": 480,
+  "camera": {
+    "distance": 1.7,
+    "azimuth": 90,
+    "elevation": -55,
+    "lookat": [
+      0.45,
+      0,
+      0.1
+    ],
+    "fovy": 45
+  },
+  "observation": [
+    0.105,
+    1,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+  ],
+  "torso": [
+    226.26,
+    239.02
+  ],
+  "joints": [
+    {
+      "name": "abdomen_z",
+      "body": "lwaist",
+      "offset": [
+        0,
+        0,
+        0.065
+      ],
+      "observation": 5,
+      "action": 1,
+      "pixel": [
+        295.35,
+        225.84
+      ]
+    },
+    {
+      "name": "abdomen_x",
+      "body": "pelvis",
+      "offset": [
+        0,
+        0,
+        0.1
+      ],
+      "observation": 7,
+      "action": 2,
+      "pixel": [
+        353.07,
+        218.24
+      ]
+    },
+    {
+      "name": "right_hip_x",
+      "body": "right_thigh",
+      "offset": [
+        0,
+        0,
+        0
+      ],
+      "observation": 8,
+      "action": 3,
+      "pixel": [
+        353.47,
+        267.83
+      ]
+    },
+    {
+      "name": "right_knee",
+      "body": "right_shin",
+      "offset": [
+        0,
+        0,
+        0.02
+      ],
+      "observation": 11,
+      "action": 6,
+      "pixel": [
+        496.97,
+        260.38
+      ]
+    },
+    {
+      "name": "left_hip_x",
+      "body": "left_thigh",
+      "offset": [
+        0,
+        0,
+        0
+      ],
+      "observation": 12,
+      "action": 7,
+      "pixel": [
+        355.21,
+        211.85
+      ]
+    },
+    {
+      "name": "left_knee",
+      "body": "left_shin",
+      "offset": [
+        0,
+        0,
+        0.02
+      ],
+      "observation": 15,
+      "action": 10,
+      "pixel": [
+        489.98,
+        209.72
+      ]
+    },
+    {
+      "name": "right_shoulder1",
+      "body": "right_upper_arm",
+      "offset": [
+        0,
+        0,
+        0
+      ],
+      "observation": 16,
+      "action": 11,
+      "pixel": [
+        211.7,
+        278.14
+      ]
+    },
+    {
+      "name": "right_elbow",
+      "body": "right_lower_arm",
+      "offset": [
+        0,
+        0,
+        0
+      ],
+      "observation": 18,
+      "action": 13,
+      "pixel": [
+        281.82,
+        368.24
+      ]
+    },
+    {
+      "name": "left_shoulder1",
+      "body": "left_upper_arm",
+      "offset": [
+        0,
+        0,
+        0
+      ],
+      "observation": 19,
+      "action": 14,
+      "pixel": [
+        230.52,
+        181.36
+      ]
+    },
+    {
+      "name": "left_elbow",
+      "body": "left_lower_arm",
+      "offset": [
+        0,
+        0,
+        0
+      ],
+      "observation": 21,
+      "action": 16,
+      "pixel": [
+        301.58,
+        175.89
+      ]
+    }
+  ]
+}
