@@ -498,8 +498,14 @@ The tests: [CliffWalkingLiveParityTests](https://github.com/SciSharp/Gym.NET/blo
 
 ## Performance
 
-Not measured yet for this env. Frozen Lake and Taxi, the other grid worlds, step 3.6× and 4.5× faster than Gymnasium's
-(213,280 against 59,436 and 164,917 against 36,414 steps a second; .NET 10 in Release against CPython 3.12, 2026-11-11).
+| | Steps a second | Bytes a step |
+|---|--:|--:|
+| Gym.NET | 322,604 | 3,952 |
+| Gymnasium | 102,118 | |
+
+3.2× faster. Gymnasium's own `benchmark_step` on both sides (Gym.NET's `Performance.BenchmarkStep`, DR-36):
+random actions, a reset at each episode's end, after a 2-second warm-up; .NET 10 in Release against CPython 3.12
+with the pinned NumPy; the medians of three interleaved rounds of 5 seconds on one machine (2026-11-24).
 
 ## Reference sources
 

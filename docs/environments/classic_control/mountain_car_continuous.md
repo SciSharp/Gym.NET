@@ -419,8 +419,14 @@ The tests: [MountainCarLiveParityTests](https://github.com/SciSharp/Gym.NET/blob
 
 ## Performance
 
-Not measured yet for this id. MountainCar-v0, the same class in discrete mode, steps 3.3× faster than Gymnasium's
-(145,364 against 43,440 steps a second; .NET 10 in Release against CPython 3.12, 2026-11-11).
+| | Steps a second | Bytes a step |
+|---|--:|--:|
+| Gym.NET | 92,571 | 11,193 |
+| Gymnasium | 28,942 | |
+
+3.2× faster. Gymnasium's own `benchmark_step` on both sides (Gym.NET's `Performance.BenchmarkStep`, DR-36):
+random actions, a reset at each episode's end, after a 2-second warm-up; .NET 10 in Release against CPython 3.12
+with the pinned NumPy; the medians of three interleaved rounds of 5 seconds on one machine (2026-11-24).
 
 ## Reference sources
 

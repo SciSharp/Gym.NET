@@ -414,9 +414,14 @@ The tests: [BlackjackLiveParityTests](https://github.com/SciSharp/Gym.NET/blob/m
 
 ## Performance
 
-Not measured yet for this env. The two toy-text envs measured, Frozen Lake and Taxi, step 3.6× and 4.5× faster than
-Gymnasium's (213,280 against 59,436 and 164,917 against 36,414 steps a second; .NET 10 in Release against CPython 3.12,
-2026-11-11).
+| | Steps a second | Bytes a step |
+|---|--:|--:|
+| Gym.NET | 66,271 | 18,656 |
+| Gymnasium | 17,185 | |
+
+3.9× faster. Gymnasium's own `benchmark_step` on both sides (Gym.NET's `Performance.BenchmarkStep`, DR-36):
+random actions, a reset at each episode's end, after a 2-second warm-up; .NET 10 in Release against CPython 3.12
+with the pinned NumPy; the medians of three interleaved rounds of 5 seconds on one machine (2026-11-24).
 
 ## Reference sources
 
