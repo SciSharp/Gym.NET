@@ -25,6 +25,8 @@ supported. A .NET 10 file-based app (`dotnet run app.cs`) publishes AOT by defau
 
 ## Make an env and run an episode
 
+# [C#](#tab/csharp)
+
 ```csharp
 using System;
 using Gym;
@@ -34,24 +36,46 @@ using NumSharp;
 // make builds the registered env inside Gymnasium's wrappers: TimeLimit(500), OrderEnforcing, PassiveEnvChecker.
 using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("CartPole-v1");
 env.ActionSpace.Seed(42);
-NDArray observation = env.Reset(seed: 42).Observation;
+(NDArray observation, Info info) = env.Reset(seed: 42);
 double episodeReturn = 0;
 while (true) {
     using NDArray action = env.ActionSpace.Sample();   // 0 (push left) or 1 (push right)
-    var (next, reward, terminated, truncated, info) = env.Step(action);
     observation.Dispose();                            // the arrays an env returns belong to the caller
-    observation = next;
+    (observation, double reward, bool terminated, bool truncated, info)
+        = env.Step(action);
     episodeReturn += reward;
     if (terminated || truncated)
         break;
 }
 
 observation.Dispose();
-Console.WriteLine($"Episode return: {episodeReturn}");
+Console.WriteLine($"Episode return: {episodeReturn}");   // Episode return: 30
 ```
 
-The later samples also use `System.Collections.Generic`, `Gym.Observations`, `Gym.Spaces`, `Gym.Wrappers`, `Gym.Vector`,
-`Gym.Environments.Envs.Classic` and `Gym.Rendering.Avalonia`.
+# [Python (Gymnasium)](#tab/python)
+
+```python
+import gymnasium as gym
+
+# make builds the registered env inside its wrappers: TimeLimit(500), OrderEnforcing, PassiveEnvChecker.
+env = gym.make("CartPole-v1")
+env.action_space.seed(42)
+observation, info = env.reset(seed=42)
+episode_return = 0.0
+while True:
+    action = env.action_space.sample()   # 0 (push left) or 1 (push right)
+    observation, reward, terminated, truncated, info = env.step(action)
+    episode_return += reward
+    if terminated or truncated:
+        break
+
+print(f"Episode return: {episode_return}")   # Episode return: 30.0
+```
+
+---
+
+The later samples also use `System.Collections.Generic`, `Gym.Envs.Registration`, `Gym.Observations`, `Gym.Spaces`,
+`Gym.Wrappers`, `Gym.Vector`, `Gym.Environments.Envs.Classic` and `Gym.Rendering.Avalonia`.
 
 - `Reset(seed, options)` returns a `ResetResult<TObs>`, `(Observation, Info)`.
 - `Step(action)` returns a `StepResult<TObs>`, `(Observation, Reward, Terminated, Truncated, Info)`. `Terminated`
@@ -76,6 +100,8 @@ method returns. NumSharp.Build, a build-time package, weaves the attribute into 
 <PackageReference Include="NumSharp.Build" Version="0.81.0" PrivateAssets="all" />
 ```
 
+# [C#](#tab/csharp)
+
 ```csharp
 using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("CartPole-v1");   // built outside the scoped method
 for (int episode = 0; episode < 3; episode++)
@@ -86,13 +112,35 @@ static double RunEpisode(Env<NDArray, NDArray> env, int seed) {
     env.Reset(seed: seed);
     double episodeReturn = 0;
     while (true) {
-        var (_, reward, terminated, truncated, _) = env.Step(env.ActionSpace.Sample());
+        (_, double reward, bool terminated, bool truncated, _)
+            = env.Step(env.ActionSpace.Sample());
         episodeReturn += reward;
         if (terminated || truncated)
             return episodeReturn;
     }
 }
 ```
+
+# [Python (Gymnasium)](#tab/python)
+
+```python
+# NumPy's arrays are garbage-collected: nothing to release, so no scope.
+def run_episode(env, seed):
+    env.reset(seed=seed)
+    episode_return = 0.0
+    while True:
+        _, reward, terminated, truncated, _ = env.step(env.action_space.sample())
+        episode_return += reward
+        if terminated or truncated:
+            return episode_return
+
+
+env = gym.make("CartPole-v1")
+for episode in range(3):
+    print(run_episode(env, seed=episode))
+```
+
+---
 
 Two rules come with it:
 
@@ -108,6 +156,8 @@ to the next is detached from your scope (DR-96).
 `using` is the alternative, one result at a time. Both results are `IDisposable`: disposing one releases its observation
 and the arrays in its info:
 
+# [C#](#tab/csharp)
+
 ```csharp
 using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("CartPole-v1");
 using ResetResult<NDArray> reset = env.Reset(seed: 0);
@@ -115,6 +165,18 @@ using NDArray action = env.ActionSpace.Sample();
 using StepResult<NDArray> step = env.Step(action);
 Console.WriteLine($"{step.Observation.Shape} {step.Reward}");   // (4) 1
 ```
+
+# [Python (Gymnasium)](#tab/python)
+
+```python
+env = gym.make("CartPole-v1")
+reset = env.reset(seed=0)   # (observation, info), released by the garbage collector
+action = env.action_space.sample()
+step = env.step(action)     # (observation, reward, terminated, truncated, info)
+print(step[0].shape, step[1])   # (4,) 1.0
+```
+
+---
 
 A copy of a result shares its arrays: dispose one of them, after the last use, and `.copy()` an observation you keep
 longer. The vector results (`VectorStepResult`, `VectorResetResult`) work the same way, and so does `[NDScoped]`.
@@ -124,14 +186,27 @@ longer. The vector results (`VectorStepResult`, `VectorResetResult`) work the sa
 `Gymnasium.Make<TObs, TAct>` returns an `Env<TObs, TAct>` and raises `TypeError` when the env has other types.
 `Gymnasium.Make` returns an `IEnv`, whose observations are `object`s and whose `Step(object)` converts the action:
 
+# [C#](#tab/csharp)
+
 ```csharp
 using IEnv env = Gymnasium.Make("CartPole-v1");           // untyped: observations are objects
-var (observation, info) = env.Reset(seed: 0);
-var step = env.Step(1);                                   // the env converts the action (here to a 0-d int64 array)
+(object? observation, Info info) = env.Reset(seed: 0);
+StepResult<object?> step = env.Step(1);                   // the env converts the action (here to a 0-d int64 array)
 Console.WriteLine($"{observation} {step.Reward}");
 (observation as IDisposable)?.Dispose();
 (step.Observation as IDisposable)?.Dispose();
 ```
+
+# [Python (Gymnasium)](#tab/python)
+
+```python
+env = gym.make("CartPole-v1")              # Python has one kind: every env is untyped
+observation, info = env.reset(seed=0)
+step = env.step(1)                         # (observation, reward, terminated, truncated, info)
+print(observation, step[1])
+```
+
+---
 
 | Ids | Env | Observation | Action |
 |---|---|---|---|
@@ -148,16 +223,30 @@ Console.WriteLine($"{observation} {step.Reward}");
 A discrete action or observation is a 0-d int64 `NDArray`, the shape NumPy gives `Discrete.sample()`. `Gymnasium.PprintRegistry()`
 prints every id; `Gymnasium.Spec(id)` returns its `EnvSpec`:
 
+# [C#](#tab/csharp)
+
 ```csharp
 Gymnasium.PprintRegistry();                               // every registered id, grouped by namespace
-var spec = Gymnasium.Spec("CartPole-v1");
+EnvSpec spec = Gymnasium.Spec("CartPole-v1");
 Console.WriteLine($"{spec.MaxEpisodeSteps} {spec.RewardThreshold}");   // 500 475
 ```
+
+# [Python (Gymnasium)](#tab/python)
+
+```python
+gym.pprint_registry()                     # every registered id, grouped by namespace
+spec = gym.spec("CartPole-v1")
+print(spec.max_episode_steps, spec.reward_threshold)   # 500 475.0
+```
+
+---
 
 ## Constructor arguments
 
 `make`'s keyword arguments are the env's constructor arguments by their Python names. Pass them as an anonymous object,
 a dictionary, or the options record generated for the env class:
+
+# [C#](#tab/csharp)
 
 ```csharp
 using IEnv a = Gymnasium.Make("CartPole-v1", new { render_mode = "rgb_array", sutton_barto_reward = true });
@@ -166,6 +255,18 @@ using IEnv c = Gymnasium.Make("CartPole-v1", new Dictionary<string, object?> { [
 using IEnv d = Gymnasium.Make("CartPole-v1", maxEpisodeSteps: 1000);   // instead of the spec's 500
 Console.WriteLine(a);   // <TimeLimit<OrderEnforcing<PassiveEnvChecker<CartPoleEnv<CartPole-v1>>>>>
 ```
+
+# [Python (Gymnasium)](#tab/python)
+
+```python
+a = gym.make("CartPole-v1", render_mode="rgb_array", sutton_barto_reward=True)
+# (C#'s options record has no Python form: keyword arguments are the one way)
+c = gym.make("CartPole-v1", **{"render_mode": "rgb_array"})
+d = gym.make("CartPole-v1", max_episode_steps=1000)   # instead of the spec's 500
+print(a)   # <TimeLimit<OrderEnforcing<PassiveEnvChecker<CartPoleEnv<CartPole-v1>>>>>
+```
+
+---
 
 `CartPoleEnvOptions` lives next to `CartPoleEnv` in `Gym.Environments.Envs.Classic`; it passes only the properties you
 set, so the registered defaults still apply. An unknown name raises Gymnasium's `TypeError`. Building an env class
@@ -182,6 +283,8 @@ for your own draws (`gymnasium.utils.seeding.np_random`).
 
 ## Spaces
 
+# [C#](#tab/csharp)
+
 ```csharp
 var box = new Box(-1.0, 1.0, new Shape(3), dtype: np.float32, seed: 0);
 using NDArray point = box.Sample();                  // float32 (3,), the values NumPy's generator draws for seed 0
@@ -192,6 +295,24 @@ var tuple = new Gym.Spaces.Tuple(new Space[] { discrete, box }, seed: 0);
 object?[] sample = tuple.Sample();                   // Python's tuple: object?[] { NDArray, NDArray }
 Console.WriteLine($"{box} {inside} {discrete} {tuple}");   // Box(-1.0, 1.0, (3,), float32) True Discrete(4) Tuple(Discrete(4), Box(...))
 ```
+
+# [Python (Gymnasium)](#tab/python)
+
+```python
+import numpy as np
+from gymnasium import spaces
+
+box = spaces.Box(-1.0, 1.0, (3,), dtype=np.float32, seed=0)
+point = box.sample()                      # float32 (3,), the values NumPy's generator draws for seed 0
+inside = box.contains(point)              # True
+discrete = spaces.Discrete(4, seed=0)
+choice = discrete.sample()                # a NumPy int64
+tuple_space = spaces.Tuple((discrete, box), seed=0)
+sample = tuple_space.sample()             # a tuple (np.int64, ndarray)
+print(box, inside, discrete, tuple_space)   # Box(-1.0, 1.0, (3,), float32) True Discrete(4) Tuple(Discrete(4), Box(...))
+```
+
+---
 
 All ten of Gymnasium's spaces are in `Gym.Spaces`: `Box`, `Discrete`, `MultiBinary`, `MultiDiscrete`, `Tuple` (samples
 are `object?[]`), `Dict` (samples are `Info`), `Text` (strings), `Sequence`, `Graph` (`GraphInstance`) and `OneOf`.
@@ -221,32 +342,68 @@ strings as constants (`RenderModes.RgbArray` is `"rgb_array"`) and converts (`Re
   pixels Gymnasium's env draws. `(NDArray)result` reads that frame directly (the result's own array: it lives until
   the result is disposed), and `(Image)result` gives a new ImageSharp image to save or show.
 
+  # [C#](#tab/csharp)
+
   ```csharp
   using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("CartPole-v1", RenderMode.RgbArray);
-  using NDArray observation = env.Reset(seed: 0).Observation;
+  using ResetResult<NDArray> reset = env.Reset(seed: 0);
+  (NDArray observation, Info info) = reset;   // both released with reset
   using RenderResult result = env.Render();
   NDArray frame = (NDArray)result;     // the result's own frame; disposed with the result
   Console.WriteLine(frame.Shape);      // (400, 600, 3), uint8, the pixels Gymnasium's CartPole draws
   ```
 
+  # [Python (Gymnasium)](#tab/python)
+
+  ```python
+  env = gym.make("CartPole-v1", render_mode="rgb_array")
+  observation, info = env.reset(seed=0)
+  frame = env.render()
+  print(frame.shape)   # (400, 600, 3), uint8: the pixels Gymnasium's CartPole draws
+  ```
+
 - `ansi` (toy_text): `Render()` returns `RenderResult.Ansi` with the text Gymnasium prints, escape codes included.
+
+  # [C#](#tab/csharp)
 
   ```csharp
   using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("FrozenLake-v1", new { render_mode = "ansi" });
-  using NDArray start = env.Reset(seed: 0).Observation;   // a 0-d int64 array: the cell, 0 to 15
+  using ResetResult<NDArray> reset = env.Reset(seed: 0);
+  (NDArray start, Info info) = reset;                       // a 0-d int64 array: the cell, 0 to 15
   using RenderResult text = env.Render();
   Console.WriteLine(((RenderResult.Ansi)text).Text);        // the 4x4 map, the agent's cell highlighted
+  ```
+
+  # [Python (Gymnasium)](#tab/python)
+
+  ```python
+  env = gym.make("FrozenLake-v1", render_mode="ansi")
+  start, info = env.reset(seed=0)   # the cell, 0 to 15
+  text = env.render()
+  print(text)   # the 4x4 map, the agent's cell highlighted
   ```
 
 - `human`: every `Reset` and `Step` draws into a window, paced at `Metadata["render_fps"]`, and `Render()` returns
   `RenderResult.None`. Set the window type once, at start-up, or pass it to `Make`; without either, the first frame
   raises `DependencyNotInstalled`, as Gymnasium does without pygame.
 
+  # [C#](#tab/csharp)
+
   ```csharp
   Gymnasium.HumanViewerFactory = AvaloniaEnvViewer.Factory;   // once, at start-up (WinFormEnvViewer.Factory on Windows)
   using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("CartPole-v1", RenderMode.Human);
-  using NDArray observation = env.Reset(seed: 0).Observation; // the window opens and shows the first frame
+  using ResetResult<NDArray> reset = env.Reset(seed: 0);      // the window opens and shows the first frame
+  (NDArray observation, Info info) = reset;
   // Every Step draws the next frame, paced at metadata["render_fps"] (50 for CartPole); Render() returns None.
+  ```
+
+  # [Python (Gymnasium)](#tab/python)
+
+  ```python
+  env = gym.make("CartPole-v1", render_mode="human")   # pygame's window
+  # the window opens and shows the first frame
+  observation, info = env.reset(seed=0)
+  # Every step draws the next frame, paced at metadata["render_fps"] (50 for CartPole); render() returns None.
   ```
 
   `Make` also takes the window for one env: `Gymnasium.Make("CartPole-v1", RenderMode.Human, WinFormEnvViewer.Factory)`.
@@ -275,15 +432,17 @@ A wrapper is an env around an env: `Wrapper<TObs, TAct>` and the `ObservationWra
 `RecordEpisodeStatistics`, `RenderCollection`, `NormalizeObservation`, `NormalizeReward`, `TimeAwareObservation` and
 `FlattenObservation` (`Gym.Wrappers`):
 
+# [C#](#tab/csharp)
+
 ```csharp
 using var env = new RecordEpisodeStatistics<NDArray, NDArray>(
     new NormalizeObservation<NDArray, NDArray>(Gymnasium.Make<NDArray, NDArray>("CartPole-v1")));
-NDArray observation = env.Reset(seed: 0).Observation;
+(NDArray observation, Info info) = env.Reset(seed: 0);
 while (true) {
     using NDArray action = env.ActionSpace.Sample();
-    var (next, _, terminated, truncated, info) = env.Step(action);
     observation.Dispose();
-    observation = next;
+    (observation, double reward, bool terminated, bool truncated, info)
+        = env.Step(action);
     if (terminated || truncated) {
         var episode = (Info)info["episode"]!;   // {"r": return, "l": length, "t": seconds}
         Console.WriteLine($"return {episode["r"]}, length {episode["l"]}");
@@ -294,6 +453,23 @@ while (true) {
 observation.Dispose();
 ```
 
+# [Python (Gymnasium)](#tab/python)
+
+```python
+env = gym.wrappers.RecordEpisodeStatistics(
+    gym.wrappers.NormalizeObservation(gym.make("CartPole-v1")))
+observation, info = env.reset(seed=0)
+while True:
+    action = env.action_space.sample()
+    observation, reward, terminated, truncated, info = env.step(action)
+    if terminated or truncated:
+        episode = info["episode"]   # {"r": return, "l": length, "t": seconds}
+        print(f"return {episode['r']}, length {episode['l']}")
+        break
+```
+
+---
+
 A wrapper owns the env it wraps: disposing the outermost one closes the stack. `env.Unwrapped` is the innermost env, and
 Python attributes are reachable by their Python names through a stack (`env.GetWrapperAttr("gravity")`).
 
@@ -301,20 +477,40 @@ Python attributes are reachable by their Python names through a stack (`env.GetW
 
 A vector env steps several copies of an env at once and returns batched arrays:
 
+# [C#](#tab/csharp)
+
 ```csharp
 // 8 carts in one env: CartPole's own vector env (its vector entry point), or "sync" for 8 copies of make's stack.
 using VectorEnv<NDArray, NDArray> envs = Gymnasium.MakeVec<NDArray, NDArray>("CartPole-v1", numEnvs: 8);
 envs.ActionSpace.Seed(42);
-using NDArray observations = envs.Reset(seed: 42).Observations;   // (8, 4) float32
-using NDArray actions = envs.ActionSpace.Sample();                 // (8,) int64
-var (next, rewards, terminations, truncations, infos) = envs.Step(actions);
-using (next)
+(NDArray observations, Info infos) = envs.Reset(seed: 42);   // (8, 4) float32
+using NDArray actions = envs.ActionSpace.Sample();             // (8,) int64
+observations.Dispose();
+(observations, NDArray rewards, NDArray terminations, NDArray truncations, infos)
+    = envs.Step(actions);
+using (observations)
 using (rewards)
 using (terminations)
 using (truncations)
-    Console.WriteLine($"{next.Shape} {rewards.dtype.name} {terminations.dtype.name}");   // (8, 4) float64 bool
+    Console.WriteLine($"{observations.Shape} {rewards.dtype.name} {terminations.dtype.name}");   // (8, 4) float64 bool
+// Rewards are float64, single or batched, where Gymnasium's vector CartPole returns float32 (DR-21).
 // A sub-env whose episode ended is reset by the next Step (AutoresetMode.NextStep, Gymnasium's default).
 ```
+
+# [Python (Gymnasium)](#tab/python)
+
+```python
+# 8 carts in one env: CartPole's own vector env (its vector entry point), or "sync" for 8 copies of make's stack.
+envs = gym.make_vec("CartPole-v1", num_envs=8)
+envs.action_space.seed(42)
+observations, infos = envs.reset(seed=42)   # (8, 4) float32
+actions = envs.action_space.sample()         # (8,) int64
+observations, rewards, terminations, truncations, infos = envs.step(actions)
+print(observations.shape, rewards.dtype.name, terminations.dtype.name)   # (8, 4) float32 bool
+# A sub-env whose episode ended is reset by the next step (AutoresetMode.NEXT_STEP, the default).
+```
+
+---
 
 - `Gymnasium.MakeVec(id, n)` uses the env's own vectorized class when it has one (CartPole's `CartPoleVectorEnv`), else
   `SyncVectorEnv`; `vectorizationMode: "sync"` asks for `SyncVectorEnv` (n copies of `make`'s stack, stepped in turn).

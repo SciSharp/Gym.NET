@@ -115,6 +115,13 @@
   margin: 0;
 }
 
+/* The quick start's C# and Python tabs (DR-141): each panel keeps its install line and its code apart, as the grid above
+   did before the tabs. Only the shown panel: a display rule on a [hidden] panel would override hidden and show both. */
+.gn-code section[role="tabpanel"]:not([hidden]) {
+  display: grid;
+  gap: 0.6rem;
+}
+
 /* ------------------------------------------------------------------- the 8-bit "select your environment" screen --- */
 
 .gn-arcade {

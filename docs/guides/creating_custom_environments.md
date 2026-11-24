@@ -29,6 +29,8 @@ wrapper and vector env does this (DR-96), and `NDScope.Detach` on an array no sc
 
 ## An example: a corridor
 
+# [C#](#tab/csharp)
+
 ```csharp
 using System;
 using System.Collections.Generic;
@@ -98,6 +100,55 @@ public sealed partial class CorridorEnv : Env<NDArray, NDArray> {
 }
 ```
 
+# [Python (Gymnasium)](#tab/python)
+
+```python
+import numpy as np
+import gymnasium as gym
+from gymnasium import spaces
+from gymnasium.error import ResetNeeded
+
+
+class CorridorEnv(gym.Env):
+    """A corridor of size cells. The agent starts on a random cell and moves left (0) or right (1); reaching the
+    right end ends the episode with reward 1, every other step costs 0.01."""
+
+    # The render modes and frame rate: the class attribute metadata.
+    metadata = {"render_modes": ["ansi"], "render_fps": 4}
+
+    def __init__(self, size=10, render_mode=None):
+        if size < 2:
+            raise ValueError("The corridor needs at least two cells.")
+        self._size = size
+        self._position = -1
+        self.observation_space = spaces.Discrete(size)   # the agent's cell
+        self.action_space = spaces.Discrete(2)           # 0: left, 1: right
+        self.render_mode = render_mode
+
+    def reset(self, seed=None, options=None):
+        super().reset(seed=seed)   # a seed reseeds self.np_random, None keeps its stream
+        self._position = int(self.np_random.integers(0, self._size - 1))
+        return np.int64(self._position), {}
+
+    def step(self, action):
+        if self._position < 0:
+            raise ResetNeeded("Call reset before step.")
+        if not self.action_space.contains(action):
+            raise ValueError(f"{action} is not an action of {self.action_space}.")
+        self._position = int(np.clip(self._position + (1 if action == 1 else -1), 0, self._size - 1))
+        terminated = self._position == self._size - 1
+        reward = 1.0 if terminated else -0.01
+        return np.int64(self._position), reward, terminated, False, {}
+
+    def render(self):
+        if self.render_mode != "ansi":
+            return None
+        return "".join("A" if i == self._position else "G" if i == self._size - 1 else "."
+                       for i in range(self._size))
+```
+
+---
+
 Notes on the choices:
 
 - **Types.** A `Discrete` space holds 0-d int64 arrays, so both types are `NDArray`. An env with a `Tuple` observation
@@ -118,11 +169,25 @@ Notes on the choices:
 
 ## Register it, make it, check it
 
+# [C#](#tab/csharp)
+
 ```csharp
 Gymnasium.Register("Corridor-v0", entryPoint: typeof(CorridorEnv), maxEpisodeSteps: 100);
 using IEnv env = Gymnasium.Make("Corridor-v0", new { size = 8, render_mode = "ansi" });
 EnvChecker.CheckEnv(env.Unwrapped);   // Gymnasium's check_env: spaces, seeding, determinism, render modes
 ```
+
+# [Python (Gymnasium)](#tab/python)
+
+```python
+from gymnasium.utils.env_checker import check_env
+
+gym.register("Corridor-v0", entry_point=CorridorEnv, max_episode_steps=100)
+env = gym.make("Corridor-v0", size=8, render_mode="ansi")
+check_env(env.unwrapped)   # spaces, seeding, determinism, render modes
+```
+
+---
 
 - `Gymnasium.Register` takes Gymnasium's `register` arguments: `entryPoint` (the class, an `EnvCreator` delegate, or a
   `"Namespace:Class"` string), `maxEpisodeSteps` (adds `TimeLimit`), `rewardThreshold`, `kwargs` (default constructor

@@ -35,8 +35,8 @@ will be removed in 2.0.
 | `new CartPoleEnv()` | `Gymnasium.Make("CartPole-v1")`, which adds Gymnasium's wrappers (`TimeLimit` of 500 steps, `OrderEnforcing`, `PassiveEnvChecker`); `new CartPoleEnv()` still builds the bare env |
 | `new CartPoleEnv(WinFormEnvViewer.Factory)` | `Gymnasium.HumanViewerFactory = WinFormEnvViewer.Factory;` then `Gymnasium.Make("CartPole-v1", new { render_mode = "human" })`, or `new CartPoleEnv(renderMode: "human", viewerFactory: WinFormEnvViewer.Factory)` |
 | `env.Seed(s); env.Reset()` | `env.Reset(seed: s)` |
-| `NDArray obs = env.Reset()` | `var (obs, info) = env.Reset()`, or `env.Reset().Observation` |
-| `Step step = env.Step(a)` | `var (obs, reward, terminated, truncated, info) = env.Step(a)` (a `StepResult<TObs>`) |
+| `NDArray obs = env.Reset()` | `(NDArray obs, Info info) = env.Reset()`; `env.Reset().Observation` takes the observation alone |
+| `Step step = env.Step(a)` | `(NDArray obs, double reward, bool terminated, bool truncated, Info info) = env.Step(a)` (a `StepResult<TObs>`) |
 | `step.Done` | `terminated \|\| truncated`: `terminated` when the task ended (the pole fell), `truncated` when a limit cut the episode short |
 | `step.Reward` (`float`) | `reward` (`double`) |
 | `step.Information` (`Gym.Collections.Dict`, or `null`) | `info` (`Gym.Envs.Info`, never `null`); `step.Information` still compiles, obsolete, until 2.0 (DR-78). `info.Get<T>(key)` reads a value as `T`, converting NumPy scalars, and a built-in env's info also reads as a typed record (`HalfCheetahInfoV5 typed = step.Info;`) |
@@ -78,24 +78,45 @@ while (true) {
 env.CloseEnvironment();
 ```
 
-1.0:
+1.0, beside the same episode in Gymnasium:
+
+# [C#](#tab/csharp)
 
 ```csharp
 Gymnasium.HumanViewerFactory = WinFormEnvViewer.Factory;    // once, at start-up
 using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("CartPole-v1", new { render_mode = "human" });
 env.ActionSpace.Seed(42);
-NDArray observation = env.Reset(seed: 42).Observation;
+(NDArray observation, Info info) = env.Reset(seed: 42);
 while (true) {
     using NDArray action = env.ActionSpace.Sample();
-    var (next, reward, terminated, truncated, info) = env.Step(action);   // draws the frame
-    observation.Dispose();                                               // arrays belong to the caller
-    observation = next;
+    observation.Dispose();                                   // arrays belong to the caller
+    (observation, double reward, bool terminated, bool truncated, info)
+        = env.Step(action);                                  // draws the frame
     if (terminated || truncated)
         break;
 }
 
 observation.Dispose();
 ```
+
+# [Python (Gymnasium)](#tab/python)
+
+```python
+import gymnasium as gym
+
+env = gym.make("CartPole-v1", render_mode="human")         # pygame's window
+env.action_space.seed(42)
+observation, info = env.reset(seed=42)
+while True:
+    action = env.action_space.sample()
+    observation, reward, terminated, truncated, info = env.step(action)   # draws the frame
+    if terminated or truncated:
+        break
+
+env.close()
+```
+
+---
 
 What behaves differently, beyond the spelling:
 
@@ -117,13 +138,29 @@ What behaves differently, beyond the spelling:
 0.2 returned an ImageSharp `Image`; 1.0 returns the frame as an array, the way Gymnasium does, and converts it to an
 image on request:
 
+# [C#](#tab/csharp)
+
 ```csharp
 using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("CartPole-v1", RenderMode.RgbArray);
-using NDArray observation = env.Reset(seed: 0).Observation;
+using ResetResult<NDArray> reset = env.Reset(seed: 0);
+(NDArray observation, Info info) = reset;                            // both released with reset
 using RenderResult result = env.Render();
 NDArray frame = (NDArray)result;                                     // (400, 600, 3) uint8, the result's own array
 using Image image = (Image)result;                                   // a new Image<Rgb24> of the frame, yours to dispose
 ```
+
+# [Python (Gymnasium)](#tab/python)
+
+```python
+from PIL import Image
+
+env = gym.make("CartPole-v1", render_mode="rgb_array")
+observation, info = env.reset(seed=0)
+frame = env.render()                                                 # (400, 600, 3) uint8
+image = Image.fromarray(frame)                                       # a Pillow image of the frame
+```
+
+---
 
 ## Keeping 0.2 code running: Gym.Legacy
 
@@ -195,8 +232,8 @@ names the 1.0 spelling (DR-58), and goes in 2.0 with `Gym.Legacy`:
 
 | 0.2 line | What it does in 1.0 | 1.0 spelling |
 |---|---|---|
-| `var (obs, reward, done, info) = env.Step(a);` | `done` is `terminated \|\| truncated`, as gym 0.21 reported it | `var (obs, reward, terminated, truncated, info) = env.Step(a);` |
-| `NDArray obs = env.Reset();` | the observation; the info is dropped, and arrays in it are never disposed (Taxi's action mask) | `env.Reset().Observation`, or `var (obs, info) = env.Reset();` |
+| `var (obs, reward, done, info) = env.Step(a);` | `done` is `terminated \|\| truncated`, as gym 0.21 reported it | `(NDArray obs, double reward, bool terminated, bool truncated, Info info) = env.Step(a);` |
+| `NDArray obs = env.Reset();` | the observation; the info is dropped, and arrays in it are never disposed (Taxi's action mask) | `(NDArray obs, Info info) = env.Reset();`, or `env.Reset().Observation` for the observation alone |
 | `env.CloseEnvironment();` | `Close()` | `env.Close()`, or `using` |
 | `new Box(-5f, 5f, np.float32)`, `new Box(low, high, dType: np.float32)` | the box `dtype:` builds; `new Box(low, high, null)` is then ambiguous | `new Box(-5, 5, dtype: np.float32)` |
 | `new CartPoleEnv(WinFormEnvViewer.Factory)` | human mode in that window, drawing every step itself (drop 0.2's per-step `Render()`, which would draw twice) | `new CartPoleEnv(renderMode: "human", viewerFactory: WinFormEnvViewer.Factory)` |

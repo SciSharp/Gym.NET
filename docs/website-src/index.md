@@ -20,15 +20,36 @@ _layout: landing
 <a class="gn-button" href="https://github.com/SciSharp/Gym.NET">GitHub</a>
 </div>
 <div class="gn-code">
+<!-- The quick start in C# and in Gymnasium (DR-141): DocFX's own tab-group markup, which its script wires at load like
+     any markdown tab group (the look, the keys, and ?tabs=python in the URL opening it on Python). -->
+<div class="tabGroup" id="tabgroup_hero">
+<ul role="tablist">
+<li role="presentation"><a href="#tabpanel_hero_csharp" role="tab" aria-controls="tabpanel_hero_csharp" data-tab="csharp" tabindex="0" aria-selected="true">C#</a></li>
+<li role="presentation"><a href="#tabpanel_hero_python" role="tab" aria-controls="tabpanel_hero_python" data-tab="python" tabindex="-1">Python (Gymnasium)</a></li>
+</ul>
+<section id="tabpanel_hero_csharp" role="tabpanel" data-tab="csharp">
 <pre><code class="lang-bash">dotnet add package Gym.NET.Environments</code></pre>
 <pre><code class="lang-csharp">using Gym;
 using Gym.Envs;
 using NumSharp;
 // make builds the registered env inside Gymnasium's wrappers, as gymnasium.make does
 using Env&lt;NDArray, NDArray&gt; env = Gymnasium.Make&lt;NDArray, NDArray&gt;("LunarLander-v3");
-NDArray observation = env.Reset(seed: 42).Observation;
+(NDArray observation, Info info) = env.Reset(seed: 42);
 using NDArray action = env.ActionSpace.Sample();
-var (next, reward, terminated, truncated, info) = env.Step(action);</code></pre>
+observation.Dispose();
+(observation, double reward, bool terminated, bool truncated, info)
+    = env.Step(action);</code></pre>
+</section>
+<section id="tabpanel_hero_python" role="tabpanel" data-tab="python" aria-hidden="true" hidden="hidden">
+<pre><code class="lang-bash">pip install "gymnasium[box2d]"</code></pre>
+<pre><code class="lang-python">import gymnasium as gym
+# make builds the registered env inside its wrappers
+env = gym.make("LunarLander-v3")
+observation, info = env.reset(seed=42)
+action = env.action_space.sample()
+observation, reward, terminated, truncated, info = env.step(action)</code></pre>
+</section>
+</div>
 </div>
 </section>
 

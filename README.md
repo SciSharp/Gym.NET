@@ -174,25 +174,45 @@ NumSharp.Lite reference ([migrating from 0.2](https://github.com/SciSharp/Gym.NE
 using System;
 using Gym;
 using Gym.Envs;
-using NumSharp;
 
 // make builds the registered env inside Gymnasium's wrappers: TimeLimit(500), OrderEnforcing, PassiveEnvChecker.
-using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("CartPole-v1");
+using IEnv env = Gymnasium.Make("CartPole-v1");
 env.ActionSpace.Seed(42);
-NDArray observation = env.Reset(seed: 42).Observation;
+(object? observation, Info info) = env.Reset(seed: 42);
 double episodeReturn = 0;
 while (true) {
-    using NDArray action = env.ActionSpace.Sample();   // 0 (push left) or 1 (push right)
-    var (next, reward, terminated, truncated, info) = env.Step(action);
-    observation.Dispose();                            // the arrays an env returns belong to the caller
-    observation = next;
+    object? action = env.ActionSpace.Sample();   // 0 (push left) or 1 (push right)
+    (observation as IDisposable)?.Dispose();     // the arrays an env returns belong to the caller
+    (observation, double reward, bool terminated, bool truncated, info)
+        = env.Step(action);
+    (action as IDisposable)?.Dispose();
     episodeReturn += reward;
     if (terminated || truncated)
         break;
 }
 
-observation.Dispose();
+(observation as IDisposable)?.Dispose();
 Console.WriteLine($"Episode return: {episodeReturn}");
+```
+
+The same episode in Gymnasium:
+
+```python
+import gymnasium as gym
+
+# make builds the registered env inside its wrappers: TimeLimit(500), OrderEnforcing, PassiveEnvChecker.
+env = gym.make("CartPole-v1")
+env.action_space.seed(42)
+observation, info = env.reset(seed=42)
+episode_return = 0.0
+while True:
+    action = env.action_space.sample()   # 0 (push left) or 1 (push right)
+    observation, reward, terminated, truncated, info = env.step(action)
+    episode_return += reward
+    if terminated or truncated:
+        break
+
+print(f"Episode return: {episode_return}")
 ```
 
 `Reset(seed)` returns `(observation, info)`. `Step(action)` returns `(observation, reward, terminated, truncated, info)`:
