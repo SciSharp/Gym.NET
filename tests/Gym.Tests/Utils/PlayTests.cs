@@ -395,25 +395,46 @@ namespace Gym.Tests.Utils {
         }
 
         /// <summary>
-        ///     <see cref="Clock.TickAsync"/> paces as <see cref="Clock.Tick"/> does, awaiting the wait (20 ms at 50 fps), returns
-        ///     the time since the previous tick, and a canceled wait throws through its task.
+        ///     <see cref="Clock.TickAsync"/> paces as <see cref="Clock.Tick"/> does, awaiting what is left of the frame (20 ms
+        ///     at 50 fps), returns the time since the previous tick, and a canceled wait throws through its task.
         /// </summary>
         /// <returns>The test.</returns>
         /// <remarks>
+        ///     <para>
         ///     The bounds prove that the tick waited, not how precisely. Windows' timers count whole system-timer periods
         ///     (about 15.6 ms unless a process raised the resolution), and a wait between one and two periods may end at the
         ///     first, so an awaited 19-20 ms wait can measure a few milliseconds short by the Stopwatch the clock reads:
         ///     GitHub's Windows runner measured 18 ms against the former bound of 19 (and 15 for the stopwatch). A tick that
         ///     did not wait measures 0-1 ms, so half a frame tells the two apart with a whole early period to spare.
+        ///     </para>
+        ///     <para>
+        ///     The wait is measured on a pair of ticks the frame was not used up between. A tick waits only for what is left
+        ///     of the frame since the previous one, as pygame's does, and a busy machine can hold the test's thread between
+        ///     the two ticks for a frame or more: GitHub's runner, running the three frameworks' test hosts at once, measured
+        ///     "waited 0 ms" once (CI on <c>e44ef97</c>). A wait shorter than a timer period may also end almost at once. So
+        ///     the pair counts only when the gap before the wait (<see cref="Clock.GetRawTime"/>) left at least 18 ms to
+        ///     wait, more than a whole period: a working tick then waits more than 15 ms at the default resolution (more
+        ///     than 17 at 1 ms), above the bound. Otherwise the next tick is measured instead, up to 50 times (a second of
+        ///     ticks), and a machine that never left that much fails the test with the gap it measured.
+        ///     </para>
         /// </remarks>
-        /// <exception cref="AssertFailedException">Thrown when the tick did not wait, mismeasured, or a canceled wait did not throw.</exception>
+        /// <exception cref="AssertFailedException">Thrown when the tick did not wait, mismeasured, a canceled wait did not throw, or no pair of 50 left the frame's wait to measure.</exception>
         [TestMethod]
         public async Task Clock_TickAsync_PacesAndCancels() {
             var clock = new Clock();
             await clock.TickAsync(50);
-            var watch = Stopwatch.StartNew();
-            long passed = await clock.TickAsync(50);
-            Assert.IsTrue(watch.ElapsedMilliseconds >= 10, $"The tick waited {watch.ElapsedMilliseconds} ms for a 20 ms frame.");
+            long passed, waited, gap;
+            int pairs = 0;
+            do {
+                // Each measured tick is the next pair's previous tick, so a retry costs one frame, not two.
+                var watch = Stopwatch.StartNew();
+                passed = await clock.TickAsync(50);
+                waited = watch.ElapsedMilliseconds;
+                // The raw time since the previous tick, measured before the wait: what the frame had already used.
+                gap = clock.GetRawTime();
+            } while (gap > 2 && ++pairs < 50);
+            Assert.IsTrue(gap <= 2, $"No pair of ticks left the frame's wait to measure: the last began {gap} ms after its previous tick.");
+            Assert.IsTrue(waited >= 10, $"The tick waited {waited} ms for a 20 ms frame, {gap} ms after the previous tick.");
             Assert.IsTrue(passed >= 10, $"The tick measured {passed} ms for a 20 ms frame.");
             // What it returns is the time since the previous tick, the wait included: the same value GetTime reads.
             Assert.AreEqual(passed, clock.GetTime());
