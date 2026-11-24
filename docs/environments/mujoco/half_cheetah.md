@@ -75,6 +75,19 @@ dotnet run --project examples/HalfCheetah -c Release -- --play
 dotnet run --project examples/HalfCheetah -c Release -- --render
 ```
 
+## Episode anatomy
+
+The whole episode, step by step: the distance run, the speed, the torso's pitch and the control cost, with a cursor
+following the video. The expert accelerates for about five seconds, past 15 m/s at step 86, then holds 18 to 19 m/s,
+up to 19.9, for 900.8 m in all; its torso stays within 9° of level, and each leg swings through a stride every 6 steps,
+0.3 s. From step 96 it runs past the floor's drawn edge, and its frames show it against grey.
+
+<div class="gn-anatomy" data-trace="media/HalfCheetah-v5.episode.json">
+<div><video src="media/HalfCheetah-v5.episode.mp4" poster="media/HalfCheetah-v5.figure.png" autoplay muted loop playsinline disablepictureinpicture disableremoteplayback aria-label="HalfCheetah-v5, seed 0, the episode the chart follows"></video><div class="gn-anatomy-readout" aria-live="off"></div></div>
+<div><div class="gn-anatomy-chart"></div><div class="gn-anatomy-legend"></div></div>
+<script type="application/json" class="gn-anatomy-spec">{"label":"HalfCheetah-v5, seed 0: the distance run, the speed, the torso's pitch and the control cost","bands":[{"height":70,"range":[0,920],"ticks":[0,300,600,900],"series":[{"column":"x","color":"#f8b800","name":"x, the distance run (m)"}]},{"height":70,"range":[-1,21],"ticks":[0,10,20],"series":[{"column":"vx","color":"#3cbcfc","name":"the forward speed (m/s)"}]},{"height":60,"range":[-10,10],"scale":57.29577951308232,"ticks":[-5,0,5],"unit":"°","series":[{"column":"pitch","color":"#b8b8f8","name":"the torso's pitch"}]},{"height":60,"range":[-0.65,0.05],"ticks":[-0.6,-0.3,0],"series":[{"column":"reward_ctrl","color":"#ff6b6b","width":1.1,"name":"the control cost, −0.1 × the torques squared"}]}],"readout":[{"label":"step","column":"@step"},{"label":"x","column":"x","digits":1,"unit":" m"},{"label":"speed","column":"vx","digits":1,"unit":" m/s"},{"label":"return so far","column":"@return","digits":1}]}</script>
+</div>
+
 ## How it works
 
 <div class="gn-figure gn-figure-wide">
@@ -257,19 +270,6 @@ cameras, the mouse orbits, pans and zooms, and H lists Gymnasium's other keys.
 Gym.NET draws MuJoCo's frames in software, about 0.2 s each for this model: the classic renderer's passes (the
 reflective floor, shadows, the skybox and the haze), reproduced in C#. By default every frame is drawn, so the window
 runs slower than real time; D switches to skipping frames.
-
-## Episode anatomy
-
-The whole episode, step by step: the distance run, the speed, the torso's pitch and the control cost, with a cursor
-following the video. The expert accelerates for about five seconds, past 15 m/s at step 86, then holds 18 to 19 m/s,
-up to 19.9, for 900.8 m in all; its torso stays within 9° of level, and each leg swings through a stride every 6 steps,
-0.3 s. From step 96 it runs past the floor's drawn edge, and its frames show it against grey.
-
-<div class="gn-anatomy" data-trace="media/HalfCheetah-v5.episode.json">
-<div><video src="media/HalfCheetah-v5.episode.mp4" poster="media/HalfCheetah-v5.figure.png" autoplay muted loop playsinline disablepictureinpicture disableremoteplayback aria-label="HalfCheetah-v5, seed 0, the episode the chart follows"></video><div class="gn-anatomy-readout" aria-live="off"></div></div>
-<div><div class="gn-anatomy-chart"></div><div class="gn-anatomy-legend"></div></div>
-<script type="application/json" class="gn-anatomy-spec">{"label":"HalfCheetah-v5, seed 0: the distance run, the speed, the torso's pitch and the control cost","bands":[{"height":70,"range":[0,920],"ticks":[0,300,600,900],"series":[{"column":"x","color":"#f8b800","name":"x, the distance run (m)"}]},{"height":70,"range":[-1,21],"ticks":[0,10,20],"series":[{"column":"vx","color":"#3cbcfc","name":"the forward speed (m/s)"}]},{"height":60,"range":[-10,10],"scale":57.29577951308232,"ticks":[-5,0,5],"unit":"°","series":[{"column":"pitch","color":"#b8b8f8","name":"the torso's pitch"}]},{"height":60,"range":[-0.65,0.05],"ticks":[-0.6,-0.3,0],"series":[{"column":"reward_ctrl","color":"#ff6b6b","width":1.1,"name":"the control cost, −0.1 × the torques squared"}]}],"readout":[{"label":"step","column":"@step"},{"label":"x","column":"x","digits":1,"unit":" m"},{"label":"speed","column":"vx","digits":1,"unit":" m/s"},{"label":"return so far","column":"@return","digits":1}]}</script>
-</div>
 
 ## Code examples
 

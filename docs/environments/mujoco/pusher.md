@@ -76,6 +76,17 @@ dotnet run --project examples/Pusher -c Release -- --render
 
 Keyboard play is not offered: the arm's seven motors would need 14 keys held in combinations, too many to play.
 
+## Episode anatomy
+
+The whole episode, step by step: the puck's distance from the goal, the fingertip's from the puck, the control cost and
+two of the arm's joints, with a cursor following the video. The expert swings the arm over in its first 30 steps (1.5 s), bringing the fingertip from 0.56 m to within 0.06 m of the puck, then pushes the puck the 0.19 m to the goal: its centre crosses the goal's edge at step 68, the whole puck is on the disc from step 90, and it ends 1.1 cm from the centre. The distance term still pays −0.049 on the last step: the goal's body lies 0.048 m below the puck's, so the term never reaches 0.
+
+<div class="gn-anatomy" data-trace="media/Pusher-v5.episode.json">
+<div><video src="media/Pusher-v5.episode.mp4" poster="media/Pusher-v5.figure.png" autoplay muted loop playsinline disablepictureinpicture disableremoteplayback aria-label="Pusher-v5, seed 7, the episode the chart follows"></video><div class="gn-anatomy-readout" aria-live="off"></div></div>
+<div><div class="gn-anatomy-chart"></div><div class="gn-anatomy-legend"></div></div>
+<script type="application/json" class="gn-anatomy-spec">{"label":"Pusher-v5, seed 7: the puck's distance from the goal, the fingertip's from the puck, the control cost and two of the arm's joints","bands":[{"height":70,"range":[0,0.22],"ticks":[0,0.1,0.2],"scale":-1,"series":[{"column":"reward_dist","color":"#ff8787","name":"the puck's distance from the goal (m)"}]},{"height":70,"range":[0,0.6],"ticks":[0,0.2,0.4],"scale":-2,"series":[{"column":"reward_near","color":"#f8b800","name":"the fingertip's distance from the puck (m)"}]},{"height":60,"range":[-0.3,0.02],"ticks":[-0.2,-0.1,0],"series":[{"column":"reward_ctrl","color":"#3cbcfc","name":"the control cost, −0.1 × the torques squared"}]},{"height":70,"range":[-70,35],"scale":57.29577951308232,"ticks":[-60,-30,0,30],"unit":"°","series":[{"column":"shoulder_pan","color":"#40c057","name":"the shoulder's pan"},{"column":"elbow","color":"#b8b8f8","name":"the elbow's flex"}]}],"readout":[{"label":"step","column":"@step"},{"label":"puck to goal","column":"reward_dist","scale":-1,"digits":3,"unit":" m"},{"label":"return so far","column":"@return","digits":1}]}</script>
+</div>
+
 ## How it works
 
 <div class="gn-figure gn-figure-wide">
@@ -244,17 +255,6 @@ and elevation −45°, where the arm is a small figure. The video sets the free 
 front-page showreel does, and so can any `default_camera_config`. In `human` mode, the mouse orbits, pans and zooms, and
 H lists Gymnasium's other keys. Gym.NET draws this model's frames in software in about 0.2 s each; by default every
 frame is drawn, and D switches to skipping frames.
-
-## Episode anatomy
-
-The whole episode, step by step: the puck's distance from the goal, the fingertip's from the puck, the control cost and
-two of the arm's joints, with a cursor following the video. The expert swings the arm over in its first 30 steps (1.5 s), bringing the fingertip from 0.56 m to within 0.06 m of the puck, then pushes the puck the 0.19 m to the goal: its centre crosses the goal's edge at step 68, the whole puck is on the disc from step 90, and it ends 1.1 cm from the centre. The distance term still pays −0.049 on the last step: the goal's body lies 0.048 m below the puck's, so the term never reaches 0.
-
-<div class="gn-anatomy" data-trace="media/Pusher-v5.episode.json">
-<div><video src="media/Pusher-v5.episode.mp4" poster="media/Pusher-v5.figure.png" autoplay muted loop playsinline disablepictureinpicture disableremoteplayback aria-label="Pusher-v5, seed 7, the episode the chart follows"></video><div class="gn-anatomy-readout" aria-live="off"></div></div>
-<div><div class="gn-anatomy-chart"></div><div class="gn-anatomy-legend"></div></div>
-<script type="application/json" class="gn-anatomy-spec">{"label":"Pusher-v5, seed 7: the puck's distance from the goal, the fingertip's from the puck, the control cost and two of the arm's joints","bands":[{"height":70,"range":[0,0.22],"ticks":[0,0.1,0.2],"scale":-1,"series":[{"column":"reward_dist","color":"#ff8787","name":"the puck's distance from the goal (m)"}]},{"height":70,"range":[0,0.6],"ticks":[0,0.2,0.4],"scale":-2,"series":[{"column":"reward_near","color":"#f8b800","name":"the fingertip's distance from the puck (m)"}]},{"height":60,"range":[-0.3,0.02],"ticks":[-0.2,-0.1,0],"series":[{"column":"reward_ctrl","color":"#3cbcfc","name":"the control cost, −0.1 × the torques squared"}]},{"height":70,"range":[-70,35],"scale":57.29577951308232,"ticks":[-60,-30,0,30],"unit":"°","series":[{"column":"shoulder_pan","color":"#40c057","name":"the shoulder's pan"},{"column":"elbow","color":"#b8b8f8","name":"the elbow's flex"}]}],"readout":[{"label":"step","column":"@step"},{"label":"puck to goal","column":"reward_dist","scale":-1,"digits":3,"unit":" m"},{"label":"return so far","column":"@return","digits":1}]}</script>
-</div>
 
 ## Code examples
 

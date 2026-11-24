@@ -75,6 +75,19 @@ dotnet run --project examples/CartPole -c Release -- --play
 dotnet run --project examples/CartPole -c Release -- --controller --render
 ```
 
+## Episode anatomy
+
+The whole episode, step by step: where the cart is, how far the pole leans, which way each step pushed. The video has
+one frame per step, and the cursor follows it. The controller drags the cart toward a set point that sways ±1.2 m
+every 250 steps; the cart reaches 0.62 m right of the centre and 0.47 m left of it, and the pole never leans past
+4.4°.
+
+<div class="gn-anatomy" data-trace="media/CartPole-v1.episode.json">
+<div><video src="media/CartPole-v1.episode.mp4" poster="media/CartPole-v1.figure.png" autoplay muted loop playsinline disablepictureinpicture disableremoteplayback aria-label="CartPole-v1, seed 3, the episode the chart follows"></video><div class="gn-anatomy-readout" aria-live="off"></div></div>
+<div><div class="gn-anatomy-chart"></div><div class="gn-anatomy-legend"></div></div>
+<script type="application/json" class="gn-anatomy-spec">{"label":"CartPole-v1, seed 3: the cart's position and the controller's set point, the pole's angle, and each push","bands":[{"height":110,"range":[-1.3,1.3],"ticks":[-1.2,0,1.2],"unit":" m","series":[{"column":"target","color":"#868e96","dash":true,"width":1.2,"name":"the controller's set point"},{"column":"x","color":"#3cbcfc","name":"the cart's position"}]},{"height":70,"range":[-6,6],"ticks":[-5,0,5],"unit":"°","scale":57.29577951308232,"series":[{"column":"theta","color":"#ff7fe3","name":"the pole's angle"}]},{"label":"push","strip":{"column":"action","colors":{"0":"#5c636a","1":"#f8b800"},"name":"each push: right in gold, left in grey"}}],"readout":[{"label":"step","column":"@step"},{"label":"x","column":"x","digits":3,"unit":" m"},{"label":"θ","column":"theta","digits":2,"unit":"°","scale":57.29577951308232},{"label":"next push","column":"action","map":{"0":"left","1":"right"}},{"label":"return so far","column":"@return","digits":0}]}</script>
+</div>
+
 ## How it works
 
 <div class="gn-figure">
@@ -221,19 +234,6 @@ Always empty, `{}`, as Gymnasium's; CartPole has no typed info record.
 The frame: white, a black track line, a black 50×30 px cart, a 10×125 px pole in (202, 152, 101), a blue axle; 125
 pixels to the metre, centred, so the frame's edges are the ±2.4 m limits. Drawn with SDL_gfx's anti-aliased polygons
 and circles, as pygame draws them.
-
-## Episode anatomy
-
-The whole episode, step by step: where the cart is, how far the pole leans, which way each step pushed. The video has
-one frame per step, and the cursor follows it. The controller drags the cart toward a set point that sways ±1.2 m
-every 250 steps; the cart reaches 0.62 m right of the centre and 0.47 m left of it, and the pole never leans past
-4.4°.
-
-<div class="gn-anatomy" data-trace="media/CartPole-v1.episode.json">
-<div><video src="media/CartPole-v1.episode.mp4" poster="media/CartPole-v1.figure.png" autoplay muted loop playsinline disablepictureinpicture disableremoteplayback aria-label="CartPole-v1, seed 3, the episode the chart follows"></video><div class="gn-anatomy-readout" aria-live="off"></div></div>
-<div><div class="gn-anatomy-chart"></div><div class="gn-anatomy-legend"></div></div>
-<script type="application/json" class="gn-anatomy-spec">{"label":"CartPole-v1, seed 3: the cart's position and the controller's set point, the pole's angle, and each push","bands":[{"height":110,"range":[-1.3,1.3],"ticks":[-1.2,0,1.2],"unit":" m","series":[{"column":"target","color":"#868e96","dash":true,"width":1.2,"name":"the controller's set point"},{"column":"x","color":"#3cbcfc","name":"the cart's position"}]},{"height":70,"range":[-6,6],"ticks":[-5,0,5],"unit":"°","scale":57.29577951308232,"series":[{"column":"theta","color":"#ff7fe3","name":"the pole's angle"}]},{"label":"push","strip":{"column":"action","colors":{"0":"#5c636a","1":"#f8b800"},"name":"each push: right in gold, left in grey"}}],"readout":[{"label":"step","column":"@step"},{"label":"x","column":"x","digits":3,"unit":" m"},{"label":"θ","column":"theta","digits":2,"unit":"°","scale":57.29577951308232},{"label":"next push","column":"action","map":{"0":"left","1":"right"}},{"label":"return so far","column":"@return","digits":0}]}</script>
-</div>
 
 ## Code examples
 

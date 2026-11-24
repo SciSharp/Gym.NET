@@ -78,6 +78,20 @@ dotnet run --project examples/LunarLander -c Release -- --play
 dotnet run --project examples/LunarLander -c Release -- --render
 ```
 
+## Episode anatomy
+
+The whole episode, step by step: the lander's x and height, its velocities and angle, the engine fired and the legs'
+contact flags, with a cursor following the video. The reset's push sends the lander left; the heuristic tilts it back
+toward the pad with the side engines and brakes the fall with the main engine, which fires in 72 of the 299 steps. The
+left leg touches down at step 117 and the right at 123, and the lander rests, for the +100, at step 299. The legs'
+flags drop to 0 before the end though the lander stands on both: see the warning in [How it works](#how-it-works).
+
+<div class="gn-anatomy" data-trace="media/LunarLander-v3.episode.json">
+<div><video src="media/LunarLander-v3.episode.mp4" poster="media/LunarLander-v3.figure.png" autoplay muted loop playsinline disablepictureinpicture disableremoteplayback aria-label="LunarLander-v3, seed 7, the episode the chart follows"></video><div class="gn-anatomy-readout" aria-live="off"></div></div>
+<div><div class="gn-anatomy-chart"></div><div class="gn-anatomy-legend"></div></div>
+<script type="application/json" class="gn-anatomy-spec">{"label":"LunarLander-v3, seed 7: the lander's x and height, its velocities and angle, the engine fired and the legs' contact flags","bands":[{"height":100,"range":[-0.3,1.5],"ticks":[0,0.5,1],"series":[{"column":"y","color":"#3cbcfc","name":"the height y"},{"column":"x","color":"#f8b800","name":"x from the pad"}]},{"height":70,"range":[-1.1,0.6],"ticks":[-1,0,0.5],"series":[{"column":"vy","color":"#3cbcfc","width":1.2,"dash":true,"name":"vy"},{"column":"vx","color":"#f8b800","width":1.2,"dash":true,"name":"vx"}]},{"height":60,"range":[-20,10],"scale":57.29577951308232,"ticks":[-15,0],"unit":"°","series":[{"column":"angle","color":"#ff7fe3","name":"the angle"}]},{"label":"engine","strip":{"column":"action","colors":{"0":"#343a40","1":"#ff7fe3","2":"#f8b800","3":"#3cbcfc"},"name":"the engine: main gold, left pink, right blue"}},{"label":"right leg","strip":{"column":"right_leg","colors":{"0":"#343a40","1":"#40c057"},"name":"the right leg's flag"}},{"label":"left leg","strip":{"column":"left_leg","colors":{"0":"#343a40","1":"#2f9e44"},"name":"the left leg's flag"}}],"readout":[{"label":"step","column":"@step"},{"label":"x","column":"x","digits":2},{"label":"y","column":"y","digits":2},{"label":"angle","column":"angle","digits":0,"unit":"°","scale":57.29577951308232},{"label":"engine","column":"action","map":{"0":"none","1":"left","2":"main","3":"right"}},{"label":"return so far","column":"@return","digits":1}]}</script>
+</div>
+
 ## How it works
 
 <div class="gn-figure">
@@ -234,20 +248,6 @@ ground white, the hull and legs
 in violet with anti-aliased outlines, the yellow flags, and the exhaust. The exhaust particles are Box2D bodies the
 engines emit only in a render mode, and each render shortens their lives and destroys the spent ones, as in Gymnasium:
 render once a step to match its frames.
-
-## Episode anatomy
-
-The whole episode, step by step: the lander's x and height, its velocities and angle, the engine fired and the legs'
-contact flags, with a cursor following the video. The reset's push sends the lander left; the heuristic tilts it back
-toward the pad with the side engines and brakes the fall with the main engine, which fires in 72 of the 299 steps. The
-left leg touches down at step 117 and the right at 123, and the lander rests, for the +100, at step 299. The legs'
-flags drop to 0 before the end though the lander stands on both: see the warning above.
-
-<div class="gn-anatomy" data-trace="media/LunarLander-v3.episode.json">
-<div><video src="media/LunarLander-v3.episode.mp4" poster="media/LunarLander-v3.figure.png" autoplay muted loop playsinline disablepictureinpicture disableremoteplayback aria-label="LunarLander-v3, seed 7, the episode the chart follows"></video><div class="gn-anatomy-readout" aria-live="off"></div></div>
-<div><div class="gn-anatomy-chart"></div><div class="gn-anatomy-legend"></div></div>
-<script type="application/json" class="gn-anatomy-spec">{"label":"LunarLander-v3, seed 7: the lander's x and height, its velocities and angle, the engine fired and the legs' contact flags","bands":[{"height":100,"range":[-0.3,1.5],"ticks":[0,0.5,1],"series":[{"column":"y","color":"#3cbcfc","name":"the height y"},{"column":"x","color":"#f8b800","name":"x from the pad"}]},{"height":70,"range":[-1.1,0.6],"ticks":[-1,0,0.5],"series":[{"column":"vy","color":"#3cbcfc","width":1.2,"dash":true,"name":"vy"},{"column":"vx","color":"#f8b800","width":1.2,"dash":true,"name":"vx"}]},{"height":60,"range":[-20,10],"scale":57.29577951308232,"ticks":[-15,0],"unit":"°","series":[{"column":"angle","color":"#ff7fe3","name":"the angle"}]},{"label":"engine","strip":{"column":"action","colors":{"0":"#343a40","1":"#ff7fe3","2":"#f8b800","3":"#3cbcfc"},"name":"the engine: main gold, left pink, right blue"}},{"label":"right leg","strip":{"column":"right_leg","colors":{"0":"#343a40","1":"#40c057"},"name":"the right leg's flag"}},{"label":"left leg","strip":{"column":"left_leg","colors":{"0":"#343a40","1":"#2f9e44"},"name":"the left leg's flag"}}],"readout":[{"label":"step","column":"@step"},{"label":"x","column":"x","digits":2},{"label":"y","column":"y","digits":2},{"label":"angle","column":"angle","digits":0,"unit":"°","scale":57.29577951308232},{"label":"engine","column":"action","map":{"0":"none","1":"left","2":"main","3":"right"}},{"label":"return so far","column":"@return","digits":1}]}</script>
-</div>
 
 ## Code examples
 

@@ -80,6 +80,17 @@ dotnet run --project examples/InvertedDoublePendulum -c Release -- --play
 `--play` runs Gymnasium's `play` (`Play.Run`) at the env's 20 steps a second: the frames are cheap here, about 0.03 s
 each in Gym.NET's software renderer. Each new game starts from the same seed.
 
+## Episode anatomy
+
+The whole episode, step by step: the cart's position, both poles' angles, the push and each step's reward, with a
+cursor following the video. The expert has both poles steady within 100 steps (5 s), pushing hardest in the first steps, up to full force; after that it holds them within 0.05° of upright with pushes under 0.0005, the cart parked 0.63 m right of the middle. Each of those steps pays 9.356: the 10 for staying up less the distance penalty's 0.644, since the tip stands 1.2 m up and the penalty measures it from 2 m.
+
+<div class="gn-anatomy" data-trace="media/InvertedDoublePendulum-v5.episode.json">
+<div><video src="media/InvertedDoublePendulum-v5.episode.mp4" poster="media/InvertedDoublePendulum-v5.figure.png" autoplay muted loop playsinline disablepictureinpicture disableremoteplayback aria-label="InvertedDoublePendulum-v5, seed 0, the episode the chart follows"></video><div class="gn-anatomy-readout" aria-live="off"></div></div>
+<div><div class="gn-anatomy-chart"></div><div class="gn-anatomy-legend"></div></div>
+<script type="application/json" class="gn-anatomy-spec">{"label":"InvertedDoublePendulum-v5, seed 0: the cart's position, both poles' angles, the push and each step's reward","bands":[{"height":70,"range":[-0.55,0.75],"ticks":[-0.4,0,0.4],"series":[{"column":"x","color":"#f8b800","name":"the cart's position (m), on a rail of ±1"}]},{"height":70,"range":[-12.5,6.5],"scale":57.29577951308232,"ticks":[-10,-5,0,5],"unit":"°","series":[{"column":"angle1","color":"#3cbcfc","name":"the lower pole's angle"},{"column":"angle2","color":"#b8b8f8","name":"the upper pole's angle, from the lower's"}]},{"height":60,"range":[-1.05,0.8],"ticks":[-1,0,0.5],"series":[{"column":"a0","color":"#ff6b6b","name":"the push, from −1 to 1 (× gear 500)"}]},{"height":60,"range":[9.22,9.38],"ticks":[9.25,9.3,9.35],"series":[{"column":"reward","color":"#40c057","name":"each step's reward; 9.36 at most"}]}],"readout":[{"label":"step","column":"@step"},{"label":"cart","column":"x","digits":2,"unit":" m"},{"label":"return so far","column":"@return","digits":1}]}</script>
+</div>
+
 ## How it works
 
 <div class="gn-figure gn-figure-wide">
@@ -236,17 +247,6 @@ camera named the frames come from MuJoCo's free camera at the model's extent, 8.
 tall. The video sets the free camera 2.6 m off, as the front-page showreel does, and so can any `default_camera_config`.
 In `human` mode, the mouse orbits, pans and zooms, and H lists Gymnasium's other keys. Gym.NET draws this model's frames
 in software in about 0.03 s each, faster than the env's 20 frames a second.
-
-## Episode anatomy
-
-The whole episode, step by step: the cart's position, both poles' angles, the push and each step's reward, with a
-cursor following the video. The expert has both poles steady within 100 steps (5 s), pushing hardest in the first steps, up to full force; after that it holds them within 0.05° of upright with pushes under 0.0005, the cart parked 0.63 m right of the middle. Each of those steps pays 9.356: the 10 for staying up less the distance penalty's 0.644, since the tip stands 1.2 m up and the penalty measures it from 2 m.
-
-<div class="gn-anatomy" data-trace="media/InvertedDoublePendulum-v5.episode.json">
-<div><video src="media/InvertedDoublePendulum-v5.episode.mp4" poster="media/InvertedDoublePendulum-v5.figure.png" autoplay muted loop playsinline disablepictureinpicture disableremoteplayback aria-label="InvertedDoublePendulum-v5, seed 0, the episode the chart follows"></video><div class="gn-anatomy-readout" aria-live="off"></div></div>
-<div><div class="gn-anatomy-chart"></div><div class="gn-anatomy-legend"></div></div>
-<script type="application/json" class="gn-anatomy-spec">{"label":"InvertedDoublePendulum-v5, seed 0: the cart's position, both poles' angles, the push and each step's reward","bands":[{"height":70,"range":[-0.55,0.75],"ticks":[-0.4,0,0.4],"series":[{"column":"x","color":"#f8b800","name":"the cart's position (m), on a rail of ±1"}]},{"height":70,"range":[-12.5,6.5],"scale":57.29577951308232,"ticks":[-10,-5,0,5],"unit":"°","series":[{"column":"angle1","color":"#3cbcfc","name":"the lower pole's angle"},{"column":"angle2","color":"#b8b8f8","name":"the upper pole's angle, from the lower's"}]},{"height":60,"range":[-1.05,0.8],"ticks":[-1,0,0.5],"series":[{"column":"a0","color":"#ff6b6b","name":"the push, from −1 to 1 (× gear 500)"}]},{"height":60,"range":[9.22,9.38],"ticks":[9.25,9.3,9.35],"series":[{"column":"reward","color":"#40c057","name":"each step's reward; 9.36 at most"}]}],"readout":[{"label":"step","column":"@step"},{"label":"cart","column":"x","digits":2,"unit":" m"},{"label":"return so far","column":"@return","digits":1}]}</script>
-</div>
 
 ## Code examples
 

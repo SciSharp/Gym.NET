@@ -78,6 +78,20 @@ dotnet run --project examples/MountainCar -c Release -- --play
 dotnet run --project examples/MountainCar -c Release -- --render
 ```
 
+## Episode anatomy
+
+The whole episode, step by step: where the car is, how fast it moves, which way each step pushed. The video has one
+frame per step, and the cursor follows it. Pushing right from the start, the car climbs only to −0.361 before the
+hill stops it (step 38). The rule turns with it, and the car swings up the left slope to −1.014 (step 79). From there
+the engine and the hill pull the same way: the car crosses the valley's floor at step 97, reaches its top speed,
+0.051, at step 100, and carries over the right hill to the flag after 122 steps.
+
+<div class="gn-anatomy" data-trace="media/MountainCar-v0.episode.json">
+<div><video src="media/MountainCar-v0.episode.mp4" poster="media/MountainCar-v0.figure.png" autoplay muted loop playsinline disablepictureinpicture disableremoteplayback aria-label="MountainCar-v0, seed 4, the episode the chart follows"></video><div class="gn-anatomy-readout" aria-live="off"></div></div>
+<div><div class="gn-anatomy-chart"></div><div class="gn-anatomy-legend"></div></div>
+<script type="application/json" class="gn-anatomy-spec">{"label":"MountainCar-v0, seed 4: the car's position and velocity, and each push","bands":[{"height":110,"range":[-1.25,0.65],"ticks":[-1.2,-0.5,0.5],"series":[{"column":"position","color":"#3cbcfc","name":"the car's position (the flag at 0.5)"}]},{"height":70,"range":[-0.07,0.07],"ticks":[-0.07,0,0.07],"series":[{"column":"velocity","color":"#ff7fe3","name":"its velocity"}]},{"label":"push","strip":{"column":"action","colors":{"0":"#5c636a","1":"#343a40","2":"#f8b800"},"name":"each push: right in gold, left in grey"}}],"readout":[{"label":"step","column":"@step"},{"label":"x","column":"position","digits":3},{"label":"v","column":"velocity","digits":4},{"label":"next push","column":"action","map":{"0":"left","1":"none","2":"right"}},{"label":"return so far","column":"@return","digits":0}]}</script>
+</div>
+
 ## How it works
 
 <div class="gn-figure">
@@ -221,20 +235,6 @@ The frame: white, the hill as a black anti-aliased line through 100 points, a bl
 $\cos(3x)$ radians (Gymnasium's stand-in for the slope's angle) on two grey wheels, and a yellow flag on a 50 px pole
 at x = 0.5; 333 pixels to a unit of x, so the frame spans the track from −1.2 to 0.6. Drawn with SDL_gfx's
 anti-aliased polygons and circles and pygame's anti-aliased lines, as pygame draws them.
-
-## Episode anatomy
-
-The whole episode, step by step: where the car is, how fast it moves, which way each step pushed. The video has one
-frame per step, and the cursor follows it. Pushing right from the start, the car climbs only to −0.361 before the
-hill stops it (step 38). The rule turns with it, and the car swings up the left slope to −1.014 (step 79). From there
-the engine and the hill pull the same way: the car crosses the valley's floor at step 97, reaches its top speed,
-0.051, at step 100, and carries over the right hill to the flag after 122 steps.
-
-<div class="gn-anatomy" data-trace="media/MountainCar-v0.episode.json">
-<div><video src="media/MountainCar-v0.episode.mp4" poster="media/MountainCar-v0.figure.png" autoplay muted loop playsinline disablepictureinpicture disableremoteplayback aria-label="MountainCar-v0, seed 4, the episode the chart follows"></video><div class="gn-anatomy-readout" aria-live="off"></div></div>
-<div><div class="gn-anatomy-chart"></div><div class="gn-anatomy-legend"></div></div>
-<script type="application/json" class="gn-anatomy-spec">{"label":"MountainCar-v0, seed 4: the car's position and velocity, and each push","bands":[{"height":110,"range":[-1.25,0.65],"ticks":[-1.2,-0.5,0.5],"series":[{"column":"position","color":"#3cbcfc","name":"the car's position (the flag at 0.5)"}]},{"height":70,"range":[-0.07,0.07],"ticks":[-0.07,0,0.07],"series":[{"column":"velocity","color":"#ff7fe3","name":"its velocity"}]},{"label":"push","strip":{"column":"action","colors":{"0":"#5c636a","1":"#343a40","2":"#f8b800"},"name":"each push: right in gold, left in grey"}}],"readout":[{"label":"step","column":"@step"},{"label":"x","column":"position","digits":3},{"label":"v","column":"velocity","digits":4},{"label":"next push","column":"action","map":{"0":"left","1":"none","2":"right"}},{"label":"return so far","column":"@return","digits":0}]}</script>
-</div>
 
 ## Code examples
 

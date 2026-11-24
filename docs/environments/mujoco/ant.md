@@ -76,6 +76,17 @@ dotnet run --project examples/Ant -c Release -- --render
 
 Keyboard play is not offered: the ant's eight motors would need 16 keys held in combinations, too many to play.
 
+## Episode anatomy
+
+The whole episode, step by step: the distance run, the speed, the torso's height and its sideways drift, with a cursor
+following the video. The expert runs 286.4 m in the 50 s, at 5.8 m/s on average after its first 100 steps and up to 8.2 m/s, drifting to its right as it goes, 18.5 m off the x axis by the end. It strides with one diagonal pair of legs, 2 and 4, whose hips swing through a stride every 0.54 s (11 steps), while leg 3's ankle stays pressed near its 30° limit; its torso bounces between 0.40 and 0.91 m, never nearer than 0.09 m to the healthy band's top.
+
+<div class="gn-anatomy" data-trace="media/Ant-v5.episode.json">
+<div><video src="media/Ant-v5.episode.mp4" poster="media/Ant-v5.figure.png" autoplay muted loop playsinline disablepictureinpicture disableremoteplayback aria-label="Ant-v5, seed 0, the episode the chart follows"></video><div class="gn-anatomy-readout" aria-live="off"></div></div>
+<div><div class="gn-anatomy-chart"></div><div class="gn-anatomy-legend"></div></div>
+<script type="application/json" class="gn-anatomy-spec">{"label":"Ant-v5, seed 0: the distance run, the speed, the torso's height and its sideways drift","bands":[{"height":70,"range":[-5,300],"ticks":[0,100,200,300],"series":[{"column":"x","color":"#f8b800","name":"x, the distance run (m)"}]},{"height":70,"range":[-0.5,8.6],"ticks":[0,4,8],"series":[{"column":"vx","color":"#3cbcfc","name":"the forward speed (m/s)"}]},{"height":70,"range":[0.15,1.05],"ticks":[0.2,0.6,1],"series":[{"column":"z","color":"#40c057","name":"the torso's height (m); healthy from 0.2 to 1"}]},{"height":60,"range":[-20,3],"ticks":[-15,-10,-5,0],"series":[{"column":"y","color":"#b8b8f8","name":"y, the sideways drift (m)"}]}],"readout":[{"label":"step","column":"@step"},{"label":"x","column":"x","digits":1,"unit":" m"},{"label":"height","column":"z","digits":2,"unit":" m"},{"label":"return so far","column":"@return","digits":1}]}</script>
+</div>
+
 ## How it works
 
 <div class="gn-figure gn-figure-wide">
@@ -280,17 +291,6 @@ for Ant sets only the distance, 4 m: the camera stays where the ant starts, and 
 travel and following the body's centre of mass, as the video does. In `human` mode, Tab cycles the cameras, the mouse
 orbits, pans and zooms, and H lists Gymnasium's other keys. Gym.NET draws this model's frames in software in about
 0.25 s each; by default every frame is drawn, and D switches to skipping frames.
-
-## Episode anatomy
-
-The whole episode, step by step: the distance run, the speed, the torso's height and its sideways drift, with a cursor
-following the video. The expert runs 286.4 m in the 50 s, at 5.8 m/s on average after its first 100 steps and up to 8.2 m/s, drifting to its right as it goes, 18.5 m off the x axis by the end. It strides with one diagonal pair of legs, 2 and 4, whose hips swing through a stride every 0.54 s (11 steps), while leg 3's ankle stays pressed near its 30° limit; its torso bounces between 0.40 and 0.91 m, never nearer than 0.09 m to the healthy band's top.
-
-<div class="gn-anatomy" data-trace="media/Ant-v5.episode.json">
-<div><video src="media/Ant-v5.episode.mp4" poster="media/Ant-v5.figure.png" autoplay muted loop playsinline disablepictureinpicture disableremoteplayback aria-label="Ant-v5, seed 0, the episode the chart follows"></video><div class="gn-anatomy-readout" aria-live="off"></div></div>
-<div><div class="gn-anatomy-chart"></div><div class="gn-anatomy-legend"></div></div>
-<script type="application/json" class="gn-anatomy-spec">{"label":"Ant-v5, seed 0: the distance run, the speed, the torso's height and its sideways drift","bands":[{"height":70,"range":[-5,300],"ticks":[0,100,200,300],"series":[{"column":"x","color":"#f8b800","name":"x, the distance run (m)"}]},{"height":70,"range":[-0.5,8.6],"ticks":[0,4,8],"series":[{"column":"vx","color":"#3cbcfc","name":"the forward speed (m/s)"}]},{"height":70,"range":[0.15,1.05],"ticks":[0.2,0.6,1],"series":[{"column":"z","color":"#40c057","name":"the torso's height (m); healthy from 0.2 to 1"}]},{"height":60,"range":[-20,3],"ticks":[-15,-10,-5,0],"series":[{"column":"y","color":"#b8b8f8","name":"y, the sideways drift (m)"}]}],"readout":[{"label":"step","column":"@step"},{"label":"x","column":"x","digits":1,"unit":" m"},{"label":"height","column":"z","digits":2,"unit":" m"},{"label":"return so far","column":"@return","digits":1}]}</script>
-</div>
 
 ## Code examples
 

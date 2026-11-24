@@ -78,6 +78,21 @@ dotnet run --project examples/Pendulum -c Release -- --play
 dotnet run --project examples/Pendulum -c Release -- --render
 ```
 
+## Episode anatomy
+
+The whole episode, step by step: the angle from upright, the speed, the torque, and which of the controller's three
+regimes chose it. The video has one frame per step, and the cursor follows it. From 109.8° the controller pumps at full
+torque and swings the pendulum through the bottom (step 7) and up the other side, at up to 6.18 rad/s (step 8). From
+step 13 to 17 the energy hovers around the upright rest's, and pumping and braking alternate. At step 18, 30° from the
+top, the PD law takes over; from step 31 the pendulum stays within 1° of upright, and from step 35 the torque stays
+under 0.071 N·m. The return, −114.1, is all but the last 0.01 earned in the first 30 steps.
+
+<div class="gn-anatomy" data-trace="media/Pendulum-v1.episode.json">
+<div><video src="media/Pendulum-v1.episode.mp4" poster="media/Pendulum-v1.figure.png" autoplay muted loop playsinline disablepictureinpicture disableremoteplayback aria-label="Pendulum-v1, seed 5, the episode the chart follows"></video><div class="gn-anatomy-readout" aria-live="off"></div></div>
+<div><div class="gn-anatomy-chart"></div><div class="gn-anatomy-legend"></div></div>
+<script type="application/json" class="gn-anatomy-spec">{"label":"Pendulum-v1, seed 5: the angle from upright, the angular velocity, the torque, and the controller's regime","bands":[{"height":100,"range":[-190,190],"ticks":[-180,0,180],"unit":"°","scale":57.29577951308232,"series":[{"column":"theta","color":"#3cbcfc","name":"the angle from upright"}]},{"height":60,"range":[-8,8],"ticks":[-8,0,8],"series":[{"column":"theta_dot","color":"#ff7fe3","name":"the angular velocity"}]},{"height":60,"range":[-2.2,2.2],"ticks":[-2,0,2],"series":[{"column":"torque","color":"#f8b800","name":"the torque"}]},{"label":"regime","strip":{"column":"phase","colors":{"0":"#f8b800","1":"#5c636a","2":"#2f9e44"},"name":"pump in gold, brake in grey, hold in green"}}],"readout":[{"label":"step","column":"@step"},{"label":"θ","column":"theta","digits":1,"unit":"°","scale":57.29577951308232},{"label":"dθ/dt","column":"theta_dot","digits":2},{"label":"next torque","column":"torque","digits":2},{"label":"regime","column":"phase","map":{"0":"pump","1":"brake","2":"hold"}},{"label":"return so far","column":"@return","digits":1}]}</script>
+</div>
+
 ## How it works
 
 <div class="gn-figure gn-figure-narrow">
@@ -222,21 +237,6 @@ Gymnasium's curved arrow image around the pivot, shrunk with pygame's `smoothsca
 mirrored for a counterclockwise torque. 113.6 pixels to the metre: the frame spans ±2.2 m around the pivot at its
 centre. Drawn with SDL_gfx's anti-aliased polygons and circles, as pygame draws them; the arrow image is Gymnasium's
 own, embedded.
-
-## Episode anatomy
-
-The whole episode, step by step: the angle from upright, the speed, the torque, and which of the controller's three
-regimes chose it. The video has one frame per step, and the cursor follows it. From 109.8° the controller pumps at full
-torque and swings the pendulum through the bottom (step 7) and up the other side, at up to 6.18 rad/s (step 8). From
-step 13 to 17 the energy hovers around the upright rest's, and pumping and braking alternate. At step 18, 30° from the
-top, the PD law takes over; from step 31 the pendulum stays within 1° of upright, and from step 35 the torque stays
-under 0.071 N·m. The return, −114.1, is all but the last 0.01 earned in the first 30 steps.
-
-<div class="gn-anatomy" data-trace="media/Pendulum-v1.episode.json">
-<div><video src="media/Pendulum-v1.episode.mp4" poster="media/Pendulum-v1.figure.png" autoplay muted loop playsinline disablepictureinpicture disableremoteplayback aria-label="Pendulum-v1, seed 5, the episode the chart follows"></video><div class="gn-anatomy-readout" aria-live="off"></div></div>
-<div><div class="gn-anatomy-chart"></div><div class="gn-anatomy-legend"></div></div>
-<script type="application/json" class="gn-anatomy-spec">{"label":"Pendulum-v1, seed 5: the angle from upright, the angular velocity, the torque, and the controller's regime","bands":[{"height":100,"range":[-190,190],"ticks":[-180,0,180],"unit":"°","scale":57.29577951308232,"series":[{"column":"theta","color":"#3cbcfc","name":"the angle from upright"}]},{"height":60,"range":[-8,8],"ticks":[-8,0,8],"series":[{"column":"theta_dot","color":"#ff7fe3","name":"the angular velocity"}]},{"height":60,"range":[-2.2,2.2],"ticks":[-2,0,2],"series":[{"column":"torque","color":"#f8b800","name":"the torque"}]},{"label":"regime","strip":{"column":"phase","colors":{"0":"#f8b800","1":"#5c636a","2":"#2f9e44"},"name":"pump in gold, brake in grey, hold in green"}}],"readout":[{"label":"step","column":"@step"},{"label":"θ","column":"theta","digits":1,"unit":"°","scale":57.29577951308232},{"label":"dθ/dt","column":"theta_dot","digits":2},{"label":"next torque","column":"torque","digits":2},{"label":"regime","column":"phase","map":{"0":"pump","1":"brake","2":"hold"}},{"label":"return so far","column":"@return","digits":1}]}</script>
-</div>
 
 ## Code examples
 

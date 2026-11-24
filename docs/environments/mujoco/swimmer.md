@@ -77,6 +77,17 @@ dotnet run --project examples/Swimmer -c Release -- --render
 Keyboard play is not offered: Gym.NET draws a frame of this model in about 0.55 s in software, while a step is 40 ms of
 simulated time, so a game would run about 14 times slower than real time.
 
+## Episode anatomy
+
+The whole episode, step by step: the distance swum, the speed, the heading and the two rotors' angles, with a cursor
+following the video. The expert swims with a stroke of about 36 steps (1.4 s), the back rotor a quarter of a stroke (8 steps) behind the front one, so a wave runs down the body toward the tail; it drives the rotors at full torque most of the time, the front one in 77% of the steps and the back one in 99%. Within each stroke the speed swings between −0.97 and 1.21 m/s, 0.36 m/s on average, 14.4 m in all; the heading swings between −55° and 40°, and the rotors between −56° and 59°, well inside their ±100°.
+
+<div class="gn-anatomy" data-trace="media/Swimmer-v5.episode.json">
+<div><video src="media/Swimmer-v5.episode.mp4" poster="media/Swimmer-v5.figure.png" autoplay muted loop playsinline disablepictureinpicture disableremoteplayback aria-label="Swimmer-v5, seed 0, the episode the chart follows"></video><div class="gn-anatomy-readout" aria-live="off"></div></div>
+<div><div class="gn-anatomy-chart"></div><div class="gn-anatomy-legend"></div></div>
+<script type="application/json" class="gn-anatomy-spec">{"label":"Swimmer-v5, seed 0: the distance swum, the speed, the heading and the two rotors' angles","bands":[{"height":70,"range":[-0.5,15.5],"ticks":[0,5,10,15],"series":[{"column":"x","color":"#f8b800","name":"x, the distance swum (m)"}]},{"height":70,"range":[-1.1,1.35],"ticks":[-1,0,1],"series":[{"column":"vx","color":"#3cbcfc","name":"the forward speed (m/s)"}]},{"height":60,"range":[-60,60],"scale":57.29577951308232,"ticks":[-45,0,45],"unit":"°","series":[{"column":"angle","color":"#b8b8f8","name":"the heading"}]},{"height":70,"range":[-65,65],"scale":57.29577951308232,"ticks":[-45,0,45],"unit":"°","series":[{"column":"joint1","color":"#40c057","name":"the front rotor's angle"},{"column":"joint2","color":"#ff6b6b","name":"the back rotor's angle"}]}],"readout":[{"label":"step","column":"@step"},{"label":"x","column":"x","digits":2,"unit":" m"},{"label":"speed","column":"vx","digits":2,"unit":" m/s"},{"label":"return so far","column":"@return","digits":1}]}</script>
+</div>
+
 ## How it works
 
 <div class="gn-figure gn-figure-wide">
@@ -234,17 +245,6 @@ own camera, 3 m to the side and 3 m up, looking down at 45° across the directio
 centre of mass, as the video does. In
 `human` mode, Tab cycles the cameras, the mouse orbits, pans and zooms, and H lists Gymnasium's other keys. Gym.NET draws
 this model's frames in software in about 0.55 s each; by default every frame is drawn, and D switches to skipping frames.
-
-## Episode anatomy
-
-The whole episode, step by step: the distance swum, the speed, the heading and the two rotors' angles, with a cursor
-following the video. The expert swims with a stroke of about 36 steps (1.4 s), the back rotor a quarter of a stroke (8 steps) behind the front one, so a wave runs down the body toward the tail; it drives the rotors at full torque most of the time, the front one in 77% of the steps and the back one in 99%. Within each stroke the speed swings between −0.97 and 1.21 m/s, 0.36 m/s on average, 14.4 m in all; the heading swings between −55° and 40°, and the rotors between −56° and 59°, well inside their ±100°.
-
-<div class="gn-anatomy" data-trace="media/Swimmer-v5.episode.json">
-<div><video src="media/Swimmer-v5.episode.mp4" poster="media/Swimmer-v5.figure.png" autoplay muted loop playsinline disablepictureinpicture disableremoteplayback aria-label="Swimmer-v5, seed 0, the episode the chart follows"></video><div class="gn-anatomy-readout" aria-live="off"></div></div>
-<div><div class="gn-anatomy-chart"></div><div class="gn-anatomy-legend"></div></div>
-<script type="application/json" class="gn-anatomy-spec">{"label":"Swimmer-v5, seed 0: the distance swum, the speed, the heading and the two rotors' angles","bands":[{"height":70,"range":[-0.5,15.5],"ticks":[0,5,10,15],"series":[{"column":"x","color":"#f8b800","name":"x, the distance swum (m)"}]},{"height":70,"range":[-1.1,1.35],"ticks":[-1,0,1],"series":[{"column":"vx","color":"#3cbcfc","name":"the forward speed (m/s)"}]},{"height":60,"range":[-60,60],"scale":57.29577951308232,"ticks":[-45,0,45],"unit":"°","series":[{"column":"angle","color":"#b8b8f8","name":"the heading"}]},{"height":70,"range":[-65,65],"scale":57.29577951308232,"ticks":[-45,0,45],"unit":"°","series":[{"column":"joint1","color":"#40c057","name":"the front rotor's angle"},{"column":"joint2","color":"#ff6b6b","name":"the back rotor's angle"}]}],"readout":[{"label":"step","column":"@step"},{"label":"x","column":"x","digits":2,"unit":" m"},{"label":"speed","column":"vx","digits":2,"unit":" m/s"},{"label":"return so far","column":"@return","digits":1}]}</script>
-</div>
 
 ## Code examples
 

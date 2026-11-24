@@ -76,6 +76,17 @@ dotnet run --project examples/HumanoidStandup -c Release -- --render
 
 Keyboard play is not offered: the humanoid's seventeen motors are far too many for a keyboard.
 
+## Episode anatomy
+
+The whole episode, step by step: the torso's height, the height term it earns and both knees, with a cursor following
+the video. The expert is on its feet within 0.6 s: it sits up, folds both knees under it to about −160° and rises out of the squat, its torso passing 1 m at step 31 and 1.2 m at step 38; from step 100 on it stays between 1.21 and 1.23 m, its knees nearly straight. Standing earns about 406 a step from the height term, 399,057.6 of its 399,827.7; it barely moves otherwise, 1.3 m along x and 0.5 m along y in the 15 s.
+
+<div class="gn-anatomy" data-trace="media/HumanoidStandup-v5.episode.json">
+<div><video src="media/HumanoidStandup-v5.episode.mp4" poster="media/HumanoidStandup-v5.figure.png" autoplay muted loop playsinline disablepictureinpicture disableremoteplayback aria-label="HumanoidStandup-v5, seed 0, the episode the chart follows"></video><div class="gn-anatomy-readout" aria-live="off"></div></div>
+<div><div class="gn-anatomy-chart"></div><div class="gn-anatomy-legend"></div></div>
+<script type="application/json" class="gn-anatomy-spec">{"label":"HumanoidStandup-v5, seed 0: the torso's height, the height term and both knees","bands":[{"height":80,"range":[0,1.35],"ticks":[0.2,0.6,1,1.2],"series":[{"column":"z","color":"#40c057","name":"the torso's height (m)"}]},{"height":70,"range":[0,450],"ticks":[0,200,400],"series":[{"column":"reward_linup","color":"#f8b800","name":"the height term, the height over 0.003 s"}]},{"height":80,"range":[-175,15],"scale":57.29577951308232,"ticks":[-150,-90,-30,0],"unit":"°","series":[{"column":"right_knee","color":"#b8b8f8","name":"the right knee's angle"},{"column":"left_knee","color":"#3cbcfc","name":"the left knee's angle"}]}],"readout":[{"label":"step","column":"@step"},{"label":"height","column":"z","digits":2,"unit":" m"},{"label":"return so far","column":"@return","digits":1}]}</script>
+</div>
+
 ## How it works
 
 <div class="gn-figure gn-figure-wide">
@@ -286,17 +297,6 @@ a free camera tracks nothing; the humanoid stands up where it lies, so it stays 
 the model's own camera, 3 m to the side and 0.5 m above the centre of mass, following it, as the video does. In `human`
 mode, Tab cycles the cameras, the mouse orbits, pans and zooms, and H lists Gymnasium's other keys. Gym.NET draws this
 model's frames in software in about 0.6 s each; by default every frame is drawn, and D switches to skipping frames.
-
-## Episode anatomy
-
-The whole episode, step by step: the torso's height, the height term it earns and both knees, with a cursor following
-the video. The expert is on its feet within 0.6 s: it sits up, folds both knees under it to about −160° and rises out of the squat, its torso passing 1 m at step 31 and 1.2 m at step 38; from step 100 on it stays between 1.21 and 1.23 m, its knees nearly straight. Standing earns about 406 a step from the height term, 399,057.6 of its 399,827.7; it barely moves otherwise, 1.3 m along x and 0.5 m along y in the 15 s.
-
-<div class="gn-anatomy" data-trace="media/HumanoidStandup-v5.episode.json">
-<div><video src="media/HumanoidStandup-v5.episode.mp4" poster="media/HumanoidStandup-v5.figure.png" autoplay muted loop playsinline disablepictureinpicture disableremoteplayback aria-label="HumanoidStandup-v5, seed 0, the episode the chart follows"></video><div class="gn-anatomy-readout" aria-live="off"></div></div>
-<div><div class="gn-anatomy-chart"></div><div class="gn-anatomy-legend"></div></div>
-<script type="application/json" class="gn-anatomy-spec">{"label":"HumanoidStandup-v5, seed 0: the torso's height, the height term and both knees","bands":[{"height":80,"range":[0,1.35],"ticks":[0.2,0.6,1,1.2],"series":[{"column":"z","color":"#40c057","name":"the torso's height (m)"}]},{"height":70,"range":[0,450],"ticks":[0,200,400],"series":[{"column":"reward_linup","color":"#f8b800","name":"the height term, the height over 0.003 s"}]},{"height":80,"range":[-175,15],"scale":57.29577951308232,"ticks":[-150,-90,-30,0],"unit":"°","series":[{"column":"right_knee","color":"#b8b8f8","name":"the right knee's angle"},{"column":"left_knee","color":"#3cbcfc","name":"the left knee's angle"}]}],"readout":[{"label":"step","column":"@step"},{"label":"height","column":"z","digits":2,"unit":" m"},{"label":"return so far","column":"@return","digits":1}]}</script>
-</div>
 
 ## Code examples
 

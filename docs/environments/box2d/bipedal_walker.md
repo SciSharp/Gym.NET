@@ -80,6 +80,19 @@ dotnet run --project examples/BipedalWalker -c Release -- --play
 dotnet run --project examples/BipedalWalker -c Release -- --render
 ```
 
+## Episode anatomy
+
+The whole episode, step by step: the walker's progress along the course, the hull's angle, the hips' and knees' angles
+and the feet's contact flags, with a cursor following the video. The gait swaps its legs 49 times, every 33 steps
+on average, and keeps the hull within 12° of level, walking at about 2.6 units a second (vx 0.32 on average). It
+reaches the course's end at step 1,598, two steps before the time limit.
+
+<div class="gn-anatomy" data-trace="media/BipedalWalker-v3.episode.json">
+<div><video src="media/BipedalWalker-v3.episode.mp4" poster="media/BipedalWalker-v3.figure.png" autoplay muted loop playsinline disablepictureinpicture disableremoteplayback aria-label="BipedalWalker-v3, seed 0, the episode the chart follows"></video><div class="gn-anatomy-readout" aria-live="off"></div></div>
+<div><div class="gn-anatomy-chart"></div><div class="gn-anatomy-legend"></div></div>
+<script type="application/json" class="gn-anatomy-spec">{"label":"BipedalWalker-v3, seed 0: the walker's progress, the hull's angle, the hips' and knees' angles and the feet's contact flags","bands":[{"height":70,"range":[0,92],"ticks":[0,30,60,90],"series":[{"column":"x","color":"#f8b800","name":"x along the course, the end at 88.7"}]},{"height":60,"range":[-15,15],"scale":57.29577951308232,"ticks":[-10,0,10],"unit":"°","series":[{"column":"hull_angle","color":"#b8b8f8","name":"the hull's angle"}]},{"height":80,"range":[-0.9,1.25],"ticks":[-0.5,0,0.5,1],"series":[{"column":"hip1","color":"#3cbcfc","name":"leg 1's hip"},{"column":"hip2","color":"#ff7fe3","name":"leg 2's hip"}]},{"height":80,"range":[-1.8,0.8],"ticks":[-1.5,-1,-0.5,0,0.5],"series":[{"column":"knee1","color":"#3cbcfc","width":1.2,"dash":true,"name":"leg 1's knee"},{"column":"knee2","color":"#ff7fe3","width":1.2,"dash":true,"name":"leg 2's knee"}]},{"label":"foot 1","strip":{"column":"contact1","colors":{"0":"#343a40","1":"#3cbcfc"},"name":"leg 1's contact flag"}},{"label":"foot 2","strip":{"column":"contact2","colors":{"0":"#343a40","1":"#ff7fe3"},"name":"leg 2's contact flag"}}],"readout":[{"label":"step","column":"@step"},{"label":"x","column":"x","digits":1},{"label":"angle","column":"hull_angle","digits":0,"unit":"°","scale":57.29577951308232},{"label":"return so far","column":"@return","digits":1}]}</script>
+</div>
+
 ## How it works
 
 <div class="gn-figure">
@@ -277,19 +290,6 @@ and one lidar ray in red. The rays take turns: each render draws the next one, s
 then none for 80 frames, so render once a step to match Gymnasium's frames. In `human` mode the window shows the
 scrolling frame as Gymnasium's does, never cleared: while the walker stands left of its start, the window's left
 columns keep the previous frames' pixels.
-
-## Episode anatomy
-
-The whole episode, step by step: the walker's progress along the course, the hull's angle, the hips' and knees' angles
-and the feet's contact flags, with a cursor following the video. The gait swaps its legs 49 times, every 33 steps
-on average, and keeps the hull within 12° of level, walking at about 2.6 units a second (vx 0.32 on average). It
-reaches the course's end at step 1,598, two steps before the time limit.
-
-<div class="gn-anatomy" data-trace="media/BipedalWalker-v3.episode.json">
-<div><video src="media/BipedalWalker-v3.episode.mp4" poster="media/BipedalWalker-v3.figure.png" autoplay muted loop playsinline disablepictureinpicture disableremoteplayback aria-label="BipedalWalker-v3, seed 0, the episode the chart follows"></video><div class="gn-anatomy-readout" aria-live="off"></div></div>
-<div><div class="gn-anatomy-chart"></div><div class="gn-anatomy-legend"></div></div>
-<script type="application/json" class="gn-anatomy-spec">{"label":"BipedalWalker-v3, seed 0: the walker's progress, the hull's angle, the hips' and knees' angles and the feet's contact flags","bands":[{"height":70,"range":[0,92],"ticks":[0,30,60,90],"series":[{"column":"x","color":"#f8b800","name":"x along the course, the end at 88.7"}]},{"height":60,"range":[-15,15],"scale":57.29577951308232,"ticks":[-10,0,10],"unit":"°","series":[{"column":"hull_angle","color":"#b8b8f8","name":"the hull's angle"}]},{"height":80,"range":[-0.9,1.25],"ticks":[-0.5,0,0.5,1],"series":[{"column":"hip1","color":"#3cbcfc","name":"leg 1's hip"},{"column":"hip2","color":"#ff7fe3","name":"leg 2's hip"}]},{"height":80,"range":[-1.8,0.8],"ticks":[-1.5,-1,-0.5,0,0.5],"series":[{"column":"knee1","color":"#3cbcfc","width":1.2,"dash":true,"name":"leg 1's knee"},{"column":"knee2","color":"#ff7fe3","width":1.2,"dash":true,"name":"leg 2's knee"}]},{"label":"foot 1","strip":{"column":"contact1","colors":{"0":"#343a40","1":"#3cbcfc"},"name":"leg 1's contact flag"}},{"label":"foot 2","strip":{"column":"contact2","colors":{"0":"#343a40","1":"#ff7fe3"},"name":"leg 2's contact flag"}}],"readout":[{"label":"step","column":"@step"},{"label":"x","column":"x","digits":1},{"label":"angle","column":"hull_angle","digits":0,"unit":"°","scale":57.29577951308232},{"label":"return so far","column":"@return","digits":1}]}</script>
-</div>
 
 ## Code examples
 

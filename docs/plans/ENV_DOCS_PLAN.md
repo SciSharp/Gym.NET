@@ -67,16 +67,16 @@ held for MuJoCo. This section is the specification they settled.
 | 1 | (banner and lead) | the 8-bit banner (2.1), then one paragraph: what the env is and what makes it hard | written |
 | 2 | Description | the problem, where it comes from (its paper), what the agent must learn | Gymnasium's docstring, rewritten in Gym.NET's voice (it is MIT); the paper |
 | 3 | Quick start | full width, below the infobox: make, reset and step in C# and Python (Gymnasium) tabs, the package to add; then "Play it, or watch the agent": the example's `--play` command and keys where it is playable, and the command that shows the infobox's agent in a window | compiled samples (DR-105), `examples/<Env>` |
-| 4 | How it works | the figure (2.6), the mechanics as math, the constants or joints table with Gym.NET's and Gymnasium's names and footgun notes, what simulates the env (DR-114) | the code, the model, Gymnasium's source |
-| 5 | Action space | a table: each action or each dimension, its meaning, its range (MuJoCo: each motor and its gear) | the docstring, checked against the space |
-| 6 | Observation space | a table: index, meaning, joint, type, unit or min and max; notes where the bounds differ from what an episode allows | the docstring, checked against the space |
-| 7 | Rewards | how each step is scored, the options that change it | the docstring and the code |
-| 8 | Starting state | the reset distribution, the reset options | the docstring and the code |
-| 9 | Episode end | termination conditions, truncation (the `TimeLimit` that `Make` adds) | the docstring and the registry |
-| 10 | Arguments | three columns (DR-116): Gymnasium's keyword over the C# parameter, the type over the default, the effect with its footguns; `Make` by keyword and by the generated options record in a C# tab beside Gymnasium's `gym.make` (DR-141); settable physics properties | the constructor, checked by the test |
-| 11 | Info | the keys, their members, their meaning, whether reset sends them; the typed info record | the info record (DR-91, DR-95) |
-| 12 | Rendering | each render mode, the frame, human mode's viewer; MuJoCo's cameras (which one draws by default), `depth_array`, `rgbd_tuple` | the code |
-| 13 | Episode anatomy | the infobox's episode beside an SVG chart of every step, a cursor following the video and a live readout (DR-115) | the example's trace (2.6) |
+| 4 | Episode anatomy | right above How it works (DR-142): the infobox's episode beside an SVG chart of every step, a cursor following the video and a live readout (DR-115) | the example's trace (2.6) |
+| 5 | How it works | the figure (2.6), the mechanics as math, the constants or joints table with Gym.NET's and Gymnasium's names and footgun notes, what simulates the env (DR-114) | the code, the model, Gymnasium's source |
+| 6 | Action space | a table: each action or each dimension, its meaning, its range (MuJoCo: each motor and its gear) | the docstring, checked against the space |
+| 7 | Observation space | a table: index, meaning, joint, type, unit or min and max; notes where the bounds differ from what an episode allows | the docstring, checked against the space |
+| 8 | Rewards | how each step is scored, the options that change it | the docstring and the code |
+| 9 | Starting state | the reset distribution, the reset options | the docstring and the code |
+| 10 | Episode end | termination conditions, truncation (the `TimeLimit` that `Make` adds) | the docstring and the registry |
+| 11 | Arguments | three columns (DR-116): Gymnasium's keyword over the C# parameter, the type over the default, the effect with its footguns; `Make` by keyword and by the generated options record in a C# tab beside Gymnasium's `gym.make` (DR-141); settable physics properties | the constructor, checked by the test |
+| 12 | Info | the keys, their members, their meaning, whether reset sends them; the typed info record | the info record (DR-91, DR-95) |
+| 13 | Rendering | each render mode, the frame, human mode's viewer; MuJoCo's cameras (which one draws by default), `depth_array`, `rgbd_tuple` | the code |
 | 14 | Code examples | about six per env, each with C# and Python (Gymnasium) tabs: the make/reset/step loop, then what is particular to the env (reset options, the options record, physics, cameras, wrappers, vector envs) | compiled samples (DR-105) |
 | 15 | Agents and examples | the infobox's agent (policy, seed, steps, return), the `examples/<Env>` project (`<Env>Program.cs`), its commands and keyboard keys, `--record` | `examples/`, `tests/Gym.Tests/Agents` |
 | 16 | Vectorized environment | `MakeVec`: the vector entry point where one exists, sync and async | the registry |
@@ -169,6 +169,11 @@ names the file that recorded it.
   sidebar lists (`docs/environments/toc.json`, read beside the manifest): the pages come family by family (E3 to E7),
   and the button never leads to a page not written yet.
 - **Keys.** Enter opens the selected env's page while focus is in the gallery; the arrows keep moving the cursor.
+- **The lock (DR-143).** A hover previews a cartridge; a click locks it, and while it is locked the pointer crossing
+  the other cartridges leaves NOW PLAYING alone, so a reader can pick mid-shelf and go to the panel or the sidebar.
+  A click on the locked cartridge, or Esc, releases it; a click on another moves it; the arrows, Home and End carry
+  it. Locked, the cursor settles: the frame stops blinking and stays gold, the arrow turns gold. The links line ends
+  with the hint, "click a cartridge to keep it", or "click it again or Esc to let go".
 - **Sticky floor.** The manual makes the panel taller than DR-101's tallest (516 px), so every env's panel was measured
   again (E2): the tallest is BipedalWalkerHardcore-v3's, 724 px once READ THE MANUAL shows (671 px while no page
   exists), and the floor moved from 660 px to 840 px of window height. Each manual row keeps to two lines in the
@@ -220,6 +225,7 @@ pushed when the maintainer says so.
 | E7 | MuJoCo: the 11 pages with their v4 sections, cameras and depth rendering; their examples' `--record` with the joints projected (HalfCheetah's mockup is the model). **Done 2026-11-24**: every replayed trace's return equals the recording's bit for bit in Gymnasium on MuJoCo 4.0.0; the figures are Gym.NET's own drawing, measured against Gymnasium's frame of the same state (0 pixels for InvertedDoublePendulum, 3 one-level pixels for InvertedPendulum, 7 for Reacher, 1,024 for Pusher, up to 45,452 of 456,000 for Humanoid) and every projected point within 0.3 px of MuJoCo's own anchor; the pages' green or amber frames badge follows MUJOCO_ASSESSMENT 18.3; a figure is the reset without noise from a free camera of known placement, Pusher's and Reacher's (no noise argument) the episode's own reset; Reacher's 50-step episode is recorded at 25 fps; the frame times are measured (`e7/frametime.cs`); Gymnasium's default camera does not follow a body (its `trackbodyid` on a free camera tracks nothing), which Hopper's and Walker2d's pages had said it did | DR-112…DR-116 |
 | E8 | The Performance rows not measured yet (MountainCarContinuous-v0's page says so and cites MountainCar-v0's); the external links checked; the headless pass over every page and button. **Done 2026-11-24**: Gymnasium's `benchmark_step` against `Performance.BenchmarkStep` (2-second warm-up, the medians of three interleaved 5-second rounds) for the 14 ids without a row, so MountainCarContinuous (3.2×), Cliff Walking (3.2×) and Blackjack (3.9×) have their own and every MuJoCo page one; the 218 external links of the env pages fetched: 211 answer 200, IEEE's and PubMed's 202 and 203 are bot pages over existing records, the two DOIs a publisher refuses or a first pass cut at a parenthesis resolve through doi.org's handle API; a headless sweep (`e8/qa-sweep.mjs`) of the 24 pages of the Environments toc at 1280 dark and 1440 light: no failed request, exception or console error, every image decoded, every infobox video playing, every anatomy drawn, every tab group C# and Python, every same-page anchor present, nothing wider than the article, the 137 same-site link targets 200 with their anchors, and each of the gallery's 24 cartridges opening its page | DR-36, DR-102 |
 | E9 | The maintainer's follow-ups once every page was live (round 42): the sidebar remembers its sections as NumSharp's does and the four families open by default (DR-138); every sample in Gymnasium's shape with its types spelled out (DR-139, DR-140): the 23 pages' samples, the guides, the README, the landing page and `examples/`; a Python (Gymnasium) twin beside every C# sample that has one: the 23 Arguments sections, the guides and the landing page's quick start, and below the README's (DR-141). **Done 2026-11-24**, not pushed (the maintainer: "Dont deploy or push yet") | DR-138…DR-141 |
+| E10 | Round 43: Episode anatomy right above How it works on the 23 pages (DR-142); the gallery's lock, a click keeping a cartridge on NOW PLAYING while the pointer crosses the others, its cursor settled (DR-143), on the landing page and the Environments page. **Done 2026-11-24**, not pushed | DR-142, DR-143 |
 
 ## 6. Risks
 

@@ -79,6 +79,18 @@ dotnet run --project examples/CliffWalking -c Release -- --play
 dotnet run --project examples/CliffWalking -c Release -- --render
 ```
 
+## Episode anatomy
+
+The whole episode on the grid: every move the walker made, and a ring on the cell the video shows. Below, the move the
+plan chose at each step. The plan steps up off the start, walks right along the cliff's edge for eleven steps, and steps
+down onto the goal: 13 steps and a return of −13, without a fall.
+
+<div class="gn-anatomy gn-anatomy-wide" data-trace="media/CliffWalking-v1.episode.json">
+<div><video src="media/CliffWalking-v1.episode.mp4" poster="media/CliffWalking-v1.board.png" autoplay muted loop playsinline disablepictureinpicture disableremoteplayback aria-label="CliffWalking-v1, seed 0, the episode the chart follows"></video><div class="gn-anatomy-readout" aria-live="off"></div></div>
+<div><div class="gn-anatomy-chart"></div><div class="gn-anatomy-legend"></div></div>
+<script type="application/json" class="gn-anatomy-spec">{"label":"CliffWalking-v1, seed 0: the walker's path on the grid and the moves the plan chose","bands":[{"height":150,"board":{"image":"media/CliffWalking-v1.board.png","size":[768,256],"origin":[0,0],"cell":[64,64],"row":"row","col":"col","path":{"column":"reward","colors":{"-1":"#1971c2"}},"name":"the path, step by step"}},{"label":"move","strip":{"column":"action","colors":{"0":"#ff7fe3","1":"#f8b800","2":"#3cbcfc","3":"#adb5bd"},"name":"the move chosen: up pink, right gold, down blue, left grey"}}],"readout":[{"label":"step","column":"@step"},{"label":"cell","column":"state","digits":0},{"label":"moves","column":"action","map":{"0":"up","1":"right","2":"down","3":"left"}},{"label":"return so far","column":"@return","digits":0}]}</script>
+</div>
+
 ## How it works
 
 <div class="gn-figure gn-figure-wide">
@@ -252,18 +264,6 @@ as `info.Get<double>("prob")`, or through the typed record.
 The frame is the Farama Foundation's pixel art, embedded from Gymnasium, which draws Cliff Walking with it from 1.4.0
 on: grass tiles, the cliff's tiles (its two ends, and two middle tiles that alternate), the `S` and `G` letters, the
 goal's flag and the walker, on 64-pixel cells.
-
-## Episode anatomy
-
-The whole episode on the grid: every move the walker made, and a ring on the cell the video shows. Below, the move the
-plan chose at each step. The plan steps up off the start, walks right along the cliff's edge for eleven steps, and steps
-down onto the goal: 13 steps and a return of −13, without a fall.
-
-<div class="gn-anatomy gn-anatomy-wide" data-trace="media/CliffWalking-v1.episode.json">
-<div><video src="media/CliffWalking-v1.episode.mp4" poster="media/CliffWalking-v1.board.png" autoplay muted loop playsinline disablepictureinpicture disableremoteplayback aria-label="CliffWalking-v1, seed 0, the episode the chart follows"></video><div class="gn-anatomy-readout" aria-live="off"></div></div>
-<div><div class="gn-anatomy-chart"></div><div class="gn-anatomy-legend"></div></div>
-<script type="application/json" class="gn-anatomy-spec">{"label":"CliffWalking-v1, seed 0: the walker's path on the grid and the moves the plan chose","bands":[{"height":150,"board":{"image":"media/CliffWalking-v1.board.png","size":[768,256],"origin":[0,0],"cell":[64,64],"row":"row","col":"col","path":{"column":"reward","colors":{"-1":"#1971c2"}},"name":"the path, step by step"}},{"label":"move","strip":{"column":"action","colors":{"0":"#ff7fe3","1":"#f8b800","2":"#3cbcfc","3":"#adb5bd"},"name":"the move chosen: up pink, right gold, down blue, left grey"}}],"readout":[{"label":"step","column":"@step"},{"label":"cell","column":"state","digits":0},{"label":"moves","column":"action","map":{"0":"up","1":"right","2":"down","3":"left"}},{"label":"return so far","column":"@return","digits":0}]}</script>
-</div>
 
 ## Code examples
 

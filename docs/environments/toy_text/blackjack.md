@@ -79,6 +79,19 @@ dotnet run --project examples/Blackjack -c Release -- --play
 dotnet run --project examples/Blackjack -c Release -- --render
 ```
 
+## Episode anatomy
+
+The page's hand, step by step: the player's sum against the lines at 17, where the dealer stands, and 21, over which a
+hand busts; below, the usable ace and each action. Two 2s make 4. An ace makes a soft 15 and a 2 a soft 17, both hits
+against the dealer's ace; a 6 then takes the ace back to 1, a hard 13, and a 2, an ace and a 5 bring it to 21, where the
+player sticks. The dealer turns over a 6 and stands on a soft 17: the player wins, 1.
+
+<div class="gn-anatomy" data-trace="media/Blackjack-v1.episode.json">
+<div><video src="media/Blackjack-v1.episode.mp4" poster="media/Blackjack-v1.figure.png" autoplay muted loop playsinline disablepictureinpicture disableremoteplayback aria-label="Blackjack-v1, seed 1574758, the hand the chart follows"></video><div class="gn-anatomy-readout" aria-live="off"></div></div>
+<div><div class="gn-anatomy-chart"></div><div class="gn-anatomy-legend"></div></div>
+<script type="application/json" class="gn-anatomy-spec">{"label":"Blackjack-v1, seed 1574758: the player's sum against the dealer's 17 and the bust at 21, the usable ace, and each hit or stick","bands":[{"height":110,"range":[0,24],"ticks":[0,17,21],"series":[{"column":"sum","color":"#3cbcfc","name":"the player's sum (the lines at 17 and 21)"}]},{"label":"ace","strip":{"column":"usable","colors":{"0":"#343a40","1":"#f8b800"},"name":"a usable ace"}},{"label":"action","strip":{"column":"action","colors":{"0":"#e8590c","1":"#40c057"},"name":"hit in green, stick in orange"}}],"readout":[{"label":"step","column":"@step"},{"label":"sum","column":"sum","digits":0},{"label":"dealer shows","column":"dealer","map":{"1":"an ace"}},{"label":"usable ace","column":"usable","map":{"0":"no","1":"yes"}},{"label":"next","column":"action","map":{"0":"stick","1":"hit"}},{"label":"return so far","column":"@return","digits":0}]}</script>
+</div>
+
 ## How it works
 
 <div class="gn-figure gn-figure-art">
@@ -208,19 +221,6 @@ env = gym.make("Blackjack-v1", sab=False, natural=True)
 Blackjack has no text mode. The frame is the Farama Foundation's pixel art, embedded from Gymnasium, drawn at four
 pixels to an art pixel: the dealer's label with the face-up card's value, that card and one face down, the player's
 label, their sum in large digits, and "usable ace" while they hold one.
-
-## Episode anatomy
-
-The page's hand, step by step: the player's sum against the lines at 17, where the dealer stands, and 21, over which a
-hand busts; below, the usable ace and each action. Two 2s make 4. An ace makes a soft 15 and a 2 a soft 17, both hits
-against the dealer's ace; a 6 then takes the ace back to 1, a hard 13, and a 2, an ace and a 5 bring it to 21, where the
-player sticks. The dealer turns over a 6 and stands on a soft 17: the player wins, 1.
-
-<div class="gn-anatomy" data-trace="media/Blackjack-v1.episode.json">
-<div><video src="media/Blackjack-v1.episode.mp4" poster="media/Blackjack-v1.figure.png" autoplay muted loop playsinline disablepictureinpicture disableremoteplayback aria-label="Blackjack-v1, seed 1574758, the hand the chart follows"></video><div class="gn-anatomy-readout" aria-live="off"></div></div>
-<div><div class="gn-anatomy-chart"></div><div class="gn-anatomy-legend"></div></div>
-<script type="application/json" class="gn-anatomy-spec">{"label":"Blackjack-v1, seed 1574758: the player's sum against the dealer's 17 and the bust at 21, the usable ace, and each hit or stick","bands":[{"height":110,"range":[0,24],"ticks":[0,17,21],"series":[{"column":"sum","color":"#3cbcfc","name":"the player's sum (the lines at 17 and 21)"}]},{"label":"ace","strip":{"column":"usable","colors":{"0":"#343a40","1":"#f8b800"},"name":"a usable ace"}},{"label":"action","strip":{"column":"action","colors":{"0":"#e8590c","1":"#40c057"},"name":"hit in green, stick in orange"}}],"readout":[{"label":"step","column":"@step"},{"label":"sum","column":"sum","digits":0},{"label":"dealer shows","column":"dealer","map":{"1":"an ace"}},{"label":"usable ace","column":"usable","map":{"0":"no","1":"yes"}},{"label":"next","column":"action","map":{"0":"stick","1":"hit"}},{"label":"return so far","column":"@return","digits":0}]}</script>
-</div>
 
 ## Code examples
 

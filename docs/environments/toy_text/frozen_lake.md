@@ -77,6 +77,20 @@ dotnet run --project examples/FrozenLake -c Release -- --play
 dotnet run --project examples/FrozenLake -c Release -- --render
 ```
 
+## Episode anatomy
+
+The whole episode, step by step, on the lake itself: every move the elf made, blue where it went as aimed and orange
+where it slid, and a ring on the cell the video shows. Below, the move the plan chose at each step and the slides. The
+plan aims left on cells 0 and 4, into the lake's edge, so the ice can only keep the elf there or slide it up and down
+the left column, never right into the hole at 5. For 34 steps it shuffles between cells 0, 4 and 8, 23 of its 41 moves
+slide, and from cell 9 it walks the bottom row to the goal.
+
+<div class="gn-anatomy" data-trace="media/FrozenLake-v1.episode.json">
+<div><video src="media/FrozenLake-v1.episode.mp4" poster="media/FrozenLake-v1.figure.png" autoplay muted loop playsinline disablepictureinpicture disableremoteplayback aria-label="FrozenLake-v1, seed 1, the episode the chart follows"></video><div class="gn-anatomy-readout" aria-live="off"></div></div>
+<div><div class="gn-anatomy-chart"></div><div class="gn-anatomy-legend"></div></div>
+<script type="application/json" class="gn-anatomy-spec">{"label":"FrozenLake-v1, seed 1: the elf's path on the lake, the moves the plan chose and the slides","bands":[{"height":220,"board":{"image":"media/FrozenLake-v1.board.png","size":[256,256],"origin":[0,0],"cell":[64,64],"row":"row","col":"col","path":{"column":"slipped","colors":{"0":"#1971c2","1":"#e8590c"}},"name":"the path: a move as aimed in blue, a slide in orange"}},{"label":"move","strip":{"column":"action","colors":{"0":"#adb5bd","1":"#3cbcfc","2":"#f8b800","3":"#ff7fe3"},"name":"the move chosen: left grey, down blue, right gold, up pink"}},{"label":"slide","strip":{"column":"slipped","colors":{"0":"#343a40","1":"#e8590c"},"name":"a slide"}}],"readout":[{"label":"step","column":"@step"},{"label":"cell","column":"state","digits":0},{"label":"aims","column":"action","map":{"0":"left","1":"down","2":"right","3":"up"}},{"label":"slides","column":"slipped","map":{"0":"no","1":"yes"}},{"label":"return so far","column":"@return","digits":0}]}</script>
+</div>
+
 ## How it works
 
 <div class="gn-figure gn-figure-pixel">
@@ -222,20 +236,6 @@ another is set). Read it as `info.Get<double>("prob")`, or through the typed rec
 The frame is Farama's pixel art, embedded from Gymnasium: ice tiles with cracks, holes, the elf, the flag and the `S`
 and `G` letters, on 64-pixel cells (a map wider than 8 cells shrinks them to fit 512 pixels). The elf disappears into a
 hole it falls in.
-
-## Episode anatomy
-
-The whole episode, step by step, on the lake itself: every move the elf made, blue where it went as aimed and orange
-where it slid, and a ring on the cell the video shows. Below, the move the plan chose at each step and the slides. The
-plan aims left on cells 0 and 4, into the lake's edge, so the ice can only keep the elf there or slide it up and down
-the left column, never right into the hole at 5. For 34 steps it shuffles between cells 0, 4 and 8, 23 of its 41 moves
-slide, and from cell 9 it walks the bottom row to the goal.
-
-<div class="gn-anatomy" data-trace="media/FrozenLake-v1.episode.json">
-<div><video src="media/FrozenLake-v1.episode.mp4" poster="media/FrozenLake-v1.figure.png" autoplay muted loop playsinline disablepictureinpicture disableremoteplayback aria-label="FrozenLake-v1, seed 1, the episode the chart follows"></video><div class="gn-anatomy-readout" aria-live="off"></div></div>
-<div><div class="gn-anatomy-chart"></div><div class="gn-anatomy-legend"></div></div>
-<script type="application/json" class="gn-anatomy-spec">{"label":"FrozenLake-v1, seed 1: the elf's path on the lake, the moves the plan chose and the slides","bands":[{"height":220,"board":{"image":"media/FrozenLake-v1.board.png","size":[256,256],"origin":[0,0],"cell":[64,64],"row":"row","col":"col","path":{"column":"slipped","colors":{"0":"#1971c2","1":"#e8590c"}},"name":"the path: a move as aimed in blue, a slide in orange"}},{"label":"move","strip":{"column":"action","colors":{"0":"#adb5bd","1":"#3cbcfc","2":"#f8b800","3":"#ff7fe3"},"name":"the move chosen: left grey, down blue, right gold, up pink"}},{"label":"slide","strip":{"column":"slipped","colors":{"0":"#343a40","1":"#e8590c"},"name":"a slide"}}],"readout":[{"label":"step","column":"@step"},{"label":"cell","column":"state","digits":0},{"label":"aims","column":"action","map":{"0":"left","1":"down","2":"right","3":"up"}},{"label":"slides","column":"slipped","map":{"0":"no","1":"yes"}},{"label":"return so far","column":"@return","digits":0}]}</script>
-</div>
 
 ## Code examples
 

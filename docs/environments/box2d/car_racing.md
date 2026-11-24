@@ -78,6 +78,20 @@ dotnet run --project examples/CarRacing -c Release -- --play
 dotnet run --project examples/CarRacing -c Release -- --render
 ```
 
+## Episode anatomy
+
+The whole episode, step by step: the tiles touched, the speed and the three controls, with a cursor following the
+video. The agent reaches 44 units a second within its first second, 49 steps, and holds 43 on average from then on,
+lifting off the gas in the bends and braking once, for six steps into the sharp bend at step 192. When the time limit
+ends the episode it has touched 254 of the 259 tiles in order and is five tiles short of the line: the lap needs the
+first tile again, so the return is 254 × 1000/259 − 100 = 880.7 rather than a finished lap's.
+
+<div class="gn-anatomy" data-trace="media/CarRacing-v3.episode.json">
+<div><video src="media/CarRacing-v3.episode.mp4" poster="media/CarRacing-v3.figure.png" autoplay muted loop playsinline disablepictureinpicture disableremoteplayback aria-label="CarRacing-v3, seed 11, the episode the chart follows"></video><div class="gn-anatomy-readout" aria-live="off"></div></div>
+<div><div class="gn-anatomy-chart"></div><div class="gn-anatomy-legend"></div></div>
+<script type="application/json" class="gn-anatomy-spec">{"label":"CarRacing-v3, seed 11: the tiles touched, the speed and the three controls","bands":[{"height":80,"range":[0,262],"ticks":[0,100,200],"series":[{"column":"tiles","color":"#f8b800","name":"tiles touched, of 259"}]},{"height":70,"range":[0,50],"ticks":[0,20,40],"series":[{"column":"speed","color":"#3cbcfc","name":"speed, units a second"}]},{"height":70,"range":[-1.05,1.05],"ticks":[-1,0,1],"series":[{"column":"steer","color":"#ff7fe3","width":1.2,"name":"steering: −1 left, 1 right"}]},{"label":"gas","strip":{"column":"gas","colors":{"0":"#343a40","0.6000000238418579":"#40c057"},"name":"gas at 0.6"}},{"label":"brake","strip":{"column":"brake","colors":{"0":"#343a40","0.4000000059604645":"#ff6b6b"},"name":"brake at 0.4"}}],"readout":[{"label":"step","column":"@step"},{"label":"tiles","column":"tiles","digits":0},{"label":"speed","column":"speed","digits":1},{"label":"return so far","column":"@return","digits":1}]}</script>
+</div>
+
 ## How it works
 
 <div class="gn-figure">
@@ -240,20 +254,6 @@ Every step draws the 96×96 observation whatever the render mode, so every mode 
 greens, the road in three shades of grey, which a tile loses for the plain road colour once the car has touched it, the
 kerbs, the car with its skid marks, the indicators and the score, `f"{reward:04.0f}"` in pygame's default font, whose
 glyphs Gym.NET carries as SDL_ttf lays them out.
-
-## Episode anatomy
-
-The whole episode, step by step: the tiles touched, the speed and the three controls, with a cursor following the
-video. The agent reaches 44 units a second within its first second, 49 steps, and holds 43 on average from then on,
-lifting off the gas in the bends and braking once, for six steps into the sharp bend at step 192. When the time limit
-ends the episode it has touched 254 of the 259 tiles in order and is five tiles short of the line: the lap needs the
-first tile again, so the return is 254 × 1000/259 − 100 = 880.7 rather than a finished lap's.
-
-<div class="gn-anatomy" data-trace="media/CarRacing-v3.episode.json">
-<div><video src="media/CarRacing-v3.episode.mp4" poster="media/CarRacing-v3.figure.png" autoplay muted loop playsinline disablepictureinpicture disableremoteplayback aria-label="CarRacing-v3, seed 11, the episode the chart follows"></video><div class="gn-anatomy-readout" aria-live="off"></div></div>
-<div><div class="gn-anatomy-chart"></div><div class="gn-anatomy-legend"></div></div>
-<script type="application/json" class="gn-anatomy-spec">{"label":"CarRacing-v3, seed 11: the tiles touched, the speed and the three controls","bands":[{"height":80,"range":[0,262],"ticks":[0,100,200],"series":[{"column":"tiles","color":"#f8b800","name":"tiles touched, of 259"}]},{"height":70,"range":[0,50],"ticks":[0,20,40],"series":[{"column":"speed","color":"#3cbcfc","name":"speed, units a second"}]},{"height":70,"range":[-1.05,1.05],"ticks":[-1,0,1],"series":[{"column":"steer","color":"#ff7fe3","width":1.2,"name":"steering: −1 left, 1 right"}]},{"label":"gas","strip":{"column":"gas","colors":{"0":"#343a40","0.6000000238418579":"#40c057"},"name":"gas at 0.6"}},{"label":"brake","strip":{"column":"brake","colors":{"0":"#343a40","0.4000000059604645":"#ff6b6b"},"name":"brake at 0.4"}}],"readout":[{"label":"step","column":"@step"},{"label":"tiles","column":"tiles","digits":0},{"label":"speed","column":"speed","digits":1},{"label":"return so far","column":"@return","digits":1}]}</script>
-</div>
 
 ## Code examples
 

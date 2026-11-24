@@ -77,6 +77,17 @@ dotnet run --project examples/Humanoid -c Release -- --render
 
 Keyboard play is not offered: the humanoid's seventeen motors are far too many for a keyboard.
 
+## Episode anatomy
+
+The whole episode, step by step: the distance run, the centre of mass's speed, the torso's height and the right knee,
+with a cursor following the video. The expert runs rather than walks: a stride every 0.34 s (22.5 steps), its centre of mass at 5.3 m/s on average after the first 100 steps, 74.4 m in the 15 s and never more than 1.1 m off the x axis. Its torso rides between 1.22 and 1.30 m once it has landed, well inside the healthy band, and the healthy bonus makes 5,000 of its 10,563.5. MuJoCo's joint limits are soft: on 169 of the steps its right knee straightens past its −2° stop, to as much as 21°.
+
+<div class="gn-anatomy" data-trace="media/Humanoid-v5.episode.json">
+<div><video src="media/Humanoid-v5.episode.mp4" poster="media/Humanoid-v5.figure.png" autoplay muted loop playsinline disablepictureinpicture disableremoteplayback aria-label="Humanoid-v5, seed 0, the episode the chart follows"></video><div class="gn-anatomy-readout" aria-live="off"></div></div>
+<div><div class="gn-anatomy-chart"></div><div class="gn-anatomy-legend"></div></div>
+<script type="application/json" class="gn-anatomy-spec">{"label":"Humanoid-v5, seed 0: the distance run, the centre of mass's speed, the torso's height and the right knee","bands":[{"height":70,"range":[-2,78],"ticks":[0,25,50,75],"series":[{"column":"x","color":"#f8b800","name":"x, the distance run (m)"}]},{"height":70,"range":[-0.3,6.2],"ticks":[0,2,4,6],"scale":0.8,"series":[{"column":"reward_forward","color":"#3cbcfc","name":"the centre of mass's speed (m/s), the reward's"}]},{"height":60,"range":[0.95,1.45],"ticks":[1,1.2,1.4],"series":[{"column":"z","color":"#40c057","name":"the torso's height (m); healthy above 1"}]},{"height":70,"range":[-125,30],"scale":57.29577951308232,"ticks":[-90,-45,0],"unit":"°","series":[{"column":"right_knee","color":"#b8b8f8","name":"the right knee's angle; its stop at −2°"}]}],"readout":[{"label":"step","column":"@step"},{"label":"x","column":"x","digits":1,"unit":" m"},{"label":"height","column":"z","digits":2,"unit":" m"},{"label":"return so far","column":"@return","digits":1}]}</script>
+</div>
+
 ## How it works
 
 <div class="gn-figure gn-figure-wide">
@@ -303,17 +314,6 @@ takes the model's own camera, 4 m to the side at the height of the centre of mas
 travel and following it, as the video does. In `human` mode, Tab cycles the cameras, the mouse orbits, pans and zooms,
 and H lists Gymnasium's other keys. Gym.NET draws this model's frames in software in about 0.6 s each; by default
 every frame is drawn, and D switches to skipping frames.
-
-## Episode anatomy
-
-The whole episode, step by step: the distance run, the centre of mass's speed, the torso's height and the right knee,
-with a cursor following the video. The expert runs rather than walks: a stride every 0.34 s (22.5 steps), its centre of mass at 5.3 m/s on average after the first 100 steps, 74.4 m in the 15 s and never more than 1.1 m off the x axis. Its torso rides between 1.22 and 1.30 m once it has landed, well inside the healthy band, and the healthy bonus makes 5,000 of its 10,563.5. MuJoCo's joint limits are soft: on 169 of the steps its right knee straightens past its −2° stop, to as much as 21°.
-
-<div class="gn-anatomy" data-trace="media/Humanoid-v5.episode.json">
-<div><video src="media/Humanoid-v5.episode.mp4" poster="media/Humanoid-v5.figure.png" autoplay muted loop playsinline disablepictureinpicture disableremoteplayback aria-label="Humanoid-v5, seed 0, the episode the chart follows"></video><div class="gn-anatomy-readout" aria-live="off"></div></div>
-<div><div class="gn-anatomy-chart"></div><div class="gn-anatomy-legend"></div></div>
-<script type="application/json" class="gn-anatomy-spec">{"label":"Humanoid-v5, seed 0: the distance run, the centre of mass's speed, the torso's height and the right knee","bands":[{"height":70,"range":[-2,78],"ticks":[0,25,50,75],"series":[{"column":"x","color":"#f8b800","name":"x, the distance run (m)"}]},{"height":70,"range":[-0.3,6.2],"ticks":[0,2,4,6],"scale":0.8,"series":[{"column":"reward_forward","color":"#3cbcfc","name":"the centre of mass's speed (m/s), the reward's"}]},{"height":60,"range":[0.95,1.45],"ticks":[1,1.2,1.4],"series":[{"column":"z","color":"#40c057","name":"the torso's height (m); healthy above 1"}]},{"height":70,"range":[-125,30],"scale":57.29577951308232,"ticks":[-90,-45,0],"unit":"°","series":[{"column":"right_knee","color":"#b8b8f8","name":"the right knee's angle; its stop at −2°"}]}],"readout":[{"label":"step","column":"@step"},{"label":"x","column":"x","digits":1,"unit":" m"},{"label":"height","column":"z","digits":2,"unit":" m"},{"label":"return so far","column":"@return","digits":1}]}</script>
-</div>
 
 ## Code examples
 

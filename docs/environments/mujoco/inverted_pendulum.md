@@ -77,6 +77,17 @@ dotnet run --project examples/InvertedPendulum -c Release -- --play
 `--play` runs Gymnasium's `play` (`Play.Run`) at the env's 25 steps a second: the frames are cheap here, about 0.02 s
 each in Gym.NET's software renderer. Each new game starts from the same seed.
 
+## Episode anatomy
+
+The whole episode, step by step: the cart's position, the pole's angle and the push, with a cursor following the
+video. The expert hardly has to act: the pole stays within 3° of upright for the whole episode (it falls past 11.5°), the cart within 13 cm of the middle of its 2 m rail, and no push reaches half the motor's strength (1.43 of 3 at the most, 0.13 on average).
+
+<div class="gn-anatomy" data-trace="media/InvertedPendulum-v5.episode.json">
+<div><video src="media/InvertedPendulum-v5.episode.mp4" poster="media/InvertedPendulum-v5.figure.png" autoplay muted loop playsinline disablepictureinpicture disableremoteplayback aria-label="InvertedPendulum-v5, seed 0, the episode the chart follows"></video><div class="gn-anatomy-readout" aria-live="off"></div></div>
+<div><div class="gn-anatomy-chart"></div><div class="gn-anatomy-legend"></div></div>
+<script type="application/json" class="gn-anatomy-spec">{"label":"InvertedPendulum-v5, seed 0: the cart's position, the pole's angle and the push","bands":[{"height":70,"range":[-0.16,0.04],"ticks":[-0.15,-0.1,-0.05,0],"series":[{"column":"x","color":"#f8b800","name":"the cart's position (m), on a rail of ±1"}]},{"height":70,"range":[-12,12],"scale":57.29577951308232,"ticks":[-10,0,10],"unit":"°","series":[{"column":"angle","color":"#3cbcfc","name":"the pole's angle; it falls past ±11.5°"}]},{"height":60,"range":[-1.6,1.0],"ticks":[-1,0,1],"series":[{"column":"a0","color":"#ff6b6b","name":"the push, from −3 to 3 (× gear 100)"}]}],"readout":[{"label":"step","column":"@step"},{"label":"angle","column":"angle","scale":57.29577951308232,"digits":2,"unit":"°"},{"label":"return so far","column":"@return","digits":0}]}</script>
+</div>
+
 ## How it works
 
 <div class="gn-figure gn-figure-wide">
@@ -222,17 +233,6 @@ MuJoCo's free camera with the env's `default_camera_config`: 2.04 m from the mid
 and elevation −45°, which keeps the whole rail in view, as the video does. In `human` mode, the mouse orbits, pans and
 zooms, and H lists Gymnasium's other keys. Gym.NET draws this model's frames in software in about 0.02 s each, faster
 than the env's 25 frames a second.
-
-## Episode anatomy
-
-The whole episode, step by step: the cart's position, the pole's angle and the push, with a cursor following the
-video. The expert hardly has to act: the pole stays within 3° of upright for the whole episode (it falls past 11.5°), the cart within 13 cm of the middle of its 2 m rail, and no push reaches half the motor's strength (1.43 of 3 at the most, 0.13 on average).
-
-<div class="gn-anatomy" data-trace="media/InvertedPendulum-v5.episode.json">
-<div><video src="media/InvertedPendulum-v5.episode.mp4" poster="media/InvertedPendulum-v5.figure.png" autoplay muted loop playsinline disablepictureinpicture disableremoteplayback aria-label="InvertedPendulum-v5, seed 0, the episode the chart follows"></video><div class="gn-anatomy-readout" aria-live="off"></div></div>
-<div><div class="gn-anatomy-chart"></div><div class="gn-anatomy-legend"></div></div>
-<script type="application/json" class="gn-anatomy-spec">{"label":"InvertedPendulum-v5, seed 0: the cart's position, the pole's angle and the push","bands":[{"height":70,"range":[-0.16,0.04],"ticks":[-0.15,-0.1,-0.05,0],"series":[{"column":"x","color":"#f8b800","name":"the cart's position (m), on a rail of ±1"}]},{"height":70,"range":[-12,12],"scale":57.29577951308232,"ticks":[-10,0,10],"unit":"°","series":[{"column":"angle","color":"#3cbcfc","name":"the pole's angle; it falls past ±11.5°"}]},{"height":60,"range":[-1.6,1.0],"ticks":[-1,0,1],"series":[{"column":"a0","color":"#ff6b6b","name":"the push, from −3 to 3 (× gear 100)"}]}],"readout":[{"label":"step","column":"@step"},{"label":"angle","column":"angle","scale":57.29577951308232,"digits":2,"unit":"°"},{"label":"return so far","column":"@return","digits":0}]}</script>
-</div>
 
 ## Code examples
 

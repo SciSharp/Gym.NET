@@ -80,6 +80,19 @@ dotnet run --project examples/Taxi -c Release -- --play
 dotnet run --project examples/Taxi -c Release -- --render
 ```
 
+## Episode anatomy
+
+The whole episode in the town: the taxi's path, blue while it drives empty and orange with the passenger aboard, and a
+ring on the cell the video shows. Below, the action the plan chose at each step. A wall stands east of the taxi's start,
+so the plan drives south first, around it, and up to G; it picks the passenger up at step 6, drives back west along the
+third row, under the wall, and up to R, and drops them off at step 15: 16 steps, return 5.
+
+<div class="gn-anatomy" data-trace="media/Taxi-v4.episode.json">
+<div><video src="media/Taxi-v4.episode.mp4" poster="media/Taxi-v4.board.png" autoplay muted loop playsinline disablepictureinpicture disableremoteplayback aria-label="Taxi-v4, seed 12, the episode the chart follows"></video><div class="gn-anatomy-readout" aria-live="off"></div></div>
+<div><div class="gn-anatomy-chart"></div><div class="gn-anatomy-legend"></div></div>
+<script type="application/json" class="gn-anatomy-spec">{"label":"Taxi-v4, seed 12: the taxi's path through the town, empty and with the passenger, and the actions the plan chose","bands":[{"height":220,"board":{"image":"media/Taxi-v4.board.png","size":[536,456],"origin":[48,128],"cell":[88,56],"row":"row","col":"col","path":{"column":"aboard","colors":{"0":"#1971c2","1":"#e8590c"}},"name":"the path: empty in blue, with the passenger in orange"}},{"label":"action","strip":{"column":"action","colors":{"0":"#3cbcfc","1":"#ff7fe3","2":"#f8b800","3":"#adb5bd","4":"#40c057","5":"#cc5de8"},"name":"the action: south blue, north pink, east gold, west grey, pick-up green, drop-off violet"}}],"readout":[{"label":"step","column":"@step"},{"label":"state","column":"state","digits":0},{"label":"passenger","column":"passenger","map":{"0":"at R","1":"at G","2":"at Y","3":"at B","4":"in the taxi"}},{"label":"action","column":"action","map":{"0":"south","1":"north","2":"east","3":"west","4":"pick up","5":"drop off"}},{"label":"return so far","column":"@return","digits":0}]}</script>
+</div>
+
 ## How it works
 
 <div class="gn-figure gn-figure-medium">
@@ -240,19 +253,6 @@ when the result is disposed: draw from it, or copy it, before that. Read the inf
 The frame is the Farama Foundation's pixel art, embedded from Gymnasium: the town with its walls and four stands, a
 house, the destination's frame, the waiting passenger, and the taxi, which faces its last move and shows the passenger
 inside once they are aboard.
-
-## Episode anatomy
-
-The whole episode in the town: the taxi's path, blue while it drives empty and orange with the passenger aboard, and a
-ring on the cell the video shows. Below, the action the plan chose at each step. A wall stands east of the taxi's start,
-so the plan drives south first, around it, and up to G; it picks the passenger up at step 6, drives back west along the
-third row, under the wall, and up to R, and drops them off at step 15: 16 steps, return 5.
-
-<div class="gn-anatomy" data-trace="media/Taxi-v4.episode.json">
-<div><video src="media/Taxi-v4.episode.mp4" poster="media/Taxi-v4.board.png" autoplay muted loop playsinline disablepictureinpicture disableremoteplayback aria-label="Taxi-v4, seed 12, the episode the chart follows"></video><div class="gn-anatomy-readout" aria-live="off"></div></div>
-<div><div class="gn-anatomy-chart"></div><div class="gn-anatomy-legend"></div></div>
-<script type="application/json" class="gn-anatomy-spec">{"label":"Taxi-v4, seed 12: the taxi's path through the town, empty and with the passenger, and the actions the plan chose","bands":[{"height":220,"board":{"image":"media/Taxi-v4.board.png","size":[536,456],"origin":[48,128],"cell":[88,56],"row":"row","col":"col","path":{"column":"aboard","colors":{"0":"#1971c2","1":"#e8590c"}},"name":"the path: empty in blue, with the passenger in orange"}},{"label":"action","strip":{"column":"action","colors":{"0":"#3cbcfc","1":"#ff7fe3","2":"#f8b800","3":"#adb5bd","4":"#40c057","5":"#cc5de8"},"name":"the action: south blue, north pink, east gold, west grey, pick-up green, drop-off violet"}}],"readout":[{"label":"step","column":"@step"},{"label":"state","column":"state","digits":0},{"label":"passenger","column":"passenger","map":{"0":"at R","1":"at G","2":"at Y","3":"at B","4":"in the taxi"}},{"label":"action","column":"action","map":{"0":"south","1":"north","2":"east","3":"west","4":"pick up","5":"drop off"}},{"label":"return so far","column":"@return","digits":0}]}</script>
-</div>
 
 ## Code examples
 

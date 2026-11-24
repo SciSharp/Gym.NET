@@ -79,6 +79,20 @@ dotnet run --project examples/Acrobot -c Release -- --play
 dotnet run --project examples/Acrobot -c Release -- --render
 ```
 
+## Episode anatomy
+
+The whole episode, step by step: the tip's height against the line, both joint speeds, and which way each step
+torqued the elbow. The video has one frame per step, and the cursor follows it. Pushing the way the second link turns,
+the rule lifts the top of every swing higher: the tip's height peaks at −1.95 m (step 6), then −1.81, −1.70, −1.66,
+−1.49, −1.21, −0.87 and −0.38 m (step 52), and at step 65 the tip goes over the line, 1.08 m above the pivot. The
+elbow's speed reaches 6.66 rad/s, under a quarter of its limit; 34 steps pushed +1 and 31 pushed −1.
+
+<div class="gn-anatomy" data-trace="media/Acrobot-v1.episode.json">
+<div><video src="media/Acrobot-v1.episode.mp4" poster="media/Acrobot-v1.figure.png" autoplay muted loop playsinline disablepictureinpicture disableremoteplayback aria-label="Acrobot-v1, seed 1, the episode the chart follows"></video><div class="gn-anatomy-readout" aria-live="off"></div></div>
+<div><div class="gn-anatomy-chart"></div><div class="gn-anatomy-legend"></div></div>
+<script type="application/json" class="gn-anatomy-spec">{"label":"Acrobot-v1, seed 1: the tip's height above the pivot against the line at 1 m, both joint speeds, and each push","bands":[{"height":110,"range":[-2.1,1.2],"ticks":[-2,-1,0,1],"unit":" m","series":[{"column":"height","color":"#3cbcfc","name":"the tip's height (the line at 1 m)"}]},{"height":70,"range":[-7,7],"ticks":[-6,0,6],"series":[{"column":"theta1_dot","color":"#adb5bd","width":1.2,"name":"the shoulder's speed"},{"column":"theta2_dot","color":"#ff7fe3","name":"the elbow's speed"}]},{"label":"push","strip":{"column":"action","colors":{"0":"#5c636a","1":"#343a40","2":"#f8b800"},"name":"each push: +1 in gold, −1 in grey"}}],"readout":[{"label":"step","column":"@step"},{"label":"h","column":"height","digits":2,"unit":" m"},{"label":"θ1","column":"theta1","digits":0,"unit":"°","scale":57.29577951308232},{"label":"θ2","column":"theta2","digits":0,"unit":"°","scale":57.29577951308232},{"label":"next push","column":"action","map":{"0":"−1","1":"0","2":"+1"}},{"label":"return so far","column":"@return","digits":0}]}</script>
+</div>
+
 ## How it works
 
 <div class="gn-figure gn-figure-narrow">
@@ -240,20 +254,6 @@ The frame: white, a black line 1 m above the pivot across the whole frame, the t
 and yellow joints at the pivot and the elbow. 113.6 pixels to the metre: the frame spans the links' 2 m and 0.2 m more
 either side of the pivot at its centre. Drawn with SDL_gfx's anti-aliased polygons and circles and pygame's line, as
 pygame draws them.
-
-## Episode anatomy
-
-The whole episode, step by step: the tip's height against the line, both joint speeds, and which way each step
-torqued the elbow. The video has one frame per step, and the cursor follows it. Pushing the way the second link turns,
-the rule lifts the top of every swing higher: the tip's height peaks at −1.95 m (step 6), then −1.81, −1.70, −1.66,
-−1.49, −1.21, −0.87 and −0.38 m (step 52), and at step 65 the tip goes over the line, 1.08 m above the pivot. The
-elbow's speed reaches 6.66 rad/s, under a quarter of its limit; 34 steps pushed +1 and 31 pushed −1.
-
-<div class="gn-anatomy" data-trace="media/Acrobot-v1.episode.json">
-<div><video src="media/Acrobot-v1.episode.mp4" poster="media/Acrobot-v1.figure.png" autoplay muted loop playsinline disablepictureinpicture disableremoteplayback aria-label="Acrobot-v1, seed 1, the episode the chart follows"></video><div class="gn-anatomy-readout" aria-live="off"></div></div>
-<div><div class="gn-anatomy-chart"></div><div class="gn-anatomy-legend"></div></div>
-<script type="application/json" class="gn-anatomy-spec">{"label":"Acrobot-v1, seed 1: the tip's height above the pivot against the line at 1 m, both joint speeds, and each push","bands":[{"height":110,"range":[-2.1,1.2],"ticks":[-2,-1,0,1],"unit":" m","series":[{"column":"height","color":"#3cbcfc","name":"the tip's height (the line at 1 m)"}]},{"height":70,"range":[-7,7],"ticks":[-6,0,6],"series":[{"column":"theta1_dot","color":"#adb5bd","width":1.2,"name":"the shoulder's speed"},{"column":"theta2_dot","color":"#ff7fe3","name":"the elbow's speed"}]},{"label":"push","strip":{"column":"action","colors":{"0":"#5c636a","1":"#343a40","2":"#f8b800"},"name":"each push: +1 in gold, −1 in grey"}}],"readout":[{"label":"step","column":"@step"},{"label":"h","column":"height","digits":2,"unit":" m"},{"label":"θ1","column":"theta1","digits":0,"unit":"°","scale":57.29577951308232},{"label":"θ2","column":"theta2","digits":0,"unit":"°","scale":57.29577951308232},{"label":"next push","column":"action","map":{"0":"−1","1":"0","2":"+1"}},{"label":"return so far","column":"@return","digits":0}]}</script>
-</div>
 
 ## Code examples
 

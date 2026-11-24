@@ -76,6 +76,17 @@ dotnet run --project examples/Walker2d -c Release -- --render
 Keyboard play is not offered: Gym.NET draws a frame of this model in about 0.2 s in software, while a step is 8 ms of
 simulated time, so a game would run about 25 times slower than real time.
 
+## Episode anatomy
+
+The whole episode, step by step: the distance walked, the speed, the torso's height and angle, with a cursor following
+the video. The expert walks with a stride of about 114 steps (0.9 s), at 6.4 m/s on average after its first 100 steps, 47.6 m in all; its torso's angle swings between −0.95 and 0.29 rad, within 0.05 rad of the healthy limit at its widest.
+
+<div class="gn-anatomy" data-trace="media/Walker2d-v5.episode.json">
+<div><video src="media/Walker2d-v5.episode.mp4" poster="media/Walker2d-v5.figure.png" autoplay muted loop playsinline disablepictureinpicture disableremoteplayback aria-label="Walker2d-v5, seed 0, the episode the chart follows"></video><div class="gn-anatomy-readout" aria-live="off"></div></div>
+<div><div class="gn-anatomy-chart"></div><div class="gn-anatomy-legend"></div></div>
+<script type="application/json" class="gn-anatomy-spec">{"label":"Walker2d-v5, seed 0: the distance walked, the speed, the torso's height and angle","bands":[{"height":70,"range":[-1,50],"ticks":[0,20,40],"series":[{"column":"x","color":"#f8b800","name":"x, the distance walked (m)"}]},{"height":70,"range":[-1.5,9],"ticks":[0,4,8],"series":[{"column":"vx","color":"#3cbcfc","name":"the forward speed (m/s)"}]},{"height":70,"range":[0.7,2.1],"ticks":[0.8,1.2,2],"series":[{"column":"z","color":"#40c057","name":"the torso's height (m); healthy from 0.8 to 2"}]},{"height":60,"range":[-60,60],"scale":57.29577951308232,"ticks":[-45,0,45],"unit":"°","series":[{"column":"angle","color":"#b8b8f8","name":"the torso's angle; healthy within ±57.3°"}]}],"readout":[{"label":"step","column":"@step"},{"label":"x","column":"x","digits":1,"unit":" m"},{"label":"height","column":"z","digits":2,"unit":" m"},{"label":"return so far","column":"@return","digits":1}]}</script>
+</div>
+
 ## How it works
 
 <div class="gn-figure gn-figure-narrow">
@@ -256,17 +267,6 @@ a free camera tracks nothing, so the camera stays where it is and a walking walk
 video does. In `human` mode, Tab cycles the cameras, the mouse
 orbits, pans and zooms, and H lists Gymnasium's other keys. Gym.NET draws this model's frames in software in about
 0.2 s each; by default every frame is drawn, and D switches to skipping frames.
-
-## Episode anatomy
-
-The whole episode, step by step: the distance walked, the speed, the torso's height and angle, with a cursor following
-the video. The expert walks with a stride of about 114 steps (0.9 s), at 6.4 m/s on average after its first 100 steps, 47.6 m in all; its torso's angle swings between −0.95 and 0.29 rad, within 0.05 rad of the healthy limit at its widest.
-
-<div class="gn-anatomy" data-trace="media/Walker2d-v5.episode.json">
-<div><video src="media/Walker2d-v5.episode.mp4" poster="media/Walker2d-v5.figure.png" autoplay muted loop playsinline disablepictureinpicture disableremoteplayback aria-label="Walker2d-v5, seed 0, the episode the chart follows"></video><div class="gn-anatomy-readout" aria-live="off"></div></div>
-<div><div class="gn-anatomy-chart"></div><div class="gn-anatomy-legend"></div></div>
-<script type="application/json" class="gn-anatomy-spec">{"label":"Walker2d-v5, seed 0: the distance walked, the speed, the torso's height and angle","bands":[{"height":70,"range":[-1,50],"ticks":[0,20,40],"series":[{"column":"x","color":"#f8b800","name":"x, the distance walked (m)"}]},{"height":70,"range":[-1.5,9],"ticks":[0,4,8],"series":[{"column":"vx","color":"#3cbcfc","name":"the forward speed (m/s)"}]},{"height":70,"range":[0.7,2.1],"ticks":[0.8,1.2,2],"series":[{"column":"z","color":"#40c057","name":"the torso's height (m); healthy from 0.8 to 2"}]},{"height":60,"range":[-60,60],"scale":57.29577951308232,"ticks":[-45,0,45],"unit":"°","series":[{"column":"angle","color":"#b8b8f8","name":"the torso's angle; healthy within ±57.3°"}]}],"readout":[{"label":"step","column":"@step"},{"label":"x","column":"x","digits":1,"unit":" m"},{"label":"height","column":"z","digits":2,"unit":" m"},{"label":"return so far","column":"@return","digits":1}]}</script>
-</div>
 
 ## Code examples
 

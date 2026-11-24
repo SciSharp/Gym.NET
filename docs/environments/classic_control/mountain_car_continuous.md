@@ -78,6 +78,20 @@ dotnet run --project examples/MountainCarContinuous -c Release -- --play
 dotnet run --project examples/MountainCarContinuous -c Release -- --render
 ```
 
+## Episode anatomy
+
+The whole episode, step by step: where the car is, how fast it moves, which way each step pushed. The video has one
+frame per step, and the cursor follows it. The rule pushes left from rest, and the car rolls back across the valley and
+up the left slope until the wall stops it at step 44. From there it pushes right: the car crosses the valley's floor
+at step 64, reaches 0.069 at step 67, near the speed limit, and carries over to the flag after 78 steps. Every step
+costs 0.1; the last one also pays 100, so the return is 92.2.
+
+<div class="gn-anatomy" data-trace="media/MountainCarContinuous-v0.episode.json">
+<div><video src="media/MountainCarContinuous-v0.episode.mp4" poster="media/MountainCarContinuous-v0.figure.png" autoplay muted loop playsinline disablepictureinpicture disableremoteplayback aria-label="MountainCarContinuous-v0, seed 4, the episode the chart follows"></video><div class="gn-anatomy-readout" aria-live="off"></div></div>
+<div><div class="gn-anatomy-chart"></div><div class="gn-anatomy-legend"></div></div>
+<script type="application/json" class="gn-anatomy-spec">{"label":"MountainCarContinuous-v0, seed 4: the car's position and velocity, and each push","bands":[{"height":110,"range":[-1.25,0.65],"ticks":[-1.2,-0.5,0.45],"series":[{"column":"position","color":"#3cbcfc","name":"the car's position (the flag at 0.45)"}]},{"height":70,"range":[-0.07,0.07],"ticks":[-0.07,0,0.07],"series":[{"column":"velocity","color":"#ff7fe3","name":"its velocity"}]},{"label":"force","strip":{"column":"force","colors":{"-1":"#5c636a","1":"#f8b800"},"name":"each force: +1 in gold, −1 in grey"}}],"readout":[{"label":"step","column":"@step"},{"label":"x","column":"position","digits":3},{"label":"v","column":"velocity","digits":4},{"label":"next force","column":"force","digits":1},{"label":"return so far","column":"@return","digits":1}]}</script>
+</div>
+
 ## How it works
 
 <div class="gn-figure">
@@ -232,20 +246,6 @@ Mountain Car's frame, with the flag at x = 0.45: white, the hill as a black anti
 black 40×20 px car tilted by $\cos(3x)$ radians on two grey wheels, and a yellow flag on a 50 px pole; 333 pixels to a
 unit of x. After a step the car's coordinates are computed from the float32 state in float32, as in Gymnasium. Drawn
 with SDL_gfx's anti-aliased polygons and circles and pygame's anti-aliased lines, as pygame draws them.
-
-## Episode anatomy
-
-The whole episode, step by step: where the car is, how fast it moves, which way each step pushed. The video has one
-frame per step, and the cursor follows it. The rule pushes left from rest, and the car rolls back across the valley and
-up the left slope until the wall stops it at step 44. From there it pushes right: the car crosses the valley's floor
-at step 64, reaches 0.069 at step 67, near the speed limit, and carries over to the flag after 78 steps. Every step
-costs 0.1; the last one also pays 100, so the return is 92.2.
-
-<div class="gn-anatomy" data-trace="media/MountainCarContinuous-v0.episode.json">
-<div><video src="media/MountainCarContinuous-v0.episode.mp4" poster="media/MountainCarContinuous-v0.figure.png" autoplay muted loop playsinline disablepictureinpicture disableremoteplayback aria-label="MountainCarContinuous-v0, seed 4, the episode the chart follows"></video><div class="gn-anatomy-readout" aria-live="off"></div></div>
-<div><div class="gn-anatomy-chart"></div><div class="gn-anatomy-legend"></div></div>
-<script type="application/json" class="gn-anatomy-spec">{"label":"MountainCarContinuous-v0, seed 4: the car's position and velocity, and each push","bands":[{"height":110,"range":[-1.25,0.65],"ticks":[-1.2,-0.5,0.45],"series":[{"column":"position","color":"#3cbcfc","name":"the car's position (the flag at 0.45)"}]},{"height":70,"range":[-0.07,0.07],"ticks":[-0.07,0,0.07],"series":[{"column":"velocity","color":"#ff7fe3","name":"its velocity"}]},{"label":"force","strip":{"column":"force","colors":{"-1":"#5c636a","1":"#f8b800"},"name":"each force: +1 in gold, −1 in grey"}}],"readout":[{"label":"step","column":"@step"},{"label":"x","column":"position","digits":3},{"label":"v","column":"velocity","digits":4},{"label":"next force","column":"force","digits":1},{"label":"return so far","column":"@return","digits":1}]}</script>
-</div>
 
 ## Code examples
 

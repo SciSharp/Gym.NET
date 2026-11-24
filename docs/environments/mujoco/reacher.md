@@ -77,6 +77,17 @@ dotnet run --project examples/Reacher -c Release -- --play
 `--play` runs Gymnasium's `play` (`Play.Run`). Gym.NET draws a frame of this model in about 0.05 s in software, so the
 game runs at about 20 steps a second instead of the env's 50. Each new game starts from the same seed.
 
+## Episode anatomy
+
+The whole episode, step by step: the fingertip's distance from the target, the control cost and the arm's two angles,
+with a cursor following the video. The expert folds the elbow to 122° and barely turns the shoulder: the fingertip, 0.19 m from the target at the start, is within 2 cm of it at step 20 (0.4 s) and within 1 cm at step 23, and comes to rest less than a millimetre away. Of the −2.8, the distance costs 2.19, most of it in the first 20 steps, and the torques 0.63. The video plays at half speed, 25 frames a second, the whole episode taking 2 s.
+
+<div class="gn-anatomy" data-trace="media/Reacher-v5.episode.json">
+<div><video src="media/Reacher-v5.episode.mp4" poster="media/Reacher-v5.figure.png" autoplay muted loop playsinline disablepictureinpicture disableremoteplayback aria-label="Reacher-v5, seed 0, the episode the chart follows, at half speed"></video><div class="gn-anatomy-readout" aria-live="off"></div></div>
+<div><div class="gn-anatomy-chart"></div><div class="gn-anatomy-legend"></div></div>
+<script type="application/json" class="gn-anatomy-spec">{"label":"Reacher-v5, seed 0: the fingertip's distance from the target, the control cost and the arm's two angles","bands":[{"height":70,"range":[0,0.2],"ticks":[0,0.1,0.2],"scale":-1,"series":[{"column":"reward_dist","color":"#ff8787","name":"the fingertip's distance from the target (m)"}]},{"height":60,"range":[-0.16,0.01],"ticks":[-0.15,-0.1,-0.05,0],"series":[{"column":"reward_ctrl","color":"#3cbcfc","name":"the control cost, minus the torques squared"}]},{"height":70,"range":[-10,130],"scale":57.29577951308232,"ticks":[0,45,90],"unit":"°","series":[{"column":"angle0","color":"#40c057","name":"the shoulder's angle"},{"column":"angle1","color":"#b8b8f8","name":"the elbow's angle"}]}],"readout":[{"label":"step","column":"@step"},{"label":"distance","column":"reward_dist","scale":-1,"digits":3,"unit":" m"},{"label":"return so far","column":"@return","digits":2}]}</script>
+</div>
+
 ## How it works
 
 <div class="gn-figure gn-figure-wide">
@@ -234,17 +245,6 @@ stays at the renderer's start, 1.24 m from the middle of the model's parts at 45
 video does. In `human` mode, the mouse orbits, pans and zooms, and H lists Gymnasium's other keys. Gym.NET draws this
 model's frames in software in about 0.05 s each; by default every frame is drawn, so the window runs at about 20 steps
 a second instead of the env's 50, and D switches to skipping frames.
-
-## Episode anatomy
-
-The whole episode, step by step: the fingertip's distance from the target, the control cost and the arm's two angles,
-with a cursor following the video. The expert folds the elbow to 122° and barely turns the shoulder: the fingertip, 0.19 m from the target at the start, is within 2 cm of it at step 20 (0.4 s) and within 1 cm at step 23, and comes to rest less than a millimetre away. Of the −2.8, the distance costs 2.19, most of it in the first 20 steps, and the torques 0.63. The video plays at half speed, 25 frames a second, the whole episode taking 2 s.
-
-<div class="gn-anatomy" data-trace="media/Reacher-v5.episode.json">
-<div><video src="media/Reacher-v5.episode.mp4" poster="media/Reacher-v5.figure.png" autoplay muted loop playsinline disablepictureinpicture disableremoteplayback aria-label="Reacher-v5, seed 0, the episode the chart follows, at half speed"></video><div class="gn-anatomy-readout" aria-live="off"></div></div>
-<div><div class="gn-anatomy-chart"></div><div class="gn-anatomy-legend"></div></div>
-<script type="application/json" class="gn-anatomy-spec">{"label":"Reacher-v5, seed 0: the fingertip's distance from the target, the control cost and the arm's two angles","bands":[{"height":70,"range":[0,0.2],"ticks":[0,0.1,0.2],"scale":-1,"series":[{"column":"reward_dist","color":"#ff8787","name":"the fingertip's distance from the target (m)"}]},{"height":60,"range":[-0.16,0.01],"ticks":[-0.15,-0.1,-0.05,0],"series":[{"column":"reward_ctrl","color":"#3cbcfc","name":"the control cost, minus the torques squared"}]},{"height":70,"range":[-10,130],"scale":57.29577951308232,"ticks":[0,45,90],"unit":"°","series":[{"column":"angle0","color":"#40c057","name":"the shoulder's angle"},{"column":"angle1","color":"#b8b8f8","name":"the elbow's angle"}]}],"readout":[{"label":"step","column":"@step"},{"label":"distance","column":"reward_dist","scale":-1,"digits":3,"unit":" m"},{"label":"return so far","column":"@return","digits":2}]}</script>
-</div>
 
 ## Code examples
 
