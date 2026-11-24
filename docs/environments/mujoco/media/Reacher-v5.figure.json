@@ -1,0 +1,94 @@
+{
+  "id": "Reacher-v5",
+  "width": 760,
+  "height": 480,
+  "camera": {
+    "distance": 0.9,
+    "azimuth": 90,
+    "elevation": -90,
+    "lookat": [
+      0,
+      0,
+      0
+    ],
+    "fovy": 45
+  },
+  "observation": [
+    0.99962,
+    0.99894,
+    0.02739,
+    -0.04603,
+    0.04265,
+    0.0918,
+    0.00044,
+    0.00435,
+    0.16729,
+    -0.09111
+  ],
+  "torso": [
+    380,
+    240
+  ],
+  "joints": [
+    {
+      "name": "joint0",
+      "body": "body0",
+      "offset": [
+        0,
+        0,
+        0
+      ],
+      "observation": 0,
+      "action": 0,
+      "pixel": [
+        380,
+        240
+      ]
+    },
+    {
+      "name": "joint1",
+      "body": "body1",
+      "offset": [
+        0,
+        0,
+        0
+      ],
+      "observation": 1,
+      "action": 1,
+      "pixel": [
+        445.08,
+        238.22
+      ]
+    },
+    {
+      "name": "fingertip",
+      "body": "fingertip",
+      "offset": [
+        0,
+        0,
+        0
+      ],
+      "observation": 8,
+      "action": -1,
+      "pixel": [
+        516.68,
+        239.55
+      ]
+    },
+    {
+      "name": "target",
+      "body": "target",
+      "offset": [
+        0,
+        0,
+        0
+      ],
+      "observation": 4,
+      "action": -1,
+      "pixel": [
+        407.77,
+        180.24
+      ]
+    }
+  ]
+}

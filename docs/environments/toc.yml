@@ -52,6 +52,8 @@
     href: mujoco/inverted_pendulum.md
   - name: Pusher
     href: mujoco/pusher.md
+  - name: Reacher
+    href: mujoco/reacher.md
   - name: Swimmer
     href: mujoco/swimmer.md
   - name: Walker2d

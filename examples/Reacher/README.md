@@ -8,6 +8,7 @@ dotnet run --project examples/Reacher -c Release                   # one episode
 dotnet run --project examples/Reacher -c Release -- --render       # the same episode in a window
 dotnet run --project examples/Reacher -c Release -- --play         # you play it, from the keyboard
 dotnet run --project examples/Reacher -c Release -- --episodes 5   # seeds 0-4, and their mean
+dotnet run --project examples/Reacher -c Release -- --record docs/environments/mujoco/media   # the docs page's media
 ```
 
 Output, the same on every run since the reset is seeded and the agent has no randomness of its own (measured on an x64
@@ -46,6 +47,23 @@ episode ends; Escape or the window's close button quits.
 | Q / A | The shoulder's motor, one way or the other |
 | W / S | The elbow's motor |
 | Nothing held | Both motors off |
+
+## Recording the docs page's media
+
+`--record <folder>` plays the seed-0 episode once more (whatever `--seed` says) and writes the media of Reacher's page
+on the docs site (DR-112) into the folder, `docs/environments/mujoco/media` for the site:
+
+| File | What it is |
+|---|---|
+| `Reacher-v5.episode.mp4` | The whole episode, one 480×480 frame per step at 25 frames a second, half the env's 50, so the 50 steps last 2 s (51 frames: the reset and 50 steps), through Gymnasium's own camera for this env, H.264 through Gymnasium's `RecordVideo` and `FfmpegVideoWriter` |
+| `Reacher-v5.episode.json` | Every step: the state acted on (both joints' angles, the target's x and y, the joints' speeds), the expert's two float32 commands (`action_dtype` float32, each written as the float64 that holds it exactly), the reward and its two terms from the info, and the video's rate, 25; the state after the last step as `final` |
+| `Reacher-v5.figure.png`, `.figure.json` | How it works' frame: 760×480 of the episode's own reset (Reacher takes no `reset_noise_scale`), straight down from 0.9 m, and the camera with both joints, the fingertip and the target projected to the frame's pixels through MuJoCo's camera geometry |
+
+```
+Reacher-v5, seed 0: 50 steps, return -2.8, recorded into docs/environments/mujoco/media
+```
+
+ffmpeg must be on PATH to record; every other mode runs without it.
 
 ## The API it shows
 
