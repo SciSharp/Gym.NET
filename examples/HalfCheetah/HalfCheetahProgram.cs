@@ -150,7 +150,7 @@ internal static class HalfCheetahProgram {
     [NDScoped]
     private static (int Steps, double Return) PlayExpertEpisode(ExpertPolicy expert, int seed, bool render) {
         using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("HalfCheetah-v5", expert.MakeArguments(render));
-        NDArray observation = env.Reset(seed: seed).Observation;
+        (NDArray observation, Info info) = env.Reset(seed: seed);
         int steps = 0;
         double total = 0;
         while (true) {
@@ -249,7 +249,7 @@ internal static class HalfCheetahProgram {
         using (var env = new RecordVideo<NDArray, NDArray>(made, scratch, episodeTrigger: _ => true, namePrefix: Id,
                    videoWriter: new FfmpegVideoWriter())) {
             var cheetah = (MujocoEnv)env.Unwrapped;
-            NDArray observation = env.Reset(seed: RecordSeed).Observation;
+            (NDArray observation, Info info) = env.Reset(seed: RecordSeed);
             for (int t = 0; ; t++) {
                 NDArray action = expert.Act(observation);
                 // float32 to float64 is exact, so the JSON's number casts back to the very float32 the expert chose.
@@ -329,7 +329,7 @@ internal static class HalfCheetahProgram {
             },
         };
         using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>(Id, arguments);
-        NDArray observation = env.Reset(seed: RecordSeed).Observation;
+        (NDArray observation, Info info) = env.Reset(seed: RecordSeed);
         using RenderResult rendered = env.Render();
         NDArray frame = (NDArray)rendered;
         using (var image = Image.LoadPixelData<Rgb24>(frame.ToArray<byte>(), FigureWidth, FigureHeight))
@@ -381,7 +381,7 @@ internal static class HalfCheetahProgram {
         if (render)
             Gymnasium.HumanViewerFactory = AvaloniaEnvViewer.Factory;
         double sum = 0;
-        var action = new float[CheetahGame.ActionSize];
+        float[] action = new float[CheetahGame.ActionSize];
         for (int episode = 0; episode < episodes; episode++) {
             (int steps, double total) = PlayEpisode(policy, action, seed + episode, render);
             sum += total;
@@ -406,7 +406,7 @@ internal static class HalfCheetahProgram {
     [NDScoped]
     private static (int Steps, double Return) PlayEpisode(LinearPolicy policy, float[] action, int seed, bool render) {
         using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("HalfCheetah-v5", render ? new { render_mode = "human" } : null);
-        NDArray observation = env.Reset(seed: seed).Observation;
+        (NDArray observation, Info info) = env.Reset(seed: seed);
         int steps = 0;
         double total = 0;
         while (true) {
@@ -667,7 +667,7 @@ internal static class HalfCheetahProgram {
         string[] parts = seeds.Split('-');
         if (!int.TryParse(parts[0], out int first) || !int.TryParse(parts[^1], out int last) || last < first)
             throw new ArgumentException($"--seeds wants A-B or A, got '{seeds}'");
-        var results = new double[last - first + 1];
+        double[] results = new double[last - first + 1];
         Parallel.For(first, last + 1, s => results[s - first] = Ars.Play(model, policy, s));
         for (int s = first; s <= last; s++) {
             double r = results[s - first];

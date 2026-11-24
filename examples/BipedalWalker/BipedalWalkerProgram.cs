@@ -5,6 +5,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using Gym.Box2D;
 using Gym.Environments.Envs.Box2D;
 using Gym.Envs;
 using Gym.Observations;
@@ -130,7 +131,7 @@ namespace Gym.Examples.BipedalWalker {
             using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>(Id, render ? new { render_mode = "human" } : null);
             // The gait is a state machine with a phase: a fresh one for every episode.
             var gait = new BipedalWalkerHeuristics();
-            NDArray observation = env.Reset(seed: seed).Observation;
+            (NDArray observation, Info info) = env.Reset(seed: seed);
             int steps = 0;
             double total = 0;
             while (true) {
@@ -182,7 +183,7 @@ namespace Gym.Examples.BipedalWalker {
                        videoWriter: new FfmpegVideoWriter())) {
                 var walker = (BipedalWalkerEnv)env.Unwrapped;
                 var gait = new BipedalWalkerHeuristics();
-                NDArray observation = env.Reset(seed: DefaultSeed).Observation;
+                (NDArray observation, Info info) = env.Reset(seed: DefaultSeed);
                 for (int t = 0; ; t++) {
                     NDArray action = gait.StepHeuristic(observation);
                     double[] commands = action.ToArray<double>();
@@ -258,7 +259,7 @@ namespace Gym.Examples.BipedalWalker {
                 image.SaveAsPng(Path.Combine(folder, $"{Id}.figure.png"));
             double scroll = walker.Scroll;
             double[] Pixel(double x, double y) => new[] { Math.Round((x - scroll) * BipedalWalkerEnv.Scale, 2), Math.Round(height - y * BipedalWalkerEnv.Scale, 2) };
-            var hull = walker.Hull!;
+            b2Body hull = walker.Hull!;
             float[] o = observation.ToArray<float>();
             File.WriteAllText(Path.Combine(folder, $"{Id}.figure.json"), JsonSerializer.Serialize(new {
                 id = Id, step = FigureStep, width, height, scale = BipedalWalkerEnv.Scale, scroll = Math.Round(scroll, 5),

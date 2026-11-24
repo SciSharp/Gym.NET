@@ -60,19 +60,19 @@ public static class Ars {
             // the normalization stays frozen during an iteration, as in ARS, and is refreshed after the update
             double[] mean = (double[])policy.Mean.Clone(), scale = (double[])policy.Scale.Clone();
             int n = settings.Directions;
-            var deltas = new double[n][];
+            double[][] deltas = new double[n][];
             for (int d = 0; d < n; d++) {
                 deltas[d] = new double[dim];
                 for (int i = 0; i < dim; i++)
                     deltas[d][i] = CheetahGame.Gaussian(rng);
             }
             int[] resetSeeds = Enumerable.Range(0, 2 * n).Select(_ => rng.Next()).ToArray();
-            var returns = new double[2 * n];
+            double[] returns = new double[2 * n];
             var partial = new RunningStats[2 * n];
             double[] weights = policy.Weights;
             Parallel.For(0, 2 * n, options, k => {
                 double sign = k % 2 == 0 ? 1.0 : -1.0;
-                var w = new double[dim];
+                double[] w = new double[dim];
                 for (int i = 0; i < dim; i++)
                     w[i] = weights[i] + sign * settings.Noise * deltas[k / 2][i];
                 using var game = new CheetahGame(model);
@@ -142,7 +142,7 @@ public static class Ars {
     /// <param name="options">The parallelism.</param>
     /// <returns>The return per seed.</returns>
     public static double[] Evaluate(MjModel model, LinearPolicy policy, int count, ParallelOptions options) {
-        var scores = new double[count];
+        double[] scores = new double[count];
         Parallel.For(0, count, options, seed => scores[seed] = Play(model, policy, seed));
         return scores;
     }

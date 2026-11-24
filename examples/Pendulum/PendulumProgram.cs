@@ -138,7 +138,7 @@ namespace Gym.Examples.Pendulum {
             // make's stack: TimeLimit over OrderEnforcing over PassiveEnvChecker over the env. The render mode is a
             // constructor argument, fixed for the env's life, as in Gymnasium.
             using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>(Id, render ? new { render_mode = "human" } : null);
-            NDArray observation = env.Reset(seed: seed).Observation;
+            (NDArray observation, Info info) = env.Reset(seed: seed);
             int steps = 0;
             double total = 0;
             while (true) {
@@ -224,7 +224,7 @@ namespace Gym.Examples.Pendulum {
             using (Env<NDArray, NDArray> made = Gymnasium.Make<NDArray, NDArray>(Id, RenderMode.RgbArray))
             using (var env = new RecordVideo<NDArray, NDArray>(made, scratch, episodeTrigger: _ => true, namePrefix: Id,
                        videoWriter: new FfmpegVideoWriter())) {
-                NDArray observation = env.Reset(seed: DefaultSeed).Observation;
+                (NDArray observation, Info info) = env.Reset(seed: DefaultSeed);
                 float shown = 0;
                 for (int t = 0; ; t++) {
                     double[] s = Values(observation);

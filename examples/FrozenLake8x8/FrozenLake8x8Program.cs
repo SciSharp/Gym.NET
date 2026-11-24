@@ -124,7 +124,7 @@ namespace Gym.Examples.FrozenLake8x8 {
             using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>(Id, render ? new { render_mode = "human" } : null);
             // The plan comes from the env's own model of itself: the transition table of the unwrapped env.
             long[] plan = Plan(((FrozenLakeEnv)env.Unwrapped).P);
-            NDArray observation = env.Reset(seed: seed).Observation;
+            (NDArray observation, Info info) = env.Reset(seed: seed);
             int steps = 0;
             double total = 0;
             while (true) {
@@ -148,7 +148,7 @@ namespace Gym.Examples.FrozenLake8x8 {
         private static long[] Plan(IReadOnlyDictionary<long, IReadOnlyDictionary<long, IReadOnlyList<ToyTextTransition>>> p) {
             const double gamma = 0.99;
             int states = p.Count, actions = p[0].Count;
-            var v = new double[states];
+            double[] v = new double[states];
             // The expected discounted return of an action: no value is carried past a terminal transition.
             double Q(int s, int a) {
                 double q = 0;
@@ -170,7 +170,7 @@ namespace Gym.Examples.FrozenLake8x8 {
                 if (delta < 1e-10)
                     break;
             }
-            var plan = new long[states];
+            long[] plan = new long[states];
             for (int s = 0; s < states; s++) {
                 double best = double.NegativeInfinity;
                 for (int a = 0; a < actions; a++) {
@@ -249,7 +249,7 @@ namespace Gym.Examples.FrozenLake8x8 {
                        videoWriter: new FfmpegVideoWriter())) {
                 var lake = (FrozenLakeEnv)env.Unwrapped;
                 long[] plan = Plan(lake.P);
-                NDArray observation = env.Reset(seed: DefaultSeed).Observation;
+                (NDArray observation, Info info) = env.Reset(seed: DefaultSeed);
                 // The board the anatomy draws on: the reset's frame, the elf on the start.
                 using (RenderResult render = env.Render()) {
                     NDArray frame = (NDArray)render;

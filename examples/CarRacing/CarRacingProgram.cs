@@ -5,6 +5,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using Gym.Box2D;
 using Gym.Environments.Envs.Box2D;
 using Gym.Envs;
 using Gym.Observations;
@@ -127,7 +128,7 @@ namespace Gym.Examples.CarRacing {
             // make's stack: TimeLimit over OrderEnforcing over PassiveEnvChecker over the env. The render mode is a
             // constructor argument, fixed for the env's life, as in Gymnasium.
             using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>(Id, render ? new { render_mode = "human" } : null);
-            NDArray observation = env.Reset(seed: seed).Observation;
+            (NDArray observation, Info info) = env.Reset(seed: seed);
             int steps = 0;
             double total = 0;
             while (true) {
@@ -182,7 +183,7 @@ namespace Gym.Examples.CarRacing {
             using (var env = new RecordVideo<NDArray, NDArray>(made, scratch, episodeTrigger: _ => true, namePrefix: Id,
                        videoWriter: new FfmpegVideoWriter())) {
                 var race = (CarRacingEnv)env.Unwrapped;
-                NDArray observation = env.Reset(seed: DefaultSeed).Observation;
+                (NDArray observation, Info info) = env.Reset(seed: DefaultSeed);
                 tilesTotal = race.Track.Count;
                 for (int t = 0; ; t++) {
                     NDArray action = Act(env);
@@ -226,8 +227,8 @@ namespace Gym.Examples.CarRacing {
         /// <param name="race">The unwrapped env.</param>
         /// <returns>Five values: x, y, angle (radians), speed (world units a second), tiles.</returns>
         private static double[] State(CarRacingEnv race) {
-            var hull = race.Car!.Hull!;
-            var v = hull.LinearVelocity;
+            b2Body hull = race.Car!.Hull!;
+            b2Vec2 v = hull.LinearVelocity;
             double speed = Math.Sqrt((double)v.x * v.x + (double)v.y * v.y);
             return new[] { Math.Round(hull.Position.x, 3), Math.Round(hull.Position.y, 3), Math.Round(hull.Angle, 4), Math.Round(speed, 3), race.TileVisitedCount };
         }
@@ -276,8 +277,8 @@ namespace Gym.Examples.CarRacing {
                 Math.Abs(value) > 1e-4 ? Box(place * s, CarRacingEnv.WindowH - (h + h * value), (place + 1) * s, CarRacingEnv.WindowH - h) : null;
             double[]? Horizontal(int place, double value) =>
                 Math.Abs(value) > 1e-4 ? Box(place * s, CarRacingEnv.WindowH - 4 * h, (place + value) * s, CarRacingEnv.WindowH - 2 * h) : null;
-            var car = race.Car!;
-            var v = car.Hull!.LinearVelocity;
+            Car car = race.Car!;
+            b2Vec2 v = car.Hull!.LinearVelocity;
             double speed = Math.Sqrt((double)v.x * v.x + (double)v.y * v.y);
             double steering = car.Wheels[0].Joint.Angle, turning = car.Hull.AngularVelocity;
             File.WriteAllText(Path.Combine(folder, $"{Id}.figure.json"), JsonSerializer.Serialize(new {
@@ -302,10 +303,10 @@ namespace Gym.Examples.CarRacing {
         /// <returns>A float32 <c>[steer, gas, brake]</c>.</returns>
         private static NDArray Act(IEnv env) {
             var race = (CarRacingEnv)env.Unwrapped;
-            var hull = race.Car!.Hull!;
-            var p = hull.Position;
+            b2Body hull = race.Car!.Hull!;
+            b2Vec2 p = hull.Position;
             double angle = hull.Angle;
-            var track = race.Track;
+            IReadOnlyList<(double Alpha, double Beta, double X, double Y)> track = race.Track;
             int nearest = 0;
             double best = double.MaxValue;
             for (int i = 0; i < track.Count; i++) {
@@ -315,12 +316,12 @@ namespace Gym.Examples.CarRacing {
                     nearest = i;
                 }
             }
-            var target = track[(nearest + 5) % track.Count];
+            (double Alpha, double Beta, double X, double Y) target = track[(nearest + 5) % track.Count];
             double dx = target.X - p.x, dy = target.Y - p.y;
             // The hull's forward axis is its local +y: (-sin a, cos a) in world coordinates.
             double fx = -Math.Sin(angle), fy = Math.Cos(angle);
             double error = Math.Atan2(fx * dy - fy * dx, fx * dx + fy * dy);
-            var v = hull.LinearVelocity;
+            b2Vec2 v = hull.LinearVelocity;
             double speed = Math.Sqrt(v.x * v.x + v.y * v.y);
             float steer = (float)Math.Clamp(-error * 2.5, -1, 1);
             float gas = speed < 45 - 30 * Math.Min(1, Math.Abs(error)) ? 0.6f : 0f;

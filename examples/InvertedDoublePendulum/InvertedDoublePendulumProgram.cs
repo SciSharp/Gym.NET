@@ -137,7 +137,7 @@ namespace Gym.Examples.InvertedDoublePendulum {
             // make's stack: TimeLimit over OrderEnforcing over PassiveEnvChecker over the env. The render mode is a
             // constructor argument, fixed for the env's life, as in Gymnasium.
             using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>(Id, policy.MakeArguments(render, new Dictionary<string, object?> { ["default_camera_config"] = CameraConfig() }));
-            NDArray observation = env.Reset(seed: seed).Observation;
+            (NDArray observation, Info info) = env.Reset(seed: seed);
             int steps = 0;
             double total = 0;
             while (true) {
@@ -276,14 +276,14 @@ namespace Gym.Examples.InvertedDoublePendulum {
             // The agent's own constructor arguments, with the recorder's render mode and the page's view.
             Dictionary<string, object?> arguments = policy.MakeArguments(human: false);
             arguments["render_mode"] = "rgb_array";
-            foreach (var (name, value) in RecordView)
+            foreach ((string name, object? value) in RecordView)
                 arguments[name] = value;
             using (Env<NDArray, NDArray> made = Gymnasium.Make<NDArray, NDArray>(Id, arguments))
             using (var env = new RecordVideo<NDArray, NDArray>(made, scratch, episodeTrigger: _ => true, namePrefix: Id,
                        videoWriter: new FfmpegVideoWriter())) {
                 var mujoco = (MujocoEnv)env.Unwrapped;
                 fps = Convert.ToInt64(env.Metadata["render_fps"], CultureInfo.InvariantCulture);
-                NDArray observation = env.Reset(seed: 0).Observation;
+                (NDArray observation, Info info) = env.Reset(seed: 0);
                 for (int t = 0; ; t++) {
                     NDArray action = policy.Act(observation);
                     // float32 to float64 is exact, so the JSON's number casts back to the very float32 the agent chose.
@@ -358,10 +358,10 @@ namespace Gym.Examples.InvertedDoublePendulum {
             };
             ExpertPolicy policy = ExpertPolicy.Load(Path.Combine(AppContext.BaseDirectory, "policy.json"));
             // The agent's constructor arguments change what it observes, never the pose: kept so the figure's observation is the page's.
-            foreach (var (name, value) in policy.MakeArguments(human: false))
+            foreach ((string name, object? value) in policy.MakeArguments(human: false))
                 arguments[name] = value;
             using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>(Id, arguments);
-            NDArray observation = env.Reset(seed: 0).Observation;
+            (NDArray observation, Info info) = env.Reset(seed: 0);
             using RenderResult rendered = env.Render();
             NDArray frame = (NDArray)rendered;
             using (var image = Image.LoadPixelData<Rgb24>(frame.ToArray<byte>(), FigureWidth, FigureHeight))
@@ -502,7 +502,7 @@ namespace Gym.Examples.InvertedDoublePendulum {
             };
             var kwargs = new Dictionary<string, object?>();
             if (root["make_kwargs"] is JsonObject make)
-                foreach (var (name, value) in make)
+                foreach ((string name, JsonNode? value) in make)
                     kwargs[name] = value?.GetValueKind() switch {
                         JsonValueKind.True => true,
                         JsonValueKind.False => false,
@@ -527,7 +527,7 @@ namespace Gym.Examples.InvertedDoublePendulum {
             if (human) {
                 arguments["render_mode"] = "human";
                 if (view is not null)
-                    foreach (var (name, value) in view)
+                    foreach ((string name, object? value) in view)
                         arguments[name] = value;
             }
             return arguments;

@@ -101,8 +101,8 @@ public sealed class CheetahGame : IDisposable {
     /// <exception cref="ArgumentNullException"><paramref name="random"/> is null.</exception>
     public double[] Reset(Random random) {
         ArgumentNullException.ThrowIfNull(random);
-        var u = new double[Model.nq];
-        var z = new double[Model.nv];
+        double[] u = new double[Model.nq];
+        double[] z = new double[Model.nv];
         for (int i = 0; i < u.Length; i++)
             u[i] = -0.1 + 0.2 * random.NextDouble();
         for (int i = 0; i < z.Length; i++)

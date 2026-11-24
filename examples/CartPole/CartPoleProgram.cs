@@ -148,7 +148,7 @@ namespace Gym.Examples.CartPole {
         private static (double[] Policy, bool Solved) Train(double threshold) {
             // Gymnasium's seeding (gymnasium.utils.seeding.np_random): a NumPy-exact PCG64 generator.
             (Generator rng, _) = Seeding.NpRandom(SearchSeed);
-            var mean = new double[ParameterCount];
+            double[] mean = new double[ParameterCount];
             double[] deviation = Enumerable.Repeat(1.0, ParameterCount).ToArray();
 
             // One cart per policy. With no vectorization mode, make_vec picks the env's own vector entry point, which for
@@ -156,7 +156,7 @@ namespace Gym.Examples.CartPole {
             using VectorEnv<NDArray, NDArray> envs = Gymnasium.MakeVec<NDArray, NDArray>("CartPole-v1", numEnvs: Population);
             for (int generation = 0; generation < MaxGenerations; generation++) {
                 double[][] candidates = Sample(rng, mean, deviation);
-                var returns = new double[Population];
+                double[] returns = new double[Population];
                 Evaluate(envs, candidates, seed: generation, returns);
                 // OrderByDescending is stable, so equal returns keep their draw order and the run stays reproducible.
                 int[] elite = Enumerable.Range(0, Population).OrderByDescending(i => returns[i]).Take(EliteCount).ToArray();
@@ -165,7 +165,7 @@ namespace Gym.Examples.CartPole {
                 // The elite are the lucky draws of this generation's starting states; the refitted mean is what is kept, so
                 // it is the one judged, on every cart at once from starting states no generation was selected on.
                 double[][] judged = Enumerable.Repeat(mean, Population).ToArray();
-                var judgedReturns = new double[Population];
+                double[] judgedReturns = new double[Population];
                 Evaluate(envs, judged, seed: JudgeSeed + generation, judgedReturns);
                 double score = judgedReturns.Average();
                 Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
@@ -186,7 +186,7 @@ namespace Gym.Examples.CartPole {
             // One standard-normal block per generation, read row by row (NumPy's C order), then scaled and shifted.
             using NDArray noise = rng.standard_normal(new Shape(Population, ParameterCount));
             double[] z = noise.ToArray<double>();
-            var candidates = new double[Population][];
+            double[][] candidates = new double[Population][];
             for (int i = 0; i < Population; i++) {
                 candidates[i] = new double[ParameterCount];
                 for (int k = 0; k < ParameterCount; k++)
@@ -222,12 +222,12 @@ namespace Gym.Examples.CartPole {
         /// </remarks>
         [NDScoped]
         private static void Evaluate(VectorEnv<NDArray, NDArray> envs, double[][] candidates, long seed, double[] returns) {
-            var finished = new bool[candidates.Length];
-            NDArray observations = envs.Reset(seed: seed).Observations;
+            bool[] finished = new bool[candidates.Length];
+            (NDArray observations, Info infos) = envs.Reset(seed: seed);
             while (finished.Contains(false)) {
                 // (Population, 4) float32 observations, one row per cart.
                 float[] rows = observations.ToArray<float>();
-                var actions = new long[candidates.Length];
+                long[] actions = new long[candidates.Length];
                 for (int i = 0; i < candidates.Length; i++)
                     actions[i] = Act(candidates[i], rows.AsSpan(i * ObservationSize, ObservationSize));
 
@@ -292,7 +292,7 @@ namespace Gym.Examples.CartPole {
             // make's stack, TimeLimit(500) over OrderEnforcing over PassiveEnvChecker over CartPoleEnv. The render mode is
             // a constructor argument, fixed for the env's life, as in Gymnasium.
             using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("CartPole-v1", kwargs: render ? new { render_mode = "human" } : null);
-            NDArray observation = env.Reset(seed: PlaySeed).Observation;
+            (NDArray observation, Info info) = env.Reset(seed: PlaySeed);
             double total = 0;
             while (true) {
                 // A discrete action is a 0-d int64 array, the type Discrete(2).Sample() returns.
@@ -324,7 +324,7 @@ namespace Gym.Examples.CartPole {
             if (render)
                 Gymnasium.HumanViewerFactory = AvaloniaEnvViewer.Factory;
             using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("CartPole-v1", kwargs: render ? new { render_mode = "human" } : null);
-            NDArray observation = env.Reset(seed: ControllerSeed).Observation;
+            (NDArray observation, Info info) = env.Reset(seed: ControllerSeed);
             int steps = 0;
             double total = 0;
             while (true) {
@@ -391,7 +391,7 @@ namespace Gym.Examples.CartPole {
             using (Env<NDArray, NDArray> made = Gymnasium.Make<NDArray, NDArray>(EnvId, RenderMode.RgbArray))
             using (var env = new RecordVideo<NDArray, NDArray>(made, scratch, episodeTrigger: _ => true, namePrefix: EnvId,
                        videoWriter: new FfmpegVideoWriter())) {
-                NDArray observation = env.Reset(seed: ControllerSeed).Observation;
+                (NDArray observation, Info info) = env.Reset(seed: ControllerSeed);
                 for (int t = 0; ; t++) {
                     float[] s = observation.ToArray<float>();
                     double target = SwayTarget(t);

@@ -5,6 +5,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using Gym.Box2D;
 using Gym.Environments.Envs.Box2D;
 using Gym.Envs;
 using Gym.Observations;
@@ -128,7 +129,7 @@ namespace Gym.Examples.LunarLander {
             // make's stack: TimeLimit over OrderEnforcing over PassiveEnvChecker over the env. The render mode is a
             // constructor argument, fixed for the env's life, as in Gymnasium.
             using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>(Id, render ? new { render_mode = "human" } : null);
-            NDArray observation = env.Reset(seed: seed).Observation;
+            (NDArray observation, Info info) = env.Reset(seed: seed);
             int steps = 0;
             double total = 0;
             while (true) {
@@ -178,7 +179,7 @@ namespace Gym.Examples.LunarLander {
             using (var env = new RecordVideo<NDArray, NDArray>(made, scratch, episodeTrigger: _ => true, namePrefix: Id,
                        videoWriter: new FfmpegVideoWriter())) {
                 var lander = (LunarLanderEnv)env.Unwrapped;
-                NDArray observation = env.Reset(seed: DefaultSeed).Observation;
+                (NDArray observation, Info info) = env.Reset(seed: DefaultSeed);
                 for (int t = 0; ; t++) {
                     NDArray action = LunarLanderEnv.Heuristic(env, observation);
                     long chosen = Convert.ToInt64(action.GetValue(), CultureInfo.InvariantCulture);
@@ -248,7 +249,7 @@ namespace Gym.Examples.LunarLander {
                 image.SaveAsPng(Path.Combine(folder, $"{Id}.figure.png"));
             // World units to the frame's pixels, as the renderer places them.
             double[] Pixel(double x, double y) => new[] { Math.Round(x * LunarLanderEnv.Scale, 2), Math.Round(height - y * LunarLanderEnv.Scale, 2) };
-            var body = lander.Lander!;
+            b2Body body = lander.Lander!;
             File.WriteAllText(Path.Combine(folder, $"{Id}.figure.json"), JsonSerializer.Serialize(new {
                 id = Id, step = FigureStep, width, height, scale = LunarLanderEnv.Scale,
                 observation = Observed(observation), action,

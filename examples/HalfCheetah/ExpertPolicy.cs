@@ -92,7 +92,7 @@ internal sealed class ExpertPolicy {
         };
         var kwargs = new Dictionary<string, object?>();
         if (root["make_kwargs"] is JsonObject make)
-            foreach (var (name, value) in make)
+            foreach ((string name, JsonNode? value) in make)
                 kwargs[name] = value?.GetValueKind() switch {
                     JsonValueKind.True => true,
                     JsonValueKind.False => false,
@@ -115,7 +115,7 @@ internal sealed class ExpertPolicy {
         if (human) {
             arguments["render_mode"] = "human";
             if (view is not null)
-                foreach (var (name, value) in view)
+                foreach ((string name, object? value) in view)
                     arguments[name] = value;
         }
         return arguments;
@@ -140,7 +140,7 @@ internal sealed class ExpertPolicy {
             _layers[l].Forward(x, y);
             x = y;
         }
-        var action = new float[_low.Length];
+        float[] action = new float[_low.Length];
         // Stable-Baselines3's deterministic predict: unscale a tanh-squashed output, or clip an unsquashed one.
         for (int i = 0; i < action.Length; i++)
             action[i] = _squash ? _low[i] + 0.5f * (MathF.Tanh(x[i]) + 1f) * (_high[i] - _low[i]) : Math.Clamp(x[i], _low[i], _high[i]);
@@ -187,7 +187,7 @@ internal sealed class ExpertPolicy {
                 byte[] bytes = Convert.FromBase64String(node[field]!.GetValue<string>());
                 if (bytes.Length != count * 4)
                     throw new InvalidDataException($"{path}: '{field}' holds {bytes.Length / 4} values, not {count}");
-                var values = new float[count];
+                float[] values = new float[count];
                 // Little-endian in the file; .NET runs little-endian on every platform it supports.
                 Buffer.BlockCopy(bytes, 0, values, 0, bytes.Length);
                 return values;

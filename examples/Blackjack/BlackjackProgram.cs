@@ -153,7 +153,7 @@ namespace Gym.Examples.Blackjack {
             // make's stack: TimeLimit over OrderEnforcing over PassiveEnvChecker over the env. The render mode is a
             // constructor argument, fixed for the env's life, as in Gymnasium.
             using Env<object?[], NDArray> env = Gymnasium.Make<object?[], NDArray>(Id, render ? new { render_mode = "human" } : null);
-            object?[] observation = env.Reset(seed: seed).Observation;
+            (object?[] observation, Info info) = env.Reset(seed: seed);
             int steps = 0;
             double total = 0;
             while (true) {
@@ -219,7 +219,7 @@ namespace Gym.Examples.Blackjack {
             using (var env = new RecordVideo<object?[], NDArray>(made, scratch, episodeTrigger: _ => true, namePrefix: Id,
                        videoWriter: new FfmpegVideoWriter())) {
                 var table = (BlackjackEnv)env.Unwrapped;
-                object?[] observation = env.Reset(seed: PageSeed).Observation;
+                (object?[] observation, Info info) = env.Reset(seed: PageSeed);
                 for (int t = 0; ; t++) {
                     // The frame now on screen shows the observation the agent is about to act on (row t).
                     if (t == FigureStep)
