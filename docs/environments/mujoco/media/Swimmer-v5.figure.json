@@ -1,0 +1,62 @@
+{
+  "id": "Swimmer-v5",
+  "width": 760,
+  "height": 380,
+  "camera": {
+    "distance": 3.6,
+    "azimuth": 90,
+    "elevation": -45,
+    "lookat": [
+      0,
+      0,
+      0
+    ],
+    "fovy": 45
+  },
+  "observation": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+  ],
+  "torso": [
+    380,
+    190
+  ],
+  "joints": [
+    {
+      "name": "motor1_rot",
+      "body": "mid",
+      "offset": [
+        0,
+        0,
+        0
+      ],
+      "observation": 1,
+      "action": 0,
+      "pixel": [
+        443.71,
+        190
+      ]
+    },
+    {
+      "name": "motor2_rot",
+      "body": "back",
+      "offset": [
+        0,
+        0,
+        0
+      ],
+      "observation": 2,
+      "action": 1,
+      "pixel": [
+        316.29,
+        190
+      ]
+    }
+  ]
+}
