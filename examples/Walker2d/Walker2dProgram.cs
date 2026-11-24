@@ -86,7 +86,7 @@ namespace Gym.Examples.Walker2d {
             }
             bool render = args.Contains("--render");
             if (args.Contains("--play")) {
-                Console.Error.WriteLine($"{Id}: its frames take about 0.1 s each to draw in software and a step is 8 ms of simulated time, so keyboard play would run about 12 times slower than real time; --render shows the agent instead.");
+                Console.Error.WriteLine($"{Id}: its frames take about 0.2 s each to draw in software and a step is 8 ms of simulated time, so keyboard play would run about 25 times slower than real time; --render shows the agent instead.");
                 return 2;
             }
             // Human mode draws inside every reset and step into the app-wide viewer (DR-20); without one it raises

@@ -242,7 +242,7 @@ second.
 video does; `default_camera_config` places the free camera, as the figure does. In `human` mode, Tab cycles the
 cameras, the mouse orbits, pans and zooms, and H lists Gymnasium's other keys.
 
-Gym.NET draws MuJoCo's frames in software, about 0.1 s each for this model: the classic renderer's passes (the
+Gym.NET draws MuJoCo's frames in software, about 0.2 s each for this model: the classic renderer's passes (the
 reflective floor, shadows, the skybox and the haze), reproduced in C#. By default every frame is drawn, so the window
 runs slower than real time; D switches to skipping frames.
 

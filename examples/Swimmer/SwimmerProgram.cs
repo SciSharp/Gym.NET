@@ -85,7 +85,7 @@ namespace Gym.Examples.Swimmer {
             }
             bool render = args.Contains("--render");
             if (args.Contains("--play")) {
-                Console.Error.WriteLine($"{Id}: its frames take about 0.3 s each to draw in software and a step is 40 ms of simulated time, so keyboard play would run about 7 times slower than real time; --render shows the agent instead.");
+                Console.Error.WriteLine($"{Id}: its frames take about 0.55 s each to draw in software and a step is 40 ms of simulated time, so keyboard play would run about 14 times slower than real time; --render shows the agent instead.");
                 return 2;
             }
             // Human mode draws inside every reset and step into the app-wide viewer (DR-20); without one it raises

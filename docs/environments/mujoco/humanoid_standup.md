@@ -271,7 +271,7 @@ HumanoidStandup 4 m from a point 0.89 m above the start, 20° above it. The conf
 a free camera tracks nothing; the humanoid stands up where it lies, so it stays in view. `camera_name = "track"` takes
 the model's own camera, 3 m to the side and 0.5 m above the centre of mass, following it, as the video does. In `human`
 mode, Tab cycles the cameras, the mouse orbits, pans and zooms, and H lists Gymnasium's other keys. Gym.NET draws this
-model's frames in software in about 0.5 s each; by default every frame is drawn, and D switches to skipping frames.
+model's frames in software in about 0.6 s each; by default every frame is drawn, and D switches to skipping frames.
 
 ## Episode anatomy
 

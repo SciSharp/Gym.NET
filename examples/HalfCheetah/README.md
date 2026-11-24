@@ -31,7 +31,7 @@ HalfCheetah-v5, seed 0: 1000 steps, return 5797.0, truncated by the time limit
 The default, `--render`, `--autopilot` and `--episodes` play the product's env, the one
 `Gymnasium.Make("HalfCheetah-v5")` builds, as every example in `examples/` does (DR-74). `--play` opens the game, which moved here from
 `tools/parity/mujoco/halfcheetah_poc/play`. It steps its own copy of the engine and draws its own side view, cheap
-enough for real time, while Gym.NET draws MuJoCo's own frames in software at about 0.1 s each.
+enough for real time, while Gym.NET draws MuJoCo's own frames in software at about 0.2 s each.
 
 ## The playable HalfCheetah
 

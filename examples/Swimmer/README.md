@@ -38,8 +38,8 @@ mouse orbits, pans and zooms, Space pauses and H lists the rest. Gym.NET draws M
 default: when the window falls behind real time, D turns "render every frame" off and it skips frames instead. The
 runner leaves the default free camera's view; Tab to the model's "track" camera, which follows it.
 
-`--play` is not offered: its frames take about 0.3 s each to draw in software and a step is 40 ms of simulated time, so
-keyboard play would run about 7 times slower than real time.
+`--play` is not offered: its frames take about 0.55 s each to draw in software and a step is 40 ms of simulated time, so
+keyboard play would run about 14 times slower than real time.
 
 ## Recording the docs page's media
 

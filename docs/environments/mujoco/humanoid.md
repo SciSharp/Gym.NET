@@ -289,7 +289,7 @@ Humanoid 4 m from a point 2 m above the start, 20° above it. The config names t
 camera tracks nothing, so the camera stays where it is and a running humanoid leaves the frame. `camera_name = "track"`
 takes the model's own camera, 4 m to the side at the height of the centre of mass, looking across the direction of
 travel and following it, as the video does. In `human` mode, Tab cycles the cameras, the mouse orbits, pans and zooms,
-and H lists Gymnasium's other keys. Gym.NET draws this model's frames in software in about 0.45 s each; by default
+and H lists Gymnasium's other keys. Gym.NET draws this model's frames in software in about 0.6 s each; by default
 every frame is drawn, and D switches to skipping frames.
 
 ## Episode anatomy

@@ -929,3 +929,37 @@ Effects of approved designs that only showed up in code. None changes a design; 
     drops it when every digit is a zero.
   - A float32 action makes Gymnasium's reward an `np.float32` (NEP 50), and a Python float plus it stays float32; the
     replay checker sums `float(reward)`, as Gym.NET's double rewards do.
+- **DR-112 and DR-114, MuJoCo's pages** (E7, 2026-11-24). All eleven families follow the template, each with its v4
+  section, and the eleven examples gained `--record`. Every trace replays in Gymnasium on MuJoCo 4.0.0 to the
+  recording's return bit for bit. The figures are Gym.NET's own drawing of MuJoCo's renderer (DR-98), so each page
+  states its figure's measured difference from Gymnasium's frame of the same state, from none of 364,800 pixels
+  (InvertedDoublePendulum) to 45,452 of 456,000 (Humanoid, nearly all by a level or two), and its badge follows
+  MUJOCO_ASSESSMENT 18.3's frame cells. What the eleven pages found:
+  - Gymnasium 1.4's default camera does not follow a body: with no camera named the renderer keeps a free camera and
+    writes the env's `default_camera_config` into it, `trackbodyid` included, which MuJoCo reads only for a tracking
+    camera. Moving Hopper's root 1.5 m changes 9,344 pixels of the default view. Hopper's and Walker2d's pages (Hopper's
+    live) had said the camera tracked the thigh; corrected, and Gym.NET's renderer does the same as Gymnasium's.
+  - A figure projects the joints through `mjv_updateCamera`'s free-camera geometry; where the model turns a body at the
+    reset pose (Humanoid's `lwaist` and `pelvis`, 0.23 degrees each), body-plus-offset is within a millimetre, and the
+    checker compares the points with MuJoCo's own `xanchor` (within 0.3 px on every page). Points that are no joint
+    (Pusher's fingertip, puck and goal; the rail ends) are body origins plus the recorded offset.
+  - Pusher and Reacher take no `reset_noise_scale`, so their figures are the episode's own reset; Pusher's reset gives
+    the puck's first draw to the y slide, not x as its docstring's order suggests; Pusher's observed "fingertip" is the
+    wrist's centre, 0.1 m behind the gripper's tips, and its goal sits 0.048 m below the puck, so the distance term
+    never reaches 0.
+  - Reacher's 50-step episode would last one second at its 50 fps: its video is recorded at 25 fps (`RecordVideo`'s
+    `fps`), and the trace says 25, keeping the chart's cursor on the picture.
+  - HumanoidStandup's `uph_cost_weight` is stored and read nowhere, in Gymnasium as in Gym.NET (2.0 leaves the rewards
+    unchanged); InvertedDoublePendulum's model leans gravity 1e-5 m/s^2 toward +x, which topples the noiseless upright
+    poles at step 53 (with it set to 0 they stand all 1,000 steps); Humanoid's expert straightens its right knee past
+    its -2 degree stop on 169 steps (MuJoCo's soft limits); random torques end Ant's episodes by throwing the torso
+    above its healthy band in 9 of seeds 0-9, not by a fall.
+  - The parity tables named a "noise" keyword variant the live tests do not run for Hopper, Walker2d, Swimmer and Ant;
+    each table now names the variants `MujocoLiveParityTests.KeywordVariants` lists.
+  - The software frame times were re-measured (`frametime.cs`, twelve runs with the machine 64-100% busy): HalfCheetah
+    about 0.2 s, Hopper 0.5, Walker2d 0.2, Swimmer 0.55, Ant 0.25, Humanoid and HumanoidStandup 0.6, Pusher 0.2,
+    Reacher 0.05, the pendulums 0.02 and 0.03. The earlier pages' 0.1 and 0.3 s are corrected, with the "times slower
+    than real time" they implied.
+  - The generator of the uniform examples' `--record` (`e7/gen-record.py`, scratch) gained options for these cases:
+    the figure without the noise argument, the video's frame rate, and the doc patches of the examples that also offer
+    `--play`.

@@ -74,8 +74,8 @@ observation, reward, terminated, truncated, info = env.step(action)
 dotnet run --project examples/Swimmer -c Release -- --render
 ```
 
-Keyboard play is not offered: Gym.NET draws a frame of this model in about 0.3 s in software, while a step is 40 ms of
-simulated time, so a game would run about 7 times slower than real time.
+Keyboard play is not offered: Gym.NET draws a frame of this model in about 0.55 s in software, while a step is 40 ms of
+simulated time, so a game would run about 14 times slower than real time.
 
 ## How it works
 
@@ -222,7 +222,7 @@ model's extent, 8 m from the middle of its parts, where the swimmer is small. `c
 own camera, 3 m to the side and 3 m up, looking down at 45° across the direction of travel and following the body's
 centre of mass, as the video does. In
 `human` mode, Tab cycles the cameras, the mouse orbits, pans and zooms, and H lists Gymnasium's other keys. Gym.NET draws
-this model's frames in software in about 0.3 s each; by default every frame is drawn, and D switches to skipping frames.
+this model's frames in software in about 0.55 s each; by default every frame is drawn, and D switches to skipping frames.
 
 ## Episode anatomy
 

@@ -64,8 +64,8 @@ in slow motion; press D and the window skips frames instead.
 a walker or an arm takes a key pair, and the map lists every combination of the keys held, since Gymnasium's `play`
 looks up the exact set. The toy texts are turn-based: they step only while a key is held. Keyboard play is not offered
 for Pusher, Ant, Humanoid and HumanoidStandup, whose 7 to 17 motors would need 14 to 34 keys. It is not offered for
-Hopper, Walker2d and Swimmer either: `play` draws a frame per step, and their frames take 0.1 to 0.3 s against 8 to 40
-ms of simulated time per step, which would run the game 7 to 37 times slower than real time. HalfCheetah has its own
+Hopper, Walker2d and Swimmer either: `play` draws a frame per step, and their frames take 0.2 to 0.55 s against 8 to
+40 ms of simulated time per step, which would run the game 14 to 60 times slower than real time. HalfCheetah has its own
 game, which draws a cheap side view in real time.
 
 ## Recording a docs page's media
@@ -75,13 +75,18 @@ seeded episode once more and writes `<id>.episode.mp4` (the whole episode, one f
 through `RecordVideo` and `FfmpegVideoWriter`), `<id>.episode.json` (every step's state, action and reward, for the
 page's anatomy chart) and `<id>.figure.png` with `<id>.figure.json` (the frame How it works annotates, and the pixels
 its labels point at). Classic control's five record, into `docs/environments/classic_control/media`, Box2D's into
-`docs/environments/box2d/media`, and toy text's five, into `docs/environments/toy_text/media`; a grid world's (FrozenLake, FrozenLake8x8, CliffWalking, Taxi) also
+`docs/environments/box2d/media`, MuJoCo's eleven into `docs/environments/mujoco/media`, and toy text's five, into
+`docs/environments/toy_text/media`; a grid world's (FrozenLake, FrozenLake8x8, CliffWalking, Taxi) also
 writes `<id>.board.png`, the reset's frame, which the page's anatomy draws the episode's path on (DR-131), and
-Blackjack records the page's own hand, seed 1,574,758, rather than its default seed (DR-128):
+Blackjack records the page's own hand, seed 1,574,758, rather than its default seed (DR-128). A MuJoCo example's figure
+is its reset without noise from a free camera of known placement (Pusher's and Reacher's, which take no noise argument,
+the episode's own reset), with its joints projected through MuJoCo's camera geometry, and Reacher's 50-step episode is
+recorded at half its frame rate:
 
 ```bash
 dotnet run --project examples/Acrobot -c Release -- --record docs/environments/classic_control/media
 dotnet run --project examples/CliffWalking -c Release -- --record docs/environments/toy_text/media
+dotnet run --project examples/Hopper -c Release -- --record docs/environments/mujoco/media
 ```
 
 ffmpeg must be on PATH to record; every other mode runs without it. Each README lists its files.

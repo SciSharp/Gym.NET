@@ -73,8 +73,8 @@ observation, reward, terminated, truncated, info = env.step(action)
 dotnet run --project examples/Walker2d -c Release -- --render
 ```
 
-Keyboard play is not offered: Gym.NET draws a frame of this model in about 0.1 s in software, while a step is 8 ms of
-simulated time, so a game would run about 12 times slower than real time.
+Keyboard play is not offered: Gym.NET draws a frame of this model in about 0.2 s in software, while a step is 8 ms of
+simulated time, so a game would run about 25 times slower than real time.
 
 ## How it works
 
@@ -244,7 +244,7 @@ a free camera tracks nothing, so the camera stays where it is and a walking walk
 `camera_name = "track"` takes the model's own camera, 3 m to the side, which follows the body's centre of mass, as the
 video does. In `human` mode, Tab cycles the cameras, the mouse
 orbits, pans and zooms, and H lists Gymnasium's other keys. Gym.NET draws this model's frames in software in about
-0.1 s each; by default every frame is drawn, and D switches to skipping frames.
+0.2 s each; by default every frame is drawn, and D switches to skipping frames.
 
 ## Episode anatomy
 
