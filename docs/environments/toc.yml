@@ -36,6 +36,8 @@
     href: toy_text/taxi.md
 - name: MuJoCo
   items:
+  - name: Ant
+    href: mujoco/ant.md
   - name: Half Cheetah
     href: mujoco/half_cheetah.md
   - name: Hopper

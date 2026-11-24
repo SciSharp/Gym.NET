@@ -6,6 +6,7 @@ A four-legged robot with eight motors has to move forward. A published expert ag
 dotnet run --project examples/Ant -c Release                   # one episode, headless
 dotnet run --project examples/Ant -c Release -- --render       # the same episode in a window
 dotnet run --project examples/Ant -c Release -- --episodes 5   # seeds 0-4, and their mean
+dotnet run --project examples/Ant -c Release -- --record docs/environments/mujoco/media   # the docs page's media
 ```
 
 Output, the same on every run since the reset is seeded and the agent has no randomness of its own (measured on an x64
@@ -38,6 +39,24 @@ default: when the window falls behind real time, D turns "render every frame" of
 runner leaves the default free camera's view; Tab to the model's "track" camera, which follows it.
 
 `--play` is not offered: its 8 motors would need 16 keys held in combinations, too many to play.
+
+## Recording the docs page's media
+
+`--record <folder>` plays the seed-0 episode once more (whatever `--seed` says) and writes the media of Ant's page on
+the docs site (DR-112) into the folder, `docs/environments/mujoco/media` for the site:
+
+| File | What it is |
+|---|---|
+| `Ant-v5.episode.mp4` | The whole episode, one 480×480 frame per step at the env's 20 frames a second (1,001 frames: the reset and 1,000 steps), through the model's `track` camera, H.264 through Gymnasium's `RecordVideo` and `FfmpegVideoWriter` |
+| `Ant-v5.episode.json` | Every step: the state acted on (the torso's x, y and height, its forward velocity, the four legs' hip and ankle angles), the expert's eight float32 commands (`action_dtype` float32, each written as the float64 that holds it exactly), the reward and its four terms from the info; the state after the last step as `final` |
+| `Ant-v5.figure.png`, `.figure.json` | How it works' frame: 760×480 of the reset pose without noise, from MuJoCo's free camera 3 m off, looking down at 40°, and the camera with the torso and each hip and ankle projected to the frame's pixels through MuJoCo's camera geometry |
+
+```
+Ant-v5, seed 0: 1000 steps, return 5705.8, recorded into docs/environments/mujoco/media
+```
+
+Gym.NET draws MuJoCo's frames in software, so the recording takes a few minutes. ffmpeg must be on PATH to record; every
+other mode runs without it.
 
 ## The API it shows
 
