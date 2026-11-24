@@ -8,7 +8,7 @@ namespace Gym.Environments.Envs.ToyText {
     ///     A Blackjack observation read by name (DR-13): Gymnasium's <c>(player_sum, dealer_card, usable_ace)</c>, each item a
     ///     0-d int64 array (DR-08). <see cref="BlackjackEnv"/> returns Gym.NET's generic tuple, <see langword="object"/>?[] (what
     ///     its <c>Tuple</c> observation space samples and every space tool reads); assigning one to this record converts it:
-    ///     <c>BlackjackObservation obs = env.Reset().Observation;</c>.
+    ///     <c>(object?[] observation, Info info) = env.Reset(); BlackjackObservation hand = observation;</c>.
     /// </summary>
     /// <remarks>
     ///     The conversion shares the arrays rather than copying them, so disposing the record's arrays disposes the

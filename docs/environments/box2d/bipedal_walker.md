@@ -52,7 +52,7 @@ frame.
 
 # [C#](#tab/csharp)
 
-[!code-csharp[](../../../tests/Gym.Tests/Docs/EnvPageSamples/BipedalWalkerSamples.cs?range=1-4,38-44&dedent=12)]
+[!code-csharp[](../../../tests/Gym.Tests/Docs/EnvPageSamples/BipedalWalkerSamples.cs?range=1-4,39-47&dedent=12)]
 
 # [Python (Gymnasium)](#tab/python)
 
@@ -246,7 +246,18 @@ By Gymnasium's name in `Make`'s kwargs, or by the C# name in the constructor and
 | `hardcore`<br>`hardcore` | `bool`<br>`false` | The course with stumps, stairs and pits; BipedalWalkerHardcore-v3 sets it |
 | (Gym.NET)<br>`viewerFactory` | `EnvViewerFactory?`<br>`null` | The window for `human`: Avalonia, WinForms, or headless |
 
+
+# [C#](#tab/csharp)
+
 [!code-csharp[](../../../tests/Gym.Tests/Docs/EnvPageSamples/BipedalWalkerSamples.cs#Arguments)]
+
+# [Python (Gymnasium)](#tab/python)
+
+```python
+env = gym.make("BipedalWalker-v3", hardcore=True)
+```
+
+---
 
 ## Info
 

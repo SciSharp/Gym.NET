@@ -9,6 +9,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using Gym.Environments.Envs.Box2D;
+using Gym.Observations;
 using Gym.Vector;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using SixLabors.ImageSharp;
@@ -36,22 +37,25 @@ namespace Gym.Docs.EnvPageSamples {
         [TestMethod]
         public void QuickStart() {
             #region QuickStart
-            using Env<NDArray, NDArray> env =
-                Gymnasium.Make<NDArray, NDArray>("LunarLander-v3");
+            using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("LunarLander-v3");
             // x, y, vx, vy, angle, angular velocity, right leg, left leg
-            NDArray observation = env.Reset(seed: 42).Observation;
+            (NDArray observation, Info info) = env.Reset(seed: 42);
             // 0 nothing, 1 left engine, 2 main engine, 3 right engine
             using NDArray action = env.ActionSpace.Sample();
-            var (next, reward, terminated, truncated, info) = env.Step(action);
+            observation.Dispose();
+            (observation, double reward, bool terminated, bool truncated, info)
+                = env.Step(action);
             #endregion
-            Assert.AreEqual(8, observation.size);
+            // The quick start's first observation, read again: the same seeded reset gives the same one.
+            using ResetResult<NDArray> again = env.Reset(seed: 42);
+            NDArray first = again.Observation;
+            Assert.AreEqual(8, first.size);
             // Gymnasium's reset of seed 42 (one free step inside the reset): the lander high above the pad, at 1.418.
-            Assert.AreEqual(1.4181306f, observation.GetSingle(1));
+            Assert.AreEqual(1.4181306f, first.GetSingle(1));
             Assert.IsFalse(terminated);
             Assert.IsFalse(truncated);
             Assert.AreEqual(0, info.Count);
             _ = reward;
-            next.Dispose();
             observation.Dispose();
         }
 
@@ -60,15 +64,14 @@ namespace Gym.Docs.EnvPageSamples {
         public void RunAnEpisode() {
             int steps = 0;
             #region RunAnEpisode
-            using Env<NDArray, NDArray> env =
-                Gymnasium.Make<NDArray, NDArray>("LunarLander-v3");
-            NDArray observation = env.Reset(seed: 42).Observation;
+            using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("LunarLander-v3");
+            (NDArray observation, Info info) = env.Reset(seed: 42);
             double episodeReturn = 0;
             while (true) {
                 using NDArray action = env.ActionSpace.Sample();
-                var (next, reward, terminated, truncated, _) = env.Step(action);
                 observation.Dispose();
-                observation = next;
+                (observation, double reward, bool terminated, bool truncated, info)
+                    = env.Step(action);
                 episodeReturn += reward;
                 steps++;
                 if (terminated || truncated)
@@ -88,15 +91,14 @@ namespace Gym.Docs.EnvPageSamples {
             int steps = 0;
             double episodeReturn = 0;
             #region TheHeuristic
-            using Env<NDArray, NDArray> env =
-                Gymnasium.Make<NDArray, NDArray>("LunarLander-v3");
-            NDArray observation = env.Reset(seed: 7).Observation;
+            using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("LunarLander-v3");
+            (NDArray observation, Info info) = env.Reset(seed: 7);
             while (true) {
                 // Gymnasium's own controller: lean toward the pad, slow the fall
                 using NDArray action = LunarLanderEnv.Heuristic(env, observation);
-                var (next, reward, terminated, truncated, _) = env.Step(action);
                 observation.Dispose();
-                observation = next;
+                (observation, double reward, bool terminated, bool truncated, info)
+                    = env.Step(action);
                 (steps, episodeReturn) = (steps + 1, episodeReturn + reward);
                 if (terminated || truncated)
                     break;
@@ -122,16 +124,16 @@ namespace Gym.Docs.EnvPageSamples {
                 ("LunarLander-v3", new { enable_wind = true }),
                 ("LunarLander-v3", new { gravity = -1.62 }),
             };
-            foreach (var (id, kwargs) in variations) {
+            foreach ((string id, object? kwargs) in variations) {
                 using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>(id, kwargs);
-                NDArray observation = env.Reset(seed: 7).Observation;
+                (NDArray observation, Info info) = env.Reset(seed: 7);
                 int steps = 0;
                 double episodeReturn = 0;
                 while (true) {
                     using NDArray action = LunarLanderEnv.Heuristic(env, observation);
-                    var (next, reward, terminated, truncated, _) = env.Step(action);
                     observation.Dispose();
-                    observation = next;
+                    (observation, double reward, bool terminated, bool truncated, info)
+                        = env.Step(action);
                     (steps, episodeReturn) = (steps + 1, episodeReturn + reward);
                     if (terminated || truncated)
                         break;
@@ -154,13 +156,13 @@ namespace Gym.Docs.EnvPageSamples {
         public void Throttles() {
             double reward = 0;
             #region Throttles
-            using Env<NDArray, NDArray> env =
-                Gymnasium.Make<NDArray, NDArray>("LunarLanderContinuous-v3");
-            using var start = env.Reset(seed: 7);
+            using Env<NDArray, NDArray> env
+                = Gymnasium.Make<NDArray, NDArray>("LunarLanderContinuous-v3");
+            using ResetResult<NDArray> start = env.Reset(seed: 7);
             // main 0.5: 75% (0 to 1 maps to 50% to 100%); side -0.8: the left
             // engine at 80% (beyond -0.5 the left fires, beyond 0.5 the right)
             using NDArray action = np.array(new[] { 0.5f, -0.8f });
-            using var step = env.Step(action);
+            using StepResult<NDArray> step = env.Step(action);
             reward = step.Reward;
             Console.WriteLine($"{reward:F4}");   // -0.1445, the fall slowed, the fuel paid
             #endregion
@@ -174,9 +176,9 @@ namespace Gym.Docs.EnvPageSamples {
         [TestMethod]
         public void SaveFrame() {
             #region SaveFrame
-            using Env<NDArray, NDArray> env =
-                Gymnasium.Make<NDArray, NDArray>("LunarLander-v3", RenderMode.RgbArray);
-            using var start = env.Reset(seed: 42);
+            using Env<NDArray, NDArray> env
+                = Gymnasium.Make<NDArray, NDArray>("LunarLander-v3", RenderMode.RgbArray);
+            using ResetResult<NDArray> start = env.Reset(seed: 42);
             using RenderResult result = env.Render();
             using Image frame = (Image)result;   // 600x400, Gymnasium's pixels
             frame.SaveAsPng("lunar_lander.png");
@@ -196,12 +198,13 @@ namespace Gym.Docs.EnvPageSamples {
         public void ManyLanders() {
             #region ManyLanders
             // No vector env of its own: MakeVec steps 8 envs in turn ("sync")
-            using VectorEnv<NDArray, NDArray> envs =
-                Gymnasium.MakeVec<NDArray, NDArray>("LunarLander-v3", numEnvs: 8);
-            using var start = envs.Reset(seed: 42);
+            using VectorEnv<NDArray, NDArray> envs
+                = Gymnasium.MakeVec<NDArray, NDArray>("LunarLander-v3", numEnvs: 8);
+            using VectorResetResult<NDArray> start = envs.Reset(seed: 42);
             for (int t = 0; t < 100; t++) {
                 using NDArray actions = envs.ActionSpace.Sample();   // one per lander
-                using var step = envs.Step(actions);   // finished landers reset themselves
+                using VectorStepResult<NDArray> step
+                    = envs.Step(actions);   // finished landers reset themselves
             }
             #endregion
             Assert.AreEqual(8, envs.NumEnvs);

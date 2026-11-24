@@ -50,7 +50,7 @@ errors, and the same pixels.
 
 # [C#](#tab/csharp)
 
-[!code-csharp[](../../../tests/Gym.Tests/Docs/EnvPageSamples/PendulumSamples.cs?range=1-4,37-42&dedent=12)]
+[!code-csharp[](../../../tests/Gym.Tests/Docs/EnvPageSamples/PendulumSamples.cs?range=1-4,38-45&dedent=12)]
 
 # [Python (Gymnasium)](#tab/python)
 
@@ -189,7 +189,18 @@ By Gymnasium's name in `Make`'s kwargs, or by the C# name in the constructor and
 | `g`<br>`g` | `double`<br>`10.0` | The gravity, in m/s²; the property is `Gravity` |
 | (Gym.NET)<br>`viewerFactory` | `EnvViewerFactory?`<br>`null` | The window for `human`: Avalonia, WinForms, or headless |
 
+
+# [C#](#tab/csharp)
+
 [!code-csharp[](../../../tests/Gym.Tests/Docs/EnvPageSamples/PendulumSamples.cs#Arguments)]
+
+# [Python (Gymnasium)](#tab/python)
+
+```python
+env = gym.make("Pendulum-v1", render_mode="rgb_array", g=9.81)
+```
+
+---
 
 The generated options record names the keyword `G`. The constants are settable properties of the unwrapped env (the
 table in [How it works](#how-it-works)).

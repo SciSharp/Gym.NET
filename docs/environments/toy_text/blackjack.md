@@ -51,7 +51,7 @@ pixels.
 
 # [C#](#tab/csharp)
 
-[!code-csharp[](../../../tests/Gym.Tests/Docs/EnvPageSamples/BlackjackSamples.cs?range=1-4,40-46&dedent=12)]
+[!code-csharp[](../../../tests/Gym.Tests/Docs/EnvPageSamples/BlackjackSamples.cs?range=1-4,41-48&dedent=12)]
 
 # [Python (Gymnasium)](#tab/python)
 
@@ -180,7 +180,18 @@ By Gymnasium's name in `Make`'s kwargs, or by the C# name in the constructor and
 | `sab`<br>`sab` | `bool`<br>`false` | Sutton and Barto's rules: a natural against a dealer without one wins 1; Blackjack-v1 sets it |
 | (Gym.NET)<br>`viewerFactory` | `EnvViewerFactory?`<br>`null` | The window for `human`: Avalonia, WinForms, or headless |
 
+
+# [C#](#tab/csharp)
+
 [!code-csharp[](../../../tests/Gym.Tests/Docs/EnvPageSamples/BlackjackSamples.cs#Arguments)]
+
+# [Python (Gymnasium)](#tab/python)
+
+```python
+env = gym.make("Blackjack-v1", sab=False, natural=True)
+```
+
+---
 
 ## Info
 

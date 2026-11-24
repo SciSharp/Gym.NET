@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using Gym.Environments.Envs.Classic;
+using Gym.Observations;
 using Gym.Vector;
 using Gym.Wrappers;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -35,19 +36,25 @@ namespace Gym.Docs.EnvPageSamples {
         [TestMethod]
         public void QuickStart() {
             #region QuickStart
-            using Env<NDArray, NDArray> env =
-                Gymnasium.Make<NDArray, NDArray>("MountainCarContinuous-v0");
+            using Env<NDArray, NDArray> env
+                = Gymnasium.Make<NDArray, NDArray>("MountainCarContinuous-v0");
             // [position, velocity], float32
-            NDArray observation = env.Reset(seed: 42).Observation;
+            (NDArray observation, Info info) = env.Reset(seed: 42);
             // one float32 force in [-1, 1]
             using NDArray action = env.ActionSpace.Sample();
-            var (next, reward, terminated, truncated, info) = env.Step(action);
+            observation.Dispose();
+            (observation, double reward, bool terminated, bool truncated, info)
+                = env.Step(action);
             #endregion
+            // The quick start's first observation, read again: the same seeded reset gives the same one.
+            using ResetResult<NDArray> again = env.Reset(seed: 42);
+            NDArray first = again.Observation;
+            Assert.AreEqual(2, first.size);
             Assert.AreEqual(2, observation.size);
             // The same start as MountainCar-v0's from seed 42: both draw the position from one generator alike.
-            Assert.AreEqual(-0.4452088f, observation.GetSingle(0));
+            Assert.AreEqual(-0.4452088f, first.GetSingle(0));
             Assert.AreEqual(1, action.size);
-            Assert.AreEqual(2, next.size);
+            Assert.AreEqual(2, first.size);
             // A step that does not reach the flag costs 0.1 times the squared force, at most 0.1.
             Assert.IsTrue(reward <= 0 && reward >= -0.1);
             Assert.IsFalse(terminated);
@@ -62,18 +69,18 @@ namespace Gym.Docs.EnvPageSamples {
         [TestMethod]
         public void RunAnEpisode() {
             #region RunAnEpisode
-            using Env<NDArray, NDArray> env =
-                Gymnasium.Make<NDArray, NDArray>("MountainCarContinuous-v0");
-            NDArray observation = env.Reset(seed: 4).Observation;
+            using Env<NDArray, NDArray> env
+                = Gymnasium.Make<NDArray, NDArray>("MountainCarContinuous-v0");
+            (NDArray observation, Info info) = env.Reset(seed: 4);
             double episodeReturn = 0;
             int steps = 0;
             while (true) {
                 // full force the way the car moves; left while it is at rest
                 float force = observation.GetSingle(1) > 0 ? 1f : -1f;
                 using NDArray action = np.array(new[] { force });
-                var (next, reward, terminated, truncated, _) = env.Step(action);
                 observation.Dispose();
-                observation = next;
+                (observation, double reward, bool terminated, bool truncated, info)
+                    = env.Step(action);
                 episodeReturn += reward;
                 steps++;
                 if (terminated || truncated)
@@ -92,7 +99,7 @@ namespace Gym.Docs.EnvPageSamples {
             using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("MountainCarContinuous-v0");
             #region StartElsewhere
             var options = new Dictionary<string, object?> { ["low"] = -0.7, ["high"] = -0.5 };
-            NDArray observation = env.Reset(seed: 123, options: options).Observation;
+            (NDArray observation, Info info) = env.Reset(seed: 123, options: options);
             // [-0.5635296, 0]: the position drawn from [-0.7, -0.5)
             #endregion
             // Gymnasium's docstring prints this observation for the same call.
@@ -117,7 +124,7 @@ namespace Gym.Docs.EnvPageSamples {
             bool terminated = false, truncated = false;
             while (!terminated && !truncated) {
                 using NDArray right = np.array(new[] { 1f });
-                using var step = env.Step(right);
+                using StepResult<NDArray> step = env.Step(right);
                 (terminated, truncated) = (step.Terminated, step.Truncated);
                 steps++;
             }
@@ -150,15 +157,15 @@ namespace Gym.Docs.EnvPageSamples {
         [TestMethod]
         public void ClipTheForce() {
             #region ClipTheForce
-            using Env<NDArray, NDArray> env =
-                Gymnasium.Make<NDArray, NDArray>("MountainCarContinuous-v0");
+            using Env<NDArray, NDArray> env
+                = Gymnasium.Make<NDArray, NDArray>("MountainCarContinuous-v0");
             using var clipped = new ClipAction<NDArray, NDArray>(
                 Gymnasium.Make<NDArray, NDArray>("MountainCarContinuous-v0"));
             using NDArray tooStrong = np.array(new[] { 2f });
             env.Reset(seed: 42);
             clipped.Reset(seed: 42);
-            using var raw = env.Step(tooStrong);       // pushes as 1, costs as 2
-            using var fixedUp = clipped.Step(tooStrong);   // clipped to 1 first
+            using StepResult<NDArray> raw = env.Step(tooStrong);       // pushes as 1, costs as 2
+            using StepResult<NDArray> fixedUp = clipped.Step(tooStrong);   // clipped to 1 first
             Console.WriteLine($"{raw.Reward} {fixedUp.Reward}");   // -0.4 -0.1
             #endregion
             Assert.AreEqual(-0.4, raw.Reward, 1e-12);
@@ -175,12 +182,13 @@ namespace Gym.Docs.EnvPageSamples {
         public void ManyCars() {
             #region ManyCars
             // No vector env of its own: MakeVec steps 8 envs in turn ("sync")
-            using VectorEnv<NDArray, NDArray> envs =
-                Gymnasium.MakeVec<NDArray, NDArray>("MountainCarContinuous-v0", numEnvs: 8);
-            using var start = envs.Reset(seed: 42);
+            using VectorEnv<NDArray, NDArray> envs
+                = Gymnasium.MakeVec<NDArray, NDArray>("MountainCarContinuous-v0", numEnvs: 8);
+            using VectorResetResult<NDArray> start = envs.Reset(seed: 42);
             for (int t = 0; t < 200; t++) {
                 using NDArray actions = envs.ActionSpace.Sample();   // (8, 1) forces
-                using var step = envs.Step(actions);   // finished cars reset themselves
+                using VectorStepResult<NDArray> step
+                    = envs.Step(actions);   // finished cars reset themselves
             }
             #endregion
             Assert.AreEqual(8, envs.NumEnvs);

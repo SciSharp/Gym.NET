@@ -3,8 +3,10 @@ using Gym.Envs;
 using NumSharp;
 
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Gym.Environments.Envs.ToyText;
+using Gym.Observations;
 using Gym.Vector;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
@@ -31,16 +33,20 @@ namespace Gym.Docs.EnvPageSamples {
         [TestMethod]
         public void QuickStart() {
             #region QuickStart
-            using Env<NDArray, NDArray> env =
-                Gymnasium.Make<NDArray, NDArray>("Taxi-v4");
+            using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("Taxi-v4");
             // one of 500 states: the taxi's cell, the passenger, the destination
-            NDArray observation = env.Reset(seed: 42).Observation;
+            (NDArray observation, Info info) = env.Reset(seed: 42);
             // 0 south, 1 north, 2 east, 3 west, 4 pick up, 5 drop off
             using NDArray action = env.ActionSpace.Sample();
-            var (next, reward, terminated, truncated, info) = env.Step(action);
+            observation.Dispose();
+            (observation, double reward, bool terminated, bool truncated, info)
+                = env.Step(action);
             #endregion
+            // The quick start's first observation, read again: the same seeded reset gives the same one.
+            using ResetResult<NDArray> again = env.Reset(seed: 42);
+            NDArray first = again.Observation;
+            Assert.IsTrue(first.GetInt64() is >= 0 and < 500);
             Assert.IsTrue(observation.GetInt64() is >= 0 and < 500);
-            Assert.IsTrue(next.GetInt64() is >= 0 and < 500);
             // A first step can cost 1 or, as a pick-up or drop-off where none can happen, 10; it cannot deliver.
             Assert.IsTrue(reward is -1.0 or -10.0);
             Assert.IsFalse(terminated);
@@ -60,22 +66,22 @@ namespace Gym.Docs.EnvPageSamples {
         public void RunAnEpisode() {
             int steps = 0;
             #region RunAnEpisode
-            using Env<NDArray, NDArray> env =
-                Gymnasium.Make<NDArray, NDArray>("Taxi-v4");
-            using var start = env.Reset(seed: 42);
+            using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("Taxi-v4");
+            using ResetResult<NDArray> start = env.Reset(seed: 42);
+            (NDArray observation, Info info) = start;
             // only the moves that change something: the info's action mask
-            NDArray action = env.ActionSpace.Sample(((TaxiInfo)start.Info).ActionMask);
+            NDArray action = env.ActionSpace.Sample(((TaxiInfo)info).ActionMask);
             double episodeReturn = 0;
             while (true) {
-                using var step = env.Step(action);
+                using StepResult<NDArray> step = env.Step(action);
                 action.Dispose();
                 episodeReturn += step.Reward;
                 steps++;
                 if (step.Terminated || step.Truncated)
                     break;
                 // drawn while the step, which owns the mask, is alive
-                TaxiInfo info = step.Info;
-                action = env.ActionSpace.Sample(info.ActionMask);
+                info = step.Info;
+                action = env.ActionSpace.Sample(((TaxiInfo)info).ActionMask);
             }
             // -1 a step, 20 for the delivery: masked moves never cost 10
             Console.WriteLine($"return {episodeReturn}");
@@ -94,8 +100,7 @@ namespace Gym.Docs.EnvPageSamples {
             int steps = 0;
             double episodeReturn = 0;
             #region PlanWithTheTable
-            using Env<NDArray, NDArray> env =
-                Gymnasium.Make<NDArray, NDArray>("Taxi-v4");
+            using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("Taxi-v4");
             var taxi = (TaxiEnv)env.Unwrapped;
             int n = taxi.P.Count;
             var v = new double[n];
@@ -114,12 +119,12 @@ namespace Gym.Docs.EnvPageSamples {
             long[] plan = Enumerable.Range(0, n).Select(s => (long)Enumerable.Range(0, 6)
                 .Aggregate((b, a) => Q(s, a) > Q(s, b) + 1e-12 ? a : b)).ToArray();
 
-            NDArray observation = env.Reset(seed: 12).Observation;
+            (NDArray observation, Info info) = env.Reset(seed: 12);
             while (true) {
                 using NDArray action = NDArray.Scalar(plan[observation.GetInt64()]);
-                var (next, reward, terminated, truncated, _) = env.Step(action);
                 observation.Dispose();
-                observation = next;
+                (observation, double reward, bool terminated, bool truncated, info)
+                    = env.Step(action);
                 (steps, episodeReturn) = (steps + 1, episodeReturn + reward);
                 if (terminated || truncated)
                     break;
@@ -135,12 +140,11 @@ namespace Gym.Docs.EnvPageSamples {
         [TestMethod]
         public void EncodeAndDecode() {
             #region EncodeAndDecode
-            using Env<NDArray, NDArray> env =
-                Gymnasium.Make<NDArray, NDArray>("Taxi-v4");
+            using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("Taxi-v4");
             var taxi = (TaxiEnv)env.Unwrapped;
             // row 0, col 4, the passenger at G (1), going to R (0)
             long state = taxi.Encode(0, 4, 1, 0);   // ((0 * 5 + 4) * 5 + 1) * 4 + 0
-            var (row, col, passenger, destination) = taxi.Decode(state);
+            (long row, long col, long passenger, long destination) = taxi.Decode(state);
             // 84: 0, 4, 1, 0
             Console.WriteLine($"{state}: {row}, {col}, {passenger}, {destination}");
             #endregion
@@ -155,20 +159,20 @@ namespace Gym.Docs.EnvPageSamples {
         [TestMethod]
         public void Rain() {
             #region Rain
-            using Env<NDArray, NDArray> env =
-                Gymnasium.Make<NDArray, NDArray>("Taxi-v4", new { is_rainy = true });
+            using Env<NDArray, NDArray> env
+                = Gymnasium.Make<NDArray, NDArray>("Taxi-v4", new { is_rainy = true });
             var taxi = (TaxiEnv)env.Unwrapped;
             // south from the middle, the passenger waiting at R, going to G
             long state = taxi.Encode(2, 2, 0, 1);
             foreach (ToyTextTransition t in taxi.P[state][0]) {
-                var (row, col, _, _) = taxi.Decode(t.NextState);
+                (long row, long col, _, _) = taxi.Decode(t.NextState);
                 Console.WriteLine($"{t.Probability:F1} -> row {row}, col {col}");
             }
             // 0.8 -> row 3, col 2    south, as aimed
             // 0.1 -> row 2, col 3    blown east
             // 0.1 -> row 2, col 1    blown west
             #endregion
-            var outcomes = taxi.P[state][0];
+            IReadOnlyList<ToyTextTransition> outcomes = taxi.P[state][0];
             CollectionAssert.AreEqual(new[] { (3L, 2L), (2L, 3L), (2L, 1L) },
                 outcomes.Select(t => taxi.Decode(t.NextState)).Select(d => (d.TaxiRow, d.TaxiCol)).ToArray());
             CollectionAssert.AreEqual(new[] { 0.8, (1.0 - 0.8) / 2.0, (1.0 - 0.8) / 2.0 }, outcomes.Select(t => t.Probability).ToArray());
@@ -178,12 +182,11 @@ namespace Gym.Docs.EnvPageSamples {
         [TestMethod]
         public void AsText() {
             #region AsText
-            using Env<NDArray, NDArray> env =
-                Gymnasium.Make<NDArray, NDArray>("Taxi-v4",
+            using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("Taxi-v4",
                     new { render_mode = "ansi" });
-            using var start = env.Reset(seed: 12);
+            using ResetResult<NDArray> start = env.Reset(seed: 12);
             using NDArray south = NDArray.Scalar(0L);
-            using var step = env.Step(south);
+            using StepResult<NDArray> step = env.Step(south);
             using RenderResult result = env.Render();
             string text = ((RenderResult.Ansi)result).Text;
             // the map; the taxi in yellow, the passenger in blue, the
@@ -202,12 +205,13 @@ namespace Gym.Docs.EnvPageSamples {
         public void ManyTaxis() {
             #region ManyTaxis
             // No vector env of its own: MakeVec steps 8 envs in turn ("sync")
-            using VectorEnv<NDArray, NDArray> envs =
-                Gymnasium.MakeVec<NDArray, NDArray>("Taxi-v4", numEnvs: 8);
-            using var start = envs.Reset(seed: 42);
+            using VectorEnv<NDArray, NDArray> envs
+                = Gymnasium.MakeVec<NDArray, NDArray>("Taxi-v4", numEnvs: 8);
+            using VectorResetResult<NDArray> start = envs.Reset(seed: 42);
             for (int t = 0; t < 100; t++) {
                 using NDArray actions = envs.ActionSpace.Sample();   // one per taxi
-                using var step = envs.Step(actions);   // finished taxis reset themselves
+                using VectorStepResult<NDArray> step
+                    = envs.Step(actions);   // finished taxis reset themselves
             }
             #endregion
             Assert.AreEqual(8, envs.NumEnvs);

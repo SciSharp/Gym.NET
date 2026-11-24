@@ -6,6 +6,7 @@ using System;
 using System.Globalization;
 using System.Linq;
 using Gym.Environments.Envs.MuJoCo;
+using Gym.Observations;
 using Gym.Vector;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
@@ -34,19 +35,22 @@ namespace Gym.Docs.EnvPageSamples {
         [TestMethod]
         public void QuickStart() {
             #region QuickStart
-            using Env<NDArray, NDArray> env =
-                Gymnasium.Make<NDArray, NDArray>("Humanoid-v5");
+            using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("Humanoid-v5");
             // 348 numbers: the pose and velocities, then the bodies' inertias, velocities and forces
-            NDArray observation = env.Reset(seed: 42).Observation;
+            (NDArray observation, Info info) = env.Reset(seed: 42);
             // seventeen torques, each from -0.4 to 0.4: abdomen, legs, arms
             using NDArray action = env.ActionSpace.Sample();
-            var (next, reward, terminated, truncated, info) = env.Step(action);
+            observation.Dispose();
+            (observation, double reward, bool terminated, bool truncated, info)
+                = env.Step(action);
             #endregion
-            Assert.AreEqual(348, observation.size);
+            // The quick start's first observation, read again: the same seeded reset gives the same one.
+            using ResetResult<NDArray> again = env.Reset(seed: 42);
+            NDArray first = again.Observation;
+            Assert.AreEqual(348, first.size);
             // Gymnasium's reset of seed 42: the torso at 1.4072 m, the model's 1.4 plus the reset's uniform noise.
-            Assert.AreEqual(1.4071719583982276, observation.GetDouble(0));
+            Assert.AreEqual(1.4071719583982276, first.GetDouble(0));
             _ = (reward, terminated, truncated, info);
-            next.Dispose();
             observation.Dispose();
         }
 
@@ -55,15 +59,14 @@ namespace Gym.Docs.EnvPageSamples {
         public void RunAnEpisode() {
             int steps = 0;
             #region RunAnEpisode
-            using Env<NDArray, NDArray> env =
-                Gymnasium.Make<NDArray, NDArray>("Humanoid-v5");
-            NDArray observation = env.Reset(seed: 42).Observation;
+            using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("Humanoid-v5");
+            (NDArray observation, Info info) = env.Reset(seed: 42);
             double episodeReturn = 0;
             while (true) {
                 using NDArray action = env.ActionSpace.Sample();
-                var (next, reward, terminated, truncated, _) = env.Step(action);
                 observation.Dispose();
-                observation = next;
+                (observation, double reward, bool terminated, bool truncated, info)
+                    = env.Step(action);
                 episodeReturn += reward;
                 steps++;
                 if (terminated || truncated)
@@ -83,14 +86,14 @@ namespace Gym.Docs.EnvPageSamples {
         public void RewardTerms() {
             double reward = 0, forward = 0, healthy = 0, control = 0, contact = 0;
             #region RewardTerms
-            using Env<NDArray, NDArray> env =
-                Gymnasium.Make<NDArray, NDArray>("Humanoid-v5");
-            using var start = env.Reset(seed: 42);
+            using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("Humanoid-v5");
+            using ResetResult<NDArray> start = env.Reset(seed: 42);
             using NDArray action = np.full(17, 0.2f);   // every motor at half torque
             for (int t = 1; t < 11; t++) {
-                using var falling = env.Step(action);   // the humanoid starts 0.1 m above the floor
+                using StepResult<NDArray> falling
+                    = env.Step(action);   // the humanoid starts 0.1 m above the floor
             }
-            using var step = env.Step(action);
+            using StepResult<NDArray> step = env.Step(action);
             (reward, forward, healthy, control, contact) = (step.Reward, step.Info.Get<double>("reward_forward"),
                 step.Info.Get<double>("reward_survive"), step.Info.Get<double>("reward_ctrl"),
                 step.Info.Get<double>("reward_contact"));
@@ -115,8 +118,9 @@ namespace Gym.Docs.EnvPageSamples {
             #region ResetWithoutNoise
             using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("Humanoid-v5",
                 new HumanoidEnvV5Options { ResetNoiseScale = 0.0 });
-            using var start = env.Reset(seed: 42);
-            double[] o = start.Observation.ToArray<double>();
+            using ResetResult<NDArray> start = env.Reset(seed: 42);
+            (NDArray observation, Info info) = start;
+            double[] o = observation.ToArray<double>();
             (height, w, still) = (o[0], o[1], o.Skip(2).Take(43).All(v => v == 0));
             // 1.40, 1.00, True: the torso 1.4 m up and unrotated, every joint at 0 and at rest (items 2 to 44)
             Console.WriteLine(string.Create(CultureInfo.InvariantCulture, $"{height:F2}, {w:F2}, {still}"));
@@ -138,11 +142,11 @@ namespace Gym.Docs.EnvPageSamples {
             using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("Humanoid-v5",
                 new { terminate_when_unhealthy = false });
             var humanoid = (HumanoidEnvV5)env.Unwrapped;
-            using var start = env.Reset(seed: 0);
+            using ResetResult<NDArray> start = env.Reset(seed: 0);
             env.ActionSpace.Seed(0);
             while (true) {
                 using NDArray action = env.ActionSpace.Sample();
-                using var step = env.Step(action);
+                using StepResult<NDArray> step = env.Step(action);
                 (steps, episodeReturn) = (steps + 1, episodeReturn + step.Reward);
                 healthy += humanoid.IsHealthy ? 1 : 0;
                 if (step.Terminated || step.Truncated)
@@ -167,7 +171,7 @@ namespace Gym.Docs.EnvPageSamples {
             // the model's "track" camera follows the humanoid from the side; rgbd_tuple draws colour and depth together
             using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("Humanoid-v5",
                 new { render_mode = "rgbd_tuple", camera_name = "track" });
-            using var start = env.Reset(seed: 42);
+            using ResetResult<NDArray> start = env.Reset(seed: 42);
             using var frames = (RenderResult.RgbDepth)env.Render();
             Console.WriteLine($"{frames.RgbFrame.Shape} {frames.DepthFrame.Shape}");   // (480, 480, 3) (480, 480)
             // MuJoCo's raw depth buffer, 0 at the near plane and 1 at the far one,
@@ -189,17 +193,20 @@ namespace Gym.Docs.EnvPageSamples {
         public void ManyHumanoids() {
             #region ManyHumanoids
             // No vector env of its own: MakeVec steps 8 envs in turn ("sync")
-            using VectorEnv<NDArray, NDArray> envs =
-                Gymnasium.MakeVec<NDArray, NDArray>("Humanoid-v5", numEnvs: 8);
-            using var start = envs.Reset(seed: 42);   // 8 x 348 observations
+            using VectorEnv<NDArray, NDArray> envs
+                = Gymnasium.MakeVec<NDArray, NDArray>("Humanoid-v5", numEnvs: 8);
+            using VectorResetResult<NDArray> start
+                = envs.Reset(seed: 42);   // 8 x 348 observations
+            (NDArray observations, Info infos) = start;
             for (int t = 0; t < 100; t++) {
                 using NDArray actions = envs.ActionSpace.Sample();   // 8 x 17 torques
-                using var step = envs.Step(actions);   // fallen humanoids reset themselves
+                using VectorStepResult<NDArray> step
+                    = envs.Step(actions);   // fallen humanoids reset themselves
             }
             #endregion
             Assert.AreEqual(8, envs.NumEnvs);
             Assert.IsInstanceOfType(envs, typeof(SyncVectorEnv<NDArray, NDArray>));
-            CollectionAssert.AreEqual(new long[] { 8, 348 }, start.Observations.shape.Select(d => (long)d).ToArray());
+            CollectionAssert.AreEqual(new long[] { 8, 348 }, observations.shape.Select(d => (long)d).ToArray());
         }
 
         /// <summary>

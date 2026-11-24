@@ -6,6 +6,8 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using Gym.Environments.Envs.Classic;
+using Gym.Observations;
+using Gym.Vector;
 using Gym.Wrappers;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using SixLabors.ImageSharp;
@@ -33,13 +35,18 @@ namespace Gym.Docs.EnvPageSamples {
             #region QuickStart
             using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("CartPole-v1");
             // [x, x_dot, theta, theta_dot], float32
-            NDArray observation = env.Reset(seed: 42).Observation;
+            (NDArray observation, Info info) = env.Reset(seed: 42);
             // 0 pushes the cart left, 1 right
             using NDArray action = env.ActionSpace.Sample();
-            var (next, reward, terminated, truncated, info) = env.Step(action);
+            observation.Dispose();
+            (observation, double reward, bool terminated, bool truncated, info)
+                = env.Step(action);
             #endregion
+            // The quick start's first observation, read again: the same seeded reset gives the same one.
+            using ResetResult<NDArray> again = env.Reset(seed: 42);
+            NDArray first = again.Observation;
+            Assert.AreEqual(4, first.size);
             Assert.AreEqual(4, observation.size);
-            Assert.AreEqual(4, next.size);
             Assert.AreEqual(1.0, reward);
             Assert.IsFalse(truncated);
             Assert.IsNotNull(info);
@@ -50,13 +57,13 @@ namespace Gym.Docs.EnvPageSamples {
         public void RunAnEpisode() {
             #region RunAnEpisode
             using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("CartPole-v1");
-            NDArray observation = env.Reset(seed: 42).Observation;
+            (NDArray observation, Info info) = env.Reset(seed: 42);
             double episodeReturn = 0;
             while (true) {
                 using NDArray action = env.ActionSpace.Sample();
-                var (next, reward, terminated, truncated, _) = env.Step(action);
                 observation.Dispose();
-                observation = next;
+                (observation, double reward, bool terminated, bool truncated, info)
+                    = env.Step(action);
                 episodeReturn += reward;
                 if (terminated || truncated)
                     break;
@@ -74,7 +81,7 @@ namespace Gym.Docs.EnvPageSamples {
             using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("CartPole-v1");
             #region WiderBounds
             var options = new Dictionary<string, object?> { ["low"] = -0.2, ["high"] = 0.2 };
-            NDArray observation = env.Reset(seed: 7, options: options).Observation;
+            (NDArray observation, Info info) = env.Reset(seed: 7, options: options);
             #endregion
             foreach (float value in observation.ToArray<float>())
                 Assert.IsTrue(value >= -0.2f && value <= 0.2f);
@@ -95,8 +102,8 @@ namespace Gym.Docs.EnvPageSamples {
         [TestMethod]
         public void SaveFrame() {
             #region SaveFrame
-            using Env<NDArray, NDArray> env =
-                Gymnasium.Make<NDArray, NDArray>("CartPole-v1", RenderMode.RgbArray);
+            using Env<NDArray, NDArray> env
+                = Gymnasium.Make<NDArray, NDArray>("CartPole-v1", RenderMode.RgbArray);
             env.Reset(seed: 42);
             using RenderResult result = env.Render();
             using Image frame = (Image)result;   // 600x400, Gymnasium's pixels
@@ -115,10 +122,11 @@ namespace Gym.Docs.EnvPageSamples {
             #region ManyCarts
             // What Gymnasium.MakeVec("CartPole-v1", 8) builds: eight carts in one env
             using var envs = new CartPoleVectorEnv(numEnvs: 8);
-            using var start = envs.Reset(seed: 42);
+            using VectorResetResult<NDArray> start = envs.Reset(seed: 42);
             for (int t = 0; t < 1000; t++) {
                 using NDArray actions = envs.ActionSpace.Sample();   // one per cart
-                using var step = envs.Step(actions);   // finished carts reset themselves
+                using VectorStepResult<NDArray> step
+                    = envs.Step(actions);   // finished carts reset themselves
             }
             #endregion
             Assert.AreEqual(8, envs.NumEnvs);
@@ -134,7 +142,7 @@ namespace Gym.Docs.EnvPageSamples {
             env.Reset(seed: 42);
             while (true) {
                 using NDArray action = env.ActionSpace.Sample();
-                var (_, _, terminated, truncated, info) = env.Step(action);
+                (_, _, bool terminated, bool truncated, Info info) = env.Step(action);
                 if (terminated || truncated) {
                     // r: the return, l: the length, t: the seconds it took
                     Console.WriteLine(info["episode"]);

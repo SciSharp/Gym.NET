@@ -50,7 +50,7 @@ errors, and the same pixels.
 
 # [C#](#tab/csharp)
 
-[!code-csharp[](../../../tests/Gym.Tests/Docs/EnvPageSamples/MountainCarContinuousSamples.cs?range=1-4,38-44&dedent=12)]
+[!code-csharp[](../../../tests/Gym.Tests/Docs/EnvPageSamples/MountainCarContinuousSamples.cs?range=1-4,39-47&dedent=12)]
 
 # [Python (Gymnasium)](#tab/python)
 
@@ -199,7 +199,19 @@ By Gymnasium's name in `Make`'s kwargs, or by the C# name in the constructor and
 | (Gym.NET)<br>`continuous` | `bool`<br>`false` | This env's dynamics, flag and reward; the id's registration sets it to `true`, and `false` builds MountainCar-v0 |
 | (Gym.NET)<br>`viewerFactory` | `EnvViewerFactory?`<br>`null` | The window for `human`: Avalonia, WinForms, or headless |
 
+
+# [C#](#tab/csharp)
+
 [!code-csharp[](../../../tests/Gym.Tests/Docs/EnvPageSamples/MountainCarContinuousSamples.cs#Arguments)]
+
+# [Python (Gymnasium)](#tab/python)
+
+```python
+env = gym.make("MountainCarContinuous-v0", render_mode="rgb_array",
+               goal_velocity=0.05)
+```
+
+---
 
 An options record given to `Make` need not set `Continuous`: the id's registered `continuous: true` stays. The
 constants are settable properties of the unwrapped env (the table in [How it works](#how-it-works)).

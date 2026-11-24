@@ -48,7 +48,7 @@ Gymnasium's but not yet equal (see [Parity](#parity-with-gymnasium)).
 
 # [C#](#tab/csharp)
 
-[!code-csharp[](../../../tests/Gym.Tests/Docs/EnvPageSamples/HumanoidStandupSamples.cs?range=1-4,37-43&dedent=12)]
+[!code-csharp[](../../../tests/Gym.Tests/Docs/EnvPageSamples/HumanoidStandupSamples.cs?range=1-4,38-46&dedent=12)]
 
 # [Python (Gymnasium)](#tab/python)
 
@@ -248,7 +248,21 @@ By Gymnasium's name in `Make`'s kwargs, or by the C# name in the constructor and
 | `visual_options`<br>`visualOptions` | `IReadOnlyDictionary<int, bool>?`<br>`null` | MuJoCo's visualization flags by index (contact points, forces, ...) |
 | (Gym.NET)<br>`viewerFactory` | `EnvViewerFactory?`<br>`null` | The window for `human`: Avalonia, WinForms, or headless |
 
+
+# [C#](#tab/csharp)
+
 [!code-csharp[](../../../tests/Gym.Tests/Docs/EnvPageSamples/HumanoidStandupSamples.cs#Arguments)]
+
+# [Python (Gymnasium)](#tab/python)
+
+```python
+env = gym.make("HumanoidStandup-v5", include_cinert_in_observation=False,
+               include_cvel_in_observation=False,
+               include_qfrc_actuator_in_observation=False,
+               include_cfrc_ext_in_observation=False)
+```
+
+---
 
 ## Info
 

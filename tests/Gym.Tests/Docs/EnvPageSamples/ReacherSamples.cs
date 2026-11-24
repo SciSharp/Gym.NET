@@ -6,6 +6,7 @@ using System;
 using System.Globalization;
 using System.Linq;
 using Gym.Environments.Envs.MuJoCo;
+using Gym.Observations;
 using Gym.Vector;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
@@ -34,20 +35,23 @@ namespace Gym.Docs.EnvPageSamples {
         [TestMethod]
         public void QuickStart() {
             #region QuickStart
-            using Env<NDArray, NDArray> env =
-                Gymnasium.Make<NDArray, NDArray>("Reacher-v5");
+            using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("Reacher-v5");
             // 10 numbers: the joints' cosines and sines, the target, 2 speeds, the fingertip's offset
-            NDArray observation = env.Reset(seed: 42).Observation;
+            (NDArray observation, Info info) = env.Reset(seed: 42);
             // two torques, each from -1 to 1: shoulder and elbow
             using NDArray action = env.ActionSpace.Sample();
-            var (next, reward, terminated, truncated, info) = env.Step(action);
+            observation.Dispose();
+            (observation, double reward, bool terminated, bool truncated, info)
+                = env.Step(action);
             #endregion
-            Assert.AreEqual(10, observation.size);
+            // The quick start's first observation, read again: the same seeded reset gives the same one.
+            using ResetResult<NDArray> again = env.Reset(seed: 42);
+            NDArray first = again.Observation;
+            Assert.AreEqual(10, first.size);
             // Gymnasium's reset of seed 42: the shoulder's cosine, the reset's uniform turn of at most 0.1 rad.
-            Assert.AreEqual(0.9984993371509613, observation.GetDouble(0));
+            Assert.AreEqual(0.9984993371509613, first.GetDouble(0));
             Assert.IsFalse(terminated);
             _ = (reward, truncated, info);
-            next.Dispose();
             observation.Dispose();
         }
 
@@ -56,15 +60,14 @@ namespace Gym.Docs.EnvPageSamples {
         public void RunAnEpisode() {
             int steps = 0;
             #region RunAnEpisode
-            using Env<NDArray, NDArray> env =
-                Gymnasium.Make<NDArray, NDArray>("Reacher-v5");
-            NDArray observation = env.Reset(seed: 42).Observation;
+            using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("Reacher-v5");
+            (NDArray observation, Info info) = env.Reset(seed: 42);
             double episodeReturn = 0;
             while (true) {
                 using NDArray action = env.ActionSpace.Sample();
-                var (next, reward, terminated, truncated, _) = env.Step(action);
                 observation.Dispose();
-                observation = next;
+                (observation, double reward, bool terminated, bool truncated, info)
+                    = env.Step(action);
                 episodeReturn += reward;
                 steps++;
                 if (terminated || truncated)   // never terminated: 50 steps
@@ -80,11 +83,10 @@ namespace Gym.Docs.EnvPageSamples {
         public void RewardTerms() {
             double reward = 0, distance = 0, control = 0;
             #region RewardTerms
-            using Env<NDArray, NDArray> env =
-                Gymnasium.Make<NDArray, NDArray>("Reacher-v5");
-            using var start = env.Reset(seed: 42);
+            using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("Reacher-v5");
+            using ResetResult<NDArray> start = env.Reset(seed: 42);
             using NDArray action = np.full(2, 0.5f);   // both motors at half torque
-            using var step = env.Step(action);
+            using StepResult<NDArray> step = env.Step(action);
             (reward, distance, control) = (step.Reward, step.Info.Get<double>("reward_dist"), step.Info.Get<double>("reward_ctrl"));
             // -0.6435 = -0.1435 distance - 0.5000 control
             Console.WriteLine($"{reward:F4} = {distance:F4} distance {control:F4} control");
@@ -102,11 +104,10 @@ namespace Gym.Docs.EnvPageSamples {
         public void DistanceFromTheObservation() {
             double fromObservation = 0, fromReward = 0;
             #region DistanceFromTheObservation
-            using Env<NDArray, NDArray> env =
-                Gymnasium.Make<NDArray, NDArray>("Reacher-v5");
-            using var start = env.Reset(seed: 42);
+            using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("Reacher-v5");
+            using ResetResult<NDArray> start = env.Reset(seed: 42);
             using NDArray action = np.full(2, 0.5f);
-            using var step = env.Step(action);
+            using StepResult<NDArray> step = env.Step(action);
             double[] o = step.Observation.ToArray<double>();
             // items 8 and 9: the fingertip's offset from the target, in x and y
             fromObservation = Math.Sqrt(o[8] * o[8] + o[9] * o[9]);
@@ -124,8 +125,9 @@ namespace Gym.Docs.EnvPageSamples {
             string gap = "";
             #region WhereTheTargetStarts
             using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("Reacher-v5");
-            using var start = env.Reset(seed: 42);
-            double[] o = start.Observation.ToArray<double>();
+            using ResetResult<NDArray> start = env.Reset(seed: 42);
+            (NDArray observation, Info info) = start;
+            double[] o = observation.ToArray<double>();
             // the target's x and y are items 4 and 5, from the arm's base
             gap = Math.Sqrt(o[4] * o[4] + o[5] * o[5]).ToString("F3", CultureInfo.InvariantCulture);
             Console.WriteLine($"{gap} m");   // 0.155 m: every seed puts it within 0.2 m of the base
@@ -144,7 +146,7 @@ namespace Gym.Docs.EnvPageSamples {
             // no camera in the model: Gymnasium's free camera, 1.24 m off at 45°; rgbd_tuple draws colour and depth together
             using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("Reacher-v5",
                 new { render_mode = "rgbd_tuple" });
-            using var start = env.Reset(seed: 42);
+            using ResetResult<NDArray> start = env.Reset(seed: 42);
             using var frames = (RenderResult.RgbDepth)env.Render();
             Console.WriteLine($"{frames.RgbFrame.Shape} {frames.DepthFrame.Shape}");   // (480, 480, 3) (480, 480)
             // MuJoCo's raw depth buffer, 0 at the near plane and 1 at the far one,
@@ -166,17 +168,20 @@ namespace Gym.Docs.EnvPageSamples {
         public void ManyArms() {
             #region ManyArms
             // No vector env of its own: MakeVec steps 8 envs in turn ("sync")
-            using VectorEnv<NDArray, NDArray> envs =
-                Gymnasium.MakeVec<NDArray, NDArray>("Reacher-v5", numEnvs: 8);
-            using var start = envs.Reset(seed: 42);   // 8 x 10 observations
+            using VectorEnv<NDArray, NDArray> envs
+                = Gymnasium.MakeVec<NDArray, NDArray>("Reacher-v5", numEnvs: 8);
+            using VectorResetResult<NDArray> start
+                = envs.Reset(seed: 42);   // 8 x 10 observations
+            (NDArray observations, Info infos) = start;
             for (int t = 0; t < 100; t++) {
                 using NDArray actions = envs.ActionSpace.Sample();   // 8 x 2 torques
-                using var step = envs.Step(actions);   // every 50 steps each arm gets a new target
+                using VectorStepResult<NDArray> step
+                    = envs.Step(actions);   // every 50 steps each arm gets a new target
             }
             #endregion
             Assert.AreEqual(8, envs.NumEnvs);
             Assert.IsInstanceOfType(envs, typeof(SyncVectorEnv<NDArray, NDArray>));
-            CollectionAssert.AreEqual(new long[] { 8, 10 }, start.Observations.shape.Select(d => (long)d).ToArray());
+            CollectionAssert.AreEqual(new long[] { 8, 10 }, observations.shape.Select(d => (long)d).ToArray());
         }
 
         /// <summary>

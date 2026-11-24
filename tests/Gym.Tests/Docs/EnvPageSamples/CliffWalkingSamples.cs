@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Gym.Environments.Envs.ToyText;
+using Gym.Observations;
 using Gym.Vector;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
@@ -32,17 +33,22 @@ namespace Gym.Docs.EnvPageSamples {
         [TestMethod]
         public void QuickStart() {
             #region QuickStart
-            using Env<NDArray, NDArray> env =
-                Gymnasium.Make<NDArray, NDArray>("CliffWalking-v1");
+            using Env<NDArray, NDArray> env
+                = Gymnasium.Make<NDArray, NDArray>("CliffWalking-v1");
             // the cell, row * 12 + col: 36 is the start
-            NDArray observation = env.Reset(seed: 42).Observation;
+            (NDArray observation, Info info) = env.Reset(seed: 42);
             // 0 up, 1 right, 2 down, 3 left
             using NDArray action = env.ActionSpace.Sample();
-            var (next, reward, terminated, truncated, info) = env.Step(action);
+            observation.Dispose();
+            (observation, double reward, bool terminated, bool truncated, info)
+                = env.Step(action);
             #endregion
-            Assert.AreEqual(36L, observation.GetInt64());
+            // The quick start's first observation, read again: the same seeded reset gives the same one.
+            using ResetResult<NDArray> again = env.Reset(seed: 42);
+            NDArray first = again.Observation;
+            Assert.AreEqual(36L, first.GetInt64());
             // One step from the start: up to 24, right off the cliff (back to 36, -100), or into the edge (stays on 36).
-            Assert.IsTrue(next.GetInt64() is 24 or 36);
+            Assert.IsTrue(observation.GetInt64() is 24 or 36);
             Assert.IsTrue(reward is -1.0 or -100.0);
             Assert.IsFalse(terminated);
             Assert.IsFalse(truncated);
@@ -61,13 +67,13 @@ namespace Gym.Docs.EnvPageSamples {
             // CliffWalking-v1 has no step limit: give it one
             using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>(
                 "CliffWalking-v1", maxEpisodeSteps: 500);
-            NDArray observation = env.Reset(seed: 42).Observation;
+            (NDArray observation, Info info) = env.Reset(seed: 42);
             double episodeReturn = 0;
             while (true) {
                 using NDArray action = env.ActionSpace.Sample();
-                var (next, reward, terminated, truncated, _) = env.Step(action);
                 observation.Dispose();
-                observation = next;
+                (observation, double reward, bool terminated, bool truncated, info)
+                    = env.Step(action);
                 episodeReturn += reward;
                 steps++;
                 if (terminated || truncated)
@@ -90,8 +96,8 @@ namespace Gym.Docs.EnvPageSamples {
             int steps = 0;
             double episodeReturn = 0;
             #region PlanWithTheTable
-            using Env<NDArray, NDArray> env =
-                Gymnasium.Make<NDArray, NDArray>("CliffWalking-v1");
+            using Env<NDArray, NDArray> env
+                = Gymnasium.Make<NDArray, NDArray>("CliffWalking-v1");
             var grid = (CliffWalkingEnv)env.Unwrapped;
             int n = grid.P.Count;
             var v = new double[n];
@@ -110,12 +116,12 @@ namespace Gym.Docs.EnvPageSamples {
             long[] plan = Enumerable.Range(0, n).Select(s => (long)Enumerable.Range(0, 4)
                 .Aggregate((b, a) => Q(s, a) > Q(s, b) + 1e-12 ? a : b)).ToArray();
 
-            NDArray observation = env.Reset(seed: 0).Observation;
+            (NDArray observation, Info info) = env.Reset(seed: 0);
             while (true) {
                 using NDArray action = NDArray.Scalar(plan[observation.GetInt64()]);
-                var (next, reward, terminated, truncated, _) = env.Step(action);
                 observation.Dispose();
-                observation = next;
+                (observation, double reward, bool terminated, bool truncated, info)
+                    = env.Step(action);
                 (steps, episodeReturn) = (steps + 1, episodeReturn + reward);
                 if (terminated || truncated)
                     break;
@@ -142,8 +148,8 @@ namespace Gym.Docs.EnvPageSamples {
         [TestMethod]
         public void QLearning() {
             #region QLearning
-            using Env<NDArray, NDArray> env =
-                Gymnasium.Make<NDArray, NDArray>("CliffWalking-v1");
+            using Env<NDArray, NDArray> env
+                = Gymnasium.Make<NDArray, NDArray>("CliffWalking-v1");
             var q = new double[48, 4];
             Generator rng = np.random.default_rng(0);
             // the best move known, ties to the lowest, as NumPy's argmax
@@ -160,13 +166,14 @@ namespace Gym.Docs.EnvPageSamples {
 
             var returns = new List<double>();
             for (int episode = 0; episode < 500; episode++) {
-                using var start = env.Reset();
-                long s = start.Observation.GetInt64();
+                using ResetResult<NDArray> start = env.Reset();
+                (NDArray observation, Info info) = start;
+                long s = observation.GetInt64();
                 double total = 0;
                 while (true) {
                     long a = Act(s);
                     using NDArray action = NDArray.Scalar(a);
-                    using var step = env.Step(action);
+                    using StepResult<NDArray> step = env.Step(action);
                     long next = step.Observation.GetInt64();
                     // Q-learning: towards the reward plus the next cell's best value
                     double best = step.Terminated ? 0 : q[next, Best(next)];
@@ -184,13 +191,13 @@ namespace Gym.Docs.EnvPageSamples {
             // The whole run is the Python twin's, draw for draw: its 500 returns sum to -27,360.
             Assert.AreEqual(-27360.0, returns.Sum());
             // The greedy walk over the learned table: up, along the edge, down.
-            using var reset = env.Reset();
+            using ResetResult<NDArray> reset = env.Reset();
             long cell = reset.Observation.GetInt64();
             int walked = 0;
             double greedyReturn = 0;
             for (; walked < 200; walked++) {
                 using NDArray action = NDArray.Scalar(Best(cell));
-                using var step = env.Step(action);
+                using StepResult<NDArray> step = env.Step(action);
                 (cell, greedyReturn) = (step.Observation.GetInt64(), greedyReturn + step.Reward);
                 if (step.Terminated) {
                     walked++;
@@ -208,8 +215,8 @@ namespace Gym.Docs.EnvPageSamples {
         [TestMethod]
         public void Slippery() {
             #region Slippery
-            using Env<NDArray, NDArray> env =
-                Gymnasium.Make<NDArray, NDArray>("CliffWalkingSlippery-v1");
+            using Env<NDArray, NDArray> env
+                = Gymnasium.Make<NDArray, NDArray>("CliffWalkingSlippery-v1");
             var grid = (CliffWalkingEnv)env.Unwrapped;
             // up from the start: a third each to the left, up and right
             foreach (ToyTextTransition t in grid.P[36][CliffWalkingEnv.Up])
@@ -229,12 +236,11 @@ namespace Gym.Docs.EnvPageSamples {
         [TestMethod]
         public void AsText() {
             #region AsText
-            using Env<NDArray, NDArray> env =
-                Gymnasium.Make<NDArray, NDArray>("CliffWalking-v1",
+            using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("CliffWalking-v1",
                     new { render_mode = "ansi" });
-            using var start = env.Reset(seed: 0);
+            using ResetResult<NDArray> start = env.Reset(seed: 0);
             using NDArray up = NDArray.Scalar(CliffWalkingEnv.Up);
-            using var step = env.Step(up);
+            using StepResult<NDArray> step = env.Step(up);
             using RenderResult result = env.Render();
             string text = ((RenderResult.Ansi)result).Text;
             // x the walker, C the cliff, T the goal, o the rest
@@ -254,12 +260,13 @@ namespace Gym.Docs.EnvPageSamples {
         public void ManyCliffs() {
             #region ManyCliffs
             // No vector env of its own: MakeVec steps 8 envs in turn ("sync")
-            using VectorEnv<NDArray, NDArray> envs =
-                Gymnasium.MakeVec<NDArray, NDArray>("CliffWalking-v1", numEnvs: 8);
-            using var start = envs.Reset(seed: 42);
+            using VectorEnv<NDArray, NDArray> envs
+                = Gymnasium.MakeVec<NDArray, NDArray>("CliffWalking-v1", numEnvs: 8);
+            using VectorResetResult<NDArray> start = envs.Reset(seed: 42);
             for (int t = 0; t < 100; t++) {
                 using NDArray actions = envs.ActionSpace.Sample();   // one per grid
-                using var step = envs.Step(actions);   // finished grids reset themselves
+                using VectorStepResult<NDArray> step
+                    = envs.Step(actions);   // finished grids reset themselves
             }
             #endregion
             Assert.AreEqual(8, envs.NumEnvs);

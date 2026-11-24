@@ -50,7 +50,7 @@ rewards, flags, warnings and errors, and the same pixels.
 
 # [C#](#tab/csharp)
 
-[!code-csharp[](../../../tests/Gym.Tests/Docs/EnvPageSamples/MountainCarSamples.cs?range=1-4,37-43&dedent=12)]
+[!code-csharp[](../../../tests/Gym.Tests/Docs/EnvPageSamples/MountainCarSamples.cs?range=1-4,38-45&dedent=12)]
 
 # [Python (Gymnasium)](#tab/python)
 
@@ -190,7 +190,18 @@ By Gymnasium's name in `Make`'s kwargs, or by the C# name in the constructor and
 | (Gym.NET)<br>`continuous` | `bool`<br>`false` | MountainCarContinuous-v0's dynamics, flag and reward: `Make("MountainCarContinuous-v0")` sets it |
 | (Gym.NET)<br>`viewerFactory` | `EnvViewerFactory?`<br>`null` | The window for `human`: Avalonia, WinForms, or headless |
 
+
+# [C#](#tab/csharp)
+
 [!code-csharp[](../../../tests/Gym.Tests/Docs/EnvPageSamples/MountainCarSamples.cs#Arguments)]
+
+# [Python (Gymnasium)](#tab/python)
+
+```python
+env = gym.make("MountainCar-v0", render_mode="rgb_array", goal_velocity=0.05)
+```
+
+---
 
 The constants are settable properties of the unwrapped env (the table in [How it works](#how-it-works)).
 

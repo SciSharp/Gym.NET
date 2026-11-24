@@ -6,6 +6,7 @@ using System;
 using System.Globalization;
 using System.Linq;
 using Gym.Environments.Envs.MuJoCo;
+using Gym.Observations;
 using Gym.Vector;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
@@ -34,20 +35,23 @@ namespace Gym.Docs.EnvPageSamples {
         [TestMethod]
         public void QuickStart() {
             #region QuickStart
-            using Env<NDArray, NDArray> env =
-                Gymnasium.Make<NDArray, NDArray>("HalfCheetah-v5");
+            using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("HalfCheetah-v5");
             // 17 numbers: the torso's height and pitch, 6 joint angles, 9 velocities
-            NDArray observation = env.Reset(seed: 42).Observation;
+            (NDArray observation, Info info) = env.Reset(seed: 42);
             // six torques, each from -1 to 1: back thigh, shin, foot, then the front's
             using NDArray action = env.ActionSpace.Sample();
-            var (next, reward, terminated, truncated, info) = env.Step(action);
+            observation.Dispose();
+            (observation, double reward, bool terminated, bool truncated, info)
+                = env.Step(action);
             #endregion
-            Assert.AreEqual(17, observation.size);
+            // The quick start's first observation, read again: the same seeded reset gives the same one.
+            using ResetResult<NDArray> again = env.Reset(seed: 42);
+            NDArray first = again.Observation;
+            Assert.AreEqual(17, first.size);
             // Gymnasium's reset of seed 42: the torso 1.2 cm below its rest height (the reset's uniform noise of 0.1).
-            Assert.AreEqual(-0.012224312049589542, observation.GetDouble(0));
+            Assert.AreEqual(-0.012224312049589542, first.GetDouble(0));
             Assert.IsFalse(terminated);
             _ = (reward, truncated, info);
-            next.Dispose();
             observation.Dispose();
         }
 
@@ -56,15 +60,14 @@ namespace Gym.Docs.EnvPageSamples {
         public void RunAnEpisode() {
             int steps = 0;
             #region RunAnEpisode
-            using Env<NDArray, NDArray> env =
-                Gymnasium.Make<NDArray, NDArray>("HalfCheetah-v5");
-            NDArray observation = env.Reset(seed: 42).Observation;
+            using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("HalfCheetah-v5");
+            (NDArray observation, Info info) = env.Reset(seed: 42);
             double episodeReturn = 0;
             while (true) {
                 using NDArray action = env.ActionSpace.Sample();
-                var (next, reward, terminated, truncated, _) = env.Step(action);
                 observation.Dispose();
-                observation = next;
+                (observation, double reward, bool terminated, bool truncated, info)
+                    = env.Step(action);
                 episodeReturn += reward;
                 steps++;
                 if (terminated || truncated)   // never terminated: 1,000 steps
@@ -83,11 +86,10 @@ namespace Gym.Docs.EnvPageSamples {
         public void RewardTerms() {
             double reward = 0, forward = 0, control = 0;
             #region RewardTerms
-            using Env<NDArray, NDArray> env =
-                Gymnasium.Make<NDArray, NDArray>("HalfCheetah-v5");
-            using var start = env.Reset(seed: 42);
+            using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("HalfCheetah-v5");
+            using ResetResult<NDArray> start = env.Reset(seed: 42);
             using NDArray action = np.full(6, 0.5f);   // every motor at half torque
-            using var step = env.Step(action);
+            using StepResult<NDArray> step = env.Step(action);
             (reward, forward, control) = (step.Reward, step.Info.Get<double>("reward_forward"),
                 step.Info.Get<double>("reward_ctrl"));
             // 0.1357 = 0.2857 forward (the speed in m/s) - 0.1500 (0.1 x the torques squared)
@@ -105,9 +107,10 @@ namespace Gym.Docs.EnvPageSamples {
             #region ResetWithoutNoise
             using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("HalfCheetah-v5",
                 new HalfCheetahEnvV5Options { ResetNoiseScale = 0.0 });
-            using var start = env.Reset(seed: 42);
+            using ResetResult<NDArray> start = env.Reset(seed: 42);
+            (NDArray observation, Info info) = start;
             // the model's pose at rest: every angle and velocity 0, the same for every seed
-            allZero = start.Observation.ToArray<double>().All(v => v == 0);
+            allZero = observation.ToArray<double>().All(v => v == 0);
             Console.WriteLine(allZero);   // True
             #endregion
             Assert.IsTrue(allZero);
@@ -122,9 +125,9 @@ namespace Gym.Docs.EnvPageSamples {
             #region RewardWeights
             using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("HalfCheetah-v5",
                 new { forward_reward_weight = 2.0, ctrl_cost_weight = 0.0 });
-            using var start = env.Reset(seed: 42);
+            using ResetResult<NDArray> start = env.Reset(seed: 42);
             using NDArray action = np.full(6, 0.5f);
-            using var step = env.Step(action);
+            using StepResult<NDArray> step = env.Step(action);
             (reward, velocity) = (step.Reward, step.Info.Get<double>("x_velocity"));
             Console.WriteLine($"{reward:F4} = 2 x {velocity:F4}");   // 0.5713 = 2 x 0.2857
             #endregion
@@ -143,7 +146,7 @@ namespace Gym.Docs.EnvPageSamples {
             // the model's "track" camera follows the torso; rgbd_tuple draws colour and depth together
             using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("HalfCheetah-v5",
                 new { render_mode = "rgbd_tuple", camera_name = "track" });
-            using var start = env.Reset(seed: 42);
+            using ResetResult<NDArray> start = env.Reset(seed: 42);
             using var frames = (RenderResult.RgbDepth)env.Render();
             Console.WriteLine($"{frames.RgbFrame.Shape} {frames.DepthFrame.Shape}");   // (480, 480, 3) (480, 480)
             // MuJoCo's raw depth buffer, 0 at the near plane and 1 at the far one,
@@ -167,17 +170,19 @@ namespace Gym.Docs.EnvPageSamples {
         public void ManyCheetahs() {
             #region ManyCheetahs
             // No vector env of its own: MakeVec steps 8 envs in turn ("sync")
-            using VectorEnv<NDArray, NDArray> envs =
-                Gymnasium.MakeVec<NDArray, NDArray>("HalfCheetah-v5", numEnvs: 8);
-            using var start = envs.Reset(seed: 42);   // 8 x 17 observations
+            using VectorEnv<NDArray, NDArray> envs
+                = Gymnasium.MakeVec<NDArray, NDArray>("HalfCheetah-v5", numEnvs: 8);
+            using VectorResetResult<NDArray> start
+                = envs.Reset(seed: 42);   // 8 x 17 observations
+            (NDArray observations, Info infos) = start;
             for (int t = 0; t < 100; t++) {
                 using NDArray actions = envs.ActionSpace.Sample();   // 8 x 6 torques
-                using var step = envs.Step(actions);
+                using VectorStepResult<NDArray> step = envs.Step(actions);
             }
             #endregion
             Assert.AreEqual(8, envs.NumEnvs);
             Assert.IsInstanceOfType(envs, typeof(SyncVectorEnv<NDArray, NDArray>));
-            CollectionAssert.AreEqual(new long[] { 8, 17 }, start.Observations.shape.Select(d => (long)d).ToArray());
+            CollectionAssert.AreEqual(new long[] { 8, 17 }, observations.shape.Select(d => (long)d).ToArray());
         }
 
         /// <summary>

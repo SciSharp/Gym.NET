@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using Gym.Environments.Envs.Classic;
+using Gym.Observations;
 using Gym.Vector;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using SixLabors.ImageSharp;
@@ -35,13 +36,18 @@ namespace Gym.Docs.EnvPageSamples {
             #region QuickStart
             using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("Acrobot-v1");
             // cos and sin of both joint angles, then both speeds: float32
-            NDArray observation = env.Reset(seed: 42).Observation;
+            (NDArray observation, Info info) = env.Reset(seed: 42);
             // 0: -1 N m on the elbow, 1: none, 2: +1 N m
             using NDArray action = env.ActionSpace.Sample();
-            var (next, reward, terminated, truncated, info) = env.Step(action);
+            observation.Dispose();
+            (observation, double reward, bool terminated, bool truncated, info)
+                = env.Step(action);
             #endregion
+            // The quick start's first observation, read again: the same seeded reset gives the same one.
+            using ResetResult<NDArray> again = env.Reset(seed: 42);
+            NDArray first = again.Observation;
+            Assert.AreEqual(6, first.size);
             Assert.AreEqual(6, observation.size);
-            Assert.AreEqual(6, next.size);
             // From hanging, one step cannot lift the tip a metre above the pivot.
             Assert.AreEqual(-1.0, reward);
             Assert.IsFalse(terminated);
@@ -57,15 +63,15 @@ namespace Gym.Docs.EnvPageSamples {
         public void RunAnEpisode() {
             #region RunAnEpisode
             using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("Acrobot-v1");
-            NDArray observation = env.Reset(seed: 1).Observation;
+            (NDArray observation, Info info) = env.Reset(seed: 1);
             double episodeReturn = 0;
             while (true) {
                 // torque the elbow the way the second link turns: +1 (2) or -1 (0)
                 long push = observation.GetSingle(5) > 0 ? 2 : 0;
                 using NDArray action = NDArray.Scalar(push);
-                var (next, reward, terminated, truncated, _) = env.Step(action);
                 observation.Dispose();
-                observation = next;
+                (observation, double reward, bool terminated, bool truncated, info)
+                    = env.Step(action);
                 episodeReturn += reward;
                 if (terminated || truncated)
                     break;
@@ -82,7 +88,7 @@ namespace Gym.Docs.EnvPageSamples {
             #region StartElsewhere
             // both angles and both speeds from [-0.2, 0.2) instead of [-0.1, 0.1)
             var options = new Dictionary<string, object?> { ["low"] = -0.2, ["high"] = 0.2 };
-            NDArray observation = env.Reset(seed: 123, options: options).Observation;
+            (NDArray observation, Info info) = env.Reset(seed: 123, options: options);
             #endregion
             // Gymnasium's docstring prints this observation for the same call.
             CollectionAssert.AreEqual(new[] { 0.997341f, 0.07287608f, 0.9841162f, -0.17752565f, -0.11185605f, -0.12625128f },
@@ -117,12 +123,11 @@ namespace Gym.Docs.EnvPageSamples {
             var acrobot = (AcrobotEnv)env.Unwrapped;
             acrobot.BookOrNips = nips ? "nips" : "book";
             acrobot.Dt = dt;
-            NDArray observation = env.Reset(seed: 1).Observation;
+            (NDArray observation, Info info) = env.Reset(seed: 1);
             for (int steps = 1; ; steps++) {
                 using NDArray action = NDArray.Scalar(observation.GetSingle(5) > 0 ? 2L : 0L);
-                var (next, _, terminated, truncated, _) = env.Step(action);
                 observation.Dispose();
-                observation = next;
+                (observation, _, bool terminated, bool truncated, info) = env.Step(action);
                 if (terminated || truncated)
                     return steps;
             }
@@ -132,8 +137,8 @@ namespace Gym.Docs.EnvPageSamples {
         [TestMethod]
         public void SaveFrame() {
             #region SaveFrame
-            using Env<NDArray, NDArray> env =
-                Gymnasium.Make<NDArray, NDArray>("Acrobot-v1", RenderMode.RgbArray);
+            using Env<NDArray, NDArray> env
+                = Gymnasium.Make<NDArray, NDArray>("Acrobot-v1", RenderMode.RgbArray);
             env.Reset(seed: 1);
             using RenderResult result = env.Render();
             using Image frame = (Image)result;   // 500x500, Gymnasium's pixels
@@ -153,7 +158,7 @@ namespace Gym.Docs.EnvPageSamples {
         [TestMethod]
         public void TheTipsHeight() {
             using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("Acrobot-v1");
-            NDArray observation = env.Reset(seed: 42).Observation;
+            (NDArray observation, Info info) = env.Reset(seed: 42);
             #region TheTipsHeight
             float c1 = observation.GetSingle(0), s1 = observation.GetSingle(1);
             float c2 = observation.GetSingle(2), s2 = observation.GetSingle(3);
@@ -172,12 +177,13 @@ namespace Gym.Docs.EnvPageSamples {
         public void ManyAcrobots() {
             #region ManyAcrobots
             // No vector env of its own: MakeVec steps 8 envs in turn ("sync")
-            using VectorEnv<NDArray, NDArray> envs =
-                Gymnasium.MakeVec<NDArray, NDArray>("Acrobot-v1", numEnvs: 8);
-            using var start = envs.Reset(seed: 42);
+            using VectorEnv<NDArray, NDArray> envs
+                = Gymnasium.MakeVec<NDArray, NDArray>("Acrobot-v1", numEnvs: 8);
+            using VectorResetResult<NDArray> start = envs.Reset(seed: 42);
             for (int t = 0; t < 200; t++) {
                 using NDArray actions = envs.ActionSpace.Sample();   // one per acrobot
-                using var step = envs.Step(actions);   // finished ones reset themselves
+                using VectorStepResult<NDArray> step
+                    = envs.Step(actions);   // finished ones reset themselves
             }
             #endregion
             Assert.AreEqual(8, envs.NumEnvs);

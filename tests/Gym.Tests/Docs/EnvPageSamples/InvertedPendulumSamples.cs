@@ -6,6 +6,7 @@ using System;
 using System.Globalization;
 using System.Linq;
 using Gym.Environments.Envs.MuJoCo;
+using Gym.Observations;
 using Gym.Vector;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
@@ -34,19 +35,23 @@ namespace Gym.Docs.EnvPageSamples {
         [TestMethod]
         public void QuickStart() {
             #region QuickStart
-            using Env<NDArray, NDArray> env =
-                Gymnasium.Make<NDArray, NDArray>("InvertedPendulum-v5");
+            using Env<NDArray, NDArray> env
+                = Gymnasium.Make<NDArray, NDArray>("InvertedPendulum-v5");
             // 4 numbers: the cart's position, the pole's angle, and their speeds
-            NDArray observation = env.Reset(seed: 42).Observation;
+            (NDArray observation, Info info) = env.Reset(seed: 42);
             // one force, from -3 to 3: push the cart left or right
             using NDArray action = env.ActionSpace.Sample();
-            var (next, reward, terminated, truncated, info) = env.Step(action);
+            observation.Dispose();
+            (observation, double reward, bool terminated, bool truncated, info)
+                = env.Step(action);
             #endregion
-            Assert.AreEqual(4, observation.size);
+            // The quick start's first observation, read again: the same seeded reset gives the same one.
+            using ResetResult<NDArray> again = env.Reset(seed: 42);
+            NDArray first = again.Observation;
+            Assert.AreEqual(4, first.size);
             // Gymnasium's reset of seed 42: the cart at 0.0055 m, the reset's uniform noise of 0.01.
-            Assert.AreEqual(0.005479120971119267, observation.GetDouble(0));
+            Assert.AreEqual(0.005479120971119267, first.GetDouble(0));
             _ = (reward, terminated, truncated, info);
-            next.Dispose();
             observation.Dispose();
         }
 
@@ -55,15 +60,15 @@ namespace Gym.Docs.EnvPageSamples {
         public void RunAnEpisode() {
             int steps = 0;
             #region RunAnEpisode
-            using Env<NDArray, NDArray> env =
-                Gymnasium.Make<NDArray, NDArray>("InvertedPendulum-v5");
-            NDArray observation = env.Reset(seed: 42).Observation;
+            using Env<NDArray, NDArray> env
+                = Gymnasium.Make<NDArray, NDArray>("InvertedPendulum-v5");
+            (NDArray observation, Info info) = env.Reset(seed: 42);
             double episodeReturn = 0;
             while (true) {
                 using NDArray action = env.ActionSpace.Sample();
-                var (next, reward, terminated, truncated, _) = env.Step(action);
                 observation.Dispose();
-                observation = next;
+                (observation, double reward, bool terminated, bool truncated, info)
+                    = env.Step(action);
                 episodeReturn += reward;
                 steps++;
                 if (terminated || truncated)
@@ -84,12 +89,12 @@ namespace Gym.Docs.EnvPageSamples {
             int steps = 0;
             double episodeReturn = 0, last = -1;
             #region FallingStep
-            using Env<NDArray, NDArray> env =
-                Gymnasium.Make<NDArray, NDArray>("InvertedPendulum-v5");
-            using var start = env.Reset(seed: 42);
+            using Env<NDArray, NDArray> env
+                = Gymnasium.Make<NDArray, NDArray>("InvertedPendulum-v5");
+            using ResetResult<NDArray> start = env.Reset(seed: 42);
             using NDArray push = np.array(new[] { 3f });   // full force to the right, every step
             while (true) {
-                using var step = env.Step(push);
+                using StepResult<NDArray> step = env.Step(push);
                 (steps, episodeReturn, last) = (steps + 1, episodeReturn + step.Reward, step.Reward);
                 if (step.Terminated || step.Truncated)
                     break;
@@ -111,12 +116,12 @@ namespace Gym.Docs.EnvPageSamples {
             int steps = 0;
             double episodeReturn = 0;
             #region FallingStepInV4
-            using Env<NDArray, NDArray> env =
-                Gymnasium.Make<NDArray, NDArray>("InvertedPendulum-v4");
-            using var start = env.Reset(seed: 42);
+            using Env<NDArray, NDArray> env
+                = Gymnasium.Make<NDArray, NDArray>("InvertedPendulum-v4");
+            using ResetResult<NDArray> start = env.Reset(seed: 42);
             using NDArray push = np.array(new[] { 3f });
             while (true) {
-                using var step = env.Step(push);
+                using StepResult<NDArray> step = env.Step(push);
                 (steps, episodeReturn) = (steps + 1, episodeReturn + step.Reward);
                 if (step.Terminated || step.Truncated)
                     break;
@@ -133,11 +138,13 @@ namespace Gym.Docs.EnvPageSamples {
         public void ResetWithoutNoise() {
             bool allZero = false;
             #region ResetWithoutNoise
-            using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("InvertedPendulum-v5",
-                new InvertedPendulumEnvV5Options { ResetNoiseScale = 0.0 });
-            using var start = env.Reset(seed: 42);
+            using Env<NDArray, NDArray> env
+                = Gymnasium.Make<NDArray, NDArray>("InvertedPendulum-v5",
+                    new InvertedPendulumEnvV5Options { ResetNoiseScale = 0.0 });
+            using ResetResult<NDArray> start = env.Reset(seed: 42);
+            (NDArray observation, Info info) = start;
             // the cart in the middle, the pole upright, both at rest: every observed value 0
-            allZero = start.Observation.ToArray<double>().All(v => v == 0);
+            allZero = observation.ToArray<double>().All(v => v == 0);
             Console.WriteLine(allZero);   // True
             #endregion
             Assert.IsTrue(allZero);
@@ -152,9 +159,10 @@ namespace Gym.Docs.EnvPageSamples {
             string nearest = "";
             #region CamerasAndDepth
             // no camera in the model: Gymnasium's free camera, 2.04 m off; rgbd_tuple draws colour and depth together
-            using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("InvertedPendulum-v5",
-                new { render_mode = "rgbd_tuple" });
-            using var start = env.Reset(seed: 42);
+            using Env<NDArray, NDArray> env
+                = Gymnasium.Make<NDArray, NDArray>("InvertedPendulum-v5",
+                    new { render_mode = "rgbd_tuple" });
+            using ResetResult<NDArray> start = env.Reset(seed: 42);
             using var frames = (RenderResult.RgbDepth)env.Render();
             Console.WriteLine($"{frames.RgbFrame.Shape} {frames.DepthFrame.Shape}");   // (480, 480, 3) (480, 480)
             // MuJoCo's raw depth buffer, 0 at the near plane and 1 at the far one,
@@ -176,17 +184,20 @@ namespace Gym.Docs.EnvPageSamples {
         public void ManyPendulums() {
             #region ManyPendulums
             // No vector env of its own: MakeVec steps 8 envs in turn ("sync")
-            using VectorEnv<NDArray, NDArray> envs =
-                Gymnasium.MakeVec<NDArray, NDArray>("InvertedPendulum-v5", numEnvs: 8);
-            using var start = envs.Reset(seed: 42);   // 8 x 4 observations
+            using VectorEnv<NDArray, NDArray> envs
+                = Gymnasium.MakeVec<NDArray, NDArray>("InvertedPendulum-v5", numEnvs: 8);
+            using VectorResetResult<NDArray> start
+                = envs.Reset(seed: 42);   // 8 x 4 observations
+            (NDArray observations, Info infos) = start;
             for (int t = 0; t < 100; t++) {
                 using NDArray actions = envs.ActionSpace.Sample();   // 8 x 1 forces
-                using var step = envs.Step(actions);   // fallen pendulums reset themselves
+                using VectorStepResult<NDArray> step
+                    = envs.Step(actions);   // fallen pendulums reset themselves
             }
             #endregion
             Assert.AreEqual(8, envs.NumEnvs);
             Assert.IsInstanceOfType(envs, typeof(SyncVectorEnv<NDArray, NDArray>));
-            CollectionAssert.AreEqual(new long[] { 8, 4 }, start.Observations.shape.Select(d => (long)d).ToArray());
+            CollectionAssert.AreEqual(new long[] { 8, 4 }, observations.shape.Select(d => (long)d).ToArray());
         }
 
         /// <summary>

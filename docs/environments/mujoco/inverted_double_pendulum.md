@@ -49,7 +49,7 @@ for this model Gym.NET's software drawing of MuJoCo's frames also matches Gymnas
 
 # [C#](#tab/csharp)
 
-[!code-csharp[](../../../tests/Gym.Tests/Docs/EnvPageSamples/InvertedDoublePendulumSamples.cs?range=1-4,39-45&dedent=12)]
+[!code-csharp[](../../../tests/Gym.Tests/Docs/EnvPageSamples/InvertedDoublePendulumSamples.cs?range=1-4,40-48&dedent=12)]
 
 # [Python (Gymnasium)](#tab/python)
 
@@ -202,7 +202,19 @@ By Gymnasium's name in `Make`'s kwargs, or by the C# name in the constructor and
 | `visual_options`<br>`visualOptions` | `IReadOnlyDictionary<int, bool>?`<br>`null` | MuJoCo's visualization flags by index (contact points, forces, ...) |
 | (Gym.NET)<br>`viewerFactory` | `EnvViewerFactory?`<br>`null` | The window for `human`: Avalonia, WinForms, or headless |
 
+
+# [C#](#tab/csharp)
+
 [!code-csharp[](../../../tests/Gym.Tests/Docs/EnvPageSamples/InvertedDoublePendulumSamples.cs#Arguments)]
+
+# [Python (Gymnasium)](#tab/python)
+
+```python
+env = gym.make("InvertedDoublePendulum-v5", healthy_reward=5.0,
+               reset_noise_scale=0.05)
+```
+
+---
 
 ## Info
 

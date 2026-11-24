@@ -50,7 +50,7 @@ same moonscape, the same engine dispersion, the same landing, frame for frame.
 
 # [C#](#tab/csharp)
 
-[!code-csharp[](../../../tests/Gym.Tests/Docs/EnvPageSamples/LunarLanderSamples.cs?range=1-4,39-45&dedent=12)]
+[!code-csharp[](../../../tests/Gym.Tests/Docs/EnvPageSamples/LunarLanderSamples.cs?range=1-4,40-47&dedent=12)]
 
 # [Python (Gymnasium)](#tab/python)
 
@@ -203,7 +203,19 @@ By Gymnasium's name in `Make`'s kwargs, or by the C# name in the constructor and
 | `turbulence_power`<br>`turbulencePower` | `double`<br>`1.5` | The turbulence's strongest torque; outside 0 to 2 it warns and is kept |
 | (Gym.NET)<br>`viewerFactory` | `EnvViewerFactory?`<br>`null` | The window for `human`: Avalonia, WinForms, or headless |
 
+
+# [C#](#tab/csharp)
+
 [!code-csharp[](../../../tests/Gym.Tests/Docs/EnvPageSamples/LunarLanderSamples.cs#Arguments)]
+
+# [Python (Gymnasium)](#tab/python)
+
+```python
+env = gym.make("LunarLander-v3", enable_wind=True, wind_power=10.0,
+               turbulence_power=1.0)
+```
+
+---
 
 ## Info
 

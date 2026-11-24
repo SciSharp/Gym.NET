@@ -49,7 +49,7 @@ slides from the same seed, the same observations, rewards, infos, text and pixel
 
 # [C#](#tab/csharp)
 
-[!code-csharp[](../../../tests/Gym.Tests/Docs/EnvPageSamples/FrozenLakeSamples.cs?range=1-4,35-41&dedent=12)]
+[!code-csharp[](../../../tests/Gym.Tests/Docs/EnvPageSamples/FrozenLakeSamples.cs?range=1-4,36-43&dedent=12)]
 
 # [Python (Gymnasium)](#tab/python)
 
@@ -191,7 +191,18 @@ By Gymnasium's name in `Make`'s kwargs, or by the C# name in the constructor and
 | `reward_schedule`<br>`rewardSchedule` | `IReadOnlyList<double>?`<br>`null` | The rewards for the goal, a hole and any other tile; null is `(1, 0, 0)` |
 | (Gym.NET)<br>`viewerFactory` | `EnvViewerFactory?`<br>`null` | The window for `human`: Avalonia, WinForms, or headless |
 
+
+# [C#](#tab/csharp)
+
 [!code-csharp[](../../../tests/Gym.Tests/Docs/EnvPageSamples/FrozenLakeSamples.cs#Arguments)]
+
+# [Python (Gymnasium)](#tab/python)
+
+```python
+env = gym.make("FrozenLake-v1", map_name="8x8", is_slippery=True, success_rate=0.75)
+```
+
+---
 
 ## Info
 

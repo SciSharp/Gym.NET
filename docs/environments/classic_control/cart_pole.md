@@ -47,7 +47,7 @@ same float32 observations, rewards, flags, warnings and errors, and the same pix
 
 # [C#](#tab/csharp)
 
-[!code-csharp[](../../../tests/Gym.Tests/Docs/EnvPageSamples/CartPoleSamples.cs?range=1-4,34-39&dedent=12)]
+[!code-csharp[](../../../tests/Gym.Tests/Docs/EnvPageSamples/CartPoleSamples.cs?range=1-4,36-43&dedent=12)]
 
 # [Python (Gymnasium)](#tab/python)
 
@@ -191,7 +191,18 @@ By Gymnasium's name in `Make`'s kwargs, or by the C# name in the constructor and
 | `sutton_barto_reward`<br>`suttonBartoReward` | `bool`<br>`false` | The original paper's reward (see [Rewards](#rewards)) |
 | (Gym.NET)<br>`viewerFactory` | `EnvViewerFactory?`<br>`null` | The window for `human`: Avalonia, WinForms, or headless |
 
+
+# [C#](#tab/csharp)
+
 [!code-csharp[](../../../tests/Gym.Tests/Docs/EnvPageSamples/CartPoleSamples.cs#Arguments)]
+
+# [Python (Gymnasium)](#tab/python)
+
+```python
+env = gym.make("CartPole-v1", render_mode="rgb_array", sutton_barto_reward=True)
+```
+
+---
 
 The physics constants are settable properties of the unwrapped env (the table in [How it works](#how-it-works)).
 

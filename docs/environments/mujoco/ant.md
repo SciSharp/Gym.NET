@@ -48,7 +48,7 @@ Gymnasium's but not yet equal (see [Parity](#parity-with-gymnasium)).
 
 # [C#](#tab/csharp)
 
-[!code-csharp[](../../../tests/Gym.Tests/Docs/EnvPageSamples/AntSamples.cs?range=1-4,37-43&dedent=12)]
+[!code-csharp[](../../../tests/Gym.Tests/Docs/EnvPageSamples/AntSamples.cs?range=1-4,38-45&dedent=12)]
 
 # [Python (Gymnasium)](#tab/python)
 
@@ -246,7 +246,18 @@ By Gymnasium's name in `Make`'s kwargs, or by the C# name in the constructor and
 | `visual_options`<br>`visualOptions` | `IReadOnlyDictionary<int, bool>?`<br>`null` | MuJoCo's visualization flags by index (contact points, forces, ...) |
 | (Gym.NET)<br>`viewerFactory` | `EnvViewerFactory?`<br>`null` | The window for `human`: Avalonia, WinForms, or headless |
 
+
+# [C#](#tab/csharp)
+
 [!code-csharp[](../../../tests/Gym.Tests/Docs/EnvPageSamples/AntSamples.cs#Arguments)]
+
+# [Python (Gymnasium)](#tab/python)
+
+```python
+env = gym.make("Ant-v5", contact_cost_weight=0.0, healthy_z_range=(0.2, 1.5))
+```
+
+---
 
 ## Info
 

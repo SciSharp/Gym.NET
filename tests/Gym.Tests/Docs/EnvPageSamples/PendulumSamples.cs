@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using Gym.Environments.Envs.Classic;
+using Gym.Observations;
 using Gym.Vector;
 using Gym.Wrappers;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
@@ -36,14 +37,20 @@ namespace Gym.Docs.EnvPageSamples {
             #region QuickStart
             using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("Pendulum-v1");
             // [cos(theta), sin(theta), theta_dot], float32
-            NDArray observation = env.Reset(seed: 42).Observation;
+            (NDArray observation, Info info) = env.Reset(seed: 42);
             // one float32 torque in [-2, 2]
             using NDArray action = env.ActionSpace.Sample();
-            var (next, reward, terminated, truncated, info) = env.Step(action);
+            observation.Dispose();
+            (observation, double reward, bool terminated, bool truncated, info)
+                = env.Step(action);
             #endregion
+            // The quick start's first observation, read again: the same seeded reset gives the same one.
+            using ResetResult<NDArray> again = env.Reset(seed: 42);
+            NDArray first = again.Observation;
+            Assert.AreEqual(3, first.size);
             Assert.AreEqual(3, observation.size);
             Assert.AreEqual(1, action.size);
-            Assert.AreEqual(3, next.size);
+            Assert.AreEqual(3, first.size);
             // The cost is at most pi^2 + 0.1 * 8^2 + 0.001 * 2^2 = 16.2736044, and never negative.
             Assert.IsTrue(reward <= 0 && reward >= -16.2736045);
             Assert.IsFalse(terminated);
@@ -59,7 +66,7 @@ namespace Gym.Docs.EnvPageSamples {
         public void RunAnEpisode() {
             #region RunAnEpisode
             using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("Pendulum-v1");
-            NDArray observation = env.Reset(seed: 5).Observation;
+            (NDArray observation, Info info) = env.Reset(seed: 5);
             double episodeReturn = 0;
             while (true) {
                 float cos = observation.GetSingle(0), sin = observation.GetSingle(1);
@@ -69,9 +76,9 @@ namespace Gym.Docs.EnvPageSamples {
                     : energy < 15 ? 2.0 * (w >= 0 ? 1 : -1)   // pump
                     : -0.5 * Math.Sign(w);   // brake
                 using NDArray action = np.array(new[] { (float)Math.Clamp(u, -2.0, 2.0) });
-                var (next, reward, terminated, truncated, _) = env.Step(action);
                 observation.Dispose();
-                observation = next;
+                (observation, double reward, bool terminated, bool truncated, info)
+                    = env.Step(action);
                 episodeReturn += reward;
                 if (terminated || truncated)
                     break;
@@ -91,7 +98,7 @@ namespace Gym.Docs.EnvPageSamples {
             var options = new Dictionary<string, object?> {
                 ["x_init"] = Math.PI / 2, ["y_init"] = 0.5,
             };
-            NDArray observation = env.Reset(seed: 123, options: options).Observation;
+            (NDArray observation, Info info) = env.Reset(seed: 123, options: options);
             // [0.8403459, 0.54205054, -0.44617897]
             #endregion
             // Gymnasium's docstring prints this observation for the same call.
@@ -116,8 +123,8 @@ namespace Gym.Docs.EnvPageSamples {
         [TestMethod]
         public void SaveFrame() {
             #region SaveFrame
-            using Env<NDArray, NDArray> env =
-                Gymnasium.Make<NDArray, NDArray>("Pendulum-v1", RenderMode.RgbArray);
+            using Env<NDArray, NDArray> env
+                = Gymnasium.Make<NDArray, NDArray>("Pendulum-v1", RenderMode.RgbArray);
             env.Reset(seed: 5);
             using RenderResult result = env.Render();
             using Image frame = (Image)result;   // 500x500, Gymnasium's pixels
@@ -142,7 +149,7 @@ namespace Gym.Docs.EnvPageSamples {
             Console.WriteLine(env.ActionSpace);   // Box(-1.0, 1.0, (1,), float32)
             env.Reset(seed: 42);
             using NDArray full = np.array(new[] { 1f });   // the motor's full 2 N m
-            using var step = env.Step(full);
+            using StepResult<NDArray> step = env.Step(full);
             #endregion
             Assert.AreEqual("Box(-1.0, 1.0, (1,), float32)", env.ActionSpace.ToString());
             // The same step as a torque of 2 on the unwrapped env: Gymnasium's reward for it.
@@ -157,12 +164,13 @@ namespace Gym.Docs.EnvPageSamples {
         public void ManyPendulums() {
             #region ManyPendulums
             // No vector env of its own: MakeVec steps 8 envs in turn ("sync")
-            using VectorEnv<NDArray, NDArray> envs =
-                Gymnasium.MakeVec<NDArray, NDArray>("Pendulum-v1", numEnvs: 8);
-            using var start = envs.Reset(seed: 42);
+            using VectorEnv<NDArray, NDArray> envs
+                = Gymnasium.MakeVec<NDArray, NDArray>("Pendulum-v1", numEnvs: 8);
+            using VectorResetResult<NDArray> start = envs.Reset(seed: 42);
             for (int t = 0; t < 200; t++) {
                 using NDArray actions = envs.ActionSpace.Sample();   // (8, 1) torques
-                using var step = envs.Step(actions);   // only the time limit ends one
+                using VectorStepResult<NDArray> step
+                    = envs.Step(actions);   // only the time limit ends one
             }
             #endregion
             Assert.AreEqual(8, envs.NumEnvs);

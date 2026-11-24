@@ -6,6 +6,7 @@ using System;
 using System.Globalization;
 using System.Linq;
 using Gym.Environments.Envs.MuJoCo;
+using Gym.Observations;
 using Gym.Vector;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
@@ -34,20 +35,23 @@ namespace Gym.Docs.EnvPageSamples {
         [TestMethod]
         public void QuickStart() {
             #region QuickStart
-            using Env<NDArray, NDArray> env =
-                Gymnasium.Make<NDArray, NDArray>("Swimmer-v5");
+            using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("Swimmer-v5");
             // 8 numbers: the heading, the 2 rotors' angles, 5 velocities
-            NDArray observation = env.Reset(seed: 42).Observation;
+            (NDArray observation, Info info) = env.Reset(seed: 42);
             // two torques, each from -1 to 1: the front rotor, the back rotor
             using NDArray action = env.ActionSpace.Sample();
-            var (next, reward, terminated, truncated, info) = env.Step(action);
+            observation.Dispose();
+            (observation, double reward, bool terminated, bool truncated, info)
+                = env.Step(action);
             #endregion
-            Assert.AreEqual(8, observation.size);
+            // The quick start's first observation, read again: the same seeded reset gives the same one.
+            using ResetResult<NDArray> again = env.Reset(seed: 42);
+            NDArray first = again.Observation;
+            Assert.AreEqual(8, first.size);
             // Gymnasium's reset of seed 42: the heading, 0.0717 rad, the reset's uniform noise of 0.1.
-            Assert.AreEqual(0.07171958398227649, observation.GetDouble(0));
+            Assert.AreEqual(0.07171958398227649, first.GetDouble(0));
             Assert.IsFalse(terminated);
             _ = (reward, truncated, info);
-            next.Dispose();
             observation.Dispose();
         }
 
@@ -56,15 +60,14 @@ namespace Gym.Docs.EnvPageSamples {
         public void RunAnEpisode() {
             int steps = 0;
             #region RunAnEpisode
-            using Env<NDArray, NDArray> env =
-                Gymnasium.Make<NDArray, NDArray>("Swimmer-v5");
-            NDArray observation = env.Reset(seed: 42).Observation;
+            using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("Swimmer-v5");
+            (NDArray observation, Info info) = env.Reset(seed: 42);
             double episodeReturn = 0;
             while (true) {
                 using NDArray action = env.ActionSpace.Sample();
-                var (next, reward, terminated, truncated, _) = env.Step(action);
                 observation.Dispose();
-                observation = next;
+                (observation, double reward, bool terminated, bool truncated, info)
+                    = env.Step(action);
                 episodeReturn += reward;
                 steps++;
                 if (terminated || truncated)   // never terminated: 1,000 steps
@@ -83,11 +86,10 @@ namespace Gym.Docs.EnvPageSamples {
         public void RewardTerms() {
             double reward = 0, forward = 0, control = 0;
             #region RewardTerms
-            using Env<NDArray, NDArray> env =
-                Gymnasium.Make<NDArray, NDArray>("Swimmer-v5");
-            using var start = env.Reset(seed: 42);
+            using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("Swimmer-v5");
+            using ResetResult<NDArray> start = env.Reset(seed: 42);
             using NDArray action = np.full(2, 0.5f);   // both rotors at half torque
-            using var step = env.Step(action);
+            using StepResult<NDArray> step = env.Step(action);
             (reward, forward, control) = (step.Reward, step.Info.Get<double>("reward_forward"),
                 step.Info.Get<double>("reward_ctrl"));
             // 0.08428 = 0.08433 forward (the speed in m/s) - 0.00005 (0.0001 x the torques squared)
@@ -105,9 +107,10 @@ namespace Gym.Docs.EnvPageSamples {
             #region ResetWithoutNoise
             using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("Swimmer-v5",
                 new SwimmerEnvV5Options { ResetNoiseScale = 0.0 });
-            using var start = env.Reset(seed: 42);
+            using ResetResult<NDArray> start = env.Reset(seed: 42);
+            (NDArray observation, Info info) = start;
             // the links in a straight line, at rest: every observed value 0
-            allZero = start.Observation.ToArray<double>().All(v => v == 0);
+            allZero = observation.ToArray<double>().All(v => v == 0);
             Console.WriteLine(allZero);   // True
             #endregion
             Assert.IsTrue(allZero);
@@ -124,8 +127,10 @@ namespace Gym.Docs.EnvPageSamples {
             #region ObserveThePosition
             using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("Swimmer-v5",
                 new { exclude_current_positions_from_observation = false });
-            using var start = env.Reset(seed: 42);
-            (size, x, y) = (start.Observation.size, start.Observation.GetDouble(0), start.Observation.GetDouble(1));
+            using ResetResult<NDArray> start = env.Reset(seed: 42);
+            (NDArray observation, Info info) = start;
+            (size, x, y)
+                = (observation.size, observation.GetDouble(0), observation.GetDouble(1));
             // 10 numbers, x 0.0548 and y -0.0122 first: the root's position
             Console.WriteLine($"{size} numbers, x {x:F4} and y {y:F4} first");
             #endregion
@@ -145,7 +150,7 @@ namespace Gym.Docs.EnvPageSamples {
             // the model's "track" camera follows the swimmer from above; rgbd_tuple draws colour and depth together
             using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("Swimmer-v5",
                 new { render_mode = "rgbd_tuple", camera_name = "track" });
-            using var start = env.Reset(seed: 42);
+            using ResetResult<NDArray> start = env.Reset(seed: 42);
             using var frames = (RenderResult.RgbDepth)env.Render();
             Console.WriteLine($"{frames.RgbFrame.Shape} {frames.DepthFrame.Shape}");   // (480, 480, 3) (480, 480)
             // MuJoCo's raw depth buffer, 0 at the near plane and 1 at the far one,
@@ -167,17 +172,19 @@ namespace Gym.Docs.EnvPageSamples {
         public void ManySwimmers() {
             #region ManySwimmers
             // No vector env of its own: MakeVec steps 8 envs in turn ("sync")
-            using VectorEnv<NDArray, NDArray> envs =
-                Gymnasium.MakeVec<NDArray, NDArray>("Swimmer-v5", numEnvs: 8);
-            using var start = envs.Reset(seed: 42);   // 8 x 8 observations
+            using VectorEnv<NDArray, NDArray> envs
+                = Gymnasium.MakeVec<NDArray, NDArray>("Swimmer-v5", numEnvs: 8);
+            using VectorResetResult<NDArray> start
+                = envs.Reset(seed: 42);   // 8 x 8 observations
+            (NDArray observations, Info infos) = start;
             for (int t = 0; t < 100; t++) {
                 using NDArray actions = envs.ActionSpace.Sample();   // 8 x 2 torques
-                using var step = envs.Step(actions);
+                using VectorStepResult<NDArray> step = envs.Step(actions);
             }
             #endregion
             Assert.AreEqual(8, envs.NumEnvs);
             Assert.IsInstanceOfType(envs, typeof(SyncVectorEnv<NDArray, NDArray>));
-            CollectionAssert.AreEqual(new long[] { 8, 8 }, start.Observations.shape.Select(d => (long)d).ToArray());
+            CollectionAssert.AreEqual(new long[] { 8, 8 }, observations.shape.Select(d => (long)d).ToArray());
         }
 
         /// <summary>

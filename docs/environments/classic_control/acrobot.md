@@ -51,7 +51,7 @@ pixels.
 
 # [C#](#tab/csharp)
 
-[!code-csharp[](../../../tests/Gym.Tests/Docs/EnvPageSamples/AcrobotSamples.cs?range=1-4,36-41&dedent=12)]
+[!code-csharp[](../../../tests/Gym.Tests/Docs/EnvPageSamples/AcrobotSamples.cs?range=1-4,37-44&dedent=12)]
 
 # [Python (Gymnasium)](#tab/python)
 
@@ -209,7 +209,18 @@ By Gymnasium's name in `Make`'s kwargs, or by the C# name in the constructor and
 | `render_mode`<br>`renderMode` | `string?` or `RenderMode`<br>`null` | `"human"` opens a window; `"rgb_array"` makes `Render()` return the frame |
 | (Gym.NET)<br>`viewerFactory` | `EnvViewerFactory?`<br>`null` | The window for `human`: Avalonia, WinForms, or headless |
 
+
+# [C#](#tab/csharp)
+
 [!code-csharp[](../../../tests/Gym.Tests/Docs/EnvPageSamples/AcrobotSamples.cs#Arguments)]
+
+# [Python (Gymnasium)](#tab/python)
+
+```python
+env = gym.make("Acrobot-v1", render_mode="rgb_array")
+```
+
+---
 
 Everything else is a settable property of the unwrapped env (the table in [How it works](#how-it-works)).
 

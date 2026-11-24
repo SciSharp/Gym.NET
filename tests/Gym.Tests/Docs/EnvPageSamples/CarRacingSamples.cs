@@ -10,7 +10,9 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using Gym.Box2D;
 using Gym.Environments.Envs.Box2D;
+using Gym.Observations;
 using Gym.Vector;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using SixLabors.ImageSharp;
@@ -40,22 +42,25 @@ namespace Gym.Docs.EnvPageSamples {
         [TestMethod]
         public void QuickStart() {
             #region QuickStart
-            using Env<NDArray, NDArray> env =
-                Gymnasium.Make<NDArray, NDArray>("CarRacing-v3");
+            using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("CarRacing-v3");
             // a 96x96 RGB picture of the car, the track and the indicators
-            NDArray observation = env.Reset(seed: 42).Observation;
+            (NDArray observation, Info info) = env.Reset(seed: 42);
             // steer from -1 (left) to 1 (right), gas and brake from 0 to 1
             using NDArray action = env.ActionSpace.Sample();
-            var (next, reward, terminated, truncated, info) = env.Step(action);
+            observation.Dispose();
+            (observation, double reward, bool terminated, bool truncated, info)
+                = env.Step(action);
             #endregion
-            CollectionAssert.AreEqual(new long[] { 96, 96, 3 }, observation.shape.Select(d => (long)d).ToArray());
-            Assert.AreEqual(NPTypeCode.Byte, observation.typecode);
+            // The quick start's first observation, read again: the same seeded reset gives the same one.
+            using ResetResult<NDArray> again = env.Reset(seed: 42);
+            NDArray first = again.Observation;
+            CollectionAssert.AreEqual(new long[] { 96, 96, 3 }, first.shape.Select(d => (long)d).ToArray());
+            Assert.AreEqual(NPTypeCode.Byte, first.typecode);
             // Gymnasium's reset of seed 42: the camera starts far above and zooms in over the first second, so the first
             // picture is the whole playfield, small, on black: its mean is 32.7.
-            Assert.AreEqual(32.72562210648148, observation.astype(NPTypeCode.Double).mean().GetDouble(), 1e-12);
+            Assert.AreEqual(32.72562210648148, first.astype(NPTypeCode.Double).mean().GetDouble(), 1e-12);
             Assert.AreEqual(0, info.Count);
             _ = (reward, terminated, truncated);
-            next.Dispose();
             observation.Dispose();
         }
 
@@ -64,15 +69,14 @@ namespace Gym.Docs.EnvPageSamples {
         public void RunAnEpisode() {
             int steps = 0;
             #region RunAnEpisode
-            using Env<NDArray, NDArray> env =
-                Gymnasium.Make<NDArray, NDArray>("CarRacing-v3");
-            NDArray observation = env.Reset(seed: 42).Observation;
+            using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("CarRacing-v3");
+            (NDArray observation, Info info) = env.Reset(seed: 42);
             double episodeReturn = 0;
             while (true) {
                 using NDArray action = env.ActionSpace.Sample();
-                var (next, reward, terminated, truncated, _) = env.Step(action);
                 observation.Dispose();
-                observation = next;
+                (observation, double reward, bool terminated, bool truncated, info)
+                    = env.Step(action);
                 episodeReturn += reward;
                 steps++;
                 if (terminated || truncated)
@@ -91,21 +95,21 @@ namespace Gym.Docs.EnvPageSamples {
         public void PurePursuit() {
             double episodeReturn = 0;
             #region PurePursuit
-            using Env<NDArray, NDArray> env =
-                Gymnasium.Make<NDArray, NDArray>("CarRacing-v3");
+            using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("CarRacing-v3");
             var race = (CarRacingEnv)env.Unwrapped;   // the track and the car
-            using var start = env.Reset(seed: 11);
+            using ResetResult<NDArray> start = env.Reset(seed: 11);
             while (true) {
-                var hull = race.Car!.Hull!;
+                b2Body hull = race.Car!.Hull!;
                 double px = hull.Position.x, py = hull.Position.y, angle = hull.Angle;
-                var track = race.Track;
+                IReadOnlyList<(double Alpha, double Beta, double X, double Y)> track = race.Track;
                 // aim at the centre-line point five tiles past the nearest one
                 int nearest = Enumerable.Range(0, track.Count).MinBy(i =>
                     (track[i].X - px) * (track[i].X - px) + (track[i].Y - py) * (track[i].Y - py));
-                var (_, _, tx, ty) = track[(nearest + 5) % track.Count];
+                (_, _, double tx, double ty) = track[(nearest + 5) % track.Count];
                 // the car's nose is its local +y: the angle from it to the target
-                double error = Math.Atan2(-Math.Sin(angle) * (ty - py) - Math.Cos(angle) * (tx - px),
-                                          -Math.Sin(angle) * (tx - px) + Math.Cos(angle) * (ty - py));
+                double error
+                    = Math.Atan2(-Math.Sin(angle) * (ty - py) - Math.Cos(angle) * (tx - px),
+                                 -Math.Sin(angle) * (tx - px) + Math.Cos(angle) * (ty - py));
                 double vx = hull.LinearVelocity.x, vy = hull.LinearVelocity.y;
                 double speed = Math.Sqrt(vx * vx + vy * vy);
                 using NDArray action = np.array(new[] {
@@ -113,7 +117,7 @@ namespace Gym.Docs.EnvPageSamples {
                     speed < 45 - 30 * Math.Min(1, Math.Abs(error)) ? 0.6f : 0f,    // gas
                     Math.Abs(error) > 0.6 && speed > 30 ? 0.4f : 0f,               // brake
                 });
-                using var step = env.Step(action);
+                using StepResult<NDArray> step = env.Step(action);
                 episodeReturn += step.Reward;
                 if (step.Terminated || step.Truncated)
                     break;
@@ -135,14 +139,14 @@ namespace Gym.Docs.EnvPageSamples {
             // 0 nothing, 1 steer right, 2 steer left, 3 gas, 4 brake
             using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("CarRacing-v3",
                 new CarRacingEnvOptions { Continuous = false });
-            using var start = env.Reset(seed: 42);
+            using ResetResult<NDArray> start = env.Reset(seed: 42);
             for (int t = 0; t < 50; t++) {
                 using NDArray gas = np.array(3L);
-                using var step = env.Step(gas);
+                using StepResult<NDArray> step = env.Step(gas);
                 episodeReturn += step.Reward;
             }
             var race = (CarRacingEnv)env.Unwrapped;
-            var v = race.Car!.Hull!.LinearVelocity;
+            b2Vec2 v = race.Car!.Hull!.LinearVelocity;
             (speed, tiles) = (Math.Sqrt((double)v.x * v.x + (double)v.y * v.y), race.TileVisitedCount);
             // speed 28.9, 7 tiles, return 19.7: a discrete gas is 0.2 of the pedal
             Console.WriteLine($"speed {speed:F1}, {tiles} tiles, return {episodeReturn:F1}");
@@ -165,9 +169,11 @@ namespace Gym.Docs.EnvPageSamples {
             var race = (CarRacingEnv)env.Unwrapped;
             string Colours() => string.Join(" ", new[] { race.RoadColor, race.BgColor, race.GrassColor }
                 .Select(c => string.Join(",", c.ToArray<double>().Select(v => v.ToString("F0", CultureInfo.InvariantCulture)))));
-            using var first = env.Reset(seed: 42);   // new colours at every reset
+            using ResetResult<NDArray> first
+                = env.Reset(seed: 42);   // new colours at every reset
             Console.WriteLine(Colours());   // road 163,92,180 background 146,20,205 grass 146,20,225
-            using var kept = env.Reset(options: new Dictionary<string, object?> { ["randomize"] = false });
+            using ResetResult<NDArray> kept
+                = env.Reset(options: new Dictionary<string, object?> { ["randomize"] = false });
             Console.WriteLine(Colours());   // the same three
             #endregion
             printed.Add(Colours());
@@ -181,12 +187,12 @@ namespace Gym.Docs.EnvPageSamples {
         [TestMethod]
         public void SaveFrame() {
             #region SaveFrame
-            using Env<NDArray, NDArray> env =
-                Gymnasium.Make<NDArray, NDArray>("CarRacing-v3", RenderMode.RgbArray);
-            using var start = env.Reset(seed: 42);
+            using Env<NDArray, NDArray> env
+                = Gymnasium.Make<NDArray, NDArray>("CarRacing-v3", RenderMode.RgbArray);
+            using ResetResult<NDArray> start = env.Reset(seed: 42);
             for (int t = 0; t < 50; t++) {   // the camera zooms in over the first second
                 using NDArray gas = np.array(new[] { 0f, 0.3f, 0f });
-                using var step = env.Step(gas);
+                using StepResult<NDArray> step = env.Step(gas);
             }
             using RenderResult result = env.Render();
             using Image frame = (Image)result;   // 600x400, Gymnasium's pixels
@@ -207,17 +213,19 @@ namespace Gym.Docs.EnvPageSamples {
         public void ManyCars() {
             #region ManyCars
             // No vector env of its own: MakeVec steps 4 envs in turn ("sync")
-            using VectorEnv<NDArray, NDArray> envs =
-                Gymnasium.MakeVec<NDArray, NDArray>("CarRacing-v3", numEnvs: 4);
-            using var start = envs.Reset(seed: 42);   // 4 x 96 x 96 x 3 pictures
+            using VectorEnv<NDArray, NDArray> envs
+                = Gymnasium.MakeVec<NDArray, NDArray>("CarRacing-v3", numEnvs: 4);
+            using VectorResetResult<NDArray> start
+                = envs.Reset(seed: 42);   // 4 x 96 x 96 x 3 pictures
+            (NDArray observations, Info infos) = start;
             for (int t = 0; t < 100; t++) {
                 using NDArray actions = envs.ActionSpace.Sample();   // 4 x 3
-                using var step = envs.Step(actions);
+                using VectorStepResult<NDArray> step = envs.Step(actions);
             }
             #endregion
             Assert.AreEqual(4, envs.NumEnvs);
             Assert.IsInstanceOfType(envs, typeof(SyncVectorEnv<NDArray, NDArray>));
-            CollectionAssert.AreEqual(new long[] { 4, 96, 96, 3 }, start.Observations.shape.Select(d => (long)d).ToArray());
+            CollectionAssert.AreEqual(new long[] { 4, 96, 96, 3 }, observations.shape.Select(d => (long)d).ToArray());
         }
 
         /// <summary>

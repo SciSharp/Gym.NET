@@ -50,7 +50,7 @@ pictures sees the same pixels here.
 
 # [C#](#tab/csharp)
 
-[!code-csharp[](../../../tests/Gym.Tests/Docs/EnvPageSamples/CarRacingSamples.cs?range=1-4,43-49&dedent=12)]
+[!code-csharp[](../../../tests/Gym.Tests/Docs/EnvPageSamples/CarRacingSamples.cs?range=1-4,45-52&dedent=12)]
 
 # [Python (Gymnasium)](#tab/python)
 
@@ -206,7 +206,18 @@ By Gymnasium's name in `Make`'s kwargs, or by the C# name in the constructor and
 | `continuous`<br>`continuous` | `bool`<br>`true` | `false`: the five discrete actions instead of steering, gas and brake |
 | (Gym.NET)<br>`viewerFactory` | `EnvViewerFactory?`<br>`null` | The window for `human`: Avalonia, WinForms, or headless |
 
+
+# [C#](#tab/csharp)
+
 [!code-csharp[](../../../tests/Gym.Tests/Docs/EnvPageSamples/CarRacingSamples.cs#Arguments)]
+
+# [Python (Gymnasium)](#tab/python)
+
+```python
+env = gym.make("CarRacing-v3", continuous=False, lap_complete_percent=0.9)
+```
+
+---
 
 ## Info
 

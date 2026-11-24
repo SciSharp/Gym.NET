@@ -7,6 +7,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using Gym.Environments.Envs.Box2D;
+using Gym.Observations;
 using Gym.Vector;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 using SixLabors.ImageSharp;
@@ -35,23 +36,27 @@ namespace Gym.Docs.EnvPageSamples {
         [TestMethod]
         public void QuickStart() {
             #region QuickStart
-            using Env<NDArray, NDArray> env =
-                Gymnasium.Make<NDArray, NDArray>("BipedalWalker-v3");
+            using Env<NDArray, NDArray> env
+                = Gymnasium.Make<NDArray, NDArray>("BipedalWalker-v3");
             // the hull, 4 joints, 2 feet's contacts, 10 lidar readings
-            NDArray observation = env.Reset(seed: 42).Observation;
+            (NDArray observation, Info info) = env.Reset(seed: 42);
             // hip, knee, hip, knee: the sign turns a motor, the size is its torque
             using NDArray action = env.ActionSpace.Sample();
-            var (next, reward, terminated, truncated, info) = env.Step(action);
+            observation.Dispose();
+            (observation, double reward, bool terminated, bool truncated, info)
+                = env.Step(action);
             #endregion
-            Assert.AreEqual(24, observation.size);
+            // The quick start's first observation, read again: the same seeded reset gives the same one.
+            using ResetResult<NDArray> again = env.Reset(seed: 42);
+            NDArray first = again.Observation;
+            Assert.AreEqual(24, first.size);
             // Gymnasium's reset of seed 42 (one step with the motors off inside the reset): the first lidar ray, straight
             // down, stops at 0.4408 of its range, and both feet stand on the start pad.
-            Assert.AreEqual(0.4408141076564789f, observation.GetSingle(14));
-            Assert.AreEqual(1f, observation.GetSingle(8));
-            Assert.AreEqual(1f, observation.GetSingle(13));
+            Assert.AreEqual(0.4408141076564789f, first.GetSingle(14));
+            Assert.AreEqual(1f, first.GetSingle(8));
+            Assert.AreEqual(1f, first.GetSingle(13));
             Assert.AreEqual(0, info.Count);
             _ = (reward, terminated, truncated);
-            next.Dispose();
             observation.Dispose();
         }
 
@@ -60,15 +65,15 @@ namespace Gym.Docs.EnvPageSamples {
         public void RunAnEpisode() {
             int steps = 0;
             #region RunAnEpisode
-            using Env<NDArray, NDArray> env =
-                Gymnasium.Make<NDArray, NDArray>("BipedalWalker-v3");
-            NDArray observation = env.Reset(seed: 42).Observation;
+            using Env<NDArray, NDArray> env
+                = Gymnasium.Make<NDArray, NDArray>("BipedalWalker-v3");
+            (NDArray observation, Info info) = env.Reset(seed: 42);
             double episodeReturn = 0;
             while (true) {
                 using NDArray action = env.ActionSpace.Sample();
-                var (next, reward, terminated, truncated, _) = env.Step(action);
                 observation.Dispose();
-                observation = next;
+                (observation, double reward, bool terminated, bool truncated, info)
+                    = env.Step(action);
                 episodeReturn += reward;
                 steps++;
                 if (terminated || truncated)
@@ -88,16 +93,16 @@ namespace Gym.Docs.EnvPageSamples {
             int steps = 0;
             double episodeReturn = 0;
             #region TheGait
-            using Env<NDArray, NDArray> env =
-                Gymnasium.Make<NDArray, NDArray>("BipedalWalker-v3");
-            NDArray observation = env.Reset(seed: 0).Observation;
+            using Env<NDArray, NDArray> env
+                = Gymnasium.Make<NDArray, NDArray>("BipedalWalker-v3");
+            (NDArray observation, Info info) = env.Reset(seed: 0);
             // Gymnasium's own gait: a state machine with a phase, one per episode
             var gait = new BipedalWalkerHeuristics();
             while (true) {
                 using NDArray action = gait.StepHeuristic(observation);
-                var (next, reward, terminated, truncated, _) = env.Step(action);
                 observation.Dispose();
-                observation = next;
+                (observation, double reward, bool terminated, bool truncated, info)
+                    = env.Step(action);
                 (steps, episodeReturn) = (steps + 1, episodeReturn + reward);
                 if (terminated || truncated)
                     break;
@@ -119,15 +124,15 @@ namespace Gym.Docs.EnvPageSamples {
             double episodeReturn = 0;
             #region TheHardcoreCourse
             // stumps, stairs and pits: the same gait, blind to them
-            using Env<NDArray, NDArray> env =
-                Gymnasium.Make<NDArray, NDArray>("BipedalWalkerHardcore-v3");
-            NDArray observation = env.Reset(seed: 7).Observation;
+            using Env<NDArray, NDArray> env
+                = Gymnasium.Make<NDArray, NDArray>("BipedalWalkerHardcore-v3");
+            (NDArray observation, Info info) = env.Reset(seed: 7);
             var gait = new BipedalWalkerHeuristics();
             while (true) {
                 using NDArray action = gait.StepHeuristic(observation);
-                var (next, reward, terminated, truncated, _) = env.Step(action);
                 observation.Dispose();
-                observation = next;
+                (observation, double reward, bool terminated, bool truncated, info)
+                    = env.Step(action);
                 (steps, episodeReturn) = (steps + 1, episodeReturn + reward);
                 if (terminated || truncated)
                     break;
@@ -147,20 +152,21 @@ namespace Gym.Docs.EnvPageSamples {
         [TestMethod]
         public void ReadTheLidar() {
             #region ReadTheLidar
-            using Env<NDArray, NDArray> env =
-                Gymnasium.Make<NDArray, NDArray>("BipedalWalker-v3");
-            using var start = env.Reset(seed: 42);
+            using Env<NDArray, NDArray> env
+                = Gymnasium.Make<NDArray, NDArray>("BipedalWalker-v3");
+            using ResetResult<NDArray> start = env.Reset(seed: 42);
+            (NDArray observation, Info info) = start;
             // items 14 to 23: ten rays from the hull, from straight down to
             // 77° ahead, each the fraction of its range before it hits ground
             for (int i = 0; i < 10; i++)
-                Console.Write($"{start.Observation.GetSingle(14 + i) * BipedalWalkerEnv.LidarRange:F2} ");
+                Console.Write($"{observation.GetSingle(14 + i) * BipedalWalkerEnv.LidarRange:F2} ");
             // 2.35 2.38 2.46 2.61 2.85 3.21 3.78 4.72 5.33 5.33: flat ground
             // ahead, and nothing within 5.33 units for the last two rays
             #endregion
             // The comment's numbers, formatted as the loop prints them but in the invariant culture, so the check holds on
             // a machine whose decimal separator is a comma.
             var distances = Enumerable.Range(0, 10)
-                .Select(i => string.Create(CultureInfo.InvariantCulture, $"{start.Observation.GetSingle(14 + i) * BipedalWalkerEnv.LidarRange:F2}"))
+                .Select(i => string.Create(CultureInfo.InvariantCulture, $"{observation.GetSingle(14 + i) * BipedalWalkerEnv.LidarRange:F2}"))
                 .ToArray();
             CollectionAssert.AreEqual(new[] { "2.35", "2.38", "2.46", "2.61", "2.85", "3.21", "3.78", "4.72", "5.33", "5.33" }, distances);
         }
@@ -174,12 +180,12 @@ namespace Gym.Docs.EnvPageSamples {
             float hipSpeed = 0;
             double reward = 0;
             #region DriveTheMotors
-            using Env<NDArray, NDArray> env =
-                Gymnasium.Make<NDArray, NDArray>("BipedalWalker-v3");
-            using var start = env.Reset(seed: 42);
+            using Env<NDArray, NDArray> env
+                = Gymnasium.Make<NDArray, NDArray>("BipedalWalker-v3");
+            using ResetResult<NDArray> start = env.Reset(seed: 42);
             // the first hip at full torque, forward; the other motors hold nothing
             using NDArray action = np.array(new[] { 1f, 0f, 0f, 0f });
-            using var step = env.Step(action);
+            using StepResult<NDArray> step = env.Step(action);
             (hipSpeed, reward) = (step.Observation.GetSingle(5), step.Reward);
             // 1.00, -0.1611: item 5, the hip's speed in units of its full 4 rad/s,
             // there in one step; the reward pays 0.028 for the torque
@@ -196,9 +202,9 @@ namespace Gym.Docs.EnvPageSamples {
         [TestMethod]
         public void SaveFrame() {
             #region SaveFrame
-            using Env<NDArray, NDArray> env =
-                Gymnasium.Make<NDArray, NDArray>("BipedalWalker-v3", RenderMode.RgbArray);
-            using var start = env.Reset(seed: 42);
+            using Env<NDArray, NDArray> env
+                = Gymnasium.Make<NDArray, NDArray>("BipedalWalker-v3", RenderMode.RgbArray);
+            using ResetResult<NDArray> start = env.Reset(seed: 42);
             using RenderResult result = env.Render();
             using Image frame = (Image)result;   // 600x400, Gymnasium's pixels
             frame.SaveAsPng("bipedal_walker.png");
@@ -218,12 +224,13 @@ namespace Gym.Docs.EnvPageSamples {
         public void ManyWalkers() {
             #region ManyWalkers
             // No vector env of its own: MakeVec steps 8 envs in turn ("sync")
-            using VectorEnv<NDArray, NDArray> envs =
-                Gymnasium.MakeVec<NDArray, NDArray>("BipedalWalker-v3", numEnvs: 8);
-            using var start = envs.Reset(seed: 42);
+            using VectorEnv<NDArray, NDArray> envs
+                = Gymnasium.MakeVec<NDArray, NDArray>("BipedalWalker-v3", numEnvs: 8);
+            using VectorResetResult<NDArray> start = envs.Reset(seed: 42);
             for (int t = 0; t < 100; t++) {
                 using NDArray actions = envs.ActionSpace.Sample();   // 8 x 4 commands
-                using var step = envs.Step(actions);   // fallen walkers reset themselves
+                using VectorStepResult<NDArray> step
+                    = envs.Step(actions);   // fallen walkers reset themselves
             }
             #endregion
             Assert.AreEqual(8, envs.NumEnvs);

@@ -52,7 +52,7 @@ infos (the action mask among them), text and pixels.
 
 # [C#](#tab/csharp)
 
-[!code-csharp[](../../../tests/Gym.Tests/Docs/EnvPageSamples/TaxiSamples.cs?range=1-4,34-40&dedent=12)]
+[!code-csharp[](../../../tests/Gym.Tests/Docs/EnvPageSamples/TaxiSamples.cs?range=1-4,36-43&dedent=12)]
 
 # [Python (Gymnasium)](#tab/python)
 
@@ -206,7 +206,19 @@ By Gymnasium's name in `Make`'s kwargs, or by the C# name in the constructor and
 | `fickle_probability`<br>`fickleProbability` | `double`<br>`0.3` | The chance, drawn at the reset, that a fickle passenger will change their mind |
 | (Gym.NET)<br>`viewerFactory` | `EnvViewerFactory?`<br>`null` | The window for `human`: Avalonia, WinForms, or headless |
 
+
+# [C#](#tab/csharp)
+
 [!code-csharp[](../../../tests/Gym.Tests/Docs/EnvPageSamples/TaxiSamples.cs#Arguments)]
+
+# [Python (Gymnasium)](#tab/python)
+
+```python
+env = gym.make("Taxi-v4", is_rainy=True, fickle_passenger=True,
+               rainy_probability=0.9)
+```
+
+---
 
 ## Info
 

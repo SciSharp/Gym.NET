@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Gym.Environments.Envs.ToyText;
+using Gym.Observations;
 using Gym.Vector;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
@@ -32,16 +33,20 @@ namespace Gym.Docs.EnvPageSamples {
         [TestMethod]
         public void QuickStart() {
             #region QuickStart
-            using Env<NDArray, NDArray> env =
-                Gymnasium.Make<NDArray, NDArray>("FrozenLake-v1");
+            using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("FrozenLake-v1");
             // the cell, row * 4 + col: 0 is the start
-            NDArray observation = env.Reset(seed: 42).Observation;
+            (NDArray observation, Info info) = env.Reset(seed: 42);
             // 0 left, 1 down, 2 right, 3 up
             using NDArray action = env.ActionSpace.Sample();
-            var (next, reward, terminated, truncated, info) = env.Step(action);
+            observation.Dispose();
+            (observation, double reward, bool terminated, bool truncated, info)
+                = env.Step(action);
             #endregion
-            Assert.AreEqual(0L, observation.GetInt64());
-            Assert.IsTrue(next.GetInt64() is >= 0 and < 16);
+            // The quick start's first observation, read again: the same seeded reset gives the same one.
+            using ResetResult<NDArray> again = env.Reset(seed: 42);
+            NDArray first = again.Observation;
+            Assert.AreEqual(0L, first.GetInt64());
+            Assert.IsTrue(observation.GetInt64() is >= 0 and < 16);
             // One step from the start cannot reach the goal: the reward is 0.
             Assert.AreEqual(0.0, reward);
             Assert.IsFalse(truncated);
@@ -54,15 +59,14 @@ namespace Gym.Docs.EnvPageSamples {
         [TestMethod]
         public void RunAnEpisode() {
             #region RunAnEpisode
-            using Env<NDArray, NDArray> env =
-                Gymnasium.Make<NDArray, NDArray>("FrozenLake-v1");
-            NDArray observation = env.Reset(seed: 42).Observation;
+            using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("FrozenLake-v1");
+            (NDArray observation, Info info) = env.Reset(seed: 42);
             double episodeReturn = 0;
             while (true) {
                 using NDArray action = env.ActionSpace.Sample();
-                var (next, reward, terminated, truncated, _) = env.Step(action);
                 observation.Dispose();
-                observation = next;
+                (observation, double reward, bool terminated, bool truncated, info)
+                    = env.Step(action);
                 episodeReturn += reward;
                 if (terminated || truncated)
                     break;
@@ -81,8 +85,7 @@ namespace Gym.Docs.EnvPageSamples {
             int steps = 0;
             double episodeReturn = 0;
             #region PlanWithTheTable
-            using Env<NDArray, NDArray> env =
-                Gymnasium.Make<NDArray, NDArray>("FrozenLake-v1");
+            using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("FrozenLake-v1");
             var lake = (FrozenLakeEnv)env.Unwrapped;
             int n = lake.P.Count;
             var v = new double[n];
@@ -101,12 +104,12 @@ namespace Gym.Docs.EnvPageSamples {
             long[] plan = Enumerable.Range(0, n).Select(s => (long)Enumerable.Range(0, 4)
                 .Aggregate((b, a) => Q(s, a) > Q(s, b) + 1e-12 ? a : b)).ToArray();
 
-            NDArray observation = env.Reset(seed: 1).Observation;
+            (NDArray observation, Info info) = env.Reset(seed: 1);
             while (true) {
                 using NDArray action = NDArray.Scalar(plan[observation.GetInt64()]);
-                var (next, reward, terminated, truncated, _) = env.Step(action);
                 observation.Dispose();
-                observation = next;
+                (observation, double reward, bool terminated, bool truncated, info)
+                    = env.Step(action);
                 (steps, episodeReturn) = (steps + 1, episodeReturn + reward);
                 if (terminated || truncated)
                     break;
@@ -124,14 +127,13 @@ namespace Gym.Docs.EnvPageSamples {
             long cell = -1;
             double total = 0;
             #region NotSlippery
-            using Env<NDArray, NDArray> env =
-                Gymnasium.Make<NDArray, NDArray>("FrozenLake-v1",
+            using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("FrozenLake-v1",
                     new { is_slippery = false });
             env.Reset(seed: 0);
             // right, right, down, down, down, right: around the holes to the goal
             foreach (long move in new long[] { 2, 2, 1, 1, 1, 2 }) {
                 using NDArray action = NDArray.Scalar(move);
-                using var step = env.Step(action);
+                using StepResult<NDArray> step = env.Step(action);
                 (cell, total) = (step.Observation.GetInt64(), total + step.Reward);
             }
             Console.WriteLine($"cell {cell}, return {total}");   // cell 15, return 1
@@ -146,8 +148,8 @@ namespace Gym.Docs.EnvPageSamples {
             #region ARandomMap
             // an 8x8 lake with a path from S to G, 80% frozen
             IReadOnlyList<string> map = FrozenLakeEnv.GenerateRandomMap(size: 8, seed: 7);
-            using Env<NDArray, NDArray> env =
-                Gymnasium.Make<NDArray, NDArray>("FrozenLake-v1", new { desc = map });
+            using Env<NDArray, NDArray> env
+                = Gymnasium.Make<NDArray, NDArray>("FrozenLake-v1", new { desc = map });
             Console.WriteLine(string.Join("\n", map));   // SHFFFHFH ... HFHFFFFG
             #endregion
             // Gymnasium's generate_random_map(size=8, seed=7) returns this map.
@@ -161,12 +163,11 @@ namespace Gym.Docs.EnvPageSamples {
         public void AsText() {
             string? text = null;
             #region AsText
-            using Env<NDArray, NDArray> env =
-                Gymnasium.Make<NDArray, NDArray>("FrozenLake-v1",
+            using Env<NDArray, NDArray> env = Gymnasium.Make<NDArray, NDArray>("FrozenLake-v1",
                     new { render_mode = "ansi" });
             env.Reset(seed: 0);
             using NDArray down = NDArray.Scalar(1L);
-            using var step = env.Step(down);
+            using StepResult<NDArray> step = env.Step(down);
             using RenderResult result = env.Render();
             text = ((RenderResult.Ansi)result).Text;
             Console.WriteLine(text);   // "  (Down)" over the map, the elf's cell in red
@@ -183,12 +184,13 @@ namespace Gym.Docs.EnvPageSamples {
         public void ManyLakes() {
             #region ManyLakes
             // No vector env of its own: MakeVec steps 8 envs in turn ("sync")
-            using VectorEnv<NDArray, NDArray> envs =
-                Gymnasium.MakeVec<NDArray, NDArray>("FrozenLake-v1", numEnvs: 8);
-            using var start = envs.Reset(seed: 42);
+            using VectorEnv<NDArray, NDArray> envs
+                = Gymnasium.MakeVec<NDArray, NDArray>("FrozenLake-v1", numEnvs: 8);
+            using VectorResetResult<NDArray> start = envs.Reset(seed: 42);
             for (int t = 0; t < 100; t++) {
                 using NDArray actions = envs.ActionSpace.Sample();   // one per lake
-                using var step = envs.Step(actions);   // finished lakes reset themselves
+                using VectorStepResult<NDArray> step
+                    = envs.Step(actions);   // finished lakes reset themselves
             }
             #endregion
             Assert.AreEqual(8, envs.NumEnvs);

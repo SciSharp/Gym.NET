@@ -9,6 +9,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Gym.Environments.Envs.ToyText;
+using Gym.Observations;
 using Gym.Vector;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
@@ -37,20 +38,24 @@ namespace Gym.Docs.EnvPageSamples {
         [TestMethod]
         public void QuickStart() {
             #region QuickStart
-            using Env<object?[], NDArray> env =
-                Gymnasium.Make<object?[], NDArray>("Blackjack-v1");
+            using Env<object?[], NDArray> env
+                = Gymnasium.Make<object?[], NDArray>("Blackjack-v1");
             // (the player's sum, the dealer's face-up card, a usable ace)
-            object?[] observation = env.Reset(seed: 42).Observation;
+            (object?[] observation, Info info) = env.Reset(seed: 42);
             // 0 stick, 1 hit
             using NDArray action = env.ActionSpace.Sample();
-            var (next, reward, terminated, truncated, info) = env.Step(action);
+            (observation, double reward, bool terminated, bool truncated, info)
+                = env.Step(action);
             #endregion
+            // The quick start's first observation, read again: the same seeded reset gives the same one.
+            using ResetResult<object?[]> again = env.Reset(seed: 42);
+            object?[] first = again.Observation;
             // Gymnasium deals seed 42 a hard 15 against the dealer's 2.
-            CollectionAssert.AreEqual(new long[] { 15, 2, 0 }, observation.Select(o => ((NDArray)o!).GetInt64()).ToArray());
+            CollectionAssert.AreEqual(new long[] { 15, 2, 0 }, first.Select(o => ((NDArray)o!).GetInt64()).ToArray());
             Assert.IsTrue(reward is -1.0 or 0.0 or 1.0);
             Assert.IsFalse(truncated);
             Assert.AreEqual(0, info.Count);
-            _ = (next, terminated);
+            _ = (observation, terminated);
         }
 
         /// <summary>Run an episode: random hits and sticks until the hand ends, one hand an episode.</summary>
@@ -58,12 +63,12 @@ namespace Gym.Docs.EnvPageSamples {
         public void RunAnEpisode() {
             double episodeReturn = 0;
             #region RunAnEpisode
-            using Env<object?[], NDArray> env =
-                Gymnasium.Make<object?[], NDArray>("Blackjack-v1");
-            using var start = env.Reset(seed: 42);
+            using Env<object?[], NDArray> env
+                = Gymnasium.Make<object?[], NDArray>("Blackjack-v1");
+            using ResetResult<object?[]> start = env.Reset(seed: 42);
             while (true) {
                 using NDArray action = env.ActionSpace.Sample();
-                using var step = env.Step(action);
+                using StepResult<object?[]> step = env.Step(action);
                 episodeReturn += step.Reward;
                 if (step.Terminated || step.Truncated)
                     break;
@@ -81,22 +86,23 @@ namespace Gym.Docs.EnvPageSamples {
         public void BasicStrategy() {
             double total = 0;
             #region BasicStrategy
-            using Env<object?[], NDArray> env =
-                Gymnasium.Make<object?[], NDArray>("Blackjack-v1");
+            using Env<object?[], NDArray> env
+                = Gymnasium.Make<object?[], NDArray>("Blackjack-v1");
             // hit or stick by the player's sum, the dealer's card and a soft hand
             long Basic(long sum, long dealer, bool soft) => (soft
                 ? sum < 18 || (sum == 18 && (dealer >= 9 || dealer == 1))
                 : sum < 12 || (sum < 17 && (dealer >= 7 || dealer == 1))
                     || (sum == 12 && dealer <= 3)) ? 1 : 0;
             for (int seed = 0; seed < 10_000; seed++) {
-                using var start = env.Reset(seed: seed);
+                using ResetResult<object?[]> start = env.Reset(seed: seed);
+                (object?[] observation, Info info) = start;
                 // the tuple read by name; its arrays go with the result
-                BlackjackObservation hand = start.Observation;
+                BlackjackObservation hand = observation;
                 long dealer = hand.DealerCard.GetInt64();
                 (long sum, bool soft) = (hand.PlayerSum.GetInt64(), hand.UsableAce.GetInt64() == 1);
                 while (true) {
                     using NDArray action = NDArray.Scalar(Basic(sum, dealer, soft));
-                    using var step = env.Step(action);
+                    using StepResult<object?[]> step = env.Step(action);
                     BlackjackObservation next = step.Observation;
                     (sum, soft) = (next.PlayerSum.GetInt64(), next.UsableAce.GetInt64() == 1);
                     total += step.Reward;
@@ -117,9 +123,9 @@ namespace Gym.Docs.EnvPageSamples {
         [TestMethod]
         public void TheHands() {
             #region TheHands
-            using Env<object?[], NDArray> env =
-                Gymnasium.Make<object?[], NDArray>("Blackjack-v1");
-            using var start = env.Reset(seed: 1_574_758);
+            using Env<object?[], NDArray> env
+                = Gymnasium.Make<object?[], NDArray>("Blackjack-v1");
+            using ResetResult<object?[]> start = env.Reset(seed: 1_574_758);
             var table = (BlackjackEnv)env.Unwrapped;
             // aces are 1; the dealer's second card is the face-down one
             Console.WriteLine($"player {string.Join(" ", table.Player!)}");   // 2 2
@@ -138,21 +144,21 @@ namespace Gym.Docs.EnvPageSamples {
             double reward = 0;
             #region CasinoRules
             // Blackjack-v1 plays the book's rules (sab=true): a natural wins 1
-            using Env<object?[], NDArray> env =
-                Gymnasium.Make<object?[], NDArray>("Blackjack-v1",
+            using Env<object?[], NDArray> env
+                = Gymnasium.Make<object?[], NDArray>("Blackjack-v1",
                     new { sab = false, natural = true });
-            using var start = env.Reset(seed: 5);   // an ace and a ten
+            using ResetResult<object?[]> start = env.Reset(seed: 5);   // an ace and a ten
             using NDArray stick = NDArray.Scalar(0L);
-            using var step = env.Step(stick);
+            using StepResult<object?[]> step = env.Step(stick);
             reward = step.Reward;
             Console.WriteLine(reward);   // 1.5
             #endregion
             Assert.AreEqual(1.5, reward);
             // The same hand under the registered rules pays 1.
             using Env<object?[], NDArray> book = Gymnasium.Make<object?[], NDArray>("Blackjack-v1");
-            using var bookStart = book.Reset(seed: 5);
+            using ResetResult<object?[]> bookStart = book.Reset(seed: 5);
             using NDArray bookStick = NDArray.Scalar(0L);
-            using var bookStep = book.Step(bookStick);
+            using StepResult<object?[]> bookStep = book.Step(bookStick);
             Assert.AreEqual(1.0, bookStep.Reward);
         }
 
@@ -168,32 +174,33 @@ namespace Gym.Docs.EnvPageSamples {
         public void MonteCarlo() {
             var returns = new Dictionary<(long, long, long), List<double>>();
             #region MonteCarlo
-            using Env<object?[], NDArray> env =
-                Gymnasium.Make<object?[], NDArray>("Blackjack-v1");
+            using Env<object?[], NDArray> env
+                = Gymnasium.Make<object?[], NDArray>("Blackjack-v1");
             for (int seed = 0; seed < 10_000; seed++) {
-                using var start = env.Reset(seed: seed);
-                BlackjackObservation hand = start.Observation;
-                var state = (hand.PlayerSum.GetInt64(), hand.DealerCard.GetInt64(),
+                using ResetResult<object?[]> start = env.Reset(seed: seed);
+                (object?[] observation, Info info) = start;
+                BlackjackObservation hand = observation;
+                (long, long, long) state = (hand.PlayerSum.GetInt64(), hand.DealerCard.GetInt64(),
                     hand.UsableAce.GetInt64());
                 var seen = new List<(long, long, long)>();
                 while (true) {
                     seen.Add(state);
                     // the book's policy: stick on 20 or 21, else hit
                     using NDArray action = NDArray.Scalar(state.Item1 >= 20 ? 0L : 1L);
-                    using var step = env.Step(action);
+                    using StepResult<object?[]> step = env.Step(action);
                     BlackjackObservation next = step.Observation;
                     state = (next.PlayerSum.GetInt64(), next.DealerCard.GetInt64(),
                         next.UsableAce.GetInt64());
                     if (step.Terminated) {
                         // the only reward comes at the end: every state seen earns it
-                        foreach (var s in seen)
-                            (returns.TryGetValue(s, out var r) ? r : returns[s] = new()).Add(step.Reward);
+                        foreach ((long, long, long) s in seen)
+                            (returns.TryGetValue(s, out List<double>? r) ? r : returns[s] = new()).Add(step.Reward);
                         break;
                     }
                 }
             }
             // 20 against a 10: 0.413 from 610 hands; 13 against a 10: -0.597 from 365
-            foreach (var key in new[] { (20L, 10L, 0L), (13L, 10L, 0L) })
+            foreach ((long, long, long) key in new[] { (20L, 10L, 0L), (13L, 10L, 0L) })
                 Console.WriteLine($"{key}: {returns[key].Average():F3} from {returns[key].Count} hands");
             #endregion
             Assert.AreEqual(0.413, Math.Round(returns[(20, 10, 0)].Average(), 3));
@@ -210,19 +217,21 @@ namespace Gym.Docs.EnvPageSamples {
         public void ManyTables() {
             #region ManyTables
             // No vector env of its own: MakeVec steps 8 envs in turn ("sync")
-            using VectorEnv<object?[], NDArray> envs =
-                Gymnasium.MakeVec<object?[], NDArray>("Blackjack-v1", numEnvs: 8);
-            using var start = envs.Reset(seed: 42);
+            using VectorEnv<object?[], NDArray> envs
+                = Gymnasium.MakeVec<object?[], NDArray>("Blackjack-v1", numEnvs: 8);
+            using VectorResetResult<object?[]> start = envs.Reset(seed: 42);
+            (object?[] observations, Info infos) = start;
             for (int t = 0; t < 100; t++) {
                 using NDArray actions = envs.ActionSpace.Sample();   // one per table
-                using var step = envs.Step(actions);   // finished hands deal again
+                using VectorStepResult<object?[]> step
+                    = envs.Step(actions);   // finished hands deal again
             }
             #endregion
             Assert.AreEqual(8, envs.NumEnvs);
             Assert.IsInstanceOfType(envs, typeof(SyncVectorEnv<object?[], NDArray>));
             // The batched tuple: three arrays of eight values each.
-            Assert.AreEqual(3, start.Observations.Length);
-            Assert.AreEqual(8, ((NDArray)start.Observations[0]!).size);
+            Assert.AreEqual(3, observations.Length);
+            Assert.AreEqual(8, ((NDArray)observations[0]!).size);
         }
 
         /// <summary>
