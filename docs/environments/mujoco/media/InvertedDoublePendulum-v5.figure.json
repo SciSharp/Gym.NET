@@ -1,0 +1,108 @@
+{
+  "id": "InvertedDoublePendulum-v5",
+  "width": 760,
+  "height": 480,
+  "camera": {
+    "distance": 2.6,
+    "azimuth": 90,
+    "elevation": -5,
+    "lookat": [
+      0,
+      0,
+      0.55
+    ],
+    "fovy": 45
+  },
+  "observation": [
+    0,
+    0,
+    0,
+    1,
+    1,
+    0,
+    0,
+    0,
+    0
+  ],
+  "torso": [
+    380,
+    359.89
+  ],
+  "joints": [
+    {
+      "name": "slider",
+      "body": "cart",
+      "offset": [
+        0,
+        0,
+        0
+      ],
+      "observation": 0,
+      "action": 0,
+      "pixel": [
+        380,
+        359.89
+      ]
+    },
+    {
+      "name": "hinge2",
+      "body": "pole2",
+      "offset": [
+        0,
+        0,
+        0
+      ],
+      "observation": 2,
+      "action": -1,
+      "pixel": [
+        380,
+        228.88
+      ]
+    },
+    {
+      "name": "tip",
+      "body": "pole2",
+      "offset": [
+        0,
+        0,
+        0.6
+      ],
+      "observation": -1,
+      "action": -1,
+      "pixel": [
+        380,
+        92.48
+      ]
+    },
+    {
+      "name": "rail_left",
+      "body": "cart",
+      "offset": [
+        -1,
+        0,
+        0
+      ],
+      "observation": 0,
+      "action": -1,
+      "pixel": [
+        161.18,
+        359.89
+      ]
+    },
+    {
+      "name": "rail_right",
+      "body": "cart",
+      "offset": [
+        1,
+        0,
+        0
+      ],
+      "observation": 0,
+      "action": -1,
+      "pixel": [
+        598.82,
+        359.89
+      ]
+    }
+  ]
+}

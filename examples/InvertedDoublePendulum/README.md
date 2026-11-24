@@ -8,6 +8,7 @@ dotnet run --project examples/InvertedDoublePendulum -c Release                 
 dotnet run --project examples/InvertedDoublePendulum -c Release -- --render       # the same episode in a window
 dotnet run --project examples/InvertedDoublePendulum -c Release -- --play         # you play it, from the keyboard
 dotnet run --project examples/InvertedDoublePendulum -c Release -- --episodes 5   # seeds 0-4, and their mean
+dotnet run --project examples/InvertedDoublePendulum -c Release -- --record docs/environments/mujoco/media   # the docs page's media
 ```
 
 Output, the same on every run since the reset is seeded and the agent has no randomness of its own (measured on an x64
@@ -49,6 +50,23 @@ episode ends; Escape or the window's close button quits.
 | A | Push the cart left (-1) |
 | D | Push it right (+1) |
 | Nothing held | No force |
+
+## Recording the docs page's media
+
+`--record <folder>` plays the seed-0 episode once more (whatever `--seed` says) and writes the media of
+InvertedDoublePendulum's page on the docs site (DR-112) into the folder, `docs/environments/mujoco/media` for the site:
+
+| File | What it is |
+|---|---|
+| `InvertedDoublePendulum-v5.episode.mp4` | The whole episode, one 480×480 frame per step at the env's 20 frames a second (1,001 frames: the reset and 1,000 steps), through the showreel's free camera, 2.6 m from a point 0.55 m above the rail (Gymnasium's v5 sets no camera here), H.264 through Gymnasium's `RecordVideo` and `FfmpegVideoWriter` |
+| `InvertedDoublePendulum-v5.episode.json` | Every step: the state acted on (the cart's position and both hinges' angles, and their speeds), the expert's float32 push (`action_dtype` float32, written as the float64 that holds it exactly), the reward and its three terms from the info; the state after the last step as `final` |
+| `InvertedDoublePendulum-v5.figure.png`, `.figure.json` | How it works' frame: 760×480 of the reset pose without noise, from the same free camera, and the camera with the cart, the second hinge, the tip and the rail's ends projected to the frame's pixels through MuJoCo's camera geometry |
+
+```
+InvertedDoublePendulum-v5, seed 0: 1000 steps, return 9355.8, recorded into docs/environments/mujoco/media
+```
+
+ffmpeg must be on PATH to record; every other mode runs without it.
 
 ## The API it shows
 
