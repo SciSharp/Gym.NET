@@ -46,6 +46,8 @@
     href: mujoco/humanoid.md
   - name: Humanoid Standup
     href: mujoco/humanoid_standup.md
+  - name: Pusher
+    href: mujoco/pusher.md
   - name: Swimmer
     href: mujoco/swimmer.md
   - name: Walker2d

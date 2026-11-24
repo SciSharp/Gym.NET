@@ -1,0 +1,152 @@
+{
+  "id": "Pusher-v5",
+  "width": 760,
+  "height": 480,
+  "camera": {
+    "distance": 1.9,
+    "azimuth": 135,
+    "elevation": -38,
+    "lookat": [
+      0.42,
+      -0.33,
+      -0.12
+    ],
+    "fovy": 45
+  },
+  "observation": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0.00276,
+    -0.00275,
+    -0.002,
+    0.00374,
+    -0.00495,
+    0.00321,
+    0.00297,
+    0.821,
+    -0.6,
+    0,
+    0.60889,
+    -0.16247,
+    -0.275,
+    0.45,
+    -0.05,
+    -0.323
+  ],
+  "torso": [
+    231.97,
+    191.5
+  ],
+  "joints": [
+    {
+      "name": "r_shoulder_pan_joint",
+      "body": "r_shoulder_pan_link",
+      "offset": [
+        0,
+        0,
+        0
+      ],
+      "observation": 0,
+      "action": 0,
+      "pixel": [
+        231.97,
+        191.5
+      ]
+    },
+    {
+      "name": "r_shoulder_lift_joint",
+      "body": "r_shoulder_lift_link",
+      "offset": [
+        0,
+        0,
+        0
+      ],
+      "observation": 1,
+      "action": 1,
+      "pixel": [
+        249.62,
+        203.64
+      ]
+    },
+    {
+      "name": "r_elbow_flex_joint",
+      "body": "r_elbow_flex_link",
+      "offset": [
+        0,
+        0,
+        0
+      ],
+      "observation": 3,
+      "action": 3,
+      "pixel": [
+        332.28,
+        260.53
+      ]
+    },
+    {
+      "name": "r_wrist_flex_joint",
+      "body": "r_wrist_flex_link",
+      "offset": [
+        0,
+        0,
+        0
+      ],
+      "observation": 5,
+      "action": 5,
+      "pixel": [
+        416.96,
+        318.82
+      ]
+    },
+    {
+      "name": "tips_arm",
+      "body": "tips_arm",
+      "offset": [
+        0,
+        0,
+        0
+      ],
+      "observation": 14,
+      "action": -1,
+      "pixel": [
+        416.96,
+        318.82
+      ]
+    },
+    {
+      "name": "object",
+      "body": "object",
+      "offset": [
+        0,
+        0,
+        0
+      ],
+      "observation": 17,
+      "action": -1,
+      "pixel": [
+        453.62,
+        278.39
+      ]
+    },
+    {
+      "name": "goal",
+      "body": "goal",
+      "offset": [
+        0,
+        0,
+        0
+      ],
+      "observation": 20,
+      "action": -1,
+      "pixel": [
+        438.68,
+        253.69
+      ]
+    }
+  ]
+}

@@ -7,6 +7,7 @@ and pushes it into the goal.
 dotnet run --project examples/Pusher -c Release                   # one episode, headless
 dotnet run --project examples/Pusher -c Release -- --render       # the same episode in a window
 dotnet run --project examples/Pusher -c Release -- --episodes 5   # seeds 7-11, and their mean
+dotnet run --project examples/Pusher -c Release -- --record docs/environments/mujoco/media   # the docs page's media
 ```
 
 Output, the same on every run since the reset is seeded and the agent has no randomness of its own (measured on an x64
@@ -38,6 +39,24 @@ mouse orbits, pans and zooms, Space pauses and H lists the rest. Gym.NET draws M
 default: when the window falls behind real time, D turns "render every frame" off and it skips frames instead.
 
 `--play` is not offered: its 7 motors would need 14 keys held in combinations, too many to play.
+
+## Recording the docs page's media
+
+`--record <folder>` plays the seed-7 episode once more (whatever `--seed` says) and writes the media of Pusher's page on
+the docs site (DR-112) into the folder, `docs/environments/mujoco/media` for the site:
+
+| File | What it is |
+|---|---|
+| `Pusher-v5.episode.mp4` | The whole episode, one 480×480 frame per step at the env's 20 frames a second (101 frames: the reset and 100 steps), through the showreel's free camera, 2.4 m off at azimuth 135° (the model has no camera of its own), H.264 through Gymnasium's `RecordVideo` and `FfmpegVideoWriter` |
+| `Pusher-v5.episode.json` | Every step: the state acted on (the puck's two slides, the shoulder's pan and lift, the elbow's and the wrist's flex), the expert's seven float32 commands (`action_dtype` float32, each written as the float64 that holds it exactly), the reward and its three terms from the info; the state after the last step as `final` |
+| `Pusher-v5.figure.png`, `.figure.json` | How it works' frame: 760×480 of the episode's own reset (Pusher takes no `reset_noise_scale`), from MuJoCo's free camera 1.9 m off, and the camera with the arm's joints, the fingertip, the puck and the goal projected to the frame's pixels through MuJoCo's camera geometry |
+
+```
+Pusher-v5, seed 7: 100 steps, return -20.4, recorded into docs/environments/mujoco/media
+```
+
+Gym.NET draws MuJoCo's frames in software, so the recording takes a little while. ffmpeg must be on PATH to record;
+every other mode runs without it.
 
 ## The API it shows
 
